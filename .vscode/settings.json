@@ -1,0 +1,7 @@
+{
+  "files.exclude": {
+    "client/": true,
+    "server/": true,
+    "pyosh-blog.code-workspace": true
+  }
+}

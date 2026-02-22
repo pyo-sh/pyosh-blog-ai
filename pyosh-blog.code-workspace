@@ -1,0 +1,15 @@
+{
+  "folders": [
+    { "name": "client", "path": "./client" },
+    { "name": "server", "path": "./server" },
+    { "name": "whole", "path": "./." },
+  ],
+  "settings": {
+    "files.exclude": { "**/node_modules": true },
+    "eslint.workingDirectories": [
+      { "directory": "./client", "changeProcessCWD": true },
+      { "directory": "./server", "changeProcessCWD": true },
+    ],
+    "eslint.useFlatConfig": true,
+  },
+}
