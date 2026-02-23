@@ -2,4 +2,7 @@
 /server
 /client
 
+## Claude Code worktrees
+.claude/worktrees/
+
 ## workspace
