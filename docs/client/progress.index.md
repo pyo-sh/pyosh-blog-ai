@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-02-23 | #4 API 클라이언트 설정 (fetch wrapper + TanStack Query) | ✅   |
 | 2026-02-06 | 기술 스택 분석 & Phase 0 (보안 패치) | ✅   |
 | 2026-02-07 | ESLint 9 & Phase A (TailwindCSS v4)  | ✅   |
 | 2026-02-08 | Phase D, E (Component 경계 & 테마)   | ✅   |
@@ -13,6 +14,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-02-23.md](./progress/progress.2026-02-23.md) - #4 API 클라이언트 설정
 - [progress.2026-02-06.md](./progress/progress.2026-02-06.md) - 기술 스택 분석 & Phase 0
 - [progress.2026-02-07.md](./progress/progress.2026-02-07.md) - ESLint 9 & Phase A
 - [progress.2026-02-08.md](./progress/progress.2026-02-08.md) - Phase D & E
