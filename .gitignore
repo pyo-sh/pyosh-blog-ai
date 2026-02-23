@@ -5,7 +5,7 @@
 ## Skills are managed by User
 skills-lock.json
 
-## Claude Code worktrees
+## AI agent worktrees
 .claude/worktrees/
 
 ## workspace
