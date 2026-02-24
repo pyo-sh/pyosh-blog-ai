@@ -1,11 +1,11 @@
 ---
 name: dev-workflow
-description: GitHub Issue 기반 개발 워크플로. Issue → Worktree → Code → Push → PR → Review → Merge 순서로 작업을 수행. 코딩 작업 시작 시 자동 활성화.
+description: GitHub Issue 기반 개발 워크플로. Issue → Worktree → Code → Push → PR 생성까지 수행. 코딩 작업 시작 시 자동 활성화. 리뷰는 별도 세션에서 /dev-review로 진행.
 ---
 
 # Dev-Workflow for pyosh-blog
 
-모든 코딩 작업은 **GitHub Issue에서 시작**하여 **PR Merge로 종료**. 전역 규칙(브랜치명, 커밋 형식, 멀티 에이전트 등)은 `CLAUDE.md` 참조.
+모든 코딩 작업은 **GitHub Issue에서 시작**하여 **PR 생성으로 종료**. 리뷰·머지는 별도 스킬로 분리. 전역 규칙(브랜치명, 커밋 형식, 멀티 에이전트 등)은 `CLAUDE.md` 참조.
 
 ## Git Remote 규칙 (필수)
 
@@ -76,19 +76,34 @@ Push 전에 **반드시** `/dev-log`로 progress 기록:
 해당 영역의 worktree 내에서 실행:
 ```bash
 git push -u origin {type}/issue-{N}-{설명}
-gh pr create --title "{type}: description (#{N})" --body "Closes #{N}\n\n## 변경 사항\n..."
+```
+PR 생성은 **반드시 `--body-file` 사용** (셸 이스케이프 버그 방지):
+```bash
+# 1. 임시 파일에 PR 본문 작성
+cat > /tmp/pr-{N}-body.md <<'PREOF'
+## Summary
+Closes #{N}
+
+- 변경 사항 1
+
+## Test plan
+- [ ] 테스트 항목
+PREOF
+
+# 2. --body-file로 PR 생성
+gh pr create \
+  --title "{type}: description (#{N})" \
+  --body-file /tmp/pr-{N}-body.md
 ```
 PR 템플릿: [pr-template.md](assets/pr-template.md)
 
-### 4. AI 리뷰
-- 코드 품질, 보안, 성능 체크
-- 리뷰 코멘트를 PR에 작성
+### 4. 리뷰 요청 안내
+- PR 생성 후 사용자에게 **새 세션에서 `/dev-review` 실행**을 안내
+- 이 세션에서는 리뷰를 수행하지 않음 (컨텍스트 오염 방지)
 
-### 5. 사용자 승인 & Merge
-- 사용자 최종 승인 필수 (AI 자동 merge 금지)
-- Squash merge 권장
+> **후속 흐름**: `/dev-review` (별도 세션) → 수정 필요 시 `/dev-review-answer` → 재리뷰 → 사용자 승인 & Merge
 
-### 6. 정리
+### 5. 정리
 해당 영역 디렉토리에서 실행:
 ```bash
 cd server  # 또는 cd client
@@ -99,8 +114,15 @@ git branch -d {type}/issue-{N}-{설명}
 ## Issue 생명주기
 
 ```
-Open → In Progress (assigned) → PR Created → Review → Merged → Closed
+Open → In Progress (assigned) → PR Created → Review (dev-review) → Fix (dev-review-answer) → Merged → Closed
 ```
+
+## 관련 스킬
+
+| 스킬 | 용도 | 실행 세션 |
+|------|------|-----------|
+| **dev-review** | PR 코드 리뷰 | 코드 작성과 **다른 세션** |
+| **dev-review-answer** | 리뷰 코멘트 수정 대응 | 코드 작성 세션 또는 별도 세션 |
 
 ## 참조
 

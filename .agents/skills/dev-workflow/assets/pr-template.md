@@ -42,10 +42,11 @@ fix: resolve login redirect loop (#55)
 
 ## gh pr create 사용법
 
+**반드시 `--body-file` 사용** — `--body "..."` 인라인은 마크다운 백틱(`` ` ``)이 셸 이스케이프와 충돌하여 금지.
+
 ```bash
-gh pr create \
-  --title "feat: add post card component (#42)" \
-  --body "$(cat <<'EOF'
+# 1. 임시 파일에 PR 본문 작성
+cat > /tmp/pr-42-body.md <<'PREOF'
 ## Summary
 Closes #42
 
@@ -56,6 +57,15 @@ Closes #42
 ## Test plan
 - [ ] 데스크톱/모바일 렌더링 확인
 - [ ] 다크모드 확인
-EOF
-)"
+PREOF
+
+# 2. --body-file로 PR 생성
+gh pr create \
+  --title "feat: add post card component (#42)" \
+  --body-file /tmp/pr-42-body.md
 ```
+
+## AI 리뷰
+
+PR 생성 후 리뷰는 **별도 세션에서 `/dev-review` 스킬**로 수행.
+리뷰 코멘트 형식은 `dev-review` 스킬 참조.
