@@ -13,7 +13,7 @@ Agent B: [worktree 생성] [문서 작성] [commit] ......[LOCK] [rebase+merge] 
 ## 상수
 
 ```bash
-ROOT_REPO="/Users/pyosh/Workspace/pyosh-blog"
+ROOT_REPO="$(git rev-parse --show-toplevel)"
 LOCK_FILE="$ROOT_REPO/.claude/dev-log.lock"
 LOCK_TIMEOUT=60   # 초
 LOCK_INTERVAL=5   # 초

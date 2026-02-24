@@ -1,6 +1,6 @@
 ---
 name: dev-log
-description: pyosh-blog 모노레포에서 progress/, findings/, decisions/ 폴더를 중심으로 진행 상황·기술 조사·아키텍처 결정을 기록하는 문서 관리 스킬. 기록 전용 — 작업 관리는 GitHub Issues에서 수행. 병렬 에이전트 안전: worktree 격리 + lock 기반 merge.
+description: pyosh-blog 모노레포에서 progress/, findings/, decisions/ 기록을 관리하는 스킬. Use when (1) 작업 완료 후 progress 기록이 필요할 때, (2) 기술 조사 결과를 findings로 남길 때, (3) 아키텍처/기술 결정을 decision으로 작성할 때, (4) 사용자가 "/dev-log", "기록해줘", "progress 작성해줘" 등을 요청할 때. 병렬 에이전트 안전(worktree 격리 + lock merge).
 ---
 
 # Dev-Log for pyosh-blog
@@ -39,17 +39,8 @@ docs/{client|server}/
 
 ### Phase 1: Worktree 생성
 
-```bash
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-WORKTREE_PATH=".claude/worktrees/dev-log-${TIMESTAMP}"
-BRANCH_NAME="dev-log/${TIMESTAMP}"
-ROOT_REPO="/Users/pyosh/Workspace/pyosh-blog"
-
-cd "$ROOT_REPO"
-git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME" main
-```
-
-이후 모든 파일 작업은 `$WORKTREE_PATH` 내에서 수행.
+timestamp 기반 worktree + 브랜치 생성. 이후 모든 파일 작업은 worktree 내에서 수행.
+→ 명령어: [worktree-merge.md § Phase 1](references/worktree-merge.md)
 
 ### Phase 2: 기록 전 컨텍스트 확인
 - worktree 내 해당 영역의 `progress.index.md` + `findings.index.md` + `decisions.index.md` 읽기
@@ -59,50 +50,24 @@ git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME" main
 - **기술 조사 시**: `findings/findings.NNN-topic.md` 생성 + `findings.index.md` 갱신
 - **아키텍처 결정 시**: `decisions/decision-NNN-topic.md` 작성 (draft) + `decisions.index.md` 갱신
 - **작업 완료 시**: `progress/progress.YYYY-MM-DD.md` 생성/업데이트 + `progress.index.md` 갱신
-- 폴더/파일 없으면 즉시 생성 ([templates.md](assets/templates.md) 참고)
+- 폴더/파일 없으면 즉시 생성 ([templates.md](references/templates.md) 참고)
 - 관련 GitHub Issue 번호 포함 (예: `#123`)
 
 ### Phase 4: Commit (worktree 내)
 
-```bash
-cd "$WORKTREE_PATH"
-git add docs/
-git commit -m "docs: {type} - {summary}"
-```
+`git add docs/` → `git commit -m "docs: {type} - {summary}"`
+→ 명령어: [worktree-merge.md § Phase 4](references/worktree-merge.md)
 
 ### Phase 5: Lock → Merge → Unlock
 
-**Lock 획득 → rebase → fast-forward merge → lock 해제** 순서.
-다른 에이전트가 lock 보유 시 대기 (최대 60초, 5초 간격 재시도).
-
-```bash
-cd "$ROOT_REPO"
-# 1. Lock 획득
-LOCK_FILE=".claude/dev-log.lock"
-while ! mkdir "$LOCK_FILE" 2>/dev/null; do sleep 5; done
-
-# 2. Rebase onto latest main
-cd "$WORKTREE_PATH"
-git rebase main
-
-# 3. Fast-forward merge
-cd "$ROOT_REPO"
-git merge "$BRANCH_NAME" --ff-only
-
-# 4. Lock 해제
-rmdir "$LOCK_FILE"
-```
-
-충돌/실패 시 lock 해제 후 worktree 유지. 상세: [worktree-merge.md](references/worktree-merge.md)
+Lock 획득 → rebase → fast-forward merge → lock 해제. 다른 에이전트 lock 보유 시 최대 60초 대기.
+충돌/실패 시 반드시 lock 해제 후 worktree 유지.
+→ 명령어: [worktree-merge.md § Phase 5](references/worktree-merge.md)
 
 ### Phase 6: 정리
 
-- **성공 시**: worktree + 브랜치 삭제
-  ```bash
-  git worktree remove "$WORKTREE_PATH"
-  git branch -d "$BRANCH_NAME"
-  ```
-- **실패 시**: worktree 유지 (수동 재시도 가능), 에러 메시지 출력
+성공 시 worktree + 브랜치 삭제. 실패 시 worktree 유지 (수동 재시도 가능).
+→ 명령어: [worktree-merge.md § Phase 6](references/worktree-merge.md)
 
 ### 인덱스 갱신 규칙
 - NNN 순번: 해당 디렉토리 스캔 → 최대 순번 + 1
@@ -111,7 +76,7 @@ rmdir "$LOCK_FILE"
 
 ## 참조
 
-- [파일 템플릿](assets/templates.md) — findings, progress, decision 파일 포맷
+- [파일 템플릿](references/templates.md) — findings, progress, decision 파일 포맷
 - [인덱싱 전략](references/indexing-strategy.md) — 인덱스 갱신 규칙, 순번 충돌 방지
 - [Worktree Merge 전략](references/worktree-merge.md) — git 명령어 상세, lock 메커니즘, 에러 처리
 - [작업 예시](references/examples.md) — 시나리오별 워크플로 (병렬 시나리오 포함)
