@@ -1,12 +1,14 @@
-## Already Git Repositories
+## Already in Git Repositories
 /server
 /client
+
 
 ## Skills are managed by User
 skills-lock.json
 
 ## AI agent worktrees
 .claude/worktrees/
+.pnpm-store
 
 ## Dev-log lock file
 .claude/dev-log.lock
