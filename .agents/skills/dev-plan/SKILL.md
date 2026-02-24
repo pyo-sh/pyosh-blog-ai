@@ -1,11 +1,11 @@
 ---
 name: dev-plan
-description: Convert decision files in decisions/ directory to GitHub Issues. Establish tasks from decision files, register Issues, and clean up files. Used as a pre-step before /dev-workflow. Activates on "/dev-plan", "create issues", "convert decisions to issues", etc.
+description: Convert decision files in decisions/ directory to GitHub Issues. Establish tasks from decision files, register Issues, and clean up files. Used as a pre-step before /dev-build. Activates on "/dev-plan", "create issues", "convert decisions to issues", etc.
 ---
 
 # Dev-Plan
 
-Convert decision files in `decisions/` to GitHub Issues and clean up. Pre-step for `/dev-workflow`.
+Convert decision files in `decisions/` to GitHub Issues and clean up. Pre-step for `/dev-build`.
 
 ## Git Remote
 

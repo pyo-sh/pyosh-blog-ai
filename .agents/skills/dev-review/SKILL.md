@@ -68,7 +68,7 @@ gh pr review {PR#} \
 ### 5. Report to User
 
 - Summarize Critical/Warning/Suggestion counts
-- If Critical exists → advise fixing via `/dev-review-answer`
+- If Critical exists → advise fixing via `/dev-resolve`
 - If no Critical → advise user can approve and merge
 
 ## Review Principles

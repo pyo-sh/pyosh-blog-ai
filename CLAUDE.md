@@ -34,7 +34,7 @@ pyosh-blog/
 │       ├── findings/
 │       └── decisions/
 ├── skills/                      # 스킬 소스
-│   ├── dev-workflow/            # 개발 워크플로
+│   ├── dev-build/            # 개발 워크플로
 │   ├── dev-log/                 # 기록 관리
 │   └── subagent-creator/        # 서브에이전트 생성
 ├── client/
@@ -107,7 +107,7 @@ Issue 확인 → worktree 생성 → 코딩 → push → PR 생성 → AI 리뷰
 코딩 작업을 요청받으면 **반드시 아래 순서를 따르라:**
 
 1. **Issue 확인** — `gh issue list`로 해당 작업의 Issue가 있는지 확인. 없으면 사용자 승인 후 생성.
-2. **`/dev-workflow` 스킬 실행** — Issue 번호가 확보되면 dev-workflow에 따라 worktree 생성 → 코딩 → PR 생성.
+2. **`/dev-build` 스킬 실행** — Issue 번호가 확보되면 dev-build에 따라 worktree 생성 → 코딩 → PR 생성.
 3. **`/dev-log` 스킬 실행** — 코딩 중 기술 조사/결정 발생 시, 코딩 완료 후 PR 생성 전에 반드시 dev-log로 `docs/{area}/`에 기록.
 
 **금지**: Issue 확인 없이 바로 코딩 시작하는 것.
@@ -118,7 +118,7 @@ Issue 확인 → worktree 생성 → 코딩 → push → PR 생성 → AI 리뷰
 
 | 스킬 | 용도 |
 |------|------|
-| **dev-workflow** | Issue → Worktree → Code → PR → Merge 전체 워크플로 |
+| **dev-build** | Issue → Worktree → Code → PR → Merge 전체 워크플로 |
 | **dev-log** | progress / findings / decisions 기록 관리 |
 | **subagent-creator** | 서브 에이전트 생성 |
 

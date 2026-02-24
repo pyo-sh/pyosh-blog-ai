@@ -1,9 +1,9 @@
 ---
-name: dev-workflow
+name: dev-build
 description: GitHub Issue-based development workflow. Issue → Worktree → Code → Push → PR creation. Auto-activates when starting coding tasks. Reviews run in a separate session via /dev-review.
 ---
 
-# Dev-Workflow
+# Dev-Build
 
 Issue → Worktree → Code → Push → PR. Review and merge handled by separate skills. Global rules (branch naming, commit format, multi-agent) in `CLAUDE.md`.
 
@@ -45,7 +45,7 @@ PR **must use `--body-file`** (avoids shell escape bugs with markdown). → Temp
 ### 5. Request Review
 After PR creation, instruct user to **run `/dev-review` in a new session**. Do not review in this session.
 
-> Follow-up: `/dev-review` → fix via `/dev-review-answer` → re-review → user approval & merge
+> Follow-up: `/dev-review` → fix via `/dev-resolve` → re-review → user approval & merge
 
 ### 6. Cleanup
 ```bash

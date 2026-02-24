@@ -1,9 +1,9 @@
 ---
-name: dev-review-answer
-description: Respond to PR review comments. Read review comments left by /dev-review, fix code, and request re-review. Activates on "fix review comments", "address review", "/dev-review-answer", etc.
+name: dev-resolve
+description: Respond to PR review comments. Read review comments left by /dev-review, fix code, and request re-review. Activates on "fix review comments", "address review", "/dev-resolve", etc.
 ---
 
-# Dev-Review-Answer
+# Dev-Resolve
 
 Fix PR review comments → record → push → request re-review. Global rules in `CLAUDE.md`.
 

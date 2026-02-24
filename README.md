@@ -62,7 +62,7 @@ pyosh-blog/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  세션 A: /dev-workflow                                      │
+│  세션 A: /dev-build                                      │
 │  Issue 확인 → Worktree 생성 → 코딩 → /dev-log → PR 생성    │
 └──────────────────────────┬──────────────────────────────────┘
                            │ PR 생성 완료
@@ -74,7 +74,7 @@ pyosh-blog/
                            │ Critical/Warning 발견 시
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  세션 C: /dev-review-answer                                 │
+│  세션 C: /dev-resolve                                 │
 │  리뷰 코멘트 확인 → 코드 수정 → Push → 재리뷰 요청          │
 └──────────────────────────┬──────────────────────────────────┘
                            │ 재리뷰 필요 시 세션 B 반복
@@ -86,10 +86,10 @@ pyosh-blog/
 
 | 스킬 | 용도 | 실행 세션 |
 |------|------|-----------|
-| **dev-workflow** | Issue → Worktree → 코딩 → Push → PR 생성 | 세션 A |
+| **dev-build** | Issue → Worktree → 코딩 → Push → PR 생성 | 세션 A |
 | **dev-review** | PR 코드 리뷰 (심각도 3단계: Critical / Warning / Suggestion) | 세션 B (코드 작성과 **다른 세션**) |
-| **dev-review-answer** | 리뷰 코멘트 대응 및 코드 수정 | 세션 C (별도 세션) |
-| **dev-log** | progress / findings / decisions 기록 관리 | dev-workflow 내에서 사용 |
+| **dev-resolve** | 리뷰 코멘트 대응 및 코드 수정 | 세션 C (별도 세션) |
+| **dev-log** | progress / findings / decisions 기록 관리 | dev-build 내에서 사용 |
 | **dev-plan** | decisions 파일을 GitHub Issue로 변환 | 독립 실행 |
 
 ### 왜 세션을 분리하는가?
