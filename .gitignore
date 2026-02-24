@@ -8,4 +8,7 @@ skills-lock.json
 ## AI agent worktrees
 .claude/worktrees/
 
+## Dev-log lock file
+.claude/dev-log.lock
+
 ## workspace
