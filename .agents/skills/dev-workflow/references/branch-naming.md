@@ -1,24 +1,24 @@
-# 브랜치 & 커밋 규칙
+# Branch & Commit Rules
 
-## 브랜치
+## Branch
 ```
-{type}/issue-{N}-{설명}
+{type}/issue-{N}-{description}
 ```
-- 설명: kebab-case, 영어, 3단어 이내, 소문자
+- Description: kebab-case, English, max 3 words, lowercase
 
-## 커밋
+## Commit
 ```
 {type}: {description} (#{N})
 ```
 
 ## Type
 
-| Type | 용도 |
-|------|------|
-| `feat` | 새 기능 추가 |
-| `fix` | 버그 수정 |
-| `docs` | 문서 변경 |
-| `style` | 코드 포맷팅 (기능 변경 없음) |
-| `refactor` | 리팩토링 (기능 변경 없음) |
-| `test` | 테스트 추가/수정 |
-| `chore` | 빌드, 설정 변경 |
+| Type | Purpose |
+|------|---------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation change |
+| `style` | Code formatting (no logic change) |
+| `refactor` | Refactoring (no behavior change) |
+| `test` | Add/modify tests |
+| `chore` | Build, config changes |

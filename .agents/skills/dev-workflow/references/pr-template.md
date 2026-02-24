@@ -1,47 +1,47 @@
-# PR 템플릿
+# PR Template
 
-## 본문
+## Body
 
 ```markdown
 ## Summary
 Closes #{N}
 
-- 변경 사항 1
-- 변경 사항 2
+- Change 1
+- Change 2
 
 ## Changes
-- **파일1**: 변경 내용
-- **파일2**: 변경 내용
+- **file1**: Description
+- **file2**: Description
 
 ## Test plan
-- [ ] 테스트 항목 1
-- [ ] 테스트 항목 2
+- [ ] Test item 1
+- [ ] Test item 2
 
 ## Screenshots
-(UI 변경 시 첨부)
+(Attach if UI changes)
 ```
 
-## 필수
-1. `Closes #{N}` — Issue 자동 종료
+## Required
+1. `Closes #{N}` — Auto-closes the Issue
 2. **Summary** — 1-3 bullet points
-3. **Test plan** — 검증 방법
+3. **Test plan** — Verification method
 
-## PR 제목
+## PR Title
 ```
 {type}: {description} (#{N})
 ```
 
 ## gh pr create
 
-**`--body-file` 필수** — `--body` 인라인은 마크다운 백틱이 셸 이스케이프와 충돌.
+**`--body-file` required** — inline `--body` causes shell escape conflicts with markdown backticks.
 
 ```bash
 cat > /tmp/pr-{N}-body.md <<'PREOF'
 ## Summary
 Closes #{N}
-- 변경 사항
+- Change description
 ## Test plan
-- [ ] 테스트 항목
+- [ ] Test item
 PREOF
 
 gh pr create \

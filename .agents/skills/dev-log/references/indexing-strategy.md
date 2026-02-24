@@ -1,30 +1,30 @@
-# 인덱싱 전략
+# Indexing Strategy
 
-## 인덱스 갱신 규칙
+## Index Update Rules
 
-### findings 추가 시
-1. 기존 findings 파일 스캔 → 최대 순번 확인
-2. `findings/findings.NNN-topic.md` 생성 (최대값 + 1)
-3. `findings.index.md`에 항목 추가:
-   - 번호 (NNN), 파일 경로, 날짜, 한줄 요약 (30자 이내), 키워드 (3-5개)
+### Adding Findings
+1. Scan existing findings files → find max sequence number
+2. Create `findings/findings.NNN-topic.md` (max + 1)
+3. Add entry to `findings.index.md`:
+   - Number (NNN), file path, date, one-line summary (max 30 chars), keywords (3-5)
 
-### progress 추가 시
-1. 오늘 날짜의 progress 파일 존재 확인
-2. **있으면** 기존 파일에 추가, **없으면** 새 파일 생성
-3. `progress.index.md` **최상단**에 항목 추가:
-   - 날짜, 파일 경로, 한줄 요약 (30자 이내), 태그 (3-5개)
+### Adding Progress
+1. Check if today's progress file already exists
+2. **If exists** → append to existing file; **if not** → create new file
+3. Add entry to `progress.index.md` at **top**:
+   - Date, file path, one-line summary (max 30 chars), tags (3-5)
 
-### decisions 추가 시
-1. 기존 decisions 파일 스캔 → 최대 순번 확인
-2. `decisions/decision-NNN-topic.md` 생성 (최대값 + 1)
-3. `decisions.index.md`에 항목 추가:
-   - 번호 (NNN), 파일 경로, 날짜, 상태 (draft/accepted/rejected), 한줄 요약, 키워드
-4. 상태 변경 시 인덱스의 상태 필드도 함께 갱신
+### Adding Decisions
+1. Scan existing decision files → find max sequence number
+2. Create `decisions/decision-NNN-topic.md` (max + 1)
+3. Add entry to `decisions.index.md`:
+   - Number (NNN), file path, date, status (draft/accepted/rejected), one-line summary, keywords
+4. When status changes, update the index status field accordingly
 
-## 순번 충돌 방지
+## Sequence Collision Prevention
 
-findings / decisions 파일 생성 전:
-1. 해당 디렉토리 리스트 확인
-2. 파일명에서 순번 추출 (예: `findings.015-topic.md` → 15)
-3. 최대 순번 + 1로 새 파일 생성
-4. 인덱스에 순번 순서대로 정렬 유지
+Before creating findings/decision files:
+1. List the target directory
+2. Extract sequence numbers from filenames (e.g., `findings.015-topic.md` → 15)
+3. Create new file with max sequence + 1
+4. Maintain sorted order by sequence in the index

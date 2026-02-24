@@ -1,36 +1,36 @@
 # Priority Guide
 
-## 라벨 체계
+## Label System
 
-`priority:0` ~ `priority:7` (숫자가 낮을수록 높은 우선순위)
+`priority:0` through `priority:7` (lower number = higher priority)
 
-| 라벨 | 의미 | 기준 |
-|------|------|------|
-| `priority:0` | Critical - 즉시 처리 | 서비스 장애, 보안 이슈 |
-| `priority:1` | Urgent - 가능한 빨리 | 블로커, 핵심 기능 불가 |
-| `priority:2` | High - 중요 | 다음 마일스톤 필수 항목 |
-| `priority:3` | Medium-High | 중요하지만 즉시는 아님 |
-| `priority:4` | Medium | 일반 기능/개선 |
-| `priority:5` | Medium-Low | 있으면 좋은 기능 |
-| `priority:6` | Low - 여유있게 | 장기 과제 |
-| `priority:7` | Backlog - 나중에 | 미래 고려 사항 |
+| Label | Meaning | Criteria |
+|-------|---------|----------|
+| `priority:0` | Critical — immediate | Service outage, security issues |
+| `priority:1` | Urgent — ASAP | Blockers, core feature broken |
+| `priority:2` | High — important | Required for next milestone |
+| `priority:3` | Medium-High | Important but not immediate |
+| `priority:4` | Medium | General features/improvements |
+| `priority:5` | Medium-Low | Nice-to-have features |
+| `priority:6` | Low — no rush | Long-term tasks |
+| `priority:7` | Backlog — later | Future considerations |
 
-## 판단 기준
+## Judgment Criteria
 
-1. **Phase 정보**: 낮은 Phase일수록 높은 우선순위 경향 (절대적이지 않음)
-2. **의존성**: 다른 작업이 의존하는 항목은 우선순위 상향
-3. **기존 Issue와의 비교**: 유사한 성격의 기존 Issue보다 같거나 높게 배치
-4. **영향 범위**: 여러 기능에 영향을 주는 기반 작업은 우선순위 상향
-5. **문서화 vs 구현**: 같은 주제라면 구현이 문서화보다 우선
+1. **Phase**: Lower phase tends toward higher priority (not absolute)
+2. **Dependencies**: Items others depend on get priority boost
+3. **Comparison with existing Issues**: Rank equal or higher than similar existing Issues
+4. **Impact scope**: Foundational work affecting multiple features gets priority boost
+5. **Implementation vs documentation**: Same topic → implementation takes priority over docs
 
-## 타입 라벨 매핑
+## Type Label Mapping
 
-decision 내용에 따라 적절한 타입 라벨 부여:
+Assign type labels based on decision content:
 
-| 내용 | 라벨 |
-|------|------|
-| 새 기능 구현 | `✨FEAT` |
-| 버그 수정 | `🐛BUG` |
-| 문서화 | `📚DOCS` |
-| 리팩토링 | `♻️CLEANING` |
-| 테스트 | `✅TEST` |
+| Content | Label |
+|---------|-------|
+| New feature | `✨FEAT` |
+| Bug fix | `🐛BUG` |
+| Documentation | `📚DOCS` |
+| Refactoring | `♻️CLEANING` |
+| Testing | `✅TEST` |
