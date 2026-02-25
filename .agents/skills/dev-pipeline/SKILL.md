@@ -7,7 +7,18 @@ description: Orchestrate the full dev cycle — code, review, resolve — with a
 
 Orchestrate: `/dev-build` → `/dev-review` → `/dev-resolve` → merge. Review/resolve run in a **sandboxed side pane**. State tracked per-issue for crash recovery.
 
-> Requires tmux session (`$TMUX`), `claude` CLI. Git remote rules in `CLAUDE.md`.
+> Requires tmux session (`$TMUX`). Git remote rules in `CLAUDE.md`.
+
+## Agent Selection
+
+Before starting the pipeline, **ask the user** which AI agent to use for side-pane tasks (review/resolve):
+
+| Agent | CLI Command | Notes |
+|-------|------------|-------|
+| **Claude Code** | `claude --sandbox -p '{prompt}'` | Requires `claude` CLI |
+| **Codex** | `codex -q '{prompt}'` | Requires `codex` CLI |
+
+Store the choice in state as `"agent": "claude"` or `"agent": "codex"`. Use the corresponding CLI command for all side-pane operations (Steps 2, 4a).
 
 ## Workflow
 
@@ -30,6 +41,7 @@ Execute `/dev-build`. After PR creation, write state:
   "pr": 99,
   "branch": "feat/issue-42-add-auth",
   "worktree": ".workspace/worktrees/issue-42",
+  "agent": "claude",
   "step": "review",
   "reviewRound": 1,
   "skipReview": false,
@@ -43,9 +55,15 @@ Execute `/dev-build`. After PR creation, write state:
 Use `pipeline_open_pane()` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh):
 
 ```bash
+# Claude Code
 REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
   "cd $(pwd)/{area} && claude --sandbox -p 'Run /dev-review for PR #{PR#}. After review, exit.' ; read")
+# Codex
+REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
+  "cd $(pwd)/{area} && codex -q 'Run /dev-review for PR #{PR#}. After review, exit.' ; read")
 ```
+
+Use the agent selected in Step 0/1 (stored in state `agent` field).
 
 Save pane ID in state → `"step": "review", "reviewPane": "{pane_id}"`.
 
@@ -68,8 +86,12 @@ Kill review pane, open resolve pane in worktree:
 
 ```bash
 tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
+# Claude Code
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
   "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --sandbox -p 'Run /dev-resolve for PR #{PR#}. After done, exit.' ; read")
+# Codex
+RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
+  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex -q 'Run /dev-resolve for PR #{PR#}. After done, exit.' ; read")
 ```
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.

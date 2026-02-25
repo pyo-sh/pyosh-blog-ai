@@ -39,11 +39,21 @@ pipeline_state_delete() {
 # ──────────────────────────────────────────────
 
 pipeline_open_pane() {
-  # Usage: pipeline_open_pane <working_dir> <claude_prompt>
+  # Usage: pipeline_open_pane <working_dir> <prompt> [agent]
+  # agent: "claude" (default) or "codex"
   local workdir=$1
   local prompt=$2
+  local agent=${3:-claude}
+
+  local cmd
+  if [ "$agent" = "codex" ]; then
+    cmd="codex -q '$prompt'"
+  else
+    cmd="claude --sandbox -p '$prompt'"
+  fi
+
   tmux split-window -h -P -F '#{pane_id}' \
-    "cd '$workdir' && claude --sandbox -p '$prompt' ; echo '[Done - press Enter to close]'; read"
+    "cd '$workdir' && $cmd ; echo '[Done - press Enter to close]'; read"
 }
 
 pipeline_kill_pane() {
