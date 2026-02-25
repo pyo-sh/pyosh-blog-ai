@@ -5,14 +5,14 @@ description: Respond to PR review comments. Read review comments left by /dev-re
 
 # Dev-Resolve
 
-Fix PR review comments → record → push → request re-review. Global rules in `CLAUDE.md`.
+Fix PR review comments → record → push → request re-review. Git remote and branch rules in `CLAUDE.md`.
 
 ## Workflow
 
 ### 1. Read Review Comments
 
 ```bash
-cd {area}  # server/ or client/
+cd {area}
 gh pr view {PR#} --comments
 gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 ```
@@ -21,33 +21,29 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 
 | Severity | Action |
 |----------|--------|
-| **[CRITICAL]** / **[WARNING]** | Must fix |
-| **[SUGGESTION]** | Fix if valid, skip with reason on PR |
+| `[CRITICAL]` / `[WARNING]` | Must fix |
+| `[SUGGESTION]` | Fix if valid, skip with reason |
 
 ### 3. Fix Code
 
-Work in existing worktree (`.workspace/worktrees/issue-{N}`) or branch.
+Work in existing worktree (`.workspace/worktrees/issue-{N}`).
 
 - **Fix only reviewed items** — no unrelated changes
-- **Commit**: `fix: address review comments (#{N})`
+- Commit: `fix: address review comments (#{N})`
 
 ### 4. Record Progress (required)
 
-**Must** run `/dev-log` to record progress before pushing. Include:
-- Which review comments were addressed
-- Any technical decisions made during fixes
+**Must** run `/dev-log` before pushing. Include which comments were addressed and any technical decisions.
 
 ### 5. Push & Post Response
 
-Push changes, then post response comment on PR.
-
-**Must use `--body-file`** (avoids markdown backtick conflicts):
+**Must use `--body-file`**:
 
 ```bash
 git push
 
 mkdir -p .workspace/messages
-cat > .workspace/messages/pr-{PR#}-response.md <<'RESPEOF'
+cat > .workspace/messages/pr-{PR#}-response.md <<'EOF'
 ## Review Response
 
 ### Fixed
@@ -61,14 +57,12 @@ cat > .workspace/messages/pr-{PR#}-response.md <<'RESPEOF'
 | 1 | `file:line` | Skip reason |
 
 > Requesting re-review.
-RESPEOF
+EOF
 
 gh pr comment {PR#} --body-file .workspace/messages/pr-{PR#}-response.md
-
 rm .workspace/messages/pr-{PR#}-response.md
 ```
 
 ### 6. Notify User
 
-- Summarize fixed/skipped item counts
-- Advise to **run `/dev-review` in a new session**
+Summarize fixed/skipped counts. Advise to **run `/dev-review` in a new session** for re-review.

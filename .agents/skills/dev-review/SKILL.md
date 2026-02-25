@@ -5,41 +5,39 @@ description: PR code review skill. Run in a separate session from the code autho
 
 # Dev-Review
 
-Review PRs in a **different session** from the code author. Leave comments only — never modify code.
+Review PRs in a **different session** from the code author. Comments only — never modify code.
 
-## Review Steps
+## Steps
 
 ### 1. Check PR
-
-Run in the target area (`server/` or `client/`):
 
 ```bash
 gh pr view {PR#}
 gh pr diff {PR#}
-gh issue view {Issue#}  # check related Issue
+gh issue view {Issue#}
 ```
 
 ### 2. Analyze Code
 
-Read PR diff + surrounding context of changed files. Verify compliance with `client/CLAUDE.md` or `server/CLAUDE.md`.
+Read diff + surrounding context. Check compliance with `{area}/CLAUDE.md`.
 
-**Focus areas**: Security (OWASP Top 10), type safety (`any` abuse, missing nullable), edge cases, error handling, performance (N+1 queries, etc.), project conventions
+**Focus**: Security (OWASP Top 10), type safety, edge cases, error handling, performance (N+1), conventions.
 
 ### 3. Classify Severity
 
 | Tag | Meaning |
 |-----|---------|
-| `[CRITICAL]` | Must fix — bugs, security vulnerabilities, data loss risk |
-| `[WARNING]` | Should fix — potential issues, performance degradation |
-| `[SUGGESTION]` | Optional improvement — readability, conventions, better patterns |
+| `[CRITICAL]` | Must fix — bugs, security, data loss |
+| `[WARNING]` | Should fix — potential issues, perf degradation |
+| `[SUGGESTION]` | Optional — readability, conventions, better patterns |
 
-### 4. Submit PR Review
+### 4. Submit Review
 
-Use `gh pr review` with inline comments + summary. **Must use `--body-file`** (avoids shell conflicts with markdown backticks):
+**Must use `--body-file`** to avoid shell conflicts:
 
 ```bash
 mkdir -p .workspace/messages
-cat > .workspace/messages/pr-{PR#}-review.md <<'REVIEWEOF'
+cat > .workspace/messages/pr-{PR#}-review.md <<'EOF'
 ## Review Summary
 
 | Severity | Count |
@@ -56,27 +54,22 @@ cat > .workspace/messages/pr-{PR#}-review.md <<'REVIEWEOF'
 
 ### Suggestion
 1. `file:line` — description
-REVIEWEOF
+EOF
 
-gh pr review {PR#} \
-  --body-file .workspace/messages/pr-{PR#}-review.md \
-  --{comment|request-changes}
-
+gh pr review {PR#} --body-file .workspace/messages/pr-{PR#}-review.md --{comment|request-changes}
 rm .workspace/messages/pr-{PR#}-review.md
 ```
 
 - 1+ Critical → `--request-changes`
 - 0 Critical → `--comment`
 
-### 5. Report to User
+### 5. Report
 
-- Summarize Critical/Warning/Suggestion counts
-- If Critical exists → advise fixing via `/dev-resolve`
-- If no Critical → advise user can approve and merge
+Summarize counts. If Critical → advise `/dev-resolve`. If none → advise approve & merge.
 
-## Review Principles
+## Constraints
 
-- **No code modifications** — comments only
-- **No bias** — evaluate the code itself, not assumed intent
+- **Comments only** — never modify code
+- **No bias** — evaluate code itself, not assumed intent
 - **Be specific** — cite `file:line` with problem and alternative
-- **No over-reviewing** — do not use Critical/Warning for trivial style differences
+- **No over-reviewing** — don't flag trivial style differences as Critical/Warning

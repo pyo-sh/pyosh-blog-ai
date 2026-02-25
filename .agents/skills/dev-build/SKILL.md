@@ -5,16 +5,7 @@ description: GitHub Issue-based development workflow. Issue → Worktree → Cod
 
 # Dev-Build
 
-Issue → Worktree → Code → Push → PR. Review and merge handled by separate skills. Global rules (branch naming, commit format, multi-agent) in `CLAUDE.md`.
-
-## Prerequisite: Git Remote
-
-Monorepo — `server/` and `client/` are **independent Git repos**. Run all git/gh commands **inside the target area directory** (never from root).
-
-| Area | GitHub Repo |
-|------|-------------|
-| `server/` | `pyo-sh/pyosh-blog-be` |
-| `client/` | `pyo-sh/pyosh-blog-fe` |
+Issue → Worktree → Code → Push → PR. Review/merge handled by separate skills. Git remote and branch rules in `CLAUDE.md`.
 
 ## Workflow
 
@@ -40,12 +31,10 @@ cd .workspace/worktrees/issue-{N}
 ```bash
 git push -u origin {type}/issue-{N}-{desc}
 ```
-PR **must use `--body-file`** (avoids shell escape bugs with markdown). → Template: [pr-template.md](references/pr-template.md)
+PR **must use `--body-file`** (avoids shell escape issues). → Template: [pr-template.md](references/pr-template.md)
 
-### 5. Request Review
-After PR creation, instruct user to **run `/dev-review` in a new session** or **use `/dev-pipeline`** for automated review orchestration. Do not review in this session.
-
-> Follow-up: `/dev-review` → fix via `/dev-resolve` → re-review → user approval & merge
+### 5. Next Step
+Instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration. Do not review in this session.
 
 ### 6. Cleanup
 ```bash
