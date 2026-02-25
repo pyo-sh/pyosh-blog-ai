@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-02-25 | Issue #13 GET /api/admin/posts 쿼리 파라미터 문서화 및 구현 (AdminPostListQuerySchema + api-spec) | ✅   |
 | 2026-02-24 | PR #19 최종 반영: main 충돌 해소 + `/api/health` memory 응답 복원 + 머지 준비 완료 | ✅   |
 | 2026-02-24 | PR #19 리뷰 3차 반영: env 로더 단일화 + migration 조건부 실행 + health 핸들러 중복 정리 | ✅   |
 | 2026-02-24 | Issue #12 배포 인프라 강화: Health Check 확장 + DB 마이그레이션 스크립트/CI 워크플로 추가 + .env.example/테스트 보강 | ✅   |
@@ -29,6 +30,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-02-25.md](./progress/progress.2026-02-25.md) - Issue #13 GET /api/admin/posts 쿼리 파라미터 문서화 및 구현
 - [progress.2026-02-24.md](./progress/progress.2026-02-24.md) - Issue #12 배포 인프라 강화(Health Check + Migration 자동화 + env 샘플/테스트)
 - [progress.2026-02-24.md](./progress/progress.2026-02-24.md) - PR #19 리뷰 3차 반영(env 로더 단일화, migration 조건부 실행, health 중복 정리)
 - [progress.2026-02-24.md](./progress/progress.2026-02-24.md) - PR #19 최종 반영(main 충돌 해결, /api/health memory 복원, merge blocker 해소)
