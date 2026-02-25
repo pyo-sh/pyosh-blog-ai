@@ -86,7 +86,12 @@ Expected states:
 - `COMMENTED` (no CRITICAL) → proceed to Step 5
 - No review yet → keep polling
 
-### 4a. Review Has Critical/Warning — Trigger Resolve
+### 4a. Trigger Resolve
+
+Triggered by:
+- Step 3: `CHANGES_REQUESTED` (has Critical) — fix CRITICAL + WARNING
+- Step 5: "Fix & Re-review" — fix WARNING + SUGGESTION per user feedback
+- Step 5: "Fix & Merge" — fix WARNING + SUGGESTION, **skip re-review after**
 
 Kill the review pane (if still alive) and open a resolve pane:
 
@@ -94,13 +99,16 @@ Kill the review pane (if still alive) and open a resolve pane:
 tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --sandbox -p 'Run /dev-resolve for PR #{PR#} in {area}. Repo: {repo}. Fix all CRITICAL and WARNING items, then push. After done, exit.' ; echo '[Resolve complete - press Enter to close]'; read")
+  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --sandbox -p 'Run /dev-resolve for PR #{PR#} in {area}. Repo: {repo}. Fix {target items per trigger}. After done, exit.' ; echo '[Resolve complete - press Enter to close]'; read")
 ```
 
 Update state:
 ```json
-{ "step": "resolve", "resolvePane": "{pane_id}" }
+{ "step": "resolve", "resolvePane": "{pane_id}", "skipReview": {true|false} }
 ```
+
+- `skipReview: false` — normal flow (Step 3, Step 5 "Fix & Re-review")
+- `skipReview: true` — "Fix & Merge" flow (Step 5)
 
 ### 4b. Wait for Resolve + Confirm Changes
 
@@ -112,16 +120,19 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/commits --jq '.[-1].sha'
 
 When new commits appear:
 1. Show diff to user: `gh pr diff {PR#}`
-2. **Ask user**: "Review AI suggested these changes. Apply them?"
-   - **Yes** → go back to Step 2 (re-review)
-   - **No** → user can manually adjust, then re-trigger review
+2. Check `skipReview` in state:
+   - **`skipReview: true`** (from "Fix & Merge") → proceed directly to Step 6
+   - **`skipReview: false`** → **Ask user** — choose one:
+     - **"Apply & Re-review"** → go back to Step 2 (full re-review cycle)
+     - **"Merge as-is"** → skip re-review, proceed to Step 6 (user accepts current state)
+     - **"Manual edit"** → user edits code manually, then re-trigger from Step 2
 
 Update state:
 ```json
-{ "step": "review", "reviewRound": {N+1} }
+{ "step": "review", "reviewRound": {N+1}, "skipReview": false }
 ```
 
-### 5. No Critical Issues — Request Merge Approval
+### 5. No Critical Issues — User Decision
 
 Present review summary to user:
 
@@ -129,9 +140,12 @@ Present review summary to user:
 gh api repos/{owner}/{repo}/pulls/{PR#}/reviews --jq '.[-1].body'
 ```
 
-**Ask user**: "No critical issues. Merge this PR?"
-- **Yes** → proceed to Step 6
-- **No** → user provides feedback, loop back
+Show severity counts (Critical: 0, Warning: N, Suggestion: M).
+
+**Ask user** — choose one:
+- **"Merge"** → accept remaining Warning/Suggestion as-is, proceed to Step 6
+- **"Fix & Re-review"** → go to Step 4a (resolve Warning/Suggestion, then full re-review)
+- **"Fix & Merge"** → go to Step 4a variant: resolve only, **skip re-review**, proceed to Step 6 after resolve push
 
 ### 6. Merge + Cleanup
 
@@ -185,6 +199,7 @@ Path: `.workspace/pipeline/issue-{N}.state.json`
 | `reviewRound` | number | Current review iteration |
 | `reviewPane` | string | tmux pane ID for review |
 | `resolvePane` | string | tmux pane ID for resolve |
+| `skipReview` | boolean | If true, skip re-review after resolve ("Fix & Merge" flow) |
 | `createdAt` | string | ISO 8601 timestamp |
 | `updatedAt` | string | ISO 8601 timestamp |
 
