@@ -16,8 +16,10 @@ pyosh-blog/
 ├── CLAUDE.md                    # (현재 파일) 전역 규칙
 ├── .claude/
 │   ├── settings.local.json      # 권한 설정
-│   ├── skills/                  # 스킬 심볼릭 링크
-│   └── worktrees/               # Git worktree (gitignored)
+│   └── skills/                  # 스킬 심볼릭 링크
+├── .workspace/                  # gitignored
+│   ├── worktrees/               # Git worktree
+│   └── pipeline/                # 파이프라인 상태 파일
 ├── docs/
 │   ├── client/                  # client 작업 기록
 │   │   ├── progress.index.md

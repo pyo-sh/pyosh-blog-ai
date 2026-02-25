@@ -24,8 +24,8 @@ Run `gh issue list --assignee @me` in the target area. If none exists, get user 
 ### 1. Create Worktree
 ```bash
 cd {area}
-git worktree add -b {type}/issue-{N}-{desc} .claude/worktrees/issue-{N} main
-cd .claude/worktrees/issue-{N}
+git worktree add -b {type}/issue-{N}-{desc} .workspace/worktrees/issue-{N} main
+cd .workspace/worktrees/issue-{N}
 ```
 → Branch rules: [branch-naming.md](references/branch-naming.md)
 
@@ -43,14 +43,14 @@ git push -u origin {type}/issue-{N}-{desc}
 PR **must use `--body-file`** (avoids shell escape bugs with markdown). → Template: [pr-template.md](references/pr-template.md)
 
 ### 5. Request Review
-After PR creation, instruct user to **run `/dev-review` in a new session**. Do not review in this session.
+After PR creation, instruct user to **run `/dev-review` in a new session** or **use `/dev-pipeline`** for automated review orchestration. Do not review in this session.
 
 > Follow-up: `/dev-review` → fix via `/dev-resolve` → re-review → user approval & merge
 
 ### 6. Cleanup
 ```bash
 cd {area}
-git worktree remove .claude/worktrees/issue-{N}
+git worktree remove .workspace/worktrees/issue-{N}
 git branch -d {type}/issue-{N}-{desc}
 ```
 

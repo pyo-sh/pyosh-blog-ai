@@ -14,7 +14,7 @@ Agent B: [create worktree] [write docs] [commit] ......[LOCK] [rebase+merge] [UN
 
 ```bash
 ROOT_REPO="$(git rev-parse --show-toplevel)"
-LOCK_FILE="$ROOT_REPO/.claude/dev-log.lock"
+LOCK_FILE="$ROOT_REPO/.workspace/dev-log.lock"
 LOCK_TIMEOUT=60   # seconds
 LOCK_INTERVAL=5   # seconds
 ```
@@ -23,14 +23,14 @@ LOCK_INTERVAL=5   # seconds
 
 ```bash
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-WORKTREE_PATH="$ROOT_REPO/.claude/worktrees/dev-log-${TIMESTAMP}"
+WORKTREE_PATH="$ROOT_REPO/.workspace/worktrees/dev-log-${TIMESTAMP}"
 BRANCH_NAME="dev-log/${TIMESTAMP}"
 
 cd "$ROOT_REPO"
 git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME" main
 ```
 
-- `.claude/worktrees/` is in `.gitignore`
+- `.workspace/worktrees/` is in `.gitignore`
 - Timestamp-based branch names guarantee uniqueness
 
 ## Phase 4: Commit

@@ -6,11 +6,6 @@
 ## Skills are managed by User
 skills-lock.json
 
-## AI agent worktrees
-.claude/worktrees/
+## AI workspace (worktrees, pipeline state, locks)
+.workspace/
 .pnpm-store
-
-## Dev-log lock file
-.claude/dev-log.lock
-
-## workspace

@@ -39,19 +39,19 @@
 **Situation**: Agent A (server progress) + Agent B (client findings) running concurrently
 
 ### Agent A Flow
-1. `git worktree add .claude/worktrees/dev-log-20260224-143022 -b dev-log/20260224-143022 main`
+1. `git worktree add .workspace/worktrees/dev-log-20260224-143022 -b dev-log/20260224-143022 main`
 2. Write `docs/server/progress/progress.2026-02-24.md` inside worktree
 3. `git add docs/ && git commit -m "docs: progress - API endpoint implementation"`
-4. `mkdir .claude/dev-log.lock` → acquire lock
+4. `mkdir .workspace/dev-log.lock` → acquire lock
 5. `git rebase main` → `git merge dev-log/20260224-143022 --ff-only`
-6. `rmdir .claude/dev-log.lock` → release lock
+6. `rmdir .workspace/dev-log.lock` → release lock
 7. `git worktree remove ...` → cleanup
 
 ### Agent B Flow (concurrent)
-1. `git worktree add .claude/worktrees/dev-log-20260224-143025 -b dev-log/20260224-143025 main`
+1. `git worktree add .workspace/worktrees/dev-log-20260224-143025 -b dev-log/20260224-143025 main`
 2. Write `docs/client/findings/findings.009-ssr-caching.md` inside worktree
 3. `git add docs/ && git commit -m "docs: findings - SSR caching strategy research"`
-4. `mkdir .claude/dev-log.lock` → **wait** (Agent A holds lock)
+4. `mkdir .workspace/dev-log.lock` → **wait** (Agent A holds lock)
 5. Agent A merge complete → acquire lock
 6. `git rebase main` → Agent A's changes now reflected in main
 7. `git merge dev-log/20260224-143025 --ff-only` → success

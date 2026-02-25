@@ -26,7 +26,7 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 
 ### 3. Fix Code
 
-Work in existing worktree or branch.
+Work in existing worktree (`.workspace/worktrees/issue-{N}`) or branch.
 
 - **Fix only reviewed items** — no unrelated changes
 - **Commit**: `fix: address review comments (#{N})`
