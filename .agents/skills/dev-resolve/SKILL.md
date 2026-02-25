@@ -46,7 +46,8 @@ Push changes, then post response comment on PR.
 ```bash
 git push
 
-cat > /tmp/pr-{PR#}-response.md <<'RESPEOF'
+mkdir -p .workspace/messages
+cat > .workspace/messages/pr-{PR#}-response.md <<'RESPEOF'
 ## Review Response
 
 ### Fixed
@@ -62,7 +63,9 @@ cat > /tmp/pr-{PR#}-response.md <<'RESPEOF'
 > Requesting re-review.
 RESPEOF
 
-gh pr comment {PR#} --body-file /tmp/pr-{PR#}-response.md
+gh pr comment {PR#} --body-file .workspace/messages/pr-{PR#}-response.md
+
+rm .workspace/messages/pr-{PR#}-response.md
 ```
 
 ### 6. Notify User

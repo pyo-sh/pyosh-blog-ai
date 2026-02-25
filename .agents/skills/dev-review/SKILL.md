@@ -38,7 +38,8 @@ Read PR diff + surrounding context of changed files. Verify compliance with `cli
 Use `gh pr review` with inline comments + summary. **Must use `--body-file`** (avoids shell conflicts with markdown backticks):
 
 ```bash
-cat > /tmp/pr-{PR#}-review.md <<'REVIEWEOF'
+mkdir -p .workspace/messages
+cat > .workspace/messages/pr-{PR#}-review.md <<'REVIEWEOF'
 ## Review Summary
 
 | Severity | Count |
@@ -58,8 +59,10 @@ cat > /tmp/pr-{PR#}-review.md <<'REVIEWEOF'
 REVIEWEOF
 
 gh pr review {PR#} \
-  --body-file /tmp/pr-{PR#}-review.md \
+  --body-file .workspace/messages/pr-{PR#}-review.md \
   --{comment|request-changes}
+
+rm .workspace/messages/pr-{PR#}-review.md
 ```
 
 - 1+ Critical → `--request-changes`

@@ -139,13 +139,16 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/reviews --jq '.[-1].body'
 cd {area}
 gh pr merge {PR#} --squash --delete-branch
 
-# Clean up worktree
+# Clean up worktree (path from state file "worktree" field)
 git worktree remove .workspace/worktrees/issue-{N}
 git branch -d {type}/issue-{N}-{desc} 2>/dev/null
 
 # Kill any remaining panes
 tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 tmux kill-pane -t "$RESOLVE_PANE" 2>/dev/null
+
+# Clean up message files created during review/resolve
+rm -f .workspace/messages/pr-{PR#}-*.md
 ```
 
 Update state:

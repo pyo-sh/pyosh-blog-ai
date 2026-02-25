@@ -36,7 +36,8 @@ Closes #{N}
 **`--body-file` required** — inline `--body` causes shell escape conflicts with markdown backticks.
 
 ```bash
-cat > /tmp/pr-{N}-body.md <<'PREOF'
+mkdir -p .workspace/messages
+cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
 ## Summary
 Closes #{N}
 - Change description
@@ -46,5 +47,7 @@ PREOF
 
 gh pr create \
   --title "{type}: description (#{N})" \
-  --body-file /tmp/pr-{N}-body.md
+  --body-file .workspace/messages/pr-{N}-body.md
+
+rm .workspace/messages/pr-{N}-body.md
 ```
