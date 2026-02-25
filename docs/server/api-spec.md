@@ -191,9 +191,22 @@
 
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
+| GET | `/api/assets` | Admin | 에셋 목록 조회 (페이지네이션) |
 | POST | `/api/assets/upload` | Admin | 이미지 업로드 (multipart, max 5개, 10MB/개) |
 | GET | `/api/assets/:id` | - | 에셋 정보 조회 |
 | DELETE | `/api/assets/:id` | Admin | 에셋 삭제 (DB + 파일) |
+
+#### GET `/api/assets`
+
+**Query:** `page` (default: 1), `limit` (default: 20, max: 100)
+
+**Response 200:**
+```json
+{
+  "data": [{ "id": 1, "url": "/uploads/2026/02/uuid.png", "mimeType": "image/png", "sizeBytes": 12345, "width": 800, "height": 600, "createdAt": "2026-02-25T00:00:00.000Z" }],
+  "meta": { "page": 1, "limit": 20, "total": 50, "totalPages": 3 }
+}
+```
 
 #### POST `/api/assets/upload`
 
