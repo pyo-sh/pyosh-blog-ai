@@ -13,10 +13,12 @@ Orchestrate: `/dev-build` → `/dev-review` → `/dev-resolve` → merge. Review
 
 Before starting the pipeline, **ask the user** which AI agent to use for side-pane tasks (review/resolve):
 
-| Agent | CLI Command | Notes |
-|-------|------------|-------|
-| **Claude Code** | `claude --sandbox -p '{prompt}'` | Requires `claude` CLI |
-| **Codex** | `codex -q '{prompt}'` | Requires `codex` CLI |
+| Agent | Review Command | Resolve Command |
+|-------|---------------|-----------------|
+| **Claude Code** | `claude --dangerously-skip-permissions '{prompt}'` | `claude --dangerously-skip-permissions '{prompt}'` |
+| **Codex** | `codex --full-auto '{prompt}'` | `codex --full-auto '{prompt}'` |
+
+> Interactive TUI mode — user can watch progress in the tmux pane. Pipeline detects completion via GitHub API polling, then kills the pane.
 
 Store the choice in state as `"agent": "claude"` or `"agent": "codex"`. Use the corresponding CLI command for all side-pane operations (Steps 2, 4a).
 
@@ -31,6 +33,8 @@ STATE_FILE=".workspace/pipeline/issue-{N}.state.json"
 Exists → **resume** ([recovery.md](references/recovery.md)). Not exists → Step 1.
 
 ### 1. Run /dev-build
+
+**`cd {area}` first** — all git/gh commands must run inside the area's repo directory.
 
 Execute `/dev-build`. After PR creation, write state:
 
@@ -57,10 +61,10 @@ Use `pipeline_open_pane()` from [pipeline-helpers.sh](scripts/pipeline-helpers.s
 ```bash
 # Claude Code
 REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area} && claude --sandbox -p 'Run /dev-review for PR #{PR#}. After review, exit.' ; read")
+  "cd $(pwd)/{area} && claude --dangerously-skip-permissions 'Run /dev-review for PR #{PR#}. After review, exit.'")
 # Codex
 REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area} && codex -q 'Run /dev-review for PR #{PR#}. After review, exit.' ; read")
+  "cd $(pwd)/{area} && codex --full-auto 'Run /dev-review for PR #{PR#}. After review, exit.'")
 ```
 
 Use the agent selected in Step 0/1 (stored in state `agent` field).
@@ -88,10 +92,10 @@ Kill review pane, open resolve pane in worktree:
 tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 # Claude Code
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --sandbox -p 'Run /dev-resolve for PR #{PR#}. After done, exit.' ; read")
+  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 # Codex
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex -q 'Run /dev-resolve for PR #{PR#}. After done, exit.' ; read")
+  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex --full-auto 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 ```
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.

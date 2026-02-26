@@ -47,13 +47,13 @@ pipeline_open_pane() {
 
   local cmd
   if [ "$agent" = "codex" ]; then
-    cmd="codex -q '$prompt'"
+    cmd="codex --full-auto '$prompt'"
   else
-    cmd="claude --sandbox -p '$prompt'"
+    cmd="claude --dangerously-skip-permissions '$prompt'"
   fi
 
   tmux split-window -h -P -F '#{pane_id}' \
-    "cd '$workdir' && $cmd ; echo '[Done - press Enter to close]'; read"
+    "cd '$workdir' && $cmd"
 }
 
 pipeline_kill_pane() {

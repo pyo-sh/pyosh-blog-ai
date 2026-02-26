@@ -26,7 +26,13 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 
 ### 3. Fix Code
 
-Work in existing worktree (`.workspace/worktrees/issue-{N}`).
+**Must work inside the worktree** — not the main branch:
+
+```bash
+cd {area}/.workspace/worktrees/issue-{N}
+```
+
+> When launched by `/dev-pipeline`, the pane already opens in the worktree directory. Verify with `pwd`.
 
 - **Fix only reviewed items** — no unrelated changes
 - Commit: `fix: address review comments (#{N})`

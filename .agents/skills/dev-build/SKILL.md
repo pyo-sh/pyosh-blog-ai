@@ -13,6 +13,9 @@ Issue → Worktree → Code → Push → PR. Review/merge handled by separate sk
 Run `gh issue list --assignee @me` in the target area. If none exists, get user approval before creating.
 
 ### 1. Create Worktree
+
+**IMPORTANT: `cd {area}` first** — each area is an independent Git repo.
+
 ```bash
 cd {area}
 git worktree add -b {type}/issue-{N}-{desc} .workspace/worktrees/issue-{N} main
@@ -31,7 +34,27 @@ cd .workspace/worktrees/issue-{N}
 ```bash
 git push -u origin {type}/issue-{N}-{desc}
 ```
-PR **must use `--body-file`** (avoids shell escape issues). → Template: [pr-template.md](references/pr-template.md)
+
+**`--body-file` required** — inline `--body` causes shell escape issues. **Must** use `.workspace/messages/`:
+
+```bash
+mkdir -p .workspace/messages
+cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
+## Summary
+Closes #{N}
+- Change description
+## Test plan
+- [ ] Test item
+PREOF
+
+gh pr create \
+  --title "{type}: description (#{N})" \
+  --body-file .workspace/messages/pr-{N}-body.md
+
+rm .workspace/messages/pr-{N}-body.md
+```
+
+→ Full template: [pr-template.md](references/pr-template.md)
 
 ### 5. Next Step
 Instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration. Do not review in this session.
