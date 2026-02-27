@@ -23,4 +23,10 @@ RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# .bash_aliases 자동 로드
+RUN echo '[ -f /root/.bash_aliases ] && . /root/.bash_aliases' >> /root/.bashrc
+
+# TPM (Tmux Plugin Manager)
+RUN git clone https://github.com/tmux-plugins/tpm /root/.tmux/plugins/tpm
+
 WORKDIR /workspace

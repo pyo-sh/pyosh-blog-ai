@@ -56,14 +56,27 @@ tmux 안에서 `prefix + I` (기본: `Ctrl-b` → `I`)를 눌러 플러그인을
 ## 4. tmuxinator로 세션 시작
 
 ```bash
-tmuxinator start -p docs/tmux/session.yml
+## 호스트 세션
+tmuxinator start -p tools/tmux/session.host.yml
+
+## Docker 세션 (컨테이너 내부에서 자동 실행)
+tmuxinator start -p tools/tmux/session.docker.yml
 ```
 
 ### 세션 구조
 
+#### Host 세션 (`blog`)
+
 | Window | 이름 | Layout | Panes | 용도 |
 |--------|------|--------|-------|------|
-| 0 | work | tiled (2x2) | 4 | 메인 작업 |
+| 0 | work | even-horizontal | 2 | 메인 작업 |
+| 1 | project | - | 1 | 프로젝트 관리 |
+
+#### Docker 세션 (`lab`)
+
+| Window | 이름 | Layout | Panes | 용도 |
+|--------|------|--------|-------|------|
+| 0 | lab | tiled (2x2) | 4 | 메인 작업 |
 | 1 | server1 | even-vertical | 4 | 서버 에이전트 |
 | 2 | server2 | even-vertical | 4 | 서버 에이전트 |
 | 3 | client1 | even-vertical | 4 | 클라이언트 에이전트 |

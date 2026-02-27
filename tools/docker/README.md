@@ -70,10 +70,10 @@ docker compose up -d
 
 ### 컨테이너 접속
 
-컨테이너가 시작되면 tmuxinator가 `blog` 세션을 자동으로 생성합니다.
+컨테이너가 시작되면 tmuxinator가 `lab` 세션을 자동으로 생성합니다.
 
 ```bash
-docker exec -it dev-lab tmux attach -t blog
+docker exec -it dev-lab tmux attach -t lab
 ```
 
 ### 컨테이너 중지 및 삭제
@@ -90,6 +90,28 @@ docker compose down
 # 이미지까지 삭제 (재빌드 필요)
 docker compose down --rmi all
 ```
+
+## Aliases
+
+컨테이너 내부에서 사용할 수 있는 단축 명령어가 `.bash_aliases`에 정의되어 있습니다.
+세부 내용은 `tools/docker/.bash_aliases` 파일을 참조하세요.
+
+## Nested tmux (F12 토글)
+
+호스트에서 `docker exec`로 컨테이너 tmux에 접속하면 **tmux가 중첩**됩니다.
+이때 `Ctrl-b` prefix가 항상 호스트(outer) tmux에서 먼저 처리되므로, 컨테이너(inner) tmux를 직접 조작할 수 없습니다.
+
+**F12 키로 outer tmux의 키바인딩을 on/off 전환**할 수 있습니다.
+
+| 동작 | 설명 |
+|------|------|
+| `F12` 누르기 | outer tmux OFF → `Ctrl-b`가 inner tmux로 전달됨 |
+| `F12` 다시 누르기 | outer tmux ON 복원 → `Ctrl-b`가 outer tmux에서 처리됨 |
+
+상태바 스타일이 어두워지고 `(OFF)` 표시가 나타나면 outer tmux가 비활성 상태입니다.
+
+> 이 설정은 `tools/tmux/.tmux.conf`에 정의되어 있으며, 호스트와 컨테이너가 동일한 파일을 공유합니다.
+> F12는 항상 가장 바깥 tmux에서 가로채므로 충돌 없이 동작합니다.
 
 ## 컨테이너 내부 환경
 
@@ -118,6 +140,8 @@ docker compose down --rmi all
 | `~/.config/gh` | `/root/.config/gh` | read-only | GitHub CLI 인증 |
 | `~/.ssh` | `/root/.ssh` | read-only | SSH 키 |
 | `~/.claude` | `/root/.claude` | read-write | Claude Code 설정/메모리 |
+| `tools/tmux/.tmux.conf` | `/root/.tmux.conf` | read-only | tmux 설정 (F12 토글 포함) |
+| `tools/docker/.bash_aliases` | `/root/.bash_aliases` | read-only | 단축 명령어 |
 
 > 프로젝트 루트가 read-write로 마운트되므로 컨테이너 안에서 수정한 파일은 호스트에도 반영됩니다.
 

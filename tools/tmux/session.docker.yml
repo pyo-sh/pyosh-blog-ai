@@ -1,4 +1,4 @@
-# tmuxinator start -p tools/tmux/session.yml
+# tmuxinator start -p tools/tmux/session.docker.yml
 <%
   env_file = File.expand_path('.env')
   if File.exist?(env_file)
@@ -11,11 +11,11 @@
   end
 %>
 
-name: blog
+name: lab
 root: <%= ENV.fetch('TMUX_ROOT', '.') %>
 
 windows:
-  - work:
+  - lab:
       layout: tiled
       panes:
         - # top-left
