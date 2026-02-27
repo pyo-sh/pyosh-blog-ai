@@ -41,21 +41,12 @@ docker compose version
 gh auth login
 ```
 
-### 3. 환경 변수 설정
+### 3. Claude Code 인증
 
-프로젝트 루트에 `.env` 파일을 생성합니다.
+컨테이너 첫 실행 후 `cc` 명령어를 입력하면 `/login` 안내가 표시됩니다.
+브라우저에서 OAuth 인증을 완료하면 이후 컨테이너 재시작 시에도 인증이 유지됩니다.
 
-```bash
-cp .env.example .env
-```
-
-`.env` 파일을 열어 값을 채웁니다:
-
-```
-ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
-```
-
-API 키는 https://console.anthropic.com/settings/keys 에서 발급받을 수 있습니다.
+> **Note**: `docker compose down`으로 컨테이너를 삭제하면 인증이 초기화되므로 재인증이 필요합니다.
 
 ## 사용법
 
@@ -141,8 +132,8 @@ docker compose down --rmi all
 | `~/.gitconfig` | `/home/dev/.gitconfig` | read-only | Git 설정 |
 | `~/.config/gh` | `/home/dev/.config/gh` | read-only | GitHub CLI 인증 |
 | `~/.ssh` | `/home/dev/.ssh` | read-only | SSH 키 |
-| `~/.claude.json` | `/home/dev/.claude.json` | read-write | Claude Code 설정 파일 |
-| `~/.claude` | `/home/dev/.claude` | read-write | Claude Code 데이터/메모리 |
+| `~/.claude/projects` | `/home/dev/.claude/projects` | read-write | Claude Code 프로젝트 메모리 |
+| `~/.claude/settings.json` | `/home/dev/.claude/settings.json` | read-only | Claude Code 설정 |
 | `tools/tmux/.tmux.conf` | `/home/dev/.tmux.conf` | read-only | tmux 설정 (F12 토글 포함) |
 | `tools/docker/.bash_aliases` | `/home/dev/.bash_aliases` | read-only | 단축 명령어 |
 

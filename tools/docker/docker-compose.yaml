@@ -11,9 +11,9 @@ services:
       - ~/.gitconfig:/home/dev/.gitconfig:ro
       - ~/.config/gh:/home/dev/.config/gh:ro
       - ~/.ssh:/home/dev/.ssh:ro
-      # Claude Code 설정 공유
-      - ~/.claude.json:/home/dev/.claude.json
-      - ~/.claude:/home/dev/.claude
+      # Claude Code 설정 공유 (인증은 컨테이너 독립 관리)
+      - ~/.claude/projects:/home/dev/.claude/projects        # 프로젝트 메모리
+      - ~/.claude/settings.json:/home/dev/.claude/settings.json:ro  # 설정 (읽기전용)
       # tmux 설정
       - ../tmux/.tmux.conf:/home/dev/.tmux.conf:ro
       # bash aliases
