@@ -29,17 +29,21 @@ gem install tmuxinator
 
 ## 2. tmux 설정 적용
 
-프로젝트에 포함된 `.tmux.conf`를 홈 디렉토리에 복사합니다.
+프로젝트에 포함된 tmux 설정 파일을 홈 디렉토리에 복사합니다.
 
 ```bash
-cp docs/tmux/.tmux.conf ~/.tmux.conf
+# 호스트용
+cp tools/tmux/host.tmux.conf ~/.tmux.conf
+
+# Docker 컨테이너용 (docker-compose에서 자동 마운트)
+# cp tools/tmux/docker.tmux.conf ~/.tmux.conf
 ```
 
 > 기존 `~/.tmux.conf`가 있다면 백업 후 진행하세요: `cp ~/.tmux.conf ~/.tmux.conf.bak`
 
 ## 3. TPM (Tmux Plugin Manager) 설치
 
-`.tmux.conf`에서 `tmux-resurrect` 플러그인을 사용하므로 TPM을 설치해야 합니다.
+tmux 설정 파일에서 `tmux-resurrect` 플러그인을 사용하므로 TPM을 설치해야 합니다.
 
 ```bash
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm

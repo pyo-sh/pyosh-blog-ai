@@ -1,3 +1,6 @@
+# Disable Ctrl+s terminal freeze (XOFF flow control)
+stty -ixon 2>/dev/null
+
 # Docker dev-lab aliases
 
 alias cc="claude --dangerously-skip-permissions"
@@ -14,8 +17,8 @@ dev-update() {
   # System packages
   sudo apt-get update && sudo apt-get upgrade -y && sudo rm -rf /var/lib/apt/lists/*
 
-  # Claude Code CLI
-  sudo npm update -g @anthropic-ai/claude-code
+  # Claude Code CLI & Codex CLI
+  sudo npm update -g @anthropic-ai/claude-code @openai/codex
 
   # pnpm (corepack)
   sudo corepack prepare pnpm@latest --activate

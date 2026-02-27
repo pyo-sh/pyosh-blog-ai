@@ -5,8 +5,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 기본 도구
 RUN apt-get update && apt-get install -y \
     curl git gh tmux zsh ca-certificates gnupg sudo \
-    python3 python3-pip \
+    python3 python3-pip vim \
+    locales \
     && rm -rf /var/lib/apt/lists/*
+
+# Locale 설정 (TUI 앱 UTF-8 필수)
+RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # Node.js 22
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -20,8 +26,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
     && rm -rf /var/lib/apt/lists/*
 
-# Claude Code CLI
-RUN npm install -g @anthropic-ai/claude-code
+# Claude Code CLI & Codex CLI
+RUN npm install -g @anthropic-ai/claude-code @openai/codex
 
 # entrypoint 스크립트
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
