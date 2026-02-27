@@ -32,8 +32,10 @@ pyosh-blog/
 ├── docs/
 │   ├── client/                  # client 작업 기록 (progress / findings / decisions)
 │   └── server/                  # server 작업 기록
+├── tools/                       # 개발자 편의 도구 (tmux 등)
 ├── skills/                      # Claude Code 스킬
 ├── scripts/                     # 유틸리티 스크립트
+├── .env.example                 # 환경 변수 템플릿
 └── pyosh-blog.code-workspace    # VS Code 워크스페이스
 ```
 
@@ -53,6 +55,17 @@ pyosh-blog/
 - **`docs/`** — 개발 진행 기록, 기술 조사, 아키텍처 결정 문서
 - **`.agents/skills/`** — Claude Code 커스텀 스킬
 - **GitHub Issues** — 모든 작업의 Single Source of Truth
+
+## 환경 변수 설정
+
+`tools/` 폴더의 개발자 편의 도구(tmux 세션 등)는 환경 변수를 통해 로컬 경로를 설정합니다. 처음 세팅할 때 `.env.example`을 복사하여 본인의 환경에 맞게 수정하세요.
+
+```bash
+cp .env.example .env
+# .env 파일을 열어 경로를 수정
+```
+
+> `.env`는 `.gitignore`에 포함되어 있어 git에 추적되지 않습니다.
 
 ## AI 개발 워크플로
 
