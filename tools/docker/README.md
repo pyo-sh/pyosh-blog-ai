@@ -7,12 +7,14 @@ AI 에이전트(Claude Code)를 Docker 컨테이너 안에서 실행하기 위�
 
 ```
 Host (Windows / macOS / Linux)
-  └─ Docker container (Ubuntu 24.04)
-       └─ tmux session "blog" (tmuxinator)
+  └─ Docker container (Ubuntu 24.04, user: dev)
+       └─ tmux session "lab" (tmuxinator)
             ├─ pane 1: claude (Issue A)
             ├─ pane 2: claude (Issue B)
             └─ ...
 ```
+
+> **Note**: 컨테이너는 non-root 사용자 `dev`로 실행됩니다. Claude Code의 `--dangerously-skip-permissions` 플래그는 root 권한에서 사용할 수 없기 때문입니다.
 
 ## 사전 준비
 
@@ -136,12 +138,13 @@ docker compose down --rmi all
 | 호스트 경로 | 컨테이너 경로 | 모드 | 용도 |
 |------------|--------------|------|------|
 | 프로젝트 루트 (`../../`) | `/workspace` | read-write | 소스코드 |
-| `~/.gitconfig` | `/root/.gitconfig` | read-only | Git 설정 |
-| `~/.config/gh` | `/root/.config/gh` | read-only | GitHub CLI 인증 |
-| `~/.ssh` | `/root/.ssh` | read-only | SSH 키 |
-| `~/.claude` | `/root/.claude` | read-write | Claude Code 설정/메모리 |
-| `tools/tmux/.tmux.conf` | `/root/.tmux.conf` | read-only | tmux 설정 (F12 토글 포함) |
-| `tools/docker/.bash_aliases` | `/root/.bash_aliases` | read-only | 단축 명령어 |
+| `~/.gitconfig` | `/home/dev/.gitconfig` | read-only | Git 설정 |
+| `~/.config/gh` | `/home/dev/.config/gh` | read-only | GitHub CLI 인증 |
+| `~/.ssh` | `/home/dev/.ssh` | read-only | SSH 키 |
+| `~/.claude.json` | `/home/dev/.claude.json` | read-write | Claude Code 설정 파일 |
+| `~/.claude` | `/home/dev/.claude` | read-write | Claude Code 데이터/메모리 |
+| `tools/tmux/.tmux.conf` | `/home/dev/.tmux.conf` | read-only | tmux 설정 (F12 토글 포함) |
+| `tools/docker/.bash_aliases` | `/home/dev/.bash_aliases` | read-only | 단축 명령어 |
 
 > 프로젝트 루트가 read-write로 마운트되므로 컨테이너 안에서 수정한 파일은 호스트에도 반영됩니다.
 

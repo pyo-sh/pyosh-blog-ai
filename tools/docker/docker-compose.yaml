@@ -8,17 +8,18 @@ services:
     volumes:
       - ../../:/workspace
       # Git/GitHub 인증 공유
-      - ~/.gitconfig:/root/.gitconfig:ro
-      - ~/.config/gh:/root/.config/gh:ro
-      - ~/.ssh:/root/.ssh:ro
+      - ~/.gitconfig:/home/dev/.gitconfig:ro
+      - ~/.config/gh:/home/dev/.config/gh:ro
+      - ~/.ssh:/home/dev/.ssh:ro
       # Claude Code 설정 공유
-      - ~/.claude:/root/.claude
+      - ~/.claude.json:/home/dev/.claude.json
+      - ~/.claude:/home/dev/.claude
       # tmux 설정
-      - ../tmux/.tmux.conf:/root/.tmux.conf:ro
+      - ../tmux/.tmux.conf:/home/dev/.tmux.conf:ro
       # bash aliases
-      - ./.bash_aliases:/root/.bash_aliases:ro
+      - ./.bash_aliases:/home/dev/.bash_aliases:ro
     env_file:
       - ../../.env
     working_dir: /workspace
     # tmuxinator로 세션 시작 — 호스트에서 docker exec -it dev-lab tmux attach -t lab 로 접속
-    command: bash -c "/root/.tmux/plugins/tpm/bin/install_plugins && TMUX_ROOT=/workspace tmuxinator start -p tools/tmux/session.docker.yml && tail -f /dev/null"
+    command: bash -c "/home/dev/.tmux/plugins/tpm/bin/install_plugins && TMUX_ROOT=/workspace tmuxinator start -p tools/tmux/session.docker.yml && tail -f /dev/null"

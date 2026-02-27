@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # 기본 도구
 RUN apt-get update && apt-get install -y \
-    curl git gh tmux zsh ca-certificates gnupg \
+    curl git gh tmux zsh ca-certificates gnupg sudo \
     python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,10 +23,16 @@ RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# non-root 사용자 생성
+RUN useradd -m -s /bin/bash -G sudo dev \
+    && echo 'dev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
 # .bash_aliases 자동 로드
-RUN echo '[ -f /root/.bash_aliases ] && . /root/.bash_aliases' >> /root/.bashrc
+RUN echo '[ -f /home/dev/.bash_aliases ] && . /home/dev/.bash_aliases' >> /home/dev/.bashrc
 
 # TPM (Tmux Plugin Manager)
-RUN git clone https://github.com/tmux-plugins/tpm /root/.tmux/plugins/tpm
+RUN git clone https://github.com/tmux-plugins/tpm /home/dev/.tmux/plugins/tpm \
+    && chown -R dev:dev /home/dev/.tmux
 
+USER dev
 WORKDIR /workspace
