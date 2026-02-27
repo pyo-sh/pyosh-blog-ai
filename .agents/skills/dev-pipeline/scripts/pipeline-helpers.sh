@@ -47,7 +47,7 @@ pipeline_open_pane() {
 
   local cmd
   if [ "$agent" = "codex" ]; then
-    cmd="codex --full-auto '$prompt'"
+    cmd="codex exec --dangerously-bypass-approvals-and-sandbox '$prompt'"
   else
     cmd="claude --dangerously-skip-permissions '$prompt'"
   fi

@@ -16,7 +16,7 @@ Before starting the pipeline, **ask the user** which AI agent to use for side-pa
 | Agent | Review Command | Resolve Command |
 |-------|---------------|-----------------|
 | **Claude Code** | `claude --dangerously-skip-permissions '{prompt}'` | `claude --dangerously-skip-permissions '{prompt}'` |
-| **Codex** | `codex --full-auto '{prompt}'` | `codex --full-auto '{prompt}'` |
+| **Codex** | `codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}'` | `codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}'` |
 
 > Interactive TUI mode — user can watch progress in the tmux pane. Pipeline detects completion via GitHub API polling, then kills the pane.
 
@@ -64,7 +64,7 @@ REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
   "cd $(pwd)/{area} && claude --dangerously-skip-permissions 'Run /dev-review for PR #{PR#}. After review, exit.'")
 # Codex
 REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area} && codex --full-auto 'Run /dev-review for PR #{PR#}. After review, exit.'")
+  "cd $(pwd)/{area} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-review for PR #{PR#}. After review, exit.'")
 ```
 
 Use the agent selected in Step 0/1 (stored in state `agent` field).
@@ -95,7 +95,7 @@ RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
   "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 # Codex
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex --full-auto 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
+  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 ```
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.
