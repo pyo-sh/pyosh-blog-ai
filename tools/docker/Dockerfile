@@ -23,6 +23,10 @@ RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# entrypoint 스크립트
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # non-root 사용자 생성
 RUN useradd -m -s /bin/bash -G sudo dev \
     && echo 'dev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
@@ -36,3 +40,5 @@ RUN git clone https://github.com/tmux-plugins/tpm /home/dev/.tmux/plugins/tpm \
 
 USER dev
 WORKDIR /workspace
+
+ENTRYPOINT ["entrypoint.sh"]
