@@ -33,20 +33,11 @@ docker --version
 docker compose version
 ```
 
-### 2. GitHub CLI 인증 (호스트에서)
+### 2. 인증 설정
 
-컨테이너가 호스트의 GitHub 인증 정보를 공유합니다. 호스트에서 먼저 인증이 되어 있어야 합니다.
-
-```bash
-gh auth login
-```
-
-### 3. Claude Code 인증
-
-컨테이너 첫 실행 후 `cc` 명령어를 입력하면 `/login` 안내가 표시됩니다.
-브라우저에서 OAuth 인증을 완료하면 이후 컨테이너 재시작 시에도 인증이 유지됩니다.
-
-> **Note**: `docker compose down`으로 컨테이너를 삭제하면 인증이 초기화되므로 재인증이 필요합니다.
+인증은 컨테이너 내부의 독립 volume에서 관리됩니다. 호스트에서의 사전 인증은 필요하지 않습니다.
+컨테이너에 처음 접속한 뒤 `dev-auth-setup`을 실행하면 각 도구의 로그인을 안내합니다.
+자세한 내용은 [인증 volume 아키텍처](#인증-volume-아키텍처) 섹션을 참고하세요.
 
 ## 사용법
 
@@ -77,11 +68,73 @@ cd tools/docker
 # 중지
 docker compose stop
 
-# 중지 + 컨테이너 삭제
+# 중지 + 컨테이너 삭제 (인증 volume 유지)
 docker compose down
 
-# 이미지까지 삭제 (재빌드 필요)
+# 이미지까지 삭제 (인증 volume 유지, 재빌드 필요)
 docker compose down --rmi all
+
+# 인증 volume까지 삭제 (재인증 필요)
+docker compose down --rmi all --volumes
+# 또는 개별: docker volume rm dev-lab-auth
+```
+
+## 인증 volume 아키텍처
+
+### 왜 독립 volume인가?
+
+이전에는 호스트의 인증 파일(`~/.gitconfig`, `~/.config/gh`, `~/.ssh`)을 read-only로 바인드 마운트했습니다.
+이 방식에는 두 가지 문제가 있었습니다:
+
+1. **read-only 충돌** — `gh auth login`은 `hosts.yml`에 토큰을 써야 하는데, read-only 마운트라 `read-only file system` 에러가 발생
+2. **Keyring 부재** — 호스트(macOS)에서는 Keychain에 토큰을 저장하지만, 컨테이너(Linux)에는 Keyring이 없어 토큰 참조 불가
+
+따라서 **컨테이너 독립 named volume**으로 전환하여, 컨테이너 안에서 직접 로그인하고 토큰을 파일로 저장하는 방식을 채택했습니다.
+
+### Volume과 Container의 관계
+
+```
+docker volume: dev-lab-auth          컨테이너 파일시스템 (임시)
+┌─────────────────────────┐          ┌──────────────────────────┐
+│ /home/dev/.auth/        │          │                          │
+│   ├── gh/               │◀─symlink─│ ~/.config/gh             │
+│   │   ├── config.yml    │          │                          │
+│   │   └── hosts.yml     │          │                          │
+│   ├── claude/           │◀─symlink─│ ~/.claude                │
+│   │   ├── .credentials  │          │                          │
+│   │   └── settings.json │          │                          │
+│   ├── claude.json       │◀─symlink─│ ~/.claude.json           │
+│   ├── codex/            │◀─symlink─│ ~/.codex                 │
+│   │   └── auth.json     │          │                          │
+│   ├── gitconfig         │◀─symlink─│ ~/.gitconfig             │
+│   └── ssh/              │◀─symlink─│ ~/.ssh                   │
+└─────────────────────────┘          └──────────────────────────┘
+       영속 (컨테이너 삭제해도 유지)            컨테이너 삭제 시 소멸
+```
+
+- **Volume** (`dev-lab-auth`): Docker가 관리하는 독립 저장소. `docker compose down`으로 컨테이너를 삭제해도 데이터가 유지됨
+- **심볼릭 링크**: entrypoint에서 각 도구의 표준 경로(`~/.config/gh`, `~/.claude` 등)를 volume 경로로 연결. 도구들은 평소처럼 표준 경로에 읽고 쓰지만, 실제 데이터는 volume에 저장됨
+
+### 각 도구의 인증 저장 방식
+
+| 도구 | 인증 파일 (volume 내) | 로그인 명령 |
+|------|---------------------|------------|
+| Git | `gitconfig` | `dev-auth-setup`에서 자동 안내 |
+| GitHub CLI | `gh/hosts.yml` (`--insecure-storage`) | `gh auth login` |
+| Claude Code | `claude/.credentials.json` | `claude` 실행 후 OAuth |
+| Codex | `codex/auth.json` | `codex` 실행 후 로그인 |
+
+### 인증 관리 명령어
+
+```bash
+# 인증 상태 확인
+dev-auth-status
+
+# 인증 재설정 (수동)
+dev-auth-setup
+
+# 인증 volume 초기화 (컨테이너 외부에서)
+docker volume rm dev-lab-auth
 ```
 
 ## Aliases
@@ -122,6 +175,7 @@ docker compose down --rmi all
 | tmux | apt 기본 |
 | tmuxinator | gem 설치 |
 | Claude Code | npm global |
+| Codex | npm global |
 
 ## 네트워크
 
@@ -129,16 +183,12 @@ docker compose down --rmi all
 
 ## 볼륨 마운트
 
-| 호스트 경로 | 컨테이너 경로 | 모드 | 용도 |
-|------------|--------------|------|------|
-| 프로젝트 루트 (`../../`) | `/workspace` | read-write | 소스코드 |
-| `~/.gitconfig` | `/home/dev/.gitconfig` | read-only | Git 설정 |
-| `~/.config/gh` | `/home/dev/.config/gh` | read-only | GitHub CLI 인증 |
-| `~/.ssh` | `/home/dev/.ssh` | read-only | SSH 키 |
-| `~/.claude/projects` | `/home/dev/.claude/projects` | read-write | Claude Code 프로젝트 메모리 |
-| `~/.claude/settings.json` | `/home/dev/.claude/settings.json` | read-only | Claude Code 설정 |
-| `tools/tmux/docker.tmux.conf` | `/home/dev/.tmux.conf` | read-only | tmux 설정 (F12 토글 포함) |
-| `tools/docker/.bash_aliases` | `/home/dev/.bash_aliases` | read-only | 단축 명령어 |
+| 소스 | 컨테이너 경로 | 유형 | 용도 |
+|------|-------------|------|------|
+| 프로젝트 루트 (`../../`) | `/workspace` | bind (rw) | 소스코드 |
+| `dev-lab-auth` | `/home/dev/.auth` | named volume | 인증/설정 (gh, claude, codex, git, ssh) |
+| `tools/tmux/docker.tmux.conf` | `/home/dev/.tmux.conf` | bind (ro) | tmux 설정 |
+| `tools/docker/.bash_aliases` | `/home/dev/.bash_aliases` | bind (ro) | 단축 명령어 |
 
 > 프로젝트 루트가 read-write로 마운트되므로 컨테이너 안에서 수정한 파일은 호스트에도 반영됩니다.
 
@@ -152,7 +202,19 @@ docker compose build --no-cache
 
 ### `gh` 인증 실패
 
-호스트에서 `gh auth status`를 확인하세요. 로그인이 되어 있지 않으면 `gh auth login`을 먼저 실행해야 합니다.
+컨테이너 안에서 `dev-auth-status`로 상태를 확인하세요.
+재인증이 필요하면 `gh auth login --git-protocol https --insecure-storage`를 실행합니다.
+
+### 인증 volume 초기화
+
+인증 상태가 꼬였다면 volume을 삭제하고 다시 설정할 수 있습니다.
+
+```bash
+docker compose down
+docker volume rm dev-lab-auth
+docker compose up -d
+# 접속 후 dev-auth-setup 실행
+```
 
 ### 컨테이너 접속 불가
 

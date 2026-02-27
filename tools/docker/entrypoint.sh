@@ -12,10 +12,35 @@ elif [ ! -f /etc/localtime ]; then
   export TZ="$DEFAULT_TZ"
 fi
 
+# ── 인증 volume 심볼릭 링크 ──
+# /home/dev/.auth (named volume) → 각 도구의 표준 경로로 연결
+# named volume은 root 소유로 마운트되므로 최초 1회 소유권 변경
+AUTH="/home/dev/.auth"
+sudo chown dev:dev "$AUTH"
+mkdir -p "$AUTH/gh" "$AUTH/claude" "$AUTH/codex" "$AUTH/ssh"
+
+# gh CLI: ~/.config/gh
+mkdir -p /home/dev/.config
+ln -sfn "$AUTH/gh" /home/dev/.config/gh
+
+# Claude Code: ~/.claude (설정+인증), ~/.claude.json (온보딩/계정)
+ln -sfn "$AUTH/claude" /home/dev/.claude
+[ -f "$AUTH/claude.json" ] || echo '{}' > "$AUTH/claude.json"
+ln -sfn "$AUTH/claude.json" /home/dev/.claude.json
+
+# Codex: ~/.codex
+ln -sfn "$AUTH/codex" /home/dev/.codex
+
+# Git: ~/.gitconfig
+[ -f "$AUTH/gitconfig" ] || touch "$AUTH/gitconfig"
+ln -sfn "$AUTH/gitconfig" /home/dev/.gitconfig
+
+# SSH: ~/.ssh
+ln -sfn "$AUTH/ssh" /home/dev/.ssh
+
 # Claude Code status line 설정
-claude_settings="/home/dev/.claude/settings.json"
+claude_settings="$AUTH/claude/settings.json"
 if [ ! -f "$claude_settings" ]; then
-  mkdir -p /home/dev/.claude
   cat > "$claude_settings" << 'SETTINGS'
 {
   "statusLine": {
