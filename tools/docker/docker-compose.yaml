@@ -1,0 +1,20 @@
+services:
+  dev-lab:
+    build: .
+    container_name: dev-lab
+    stdin_open: true
+    tty: true
+    network_mode: host
+    volumes:
+      - ../../:/workspace
+      # Git/GitHub 인증 공유
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.config/gh:/root/.config/gh:ro
+      - ~/.ssh:/root/.ssh:ro
+      # Claude Code 설정 공유
+      - ~/.claude:/root/.claude
+    env_file:
+      - ../../.env
+    working_dir: /workspace
+    # tmuxinator로 세션 시작 — 호스트에서 docker exec -it dev-lab tmux attach -t blog 로 접속
+    command: bash -c "TMUX_ROOT=/workspace tmuxinator start -p tools/tmux/session.yml && tail -f /dev/null"

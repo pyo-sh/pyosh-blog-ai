@@ -71,6 +71,8 @@ cp .env.example .env
 
 모든 코딩 작업은 GitHub Issue에서 시작하여 PR Merge로 종료됩니다. 코드 작성과 리뷰는 **별도 AI 세션**에서 실행하여 컨텍스트 오염을 방지합니다.
 
+> **주의**: `/dev-pipeline`은 Claude Code의 `--dangerously-skip-permissions`, Codex의 `--dangerously-bypass-approvals-and-sandbox` 옵션을 사용합니다. 모든 도구 호출이 자동 승인되므로 **Docker 컨테이너 안에서 실행하는 것을 권장**합니다. 설정 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
+
 ### 자동 파이프라인 (`/dev-pipeline`)
 
 `/dev-pipeline`은 코딩부터 Merge까지 전체 사이클을 오케스트레이션합니다. 리뷰/수정은 tmux 사이드 패인에서 별도 Claude 인스턴스가 처리하며, 사용자는 각 단계에서 의사결정만 합니다.
@@ -143,6 +145,10 @@ cp .env.example .env
 | **Suggestion** | 가독성, 컨벤션 개선 | 사용자가 수정 여부 결정 |
 
 Critical이 모두 해결되면 사용자에게 Warning/Suggestion 처리 방법을 묻습니다. 사용자가 수용 가능하다고 판단하면 즉시 Merge할 수 있습니다.
+
+### Docker 환경 설정
+
+Docker 컨테이너 안에서 AI 에이전트를 실행하는 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
 
 ### tmux 환경 설정
 
