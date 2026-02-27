@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 기본 도구
 RUN apt-get update && apt-get install -y \
     curl git gh tmux zsh ca-certificates gnupg sudo \
-    python3 python3-pip vim \
+    python3 python3-pip vim jq \
     locales \
     && rm -rf /var/lib/apt/lists/*
 
