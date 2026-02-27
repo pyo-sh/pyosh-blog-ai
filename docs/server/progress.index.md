@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-02-27 | Issue #10 로깅 체계화: buildLoggerOptions(env 레벨/redact), loggerPlugin, 에러 핸들러 컨텍스트 강화, uncaughtException/unhandledRejection 처리 | ✅   |
 | 2026-02-25 | Issue #15 GET /api/assets 에셋 목록 엔드포인트 추가 + dev-pipeline 스킬 CLI 옵션 수정 | ✅   |
 | 2026-02-25 | Issue #13 GET /api/admin/posts 쿼리 파라미터 문서화 및 구현 (AdminPostListQuerySchema + api-spec) | ✅   |
 | 2026-02-24 | PR #19 최종 반영: main 충돌 해소 + `/api/health` memory 응답 복원 + 머지 준비 완료 | ✅   |
@@ -31,6 +32,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-02-27.md](./progress/progress.2026-02-27.md) - Issue #10 로깅 체계화: pino logger 최적화 + 에러 컨텍스트 로깅 + uncaught 예외 처리
 - [progress.2026-02-25.md](./progress/progress.2026-02-25.md) - Issue #13 GET /api/admin/posts 쿼리 파라미터 문서화 및 구현
 - [progress.2026-02-24.md](./progress/progress.2026-02-24.md) - Issue #12 배포 인프라 강화(Health Check + Migration 자동화 + env 샘플/테스트)
 - [progress.2026-02-24.md](./progress/progress.2026-02-24.md) - PR #19 리뷰 3차 반영(env 로더 단일화, migration 조건부 실행, health 중복 정리)
