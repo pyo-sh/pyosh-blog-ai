@@ -1,3 +1,6 @@
+## Environment
+.env
+
 ## Already in Git Repositories
 /server
 /client

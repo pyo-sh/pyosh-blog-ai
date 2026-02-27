@@ -131,6 +131,10 @@ pyosh-blog/
 
 Critical이 모두 해결되면 사용자에게 Warning/Suggestion 처리 방법을 묻습니다. 사용자가 수용 가능하다고 판단하면 즉시 Merge할 수 있습니다.
 
+### tmux 환경 설정
+
+tmux 및 tmuxinator 설치, 세션 구성에 대해서는 [tools/tmux/README.md](tools/tmux/README.md)를 참조하세요.
+
 ### 왜 세션을 분리하는가?
 
 같은 AI 세션이 코드 작성과 리뷰를 모두 수행하면, 작성 시의 컨텍스트가 리뷰를 편향시킵니다. 세션을 분리하면:
