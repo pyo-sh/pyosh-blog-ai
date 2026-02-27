@@ -57,7 +57,12 @@ tmux 안에서 `prefix + I` (기본: `Ctrl-b` → `I`)를 눌러 플러그인을
 
 ```bash
 ## 호스트 세션
+# 최초 1회: 실행 권한 부여
+chmod +x tools/tmux/session.host.wait-and-attach.sh
+
 tmuxinator start -p tools/tmux/session.host.yml
+# 호스트 세션 생성 + 컨테이너 자동 접속
+tools/tmux/session.host.wait-and-attach.sh
 
 ## Docker 세션 (컨테이너 내부에서 자동 실행)
 tmuxinator start -p tools/tmux/session.docker.yml

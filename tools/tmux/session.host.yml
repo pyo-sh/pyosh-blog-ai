@@ -23,4 +23,4 @@ windows:
 
   - project:
       panes:
-        - docker exec -it dev-lab tmux attach -t lab
+        - # auto-attached by session.host.wait-and-attach.sh
