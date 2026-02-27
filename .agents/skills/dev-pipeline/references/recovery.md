@@ -27,7 +27,7 @@ gh pr list --head {branch} --json number,state --jq '.[0]'
 
 - PR exists + open → update step to `review`, resume
 - PR exists + merged → update step to `log`, resume
-- No PR → re-run `/dev-build` from existing worktree
+- No PR → re-run `/dev-build` from existing worktree (at `.workspace/worktrees/issue-{N}`)
 
 ### step: "review"
 

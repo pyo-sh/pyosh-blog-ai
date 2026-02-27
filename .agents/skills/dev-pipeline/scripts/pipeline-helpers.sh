@@ -2,9 +2,15 @@
 # pipeline-helpers.sh — Shell helpers for dev-pipeline skill
 # Source this file or use functions individually via the AI's Bash tool.
 
-WORKSPACE_ROOT="$(git rev-parse --show-toplevel)"
-PIPELINE_DIR="$WORKSPACE_ROOT/.workspace/pipeline"
-WORKTREE_DIR="$WORKSPACE_ROOT/.workspace/worktrees"
+# Detect monorepo root — if inside area repo (server/client), go up one level
+_GIT_ROOT="$(git rev-parse --show-toplevel)"
+if [ -d "$_GIT_ROOT/../server" ] && [ -f "$_GIT_ROOT/../CLAUDE.md" ]; then
+  MONOREPO_ROOT="$(cd "$_GIT_ROOT/.." && pwd)"
+else
+  MONOREPO_ROOT="$_GIT_ROOT"
+fi
+PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
+WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
 # ──────────────────────────────────────────────
 # State management
@@ -17,6 +23,7 @@ pipeline_state_path() {
 
 pipeline_init() {
   mkdir -p "$PIPELINE_DIR" "$WORKTREE_DIR"
+  # Ensure area's .gitignore doesn't need updating — worktrees live at monorepo root
 }
 
 pipeline_state_exists() {
@@ -111,14 +118,14 @@ pipeline_cleanup() {
   pipeline_kill_pane "$review_pane"
   pipeline_kill_pane "$resolve_pane"
 
-  # Remove worktree
+  # Remove worktree (must run from the area repo that owns it)
   local wt="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$wt" ]; then
-    cd "$WORKSPACE_ROOT" && git worktree remove "$wt" 2>/dev/null
+    cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" 2>/dev/null
   fi
 
   # Delete branch (may already be deleted by --delete-branch)
-  git branch -d "$branch" 2>/dev/null
+  cd "$MONOREPO_ROOT/$area" && git branch -d "$branch" 2>/dev/null
 
   # Remove state file
   pipeline_state_delete "$issue"

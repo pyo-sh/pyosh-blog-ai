@@ -15,11 +15,12 @@ Run `gh issue list --assignee @me` in the target area. If none exists, get user 
 ### 1. Create Worktree
 
 **IMPORTANT: `cd {area}` first** — each area is an independent Git repo.
+**NOTE: Worktrees live at the monorepo root `.workspace/`, NOT inside the area.**
 
 ```bash
 cd {area}
-git worktree add -b {type}/issue-{N}-{desc} .workspace/worktrees/issue-{N} main
-cd .workspace/worktrees/issue-{N}
+git worktree add -b {type}/issue-{N}-{desc} ../.workspace/worktrees/issue-{N} main
+cd ../.workspace/worktrees/issue-{N}
 ```
 → Branch rules: [branch-naming.md](references/branch-naming.md)
 
@@ -62,7 +63,7 @@ Instruct user to run `/dev-review` in a new session or `/dev-pipeline` for autom
 ### 6. Cleanup
 ```bash
 cd {area}
-git worktree remove .workspace/worktrees/issue-{N}
+git worktree remove ../.workspace/worktrees/issue-{N}
 git branch -d {type}/issue-{N}-{desc}
 ```
 

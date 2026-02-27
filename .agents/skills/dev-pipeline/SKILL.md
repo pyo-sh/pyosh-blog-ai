@@ -86,16 +86,16 @@ Triggered by:
 - Step 5: "Fix & Re-review" — fix WARNING + SUGGESTION, then re-review
 - Step 5: "Fix & Merge" — fix only, **skip re-review** (`skipReview: true`)
 
-Kill review pane, open resolve pane in worktree:
+Kill review pane, open resolve pane in worktree (**at monorepo root `.workspace/`**):
 
 ```bash
 tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 # Claude Code
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
+  "cd $(pwd)/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 # Codex
 RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
-  "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
+  "cd $(pwd)/.workspace/worktrees/issue-{N} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 ```
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.
@@ -123,11 +123,10 @@ Show review summary + severity counts.
 ```bash
 cd {area}
 gh pr merge {PR#} --squash --delete-branch
-git worktree remove .workspace/worktrees/issue-{N}
+git worktree remove ../.workspace/worktrees/issue-{N}
 git branch -d {branch} 2>/dev/null
 tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 tmux kill-pane -t "$RESOLVE_PANE" 2>/dev/null
-rm -f .workspace/messages/pr-{PR#}-*.md
 ```
 
 State → `"step": "log"`.

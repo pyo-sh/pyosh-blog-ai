@@ -13,7 +13,13 @@ Agent B: [create worktree] [write docs] [commit] ......[LOCK] [rebase+merge] [UN
 ## Constants
 
 ```bash
-ROOT_REPO="$(git rev-parse --show-toplevel)"
+# Detect monorepo root — if inside area repo (server/client), go up one level
+_GIT_ROOT="$(git rev-parse --show-toplevel)"
+if [ -d "$_GIT_ROOT/../server" ] && [ -f "$_GIT_ROOT/../CLAUDE.md" ]; then
+  ROOT_REPO="$(cd "$_GIT_ROOT/.." && pwd)"
+else
+  ROOT_REPO="$_GIT_ROOT"
+fi
 LOCK_FILE="$ROOT_REPO/.workspace/dev-log.lock"
 LOCK_TIMEOUT=60   # seconds
 LOCK_INTERVAL=5   # seconds

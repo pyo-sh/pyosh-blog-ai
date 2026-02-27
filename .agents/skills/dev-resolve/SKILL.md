@@ -26,10 +26,10 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 
 ### 3. Fix Code
 
-**Must work inside the worktree** — not the main branch:
+**Must work inside the worktree** — not the main branch. Worktrees live at the **monorepo root** `.workspace/`:
 
 ```bash
-cd {area}/.workspace/worktrees/issue-{N}
+cd .workspace/worktrees/issue-{N}
 ```
 
 > When launched by `/dev-pipeline`, the pane already opens in the worktree directory. Verify with `pwd`.
