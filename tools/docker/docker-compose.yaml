@@ -15,9 +15,11 @@ services:
       - ~/.claude/projects:/home/dev/.claude/projects        # 프로젝트 메모리
       - ~/.claude/settings.json:/home/dev/.claude/settings.json:ro  # 설정 (읽기전용)
       # tmux 설정
-      - ../tmux/.tmux.conf:/home/dev/.tmux.conf:ro
+      - ../tmux/docker.tmux.conf:/home/dev/.tmux.conf:ro
       # bash aliases
       - ./.bash_aliases:/home/dev/.bash_aliases:ro
+    environment:
+      - TZ=${TZ:-}
     env_file:
       - ../../.env
     working_dir: /workspace
