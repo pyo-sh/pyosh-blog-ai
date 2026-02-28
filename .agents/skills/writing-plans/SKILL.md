@@ -172,23 +172,10 @@ git commit -m "feat: add example component"
 - Commit messages: `{type}: {description}`
 - DRY, YAGNI, TDD (server), frequent commits
 
-## Execution Handoff
+## Next Step
 
-After saving the plan, offer execution choice:
+After saving the plan, offer choice:
 
-**"Plan complete and saved to `docs/{area}/plans/<filename>.md`. How would you like to proceed?**
+**1. `/dev-issue` now** — Invoke `/dev-issue` to convert the plan directly into GitHub Issues
 
-**1. Subagent-Driven (this session)** — I dispatch a fresh subagent per task, review between tasks, fast iteration
-
-**2. Manual (separate session)** — Open a new session in the worktree with the plan, execute task by task
-
-**Which approach?"**
-
-**If Subagent-Driven chosen:**
-- Stay in this session
-- Fresh subagent per task + code review between tasks
-- Each subagent reads the plan and works on one task
-
-**If Manual chosen:**
-- Guide the user to open a new session in the worktree
-- The new session reads the plan doc and executes tasks sequentially
+**2. Split to decisions** — Break the plan into task-sized decision files in `docs/{area}/decisions/`, each following the repo's `.github/ISSUE_TEMPLATE` field structure, for later `/dev-issue` conversion
