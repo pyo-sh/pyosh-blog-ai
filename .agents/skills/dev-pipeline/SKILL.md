@@ -93,17 +93,22 @@ Triggered by:
 - Step 5: "Fix & Re-review" — fix WARNING + SUGGESTION, then re-review
 - Step 5: "Fix & Merge" — fix only, **skip re-review** (`skipReview: true`)
 
-Kill review pane, open resolve pane in worktree (**target `$ORCHESTRATOR_PANE`**):
+Open resolve pane by splitting from **`$REVIEW_PANE`** (so it appears next to the review), then kill the review pane. This ensures the resolve pane takes a visible position the user already knows:
 
 ```bash
-tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
+# Split resolve from the review pane (appears to its right)
 # Claude Code
-RESOLVE_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
+RESOLVE_PANE=$(tmux split-window -h -t "$REVIEW_PANE" -P -F '#{pane_id}' \
   "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 # Codex
-RESOLVE_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
+RESOLVE_PANE=$(tmux split-window -h -t "$REVIEW_PANE" -P -F '#{pane_id}' \
   "cd $(pwd)/{area}/.workspace/worktrees/issue-{N} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
+
+# Now kill the review pane — resolve pane inherits its space
+tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 ```
+
+> Layout transition: `[Orchestrator | Review]` → `[Orchestrator | Review | Resolve]` → `[Orchestrator | Resolve]`
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.
 
