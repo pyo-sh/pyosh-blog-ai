@@ -64,32 +64,39 @@ Execute `/dev-build`. After PR creation, write state:
 
 ### 2. Open Review Pane
 
-Use `pipeline_open_pane()` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh), **passing `$ORCHESTRATOR_PANE`** as target to ensure the split always happens next to the orchestrator — not the user's active pane:
-
-```bash
-# Claude Code
-REVIEW_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
-  "cd $(pwd)/{area} && claude --dangerously-skip-permissions 'Run /dev-review for PR #{PR#}. After review, exit.'")
-# Codex
-REVIEW_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
-  "cd $(pwd)/{area} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-review for PR #{PR#}. After review, exit.'")
-```
-
-Use the agent selected in Step 0/1 (stored in state `agent` field).
-
-Save pane ID in state → `"step": "review", "reviewPane": "{pane_id}"`.
-
-### 3. Wait for Review
-
-Poll with `pipeline_poll_review` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh):
+Use `pipeline_open_pane_verified()` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh). This validates the working directory, opens the pane, verifies startup (3s grace period), and retries once on failure:
 
 ```bash
 source scripts/pipeline-helpers.sh
-REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId})
+REVIEW_PANE=$(pipeline_open_pane_verified \
+  "$(pwd)/{area}" \
+  "Run /dev-review for PR #{PR#}. After review, exit." \
+  "$AGENT" "$ORCHESTRATOR_PANE" "$ISSUE" "$AREA")
+rc=$?
 ```
 
-- `TIMEOUT` → error, report to user
-- Otherwise → analyze the review:
+**Handle result** (see [Pane Lifecycle](#pane-lifecycle) for return codes):
+- `rc=0` → Save pane ID in state → `"step": "review", "reviewPane": "{pane_id}"`, proceed to Step 3
+- `rc=2` (PANE_DEAD) → Report: "Review pane failed to start. Check agent binary and tmux session."
+- `rc=3` (PATH_INVALID) → Report: "Working directory not found."
+- `rc=4` (RETRY_FAILED) → Report: "Review pane startup failed after retry. Manual intervention needed."
+
+### 3. Wait for Review
+
+Poll with `pipeline_poll_review`, passing `$REVIEW_PANE` for health monitoring:
+
+```bash
+source scripts/pipeline-helpers.sh
+REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId} 900 "$REVIEW_PANE")
+rc=$?
+```
+
+**Handle result**:
+- `rc=0` → analyze the review (below)
+- `rc=1` (TIMEOUT) → kill pane, report to user
+- `rc=2` (PANE_DEAD) → **auto-retry once**: re-open review pane via `pipeline_open_pane_verified()`, then re-poll. If second pane also fails, report to user.
+
+On success, analyze the review:
 
 ```bash
 eval "$(pipeline_analyze_review "{area_dir}" {PR#} "$REVIEW_ID")"
@@ -110,23 +117,42 @@ Triggered by:
 - Step 5: "Fix & Re-review" — fix WARNING + SUGGESTION, then re-review
 - Step 5: "Fix & Merge" — fix only, **skip re-review** (`skipReview: true`)
 
-Kill review pane (if alive), then split resolve from **`$ORCHESTRATOR_PANE`**. This is reliable on both first run and recovery — the orchestrator pane is always alive:
+Kill review pane, resolve worktree path, then open verified resolve pane:
 
 ```bash
-tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
-# Claude Code
-RESOLVE_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
-  "cd $(pwd)/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
-# Codex
-RESOLVE_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
-  "cd $(pwd)/.workspace/worktrees/issue-{N} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
+source scripts/pipeline-helpers.sh
+pipeline_kill_pane "$REVIEW_PANE"
+
+# Resolve actual worktree path (handles legacy paths)
+WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
+
+RESOLVE_PANE=$(pipeline_open_pane_verified \
+  "$WORKTREE_PATH" \
+  "Run /dev-resolve for PR #{PR#}. After done, exit." \
+  "$AGENT" "$ORCHESTRATOR_PANE" "$ISSUE" "$AREA")
+rc=$?
 ```
+
+**Handle result** (same as Step 2):
+- `rc=0` → proceed to Step 4b
+- `rc=2|3|4` → report failure to user
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.
 
 ### 4b. Wait for Resolve
 
-Poll for new commits: `gh api repos/{owner}/{repo}/pulls/{PR#}/commits --jq '.[-1].sha'`.
+Poll for new commits with `pipeline_poll_commits`, passing `$RESOLVE_PANE` for health monitoring:
+
+```bash
+source scripts/pipeline-helpers.sh
+NEW_SHA=$(pipeline_poll_commits "{area_dir}" {PR#} "{lastCommitSha}" 900 "$RESOLVE_PANE")
+rc=$?
+```
+
+**Handle result**:
+- `rc=0` → new commits found, proceed below
+- `rc=1` (TIMEOUT) → kill pane, report to user
+- `rc=2` (PANE_DEAD) → **auto-retry once**: re-open resolve pane via `pipeline_open_pane_verified()`, then re-poll. If second pane also fails, report to user.
 
 When new commits appear:
 1. Show diff: `gh pr diff {PR#}`
@@ -172,6 +198,38 @@ rm .workspace/pipeline/issue-{N}.state.json
 - **Always clean up tmux panes** on completion or failure
 - **Always release state file** on pipeline completion
 - On unrecoverable error: save state, kill panes, report to user
+
+## Pane Lifecycle
+
+Side-pane processes can fail silently (path mismatch, agent binary missing, OOM). The pipeline uses **verified pane opening** + **health-monitored polling** to detect and recover.
+
+### Return Codes
+
+| Code | Meaning | stdout token |
+|------|---------|-------------|
+| 0 | Success | pane_id / review_id / sha |
+| 1 | Timeout | `TIMEOUT` |
+| 2 | Pane died | `PANE_DEAD` |
+| 3 | Path invalid | `PATH_INVALID` |
+| 4 | Retry exhausted | `RETRY_FAILED` |
+
+### Startup Verification
+
+`pipeline_open_pane_verified()` validates the directory, opens the pane, waits 3 seconds, then checks `pipeline_pane_alive()`. If the pane died, it re-resolves the worktree path (current + legacy locations) and retries once.
+
+### Health-Monitored Polling
+
+`pipeline_poll_review()` and `pipeline_poll_commits()` accept an optional pane ID. Each iteration:
+1. **Check API first** — the pane may have exited normally after completing its task
+2. **Then check pane health** — if pane is dead and no result found, do one final API check before returning `PANE_DEAD`
+
+This order prevents false positives when a pane exits normally after posting its result.
+
+### Auto-Retry Policy
+
+- **Max 1 automatic retry** per pane-open or polling cycle
+- On retry: re-resolve worktree path via `pipeline_resolve_worktree_path()` (handles legacy paths)
+- On retry failure: report to user with diagnostic token
 
 ## References
 
