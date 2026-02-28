@@ -45,12 +45,19 @@ pipeline_state_delete() {
 # tmux pane management
 # ──────────────────────────────────────────────
 
+pipeline_orchestrator_pane() {
+  # Capture the current pane ID — call at pipeline start to anchor splits
+  tmux display-message -p '#{pane_id}'
+}
+
 pipeline_open_pane() {
-  # Usage: pipeline_open_pane <working_dir> <prompt> [agent]
+  # Usage: pipeline_open_pane <working_dir> <prompt> [agent] [target_pane]
   # agent: "claude" (default) or "codex"
+  # target_pane: pane ID to split from (avoids splitting user's active pane)
   local workdir=$1
   local prompt=$2
   local agent=${3:-claude}
+  local target_pane=$4
 
   local cmd
   if [ "$agent" = "codex" ]; then
@@ -59,8 +66,13 @@ pipeline_open_pane() {
     cmd="claude --dangerously-skip-permissions '$prompt'"
   fi
 
-  tmux split-window -h -P -F '#{pane_id}' \
-    "cd '$workdir' && $cmd"
+  if [ -n "$target_pane" ]; then
+    tmux split-window -h -t "$target_pane" -P -F '#{pane_id}' \
+      "cd '$workdir' && $cmd"
+  else
+    tmux split-window -h -P -F '#{pane_id}' \
+      "cd '$workdir' && $cmd"
+  fi
 }
 
 pipeline_kill_pane() {

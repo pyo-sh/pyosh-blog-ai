@@ -36,6 +36,12 @@ Exists → **resume** ([recovery.md](references/recovery.md)). Not exists → St
 
 **`cd {area}` first** — all git/gh commands must run inside the area's repo directory.
 
+**Capture orchestrator pane** before starting (anchors all future splits to this pane):
+
+```bash
+ORCHESTRATOR_PANE=$(tmux display-message -p '#{pane_id}')
+```
+
 Execute `/dev-build`. After PR creation, write state:
 
 ```json
@@ -46,6 +52,7 @@ Execute `/dev-build`. After PR creation, write state:
   "branch": "feat/issue-42-add-auth",
   "worktree": ".workspace/worktrees/issue-42",
   "agent": "claude",
+  "orchestratorPane": "%0",
   "step": "review",
   "reviewRound": 1,
   "lastReviewId": 0,
@@ -57,14 +64,14 @@ Execute `/dev-build`. After PR creation, write state:
 
 ### 2. Open Review Pane
 
-Use `pipeline_open_pane()` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh):
+Use `pipeline_open_pane()` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh), **passing `$ORCHESTRATOR_PANE`** as target to ensure the split always happens next to the orchestrator — not the user's active pane:
 
 ```bash
 # Claude Code
-REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
+REVIEW_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
   "cd $(pwd)/{area} && claude --dangerously-skip-permissions 'Run /dev-review for PR #{PR#}. After review, exit.'")
 # Codex
-REVIEW_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
+REVIEW_PANE=$(tmux split-window -h -t "$ORCHESTRATOR_PANE" -P -F '#{pane_id}' \
   "cd $(pwd)/{area} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-review for PR #{PR#}. After review, exit.'")
 ```
 
@@ -103,17 +110,22 @@ Triggered by:
 - Step 5: "Fix & Re-review" — fix WARNING + SUGGESTION, then re-review
 - Step 5: "Fix & Merge" — fix only, **skip re-review** (`skipReview: true`)
 
-Kill review pane, open resolve pane in worktree (**at monorepo root `.workspace/`**):
+Open resolve pane by splitting from **`$REVIEW_PANE`** (so it appears next to the review), then kill the review pane. This ensures the resolve pane takes a visible position the user already knows:
 
 ```bash
-tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
+# Split resolve from the review pane (appears to its right)
 # Claude Code
-RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
+RESOLVE_PANE=$(tmux split-window -h -t "$REVIEW_PANE" -P -F '#{pane_id}' \
   "cd $(pwd)/.workspace/worktrees/issue-{N} && claude --dangerously-skip-permissions 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
 # Codex
-RESOLVE_PANE=$(tmux split-window -h -P -F '#{pane_id}' \
+RESOLVE_PANE=$(tmux split-window -h -t "$REVIEW_PANE" -P -F '#{pane_id}' \
   "cd $(pwd)/.workspace/worktrees/issue-{N} && codex exec --dangerously-bypass-approvals-and-sandbox 'Run /dev-resolve for PR #{PR#}. After done, exit.'")
+
+# Now kill the review pane — resolve pane inherits its space
+tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
 ```
+
+> Layout transition: `[Orchestrator | Review]` → `[Orchestrator | Review | Resolve]` → `[Orchestrator | Resolve]`
 
 State → `"step": "resolve", "resolvePane": "{pane_id}"`.
 
