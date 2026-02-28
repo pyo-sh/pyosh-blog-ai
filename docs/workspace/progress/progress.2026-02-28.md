@@ -45,6 +45,16 @@
   - client/server CLAUDE.md: Workflow 섹션을 `/dev-pipeline` 직접 참조로 변경
   - 3개 repo 동시 PR 생성 및 merge (pyosh-blog-ai#3, pyosh-blog-fe#20, pyosh-blog-be#23)
 
+- [x] Standardize labels.json + PR template + CLAUDE.md across 3 repos
+  - labels.json: removed emojis, lowercase names, all English descriptions
+  - Renamed ambiguous labels: HEY→attention, ASK→question, CLEANING→refactor
+  - GitHub remote labels updated via `gh label edit` (rename preserves existing issue associations)
+  - Root repo: deleted legacy priority:5-7 labels from remote
+  - PR template: structured sections (Summary, Changes table, Type checkbox, Author Korean checklist, Reviewer English checklist, Screenshots, Notes)
+  - server/client CLAUDE.md: translated remaining Korean (Workflow section) to English
+  - Root: local merge + push, Server: PR #25 merged, Client: PR #22 merged
+  - Deleted `.workspace/handoffs/handoff_templates.md` (completed handoff)
+
 ## Discoveries
 - **Native installer creates `~/.claude` as a real directory** at Docker build time. `ln -sfn` silently fails to replace a real directory, breaking the auth volume symlink. `npx` did not have this issue.
 - **CLAUDE.md workflow rules have no enforcement mechanism** — they rely on AI judgment. Ambiguous phrasing ("user choice") was treated as optional; making it an explicit IMPORTANT block reduces the chance of skipping.

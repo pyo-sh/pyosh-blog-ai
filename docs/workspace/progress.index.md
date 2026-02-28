@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-02-28 | Labels/PR template standardization + CLAUDE.md English (3 repos) | done |
 | 2026-02-28 | Docker auth volume fix (native installer) + CLAUDE.md English + worktree/post-commit rules | done |
 | 2026-02-28 | Issue 템플릿 개편 + priority 5단계 축소 + 라벨 마이그레이션 (3 repo) | done |
 | 2026-02-28 | dev-pipeline Pane Lifecycle Tracking + 스킬 최적화 + CLAUDE.md repo별 워크플로우 분리 | done |
