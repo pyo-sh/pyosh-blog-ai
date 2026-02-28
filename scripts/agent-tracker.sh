@@ -8,7 +8,10 @@
 
 SESSION="lab"
 INTERVAL=2
-PIPELINE_DIR="/workspace/.workspace/pipeline"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null \
+  || cd "$SCRIPT_DIR/.." && pwd)"
+PIPELINE_DIR="${PIPELINE_DIR:-"$REPO_ROOT/.workspace/pipeline"}"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Colors (blue accent theme, matching context-bar.sh)
@@ -48,6 +51,13 @@ while getopts ":s:i:h" opt; do
     \?) printf 'Unknown option: -%s\n' "$OPTARG"; exit 1 ;;
   esac
 done
+
+# Validate INTERVAL: must be a positive number
+if ! [[ "$INTERVAL" =~ ^[0-9]*\.?[0-9]+$ ]] || \
+   ! awk "BEGIN { exit ($INTERVAL > 0) ? 0 : 1 }"; then
+  printf 'Error: -i INTERVAL must be a positive number (got: %s)\n' "$INTERVAL" >&2
+  exit 1
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Rendering helpers
@@ -104,28 +114,28 @@ parse_claude_pane() {
   local status="idle"
   local bottom8
   bottom8=$(printf '%s' "$captured" | tail -8)
-  if printf '%s' "$bottom8" | grep -qP '✻|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏'; then
+  if printf '%s' "$bottom8" | grep -qE '✻|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏'; then
     status="working"
-  elif printf '%s' "$bottom8" | grep -qP '⏸|plan mode'; then
+  elif printf '%s' "$bottom8" | grep -qE '⏸|plan mode'; then
     status="plan"
   fi
 
   # ── Engine: "Opus 4.6", "Sonnet 4.6", "Haiku 4.5" ────────────────────────
   local model
   model=$(printf '%s' "$captured" \
-    | grep -oP '(Opus|Sonnet|Haiku)\s+[0-9]+\.[0-9]+' | tail -1)
+    | grep -oE '(Opus|Sonnet|Haiku)[[:space:]]+[0-9]+\.[0-9]+' | tail -1)
   [[ -z "$model" ]] && model="Claude"
 
   # ── Token %: "31% of 200k tokens" ────────────────────────────────────────
   local pct=0
   local tok
   tok=$(printf '%s' "$captured" \
-    | grep -oP '[0-9]+(?=% of [0-9]+k tokens)' | tail -1)
+    | grep -oE '[0-9]+% of [0-9]+k tokens' | sed 's/%.*//' | tail -1)
   [[ -n "$tok" ]] && pct=$tok
 
   # ── Task: 💬 line from context-bar hook ──────────────────────────────────
   local task
-  task=$(printf '%s' "$captured" | grep -oP '(?<=💬 ).+' | tail -1)
+  task=$(printf '%s' "$captured" | grep -o '💬 .*' | sed 's/.*💬 //' | tail -1)
   [[ -z "$task" ]] && task="—"
 
   printf '%s|%s|%d|%s' "$model" "$status" "$pct" "$task"
@@ -134,6 +144,50 @@ parse_claude_pane() {
 # ─────────────────────────────────────────────────────────────────────────────
 # Data extraction: Codex
 # ─────────────────────────────────────────────────────────────────────────────
+
+# find_codex_session_file <pane_id>
+# Map a Codex pane to its own session JSONL by inspecting open file descriptors
+# in the pane's process tree. Falls back to the globally most recent file.
+find_codex_session_file() {
+  local pane_id="$1"
+  local pane_pid session_file
+
+  pane_pid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
+
+  if [[ -n "$pane_pid" ]]; then
+    # Collect PIDs in pane's process tree (shell + 2 levels of children)
+    local all_pids=("$pane_pid") child grandchild
+    while IFS= read -r child; do
+      all_pids+=("$child")
+      while IFS= read -r grandchild; do
+        all_pids+=("$grandchild")
+      done < <(pgrep -P "$child" 2>/dev/null)
+    done < <(pgrep -P "$pane_pid" 2>/dev/null)
+
+    # Linux: read /proc/{pid}/fd symlinks for open session files (fast, no lsof)
+    if [[ -d /proc ]]; then
+      local pid
+      for pid in "${all_pids[@]}"; do
+        session_file=$(readlink -f /proc/"$pid"/fd/* 2>/dev/null \
+          | grep -E '\.codex/sessions.*\.jsonl$' | head -1)
+        [[ -n "$session_file" ]] && { printf '%s' "$session_file"; return; }
+      done
+    fi
+
+    # Cross-platform fallback via lsof (if available)
+    if command -v lsof >/dev/null 2>&1; then
+      local pids_str
+      pids_str=$(printf '%s,' "${all_pids[@]}"); pids_str="${pids_str%,}"
+      session_file=$(lsof -p "$pids_str" 2>/dev/null \
+        | awk '$NF ~ /\.codex\/sessions.*\.jsonl$/ { print $NF; exit }')
+      [[ -n "$session_file" ]] && { printf '%s' "$session_file"; return; }
+    fi
+  fi
+
+  # Final fallback: globally most recent session file
+  ls -t ~/.codex/sessions/*/*/*-*.jsonl 2>/dev/null | head -1
+}
+
 parse_codex_pane() {
   local pane_id="$1"
   local captured
@@ -141,9 +195,9 @@ parse_codex_pane() {
 
   local model="Codex" status="idle" pct=0 task="—"
 
-  # Most recent session JSONL
+  # Pane-specific session JSONL (falls back to globally most recent)
   local session_file
-  session_file=$(ls -t ~/.codex/sessions/*/*/*-*.jsonl 2>/dev/null | head -1)
+  session_file=$(find_codex_session_file "$pane_id")
 
   if [[ -n "$session_file" && -f "$session_file" ]]; then
     # ── Engine ───────────────────────────────────────────────────────────────
@@ -174,7 +228,7 @@ parse_codex_pane() {
   local bottom5
   bottom5=$(printf '%s' "$captured" | tail -5)
   if printf '%s' "$bottom5" \
-      | grep -qP '[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]|Working\.\.\.|Generating'; then
+      | grep -qE '[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]|Working\.\.\.|Generating'; then
     status="working"
   fi
 
