@@ -1,6 +1,16 @@
 # Progress: 2026-02-28
 
 ## Completed
+- [x] Fix Docker auth volume symlink failure with native Claude Code installer
+  - `Dockerfile`: `rm -rf ~/.claude ~/.claude.json` after install to prevent stale image layer directory
+  - `entrypoint.sh`: defensive removal of real dirs/files before symlink creation
+  - `entrypoint.sh`: 3rd `elif` branch to auto-correct stale `statusLine.command` path
+  - `entrypoint.sh`: fixed heredoc single-quote preventing `$STATUSLINE_CMD` interpolation
+- [x] Add worktree-first enforcement rule to CLAUDE.md
+  - Added IMPORTANT block: any file edit must be preceded by worktree creation
+- [x] Translate CLAUDE.md to English + add post-commit stop rule
+  - Full English translation of all Korean prose
+  - Added IMPORTANT block: always stop and ask user after commit (never auto-merge)
 - [x] Issue 템플릿 개편 및 priority 라벨 5단계 축소 (3개 repo 동시 적용)
   - ISSUE.md 삭제, bug/feature/refactor.yml 신규 추가
   - 공통 필드 통일: Area dropdown(client/server/workspace), Scope, Definition of Done, Priority(required)
@@ -36,6 +46,8 @@
   - 3개 repo 동시 PR 생성 및 merge (pyosh-blog-ai#3, pyosh-blog-fe#20, pyosh-blog-be#23)
 
 ## Discoveries
+- **Native installer creates `~/.claude` as a real directory** at Docker build time. `ln -sfn` silently fails to replace a real directory, breaking the auth volume symlink. `npx` did not have this issue.
+- **CLAUDE.md workflow rules have no enforcement mechanism** — they rely on AI judgment. Ambiguous phrasing ("user choice") was treated as optional; making it an explicit IMPORTANT block reduces the chance of skipping.
 - tmux pane은 window별 레이아웃 독립 관리 — 다른 window에서 split해도 전환 시 정상 표시
 - `tmux list-panes` 기본값은 현재 window만 검색 → `-a` 필수 for cross-window/session
 - `grep -q "%1"` → `%10`, `%100`에도 매칭됨 → `grep -qx` 앵커 필요
