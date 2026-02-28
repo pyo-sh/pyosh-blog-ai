@@ -1,9 +1,6 @@
 ---
 name: writing-plans
-description: >
-  Write detailed implementation plans from specs or requirements before touching code.
-  Use when: (1) brainstorming skill produces a design doc, (2) user has a spec and needs
-  a step-by-step plan, (3) user says "/writing-plans", "create plan", "implementation plan".
+description: "Write detailed implementation plans from specs or requirements before touching code. Use when: (1) brainstorming skill produces a design doc, (2) user has a spec and needs a step-by-step plan, (3) user says '/writing-plans', 'create plan', 'implementation plan'."
 ---
 
 # Writing Plans
@@ -18,10 +15,10 @@ Write implementation plans with exact file paths, complete code, and test comman
 
 ## Verify Commands
 
-| Area | Test | Build |
-|------|------|-------|
-| `client` | N/A | `pnpm compile:types && pnpm lint && pnpm build` |
-| `server` | `pnpm test` | `pnpm dev` |
+| Area     | Test        | Build                                           |
+| -------- | ----------- | ----------------------------------------------- |
+| `client` | N/A         | `pnpm compile:types && pnpm lint && pnpm build` |
+| `server` | `pnpm test` | `pnpm dev`                                      |
 
 ## Plan Document Header
 
@@ -34,6 +31,7 @@ Write implementation plans with exact file paths, complete code, and test comman
 **Tech Stack:** [Key technologies]
 
 **References:**
+
 - Design doc: `docs/workspace/decisions/YYYY-MM-DD-<topic>-design.md`
 - Area CLAUDE.md: `{area}/CLAUDE.md`
 
@@ -48,6 +46,7 @@ Write implementation plans with exact file paths, complete code, and test comman
 ### Task N: [Component Name]
 
 **Files:**
+
 - Create: `src/exact/path/to/file.ts`
 - Modify: `src/exact/path/to/existing.ts:123-145`
 - Test: `src/exact/path/to/__tests__/file.test.ts`
@@ -55,10 +54,10 @@ Write implementation plans with exact file paths, complete code, and test comman
 **Step 1: Write failing test**
 
 ```typescript
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 
-describe('specificBehavior', () => {
-  it('should do expected thing', () => {
+describe("specificBehavior", () => {
+  it("should do expected thing", () => {
     const result = functionUnderTest(input);
     expect(result).toEqual(expected);
   });
@@ -89,27 +88,30 @@ Run: `pnpm test -- src/exact/path/to/__tests__/file.test.ts`
 ### Task N: [Component Name]
 
 **Files:**
+
 - Create: `src/features/example/ui/example-component.tsx`
 - Modify: `src/app/example/page.tsx`
 
 **Step 1: Create component**
 
 ```tsx
-'use client';
+"use client";
 
-import { cn } from '@/shared/lib/utils';
+import { cn } from "@/shared/lib/utils";
 
-interface ExampleProps { title: string; }
+interface ExampleProps {
+  title: string;
+}
 
 export function Example({ title }: ExampleProps) {
-  return <div className={cn('text-foreground-1')}>{title}</div>;
+  return <div className={cn("text-foreground-1")}>{title}</div>;
 }
 ```
 
 **Step 2: Integrate in page**
 
 ```tsx
-import { Example } from '@/features/example/ui/example-component';
+import { Example } from "@/features/example/ui/example-component";
 ```
 
 **Step 3: Verify build**
