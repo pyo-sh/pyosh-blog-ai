@@ -51,6 +51,11 @@
   - 이슈 포맷: 하드코딩된 마크다운 템플릿 → 각 repo의 `.github/ISSUE_TEMPLATE/*.yml` 참조로 변경
   - `references/priority-guide.md` 삭제 (0-7 체계가 ISSUE_TEMPLATE의 0-4와 불일치)
   - skill-creator 기반 구조 최적화: description 트리거 강화, 중복 제거, 84행 → 52행 (-38%)
+- [x] brainstorming + writing-plans 스킬 경로 및 구조 개선
+  - brainstorming: design doc 출력 경로 `docs/plans/` → `docs/workspace/decisions/`
+  - writing-plans: 플랜 저장 경로 `docs/plans/` → `docs/{area}/plans/`
+  - writing-plans: 실행 핸드오프(subagent/manual) → `/dev-issue` 즉시 실행 or decisions 분리 선택지로 교체
+  - writing-plans: skill-creator 기반 최적화 195행 → 121행 (-38%)
 
 - [x] Feature Spec v1 리비전 + Implementation Plan → GitHub Issues 마이그레이션
   - `docs/client/feature_spec.md` 서버 API 대조 검토 후 리비전 (12건 인터뷰 Q&A 반영)
