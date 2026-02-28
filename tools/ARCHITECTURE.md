@@ -15,7 +15,8 @@ Host OS
                  └─ tmux "lab"      ← tmux/docker.tmux.conf
                       ├─ window 0: lab (2x2 tiled, 4 panes)
                       ├─ window 1-2: server agents (4 panes each)
-                      └─ window 3-4: client agents (4 panes each)
+                      ├─ window 3-4: client agents (4 panes each)
+                      └─ window 5: tracker (2 panes left/right — left auto-starts agent-tracker.sh)
 ```
 
 ## Files
