@@ -74,6 +74,7 @@ worktree 생성 → 작업 → 사용자 선택 (로컬 merge 또는 PR) → /de
 
 - main + feature branches only. Never push directly to main.
 - All work must go through a worktree (`.workspace/worktrees/`).
+- main에 merge 전 반드시 `git pull origin main`으로 remote 동기화.
 - Multi-agent: 1 agent = 1 task, worktree isolation. 같은 파일을 동시에 수정하지 않는다.
 
 ## Skills
