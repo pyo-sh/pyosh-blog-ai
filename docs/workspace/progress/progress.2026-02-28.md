@@ -1,6 +1,15 @@
 # Progress: 2026-02-28
 
 ## Completed
+- [x] Issue 템플릿 개편 및 priority 라벨 5단계 축소 (3개 repo 동시 적용)
+  - ISSUE.md 삭제, bug/feature/refactor.yml 신규 추가
+  - 공통 필드 통일: Area dropdown(client/server/workspace), Scope, Definition of Done, Priority(required)
+  - 템플릿별 특성 유지: bug(Symptom/Logs/Cause/Solution), feature(Goal/Context/Requirements/Tech), refactor(Problem/Improvement)
+  - label 영어화 (Goal, Symptom, Problem 등), description/placeholder는 한국어 유지
+  - priority 8단계(priority:0~7) → 5단계(priority:0~4: Critical/High/Medium/Low/Backlog)
+  - labels.json 동기화 (3개 repo 동일)
+  - client/server 기존 이슈 priority 라벨 마이그레이션 (client 15건, server 11건)
+  - 3개 repo 동시 PR 생성 및 merge (pyosh-blog-ai#4, pyosh-blog-fe#21, pyosh-blog-be#24)
 - [x] Docker 컨테이너 Claude Code를 native installer로 전환
   - Dockerfile: `npm install -g @anthropic-ai/claude-code` → `curl -fsSL https://claude.ai/install.sh | bash` (USER dev 이후 실행)
   - `.bash_aliases`: `dev-update()` 내 Claude Code 업데이트를 native installer 재실행으로 변경
