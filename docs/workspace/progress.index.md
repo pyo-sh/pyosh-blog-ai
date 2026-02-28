@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | PR #8 리뷰 코멘트 수정 — agent-tracker.sh: PIPELINE_DIR 경로, grep -P 이식성, Codex 세션 매핑, INTERVAL 검증 | done |
 | 2026-03-01 | tmux Agent Tracker 대시보드 `scripts/agent-tracker.sh` 구현 (#7) | done |
 | 2026-03-01 | Docker 컨테이너 TZ 기본값 Seoul 버그 수정 (docker-compose + entrypoint 데드 브랜치 제거) | done |
 | 2026-02-28 | brainstorming + writing-plans 스킬 경로/구조 개선 + 최적화 | done |

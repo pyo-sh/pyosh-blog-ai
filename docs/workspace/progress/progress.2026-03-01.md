@@ -29,3 +29,17 @@
 ## Discoveries (2)
 - Claude Code 상태 판별: `tmux capture-pane` 하단 8줄에서 spinner(✻, ⠋…) → working, `⏸` → plan, `❯` → idle 순으로 매칭
 - Codex 데이터: `~/.codex/sessions/*/*/*-*.jsonl` 중 최신 파일을 jq로 파싱 (`turn_context`, `token_count`, `user_message` 이벤트)
+
+---
+
+## Completed (3)
+- [x] PR #8 리뷰 코멘트 수정 — `scripts/agent-tracker.sh`
+  - **[WARNING] PIPELINE_DIR 하드코딩**: `git rev-parse --show-toplevel` 기반으로 리포 루트 자동 감지 + `$PIPELINE_DIR` 환경변수 오버라이드 지원
+  - **[WARNING] `grep -P` 이식성**: 모든 `grep -P`를 `grep -E` / `grep -oE | sed` 로 교체 — lookbehind/lookahead 패턴은 `grep -o + sed` 로 대체
+  - **[WARNING] Codex 세션 전역 최신 파일**: `find_codex_session_file()` 함수 추가 — 패인 PID → 프로세스 트리 → `/proc/{pid}/fd` (Linux) → lsof 폴백 순으로 패인별 세션 JSONL 특정
+  - **[SUGGESTION] INTERVAL 검증**: 인자 파싱 후 정규식 + awk로 양수 여부 검증, 잘못된 값 시 즉시 에러 종료
+
+## Discoveries (3)
+- `grep -P` lookbehind `(?<=💬 )` → `grep -o '💬 .*' | sed 's/.*💬 //'` 패턴으로 POSIX 호환 대체
+- `grep -P` lookahead `[0-9]+(?=% of...)` → `grep -oE '...' | sed 's/%.*//'` 파이프라인으로 대체
+- Linux `/proc/{pid}/fd` 심링크 스캔이 `lsof` 없이도 열린 파일 특정 가능 — 빠르고 의존성 없음
