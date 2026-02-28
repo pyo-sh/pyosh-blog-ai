@@ -15,7 +15,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Context:** This should be run in the same worktree where the design doc was created (by brainstorming skill).
 
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
+**Save plans to:** `docs/{area}/plans/YYYY-MM-DD-<feature-name>.md`
 
 ## Project Context
 
@@ -57,7 +57,7 @@ This is a monorepo with independent Git repos per area. Always specify the targe
 **Tech Stack:** [Key technologies/libraries from the area]
 
 **References:**
-- Design doc: `docs/plans/YYYY-MM-DD-<topic>-design.md`
+- Design doc: `docs/workspace/decisions/YYYY-MM-DD-<topic>-design.md`
 - Area CLAUDE.md: `{area}/CLAUDE.md`
 
 ---
@@ -176,7 +176,7 @@ git commit -m "feat: add example component"
 
 After saving the plan, offer execution choice:
 
-**"Plan complete and saved to `docs/plans/<filename>.md`. How would you like to proceed?**
+**"Plan complete and saved to `docs/{area}/plans/<filename>.md`. How would you like to proceed?**
 
 **1. Subagent-Driven (this session)** — I dispatch a fresh subagent per task, review between tasks, fast iteration
 
