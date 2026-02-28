@@ -61,6 +61,7 @@ Follow this order when receiving coding tasks:
 ## Git Workflow
 
 main + feature branches only. Never push directly to main.
+**All work must go through a worktree** (`.workspace/worktrees/`) — never commit directly on `main`.
 
 ```
 Branch: {feat|fix|docs|refactor}/issue-{N}-{description}
@@ -69,7 +70,7 @@ PR:     Include Closes #{N}
 ```
 
 ```
-Check Issue → create worktree → code → push → PR → review → user approval → merge → cleanup worktree
+Check Issue → create worktree (.workspace/worktrees/) → code → push → PR → review → user approval → merge → cleanup worktree
 ```
 
 ## Multi-Agent
