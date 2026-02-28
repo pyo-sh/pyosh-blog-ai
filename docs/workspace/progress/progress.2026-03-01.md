@@ -43,3 +43,14 @@
 - `grep -P` lookbehind `(?<=💬 )` → `grep -o '💬 .*' | sed 's/.*💬 //'` 패턴으로 POSIX 호환 대체
 - `grep -P` lookahead `[0-9]+(?=% of...)` → `grep -oE '...' | sed 's/%.*//'` 파이프라인으로 대체
 - Linux `/proc/{pid}/fd` 심링크 스캔이 `lsof` 없이도 열린 파일 특정 가능 — 빠르고 의존성 없음
+
+---
+
+## Completed (4)
+- [x] PR #8 머지 완료 — Issue #7 종료 (3 round 리뷰 통과)
+  - `tools/tmux/session.docker.yml`: `tracker` window 추가
+    - `layout: even-horizontal` (좌우 2 panes)
+    - 왼쪽 pane: `bash scripts/agent-tracker.sh` 자동 실행
+    - 오른쪽 pane: 빈 pane (자유 사용)
+  - `tools/ARCHITECTURE.md`: tmux lab 세션 window 5 설명 추가
+  - squash merge → `pyo-sh/pyosh-blog-ai#8`
