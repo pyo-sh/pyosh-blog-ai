@@ -45,6 +45,30 @@
   - client/server CLAUDE.md: Workflow 섹션을 `/dev-pipeline` 직접 참조로 변경
   - 3개 repo 동시 PR 생성 및 merge (pyosh-blog-ai#3, pyosh-blog-fe#20, pyosh-blog-be#23)
 
+- [x] Feature Spec v1 리비전 + Implementation Plan → GitHub Issues 마이그레이션
+  - `docs/client/feature_spec.md` 서버 API 대조 검토 후 리비전 (12건 인터뷰 Q&A 반영)
+  - Phase 1-4 client implementation plans 작성 (`docs/client/plans/`)
+  - Server v1 API status 문서 작성 (`docs/server/plans/v1-api-status.md`)
+  - 48개 decision files → GitHub Issues 변환 (pyo-sh/pyosh-blog-fe #23-#70)
+    - Phase 1 Core (priority:1): 15 issues — Post, Pagination, Markdown, Category
+    - Phase 2 Admin (priority:1): 12 issues — CSRF, Auth, Dashboard, Editor
+    - Phase 3 Public (priority:2): 10 issues — Comments, Guestbook, Tags, Popular, View Count
+    - Phase 4 Extras (priority:3): 11 issues — Category Admin, Assets, SEO, Search
+  - 기존 client issues #5-#18 close + delete (새 plan으로 대체)
+  - 중복 issues #71-#117 삭제
+  - Server issue pyo-sh/pyosh-blog-be#26 생성 (v1 API 상태 문서화, priority:2)
+  - plan/decision files 정리 삭제 후 커밋
+
+- [x] Standardize labels.json + PR template + CLAUDE.md across 3 repos
+  - labels.json: removed emojis, lowercase names, all English descriptions
+  - Renamed ambiguous labels: HEY→attention, ASK→question, CLEANING→refactor
+  - GitHub remote labels updated via `gh label edit` (rename preserves existing issue associations)
+  - Root repo: deleted legacy priority:5-7 labels from remote
+  - PR template: structured sections (Summary, Changes table, Type checkbox, Author Korean checklist, Reviewer English checklist, Screenshots, Notes)
+  - server/client CLAUDE.md: translated remaining Korean (Workflow section) to English
+  - Root: local merge + push, Server: PR #25 merged, Client: PR #22 merged
+  - Deleted `.workspace/handoffs/handoff_templates.md` (completed handoff)
+
 ## Discoveries
 - **Native installer creates `~/.claude` as a real directory** at Docker build time. `ln -sfn` silently fails to replace a real directory, breaking the auth volume symlink. `npx` did not have this issue.
 - **CLAUDE.md workflow rules have no enforcement mechanism** — they rely on AI judgment. Ambiguous phrasing ("user choice") was treated as optional; making it an explicit IMPORTANT block reduces the chance of skipping.

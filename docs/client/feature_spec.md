@@ -13,10 +13,11 @@
 | `/` | 홈 — 최신 글 목록 (페이지네이션) | `GET /api/posts` |
 | `/posts/[slug]` | 글 상세 (MD 렌더링 + 댓글) | `GET /api/posts/:slug` |
 | `/categories/[slug]` | 카테고리별 글 목록 | `GET /api/posts?categoryId=N` |
-| `/tags` | 태그 목록 | `GET /api/posts` 태그 집계 |
+| `/tags` | 태그 목록 | `GET /api/tags` |
 | `/tags/[slug]` | 태그별 글 목록 | `GET /api/posts?tagSlug=xxx` |
 | `/popular` | 인기 글 | `GET /api/stats/popular` |
 | `/guestbook` | 방명록 | `GET /api/guestbook` |
+| `/search?q=keyword` | 검색 결과 | `GET /api/posts?q=keyword` |
 
 ### Admin (관리자) — prefix: `/dashboard`
 
@@ -29,6 +30,8 @@
 | `/dashboard/posts/[id]/edit` | 글 수정 | `PATCH /api/admin/posts/:id` |
 | `/dashboard/categories` | 카테고리 관리 | `GET /api/categories` |
 | `/dashboard/assets` | 에셋 라이브러리 | `GET /api/assets`, `POST /api/assets/upload` |
+| `/dashboard/comments` | 댓글 관리 | `GET /api/admin/comments` |
+| `/dashboard/guestbook` | 방명록 관리 | `GET /api/admin/guestbook` |
 
 ---
 
@@ -38,7 +41,7 @@
 
 ```
 ┌─────────────────────────────────┐
-│           Header                │  ← 로고, 네비게이션, 테마 토글
+│           Header                │  ← 로고, 네비게이션, 검색, 테마 토글
 ├─────────────────────────────────┤
 │                                 │
 │         Main Content            │  ← 사이드바 없음, 단일 컬럼
@@ -61,6 +64,8 @@
 │ Sidebar  │                      │
 │ - 글     │    Main Content      │
 │ - 카테고리│                      │
+│ - 댓글   │                      │
+│ - 방명록 │                      │
 │ - 에셋   │                      │
 ├──────────┴──────────────────────┤
 │           Footer                │
@@ -74,14 +79,14 @@
 ### 3.1 홈 — 글 목록 (`/`)
 
 - **레이아웃**: 리스트형 (세로 목록)
-- **항목 표시**: 썸네일(선택) + 제목 + 요약(contentMd 앞부분) + 카테고리 + 태그 + 작성일
+- **항목 표시**: 썸네일(선택, `next/image`) + 제목 + 요약(contentMd 앞부분) + 카테고리 + 태그 + 작성일
 - **페이지네이션**: 번호 기반 (`?page=N`)
 - **정렬**: 최신순 (published_at desc) 기본
 
 ### 3.2 글 상세 (`/posts/[slug]`)
 
 - **마크다운 렌더링**: 서버 사이드 (Server Component에서 HTML로 변환)
-  - 코드 하이라이팅 지원
+  - 코드 하이라이팅: `shiki`
   - 이미지, 테이블, 인용문 등 기본 MD 문법
 - **이전/다음 글 네비게이션**: API의 `prevPost`/`nextPost` 활용
 - **메타 정보**: 카테고리, 태그, 작성일, 수정일
@@ -95,7 +100,7 @@
 
 ### 3.4 태그 (`/tags`, `/tags/[slug]`)
 
-- `/tags`: 전체 태그 클라우드/목록
+- `/tags`: 전체 태그 클라우드/목록 (`GET /api/tags` — post count 포함)
 - `/tags/[slug]`: 해당 태그의 글 목록 (홈과 동일 레이아웃)
 
 ### 3.5 인기 글 (`/popular`)
@@ -110,7 +115,7 @@
 - 작성 시: 이름, 이메일, 비밀번호, 본문 입력
 - 삭제 시: 비밀번호 확인
 - **계층형**: depth 1까지 대댓글 지원
-- **비밀 댓글**: `isSecret` 플래그 — 작성자 본인과 관리자만 내용 확인 가능
+- **비밀 댓글**: `isSecret` 플래그 — 공개 화면에서 "비밀 댓글입니다" 마스킹. 관리자 대시보드에서만 내용 확인 가능
 
 ### 3.7 방명록 (`/guestbook`)
 
@@ -120,8 +125,17 @@
 
 ### 3.8 조회수 기록
 
-- 글 상세 페이지 진입 시 `POST /api/stats/view` 호출
-- 클라이언트에서 자동 호출 (중복 제거는 서버 담당)
+- 글 상세 페이지 마운트 시 클라이언트 `useEffect`에서 `POST /api/stats/view` 호출
+- `sessionStorage`로 이미 조회한 글 추적 → 같은 세션 내 재방문 시 API 호출 생략
+- 추가 중복 제거는 서버 담당
+
+### 3.9 검색 (`/search`)
+
+- 헤더 네비게이션에 검색 아이콘/바 추가
+- `/search?q=keyword` 페이지에서 결과 표시
+- `GET /api/posts?q=keyword` 활용 (서버 사이드 검색)
+- 결과 레이아웃은 홈 글 목록과 동일
+- 페이지네이션 지원
 
 ---
 
@@ -147,7 +161,7 @@
 
 ### 4.4 글 에디터 (`/dashboard/posts/new`, `/dashboard/posts/[id]/edit`)
 
-- **텍스트에어리아 + 실시간 프리뷰** (좌: 마크다운 입력, 우: 렌더링 미리보기)
+- **순수 textarea + 실시간 프리뷰** (좌: 마크다운 입력, 우: 렌더링 미리보기)
 - **입력 필드**:
   - 제목 (max 200)
   - 본문 (마크다운)
@@ -175,6 +189,18 @@
 - URL 복사 기능 (마크다운/일반)
 - 삭제 기능
 
+### 4.7 댓글 관리 (`/dashboard/comments`)
+
+- 전체 댓글 목록 (페이지네이션)
+- 비밀 댓글 내용 확인 가능
+- 강제 삭제 기능
+- 필터: 게시글별, 비밀 여부
+
+### 4.8 방명록 관리 (`/dashboard/guestbook`)
+
+- 전체 방명록 목록 (페이지네이션)
+- 강제 삭제 기능
+
 ---
 
 ## 5. 기술 결정
@@ -190,8 +216,8 @@
 ### 5.2 마크다운 렌더링
 
 - **서버 사이드**: Server Component에서 MD → HTML 변환
-- 라이브러리 후보: `unified` + `remark` + `rehype` 파이프라인
-- 코드 하이라이팅: `rehype-highlight` 또는 `shiki`
+- 라이브러리: `unified` + `remark` + `rehype` 파이프라인
+- 코드 하이라이팅: `shiki`
 - HTML sanitize 적용
 
 ### 5.3 SEO
@@ -206,6 +232,19 @@
 - Next.js middleware로 `/dashboard/*` 보호
 - `GET /api/auth/me`로 세션 유효성 확인
 
+### 5.5 이미지 처리
+
+- 썸네일: `next/image` 컴포넌트 (자동 최적화, lazy loading)
+- 마크다운 본문 내 이미지: 일반 `<img>` (rehype에서 렌더링)
+- `next.config`에 API 서버 도메인을 `remotePatterns`에 등록
+
+### 5.6 에러/로딩 상태
+
+- 글로벌 `loading.tsx` — 스켈레톤 또는 스피너
+- 글로벌 `error.tsx` — 에러 메시지 + 재시도 버튼
+- 글로벌 `not-found.tsx` — 404 페이지
+- 페이지별 전용 UI는 필요 시 추가
+
 ---
 
 ## 6. 디렉토리 구조 (예상)
@@ -215,6 +254,9 @@ client/src/
 ├── app/
 │   ├── layout.tsx                    # 루트 레이아웃
 │   ├── page.tsx                      # 홈 (글 목록)
+│   ├── loading.tsx                   # 글로벌 로딩
+│   ├── error.tsx                     # 글로벌 에러
+│   ├── not-found.tsx                 # 404
 │   ├── posts/
 │   │   └── [slug]/page.tsx           # 글 상세
 │   ├── categories/
@@ -226,6 +268,8 @@ client/src/
 │   │   └── page.tsx                  # 인기 글
 │   ├── guestbook/
 │   │   └── page.tsx                  # 방명록
+│   ├── search/
+│   │   └── page.tsx                  # 검색 결과
 │   └── dashboard/
 │       ├── login/page.tsx            # 관리자 로그인
 │       ├── layout.tsx                # Admin 레이아웃 (사이드바)
@@ -236,11 +280,16 @@ client/src/
 │       │   └── [id]/edit/page.tsx    # 글 수정
 │       ├── categories/
 │       │   └── page.tsx              # 카테고리 관리
-│       └── assets/
-│           └── page.tsx              # 에셋 라이브러리
+│       ├── assets/
+│       │   └── page.tsx              # 에셋 라이브러리
+│       ├── comments/
+│       │   └── page.tsx              # 댓글 관리
+│       └── guestbook/
+│           └── page.tsx              # 방명록 관리
 ├── entities/
 │   ├── post/                         # Post 타입, API 함수
 │   ├── category/                     # Category 타입, API 함수
+│   ├── tag/                          # Tag 타입, API 함수
 │   ├── comment/                      # Comment 타입, API 함수
 │   ├── guestbook/                    # Guestbook 타입, API 함수
 │   ├── asset/                        # Asset 타입, API 함수
@@ -250,10 +299,12 @@ client/src/
 │   ├── post-detail/                  # 글 상세 (MD 렌더링)
 │   ├── comment-section/              # 댓글 작성/목록
 │   ├── guestbook-form/               # 방명록 작성
+│   ├── search/                       # 검색 기능
 │   ├── admin-login/                  # 로그인 폼
 │   ├── post-editor/                  # 마크다운 에디터 + 프리뷰
 │   ├── category-manager/             # 카테고리 CRUD
-│   └── asset-uploader/               # 이미지 업로드
+│   ├── asset-uploader/               # 이미지 업로드
+│   └── admin-comment-manager/        # Admin 댓글/방명록 관리
 ├── widgets/
 │   ├── header/                       # (기존) 공개 헤더
 │   ├── footer/                       # (기존) 푸터
@@ -263,6 +314,7 @@ client/src/
 ├── shared/
 │   ├── ui/                           # (기존) Button, Modal, Text 등
 │   ├── lib/                          # (기존) 유틸리티
+│   ├── hooks/                        # (기존) 공통 훅
 │   ├── constant/                     # (기존) 상수
 │   └── api/                          # API 클라이언트 (fetch wrapper)
 └── app-layer/
@@ -276,37 +328,37 @@ client/src/
 ## 7. 구현 우선순위
 
 ### Phase 1: 핵심 골격
-1. API 클라이언트 설정 (`shared/api/`)
+1. ~~API 클라이언트 설정 (`shared/api/`)~~ ✅ 완료
 2. 홈 — 글 목록 페이지
-3. 글 상세 페이지 (MD 서버 렌더링)
+3. 글 상세 페이지 (MD 서버 렌더링, shiki 코드 하이라이팅)
 4. 카테고리 네비게이션 (헤더 통합)
 
 ### Phase 2: Admin 기본
 5. 관리자 로그인 + 인증 미들웨어
 6. 대시보드 (통계)
 7. 글 목록 (Admin)
-8. 글 에디터 (생성/수정)
+8. 글 에디터 (순수 textarea + 프리뷰)
 
 ### Phase 3: 공개 부가 기능
-9. 댓글 시스템 (게스트)
+9. 댓글 시스템 (게스트, 비밀댓글 마스킹)
 10. 방명록
-11. 태그 목록/필터
+11. 태그 목록/필터 (`GET /api/tags`)
 12. 인기 글
-13. 조회수 기록
+13. 조회수 기록 (useEffect + sessionStorage 중복 방지)
 
-### Phase 4: Admin 부가 기능
+### Phase 4: 부가 기능
 14. 카테고리 관리
 15. 에셋 라이브러리
 16. SEO 최적화 (meta, OG, sitemap/RSS 연동)
+17. 검색 기능 (헤더 검색바 + 결과 페이지)
+18. Admin 댓글/방명록 관리
 
 ---
 
 ## 8. 제외 항목 (후속 버전)
 
 - OAuth 로그인 (Google/GitHub) — 댓글/방명록에서 사용
-- 검색 기능
 - 글 시리즈/연재
 - 뉴스레터/구독
-- 관리자 댓글 관리 페이지
 - 관리자 사용자 관리
 - i18n (다국어)
