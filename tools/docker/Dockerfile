@@ -26,8 +26,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
     && rm -rf /var/lib/apt/lists/*
 
-# Claude Code CLI & Codex CLI
-RUN npm install -g @anthropic-ai/claude-code @openai/codex
+# Codex CLI
+RUN npm install -g @openai/codex
 
 # entrypoint 스크립트
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -45,6 +45,11 @@ RUN git clone https://github.com/tmux-plugins/tpm /home/dev/.tmux/plugins/tpm \
     && chown -R dev:dev /home/dev/.tmux
 
 USER dev
+
+# Claude Code CLI (native installer — ~/.local/bin/claude)
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/home/dev/.local/bin:$PATH"
+
 WORKDIR /workspace
 
 ENTRYPOINT ["entrypoint.sh"]

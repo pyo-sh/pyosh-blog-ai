@@ -23,7 +23,7 @@ Host OS
 ```
 tools/
 ├── docker/
-│   ├── Dockerfile          # Image (Node 22, pnpm, Python, gh, Claude Code, Codex)
+│   ├── Dockerfile          # Image (Node 22, pnpm, Python, gh, Claude Code native, Codex)
 │   ├── docker-compose.yaml # Service definition, volume mounts
 │   ├── entrypoint.sh       # Init (auth symlinks, config linking, dev-update)
 │   └── .bash_aliases       # Agent aliases and helper functions

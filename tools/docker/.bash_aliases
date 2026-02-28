@@ -17,8 +17,11 @@ dev-update() {
   # System packages
   sudo apt-get update && sudo apt-get upgrade -y && sudo rm -rf /var/lib/apt/lists/*
 
-  # Claude Code CLI & Codex CLI
-  sudo npm update -g @anthropic-ai/claude-code @openai/codex
+  # Claude Code CLI (native installer)
+  curl -fsSL https://claude.ai/install.sh | bash
+
+  # Codex CLI
+  sudo npm update -g @openai/codex
 
   # pnpm (corepack)
   sudo corepack prepare pnpm@latest --activate
