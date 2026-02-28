@@ -1,9 +1,9 @@
 ---
-name: dev-plan
-description: Convert decision files in decisions/ directory to GitHub Issues. Establish tasks from decision files, register Issues, and clean up files. Used as a pre-step before /dev-build. Activates on "/dev-plan", "create issues", "convert decisions to issues", etc.
+name: dev-issue
+description: Convert decision files in decisions/ directory to GitHub Issues. Establish tasks from decision files, register Issues, and clean up files. Used as a pre-step before /dev-build. Activates on "/dev-issue", "create issues", "convert decisions to issues", etc.
 ---
 
-# Dev-Plan
+# Dev-Issue
 
 Convert decision files → GitHub Issues → clean up. Pre-step for `/dev-build`. Git remote rules in `CLAUDE.md`.
 

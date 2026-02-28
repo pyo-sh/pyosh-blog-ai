@@ -134,7 +134,7 @@ cp .env.example .env
 | **dev-review** | PR 코드 리뷰 (심각도: Critical / Warning / Suggestion) |
 | **dev-resolve** | 리뷰 코멘트 대응 및 코드 수정 |
 | **dev-log** | progress / findings / decisions 기록 관리 |
-| **dev-plan** | decisions 파일을 GitHub Issue로 변환 |
+| **dev-issue** | decisions 파일을 GitHub Issue로 변환 |
 
 ### 리뷰 심각도와 Merge 흐름
 
