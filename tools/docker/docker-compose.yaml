@@ -9,10 +9,8 @@ services:
       - ../../:/workspace
       # 인증/설정 (독립 volume — 컨테이너 재생성해도 유지)
       - dev-auth:/home/dev/.auth
-      # tmux 설정
-      - ../tmux/docker.tmux.conf:/home/dev/.tmux.conf:ro
-      # bash aliases
-      - ./.bash_aliases:/home/dev/.bash_aliases:ro
+      # tmux, bash_aliases는 /workspace 심링크로 연결 (entrypoint.sh)
+      # 단일 파일 bind mount는 에디터가 inode를 교체하면 깨지므로 사용하지 않음
     environment:
       - TZ=${TZ:-}
     env_file:

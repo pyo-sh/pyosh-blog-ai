@@ -54,6 +54,12 @@ elif ! jq -e '.statusLine' "$claude_settings" > /dev/null 2>&1; then
     "$claude_settings" > "${claude_settings}.tmp" && mv "${claude_settings}.tmp" "$claude_settings"
 fi
 
+# ── 설정 파일 심링크 (/workspace 디렉토리 마운트 경유) ──
+# 단일 파일 bind mount는 에디터가 inode를 교체하면 깨지므로
+# /workspace (디렉토리 마운트)를 경유하는 심링크로 연결
+ln -sfn /workspace/tools/tmux/docker.tmux.conf /home/dev/.tmux.conf
+ln -sfn /workspace/tools/docker/.bash_aliases /home/dev/.bash_aliases
+
 # .bash_aliases 로드 (dev-update 함수 사용)
 [ -f /home/dev/.bash_aliases ] && . /home/dev/.bash_aliases
 
