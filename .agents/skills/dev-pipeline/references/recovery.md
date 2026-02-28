@@ -31,15 +31,16 @@ gh pr list --head {branch} --json number,state --jq '.[0]'
 
 ### step: "review"
 
-Review may or may not be submitted.
+Review may or may not be submitted. Use `lastReviewId` from state to check for new reviews only:
 
 ```bash
 cd {area}
-gh api repos/{owner}/{repo}/pulls/{PR#}/reviews --jq '.[-1].state'
+source scripts/pipeline-helpers.sh
+REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId} 0)
 ```
 
-- Review exists → parse result, proceed to resolve or merge approval
-- No review → re-trigger review pane
+- `REVIEW_ID` != "TIMEOUT" → `eval "$(pipeline_analyze_review ...)"`, update `lastReviewId`, proceed per Step 3 decision logic
+- "TIMEOUT" (no new review) → re-trigger review pane
 
 ### step: "resolve"
 

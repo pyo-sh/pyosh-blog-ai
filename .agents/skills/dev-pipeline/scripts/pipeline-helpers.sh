@@ -80,26 +80,66 @@ pipeline_pane_alive() {
 # ──────────────────────────────────────────────
 
 pipeline_poll_review() {
-  # Usage: pipeline_poll_review <area_dir> <pr_number> [max_wait_seconds]
+  # Usage: pipeline_poll_review <area_dir> <pr> <last_review_id> [max_wait]
+  # Polls for a new /dev-review submission (body starts with "## Review Summary")
+  # that has an ID greater than last_review_id.
+  # Output: review ID on success, "TIMEOUT" on failure.
   local area_dir=$1
   local pr=$2
-  local max_wait=${3:-900}  # default 15 minutes
+  local last_review_id=${3:-0}
+  local max_wait=${4:-900}  # default 15 minutes
   local interval=30
   local elapsed=0
 
-  while [ "$elapsed" -lt "$max_wait" ]; do
-    local state
-    state=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" --jq '.[-1].state' 2>/dev/null)
-    if [ -n "$state" ] && [ "$state" != "null" ]; then
-      echo "$state"
+  while true; do
+    local review_id
+    review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
+      --jq "[.[] | select(.id > ${last_review_id})
+                 | select(.body | startswith(\"## Review Summary\"))]
+            | last // empty | .id" 2>/dev/null)
+
+    if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
+      echo "$review_id"
       return 0
     fi
-    sleep "$interval"
-    elapsed=$((elapsed + interval))
-  done
 
-  echo "TIMEOUT"
-  return 1
+    elapsed=$((elapsed + interval))
+    if [ "$elapsed" -gt "$max_wait" ]; then
+      echo "TIMEOUT"
+      return 1
+    fi
+    sleep "$interval"
+  done
+}
+
+pipeline_analyze_review() {
+  # Usage: pipeline_analyze_review <area_dir> <pr> <review_id>
+  # Fetches a specific review by ID and parses severity counts from body table.
+  # Output (eval-friendly):
+  #   STATE=COMMENTED|CHANGES_REQUESTED|APPROVED
+  #   CRITICAL=N
+  #   WARNING=N
+  #   SUGGESTION=N
+  local area_dir=$1
+  local pr=$2
+  local review_id=$3
+
+  local review_json
+  review_json=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" 2>/dev/null)
+
+  local state body
+  state=$(echo "$review_json" | jq -r '.state')
+  body=$(echo "$review_json" | jq -r '.body')
+
+  local critical warning suggestion
+  critical=$(echo "$body" | awk -F'|' '/\[CRITICAL\]/{gsub(/ /,"",$3); print $3}')
+  warning=$(echo "$body" | awk -F'|' '/\[WARNING\]/{gsub(/ /,"",$3); print $3}')
+  suggestion=$(echo "$body" | awk -F'|' '/\[SUGGESTION\]/{gsub(/ /,"",$3); print $3}')
+
+  echo "STATE=${state}"
+  echo "CRITICAL=${critical:-0}"
+  echo "WARNING=${warning:-0}"
+  echo "SUGGESTION=${suggestion:-0}"
 }
 
 # ──────────────────────────────────────────────

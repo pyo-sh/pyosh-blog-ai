@@ -48,6 +48,7 @@ Execute `/dev-build`. After PR creation, write state:
   "agent": "claude",
   "step": "review",
   "reviewRound": 1,
+  "lastReviewId": 0,
   "skipReview": false,
   "createdAt": "2026-01-01T00:00:00Z",
   "updatedAt": "2026-01-01T00:00:00Z"
@@ -73,11 +74,27 @@ Save pane ID in state → `"step": "review", "reviewPane": "{pane_id}"`.
 
 ### 3. Wait for Review
 
-Poll `gh api repos/{owner}/{repo}/pulls/{PR#}/reviews --jq '.[].state'` every 30s (max 15min).
+Poll with `pipeline_poll_review` from [pipeline-helpers.sh](scripts/pipeline-helpers.sh):
 
-- `CHANGES_REQUESTED` → Step 4a
-- `COMMENTED` (no CRITICAL) → Step 5
-- No review → keep polling
+```bash
+source scripts/pipeline-helpers.sh
+REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId})
+```
+
+- `TIMEOUT` → error, report to user
+- Otherwise → analyze the review:
+
+```bash
+eval "$(pipeline_analyze_review "{area_dir}" {PR#} "$REVIEW_ID")"
+# Now available: $STATE, $CRITICAL, $WARNING, $SUGGESTION
+```
+
+Update state: `"lastReviewId": REVIEW_ID`.
+
+**Decision logic**:
+- `STATE=CHANGES_REQUESTED` → Step 4a
+- `STATE=COMMENTED` + `CRITICAL > 0` → Step 4a
+- `STATE=COMMENTED` + `CRITICAL = 0` → Step 5 (show counts, user decision)
 
 ### 4a. Trigger Resolve
 
