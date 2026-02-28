@@ -23,4 +23,4 @@
 
 ## Next Steps
 
-- [ ] PR 리뷰 후 머지
+- [x] PR 리뷰 후 머지 → [progress.2026-02-28.md](./progress.2026-02-28.md)
