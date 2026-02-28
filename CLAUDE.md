@@ -63,12 +63,15 @@ Perform tasks as directed by the user. An Issue may be created depending on scop
 After completing work, record it in `docs/workspace/` with `/dev-log`.
 
 ```
-create worktree → work → user choice (local merge or PR) → /dev-log
+create worktree → work → commit → STOP: ask user (local merge or PR) → /dev-log
 ```
 
 > **IMPORTANT**: Any task involving file edits must start by **creating a worktree first**.
 > The moment you determine that edits are needed — even mid-analysis — switch to a worktree before making any changes.
 > Never edit files directly on main.
+
+> **IMPORTANT**: After committing in a worktree, **always stop and ask the user** whether to merge locally or open a PR.
+> Never merge automatically unless the user has explicitly instructed it in the same request.
 
 - Worktree: `.workspace/worktrees/{type}-{description}`
 - Branch: `{type}/{description}`
