@@ -12,7 +12,7 @@ Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md
 ## Directory Structure
 
 ```
-docs/{client|server}/
+docs/{client|server|workspace}/
 ├── progress.index.md
 ├── findings.index.md
 ├── decisions.index.md
@@ -23,6 +23,14 @@ docs/{client|server}/
 └── decisions/
     └── decision-NNN-topic.md
 ```
+
+### Area Selection
+
+| Area | When to use |
+|------|-------------|
+| `client` | Next.js frontend changes |
+| `server` | Fastify API server changes |
+| `workspace` | Root repo (tools/, docs/, skills/, CLAUDE.md), Docker/tmux 환경 설정 |
 
 ## File Naming
 

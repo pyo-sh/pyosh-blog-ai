@@ -1,0 +1,20 @@
+# Workspace Findings Index
+
+> 루트 레포 및 워크스페이스 환경 (Docker, tmux, skills, 워크플로) 관련 기술 조사, 문제 해결, 인사이트 모음
+
+## 목차
+
+| ID  | 제목                                                      | 날짜       | 태그                                        |
+| --- | --------------------------------------------------------- | ---------- | ------------------------------------------- |
+| 001 | tmux 기반 멀티 AI 에이전트 협업 환경                      | 2026-02-25 | #tmux #multi-agent #claude-code #ipc        |
+| 002 | Docker 단일 파일 bind mount 깨짐 & Claude Code 세션 캐싱 | 2026-02-28 | #docker #bind-mount #claude-code #cache     |
+
+## 상세 문서
+
+- [findings.001-tmux-multi-agent.md](./findings/findings.001-tmux-multi-agent.md) - tmux 멀티 에이전트 협업 패턴
+- [findings.002-docker-bind-mount-and-session-cache.md](./findings/findings.002-docker-bind-mount-and-session-cache.md) - Docker bind mount inode 문제 & Claude Code 캐싱 한계
+
+## 주요 원칙
+
+- **Docker 단일 파일 bind mount 금지** → 디렉토리 마운트 + 심링크 패턴 사용
+- **Claude Code 설정 변경 = 프로세스 재시작 필수** → `/clear`로는 불충분

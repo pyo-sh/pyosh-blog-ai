@@ -1,10 +1,11 @@
-# tmux 기반 멀티 AI 에이전트 협업 환경
+# Findings 001: tmux 기반 멀티 AI 에이전트 협업 환경
 
-## 개요
+**날짜**: 2026-02-25
+**태그**: #tmux #multi-agent #claude-code #ipc
 
-tmux는 터미널 멀티플렉서로, 여러 Claude Code 인스턴스를 독립 pane/session에서 실행하고 프로그래밍 방식으로 제어할 수 있다. 이 문서는 tmux가 AI 에이전트 협업을 위해 제공하는 기능을 정리한다.
+## 요약
 
----
+tmux를 터미널 멀티플렉서로 활용하여 여러 Claude Code 인스턴스를 독립 pane/session에서 실행하고 프로그래밍 방식으로 제어하는 협업 환경을 구축. 2025-02-25 실제 테스트 완료.
 
 ## 1. 에이전트 격리 및 생성
 
@@ -345,9 +346,6 @@ done
 cat /tmp/result.txt
 ```
 
-**장점**: 간단, 결과를 확실히 받을 수 있음
-**단점**: 단발성, 대화 불가
-
 ### 방식 2: 대화식 (interactive)
 
 새 pane에서 claude를 대화 모드로 실행하고, `send-keys`로 명령을 주입한다.
@@ -365,12 +363,7 @@ tmux send-keys -t "{last}" "Review PR #42 and leave comments" Enter
 tmux capture-pane -p -t "{last}"
 ```
 
-**장점**: 연속 대화 가능, 사용자가 화면에서 진행 과정을 볼 수 있음
-**단점**: 타이밍 제어가 어려움, 완료 감지 필요
-
 ### 방식 3: worktree 격리 + 비대화식
-
-독립 worktree에서 작업하는 자식 에이전트를 생성한다.
 
 ```bash
 # 1. worktree 생성
@@ -380,24 +373,6 @@ git worktree add .claude/worktrees/agent-task-42 -b feat/issue-42-auth
 tmux split-window -h -d -t "$TMUX_PANE" \
   -c ".claude/worktrees/agent-task-42" \
   'claude -p "Implement auth feature per issue #42" --output-format text > /tmp/task-42.txt 2>&1'
-```
-
-### 결과 수집 패턴
-
-```bash
-# 폴링으로 완료 대기
-RESULT_FILE="/tmp/child-agent-result.txt"
-for i in $(seq 1 30); do
-  if [ -f "$RESULT_FILE" ] && grep -q "EXIT_CODE" "$RESULT_FILE"; then
-    cat "$RESULT_FILE"
-    break
-  fi
-  sleep 2
-done
-
-# 또는 wait-for 채널로 동기화
-# 자식: ... && tmux wait-for -S "task-42-done"
-# 부모: tmux wait-for "task-42-done"
 ```
 
 ### 주의사항

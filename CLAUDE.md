@@ -23,10 +23,23 @@ cd /Users/pyosh/Workspace/pyosh-blog/server && gh issue list
 pyosh-blog/
 ├── client/                      # Next.js (independent repo) → client/CLAUDE.md
 ├── server/                      # Fastify (independent repo) → server/CLAUDE.md
-├── docs/{client,server}/        # progress/, findings/, decisions/ records
+├── docs/{client,server,workspace}/ # progress/, findings/, decisions/ records
 ├── skills/                      # Skill sources
 └── .workspace/                  # gitignored — worktrees, pipeline state
 ```
+
+### docs/ Reference
+
+When you need context about past work, technical decisions, or known issues, **read the relevant docs first**:
+
+| Path | Contents |
+|------|----------|
+| `docs/{area}/progress.index.md` | Task completion timeline |
+| `docs/{area}/findings.index.md` | Technical research & issue resolutions |
+| `docs/{area}/decisions.index.md` | Architecture/tech decisions |
+
+- `workspace` area covers root repo changes (tools/, Docker, tmux, skills, workflow config)
+- CI/CD is recorded under the respective area (`client` or `server`), not `workspace`
 
 ## Common Dev Principles
 
