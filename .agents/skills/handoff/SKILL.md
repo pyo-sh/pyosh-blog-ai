@@ -1,6 +1,10 @@
 ---
 name: handoff
-description: Create or update a handoff document for the next agent to continue work with fresh context. Use when: (1) switching to a new conversation, (2) context window is getting large, (3) user says "handoff", "save context", "wrap up for next session", or similar.
+description: >-
+  Create or update a handoff document for the next agent to continue work
+  with fresh context. Use when (1) switching to a new conversation,
+  (2) context window is getting large, (3) user says "handoff",
+  "save context", "wrap up for next session", or similar.
 ---
 
 Save to `{root}/.workspace/handoffs/handoff_{summary}.md` where `{summary}` is a one-word topic.
