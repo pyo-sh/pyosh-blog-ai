@@ -1,6 +1,11 @@
 # Progress: 2026-02-28
 
 ## Completed
+- [x] Docker 컨테이너 Claude Code를 native installer로 전환
+  - Dockerfile: `npm install -g @anthropic-ai/claude-code` → `curl -fsSL https://claude.ai/install.sh | bash` (USER dev 이후 실행)
+  - `.bash_aliases`: `dev-update()` 내 Claude Code 업데이트를 native installer 재실행으로 변경
+  - `ARCHITECTURE.md`: Dockerfile 설명 반영
+  - 효과: 시작 시 npx 경고 메시지 제거, 자동 백그라운드 업데이트 지원
 - [x] dev-pipeline 스킬에 Pane Lifecycle Tracking 추가
   - `pipeline_pane_alive()` 버그 수정 (`-a` 플래그, `grep -qx` 앵커 매칭)
   - `pipeline_resolve_worktree_path()` 신규 — 현재/레거시 worktree 경로 자동 탐색
