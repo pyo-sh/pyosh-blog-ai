@@ -47,7 +47,9 @@ RUN git clone https://github.com/tmux-plugins/tpm /home/dev/.tmux/plugins/tpm \
 USER dev
 
 # Claude Code CLI (native installer — ~/.local/bin/claude)
-RUN curl -fsSL https://claude.ai/install.sh | bash
+# 설치 후 생성된 ~/.claude 제거 (entrypoint.sh에서 auth volume 심링크로 교체)
+RUN curl -fsSL https://claude.ai/install.sh | bash \
+    && rm -rf /home/dev/.claude /home/dev/.claude.json
 ENV PATH="/home/dev/.local/bin:$PATH"
 
 WORKDIR /workspace
