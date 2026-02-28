@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | Docker 컨테이너 TZ 기본값 Seoul 버그 수정 (docker-compose + entrypoint 데드 브랜치 제거) | done |
 | 2026-02-28 | brainstorming + writing-plans 스킬 경로/구조 개선 + 최적화 | done |
 | 2026-02-28 | dev-issue 스킬 리비전: 입력 소스 확장 + ISSUE_TEMPLATE 참조 + 구조 최적화 | done |
 | 2026-02-28 | Feature Spec v1 리비전 + 48 GitHub Issues 마이그레이션 (client #23-#70, server #26) | done |
