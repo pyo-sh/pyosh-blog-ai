@@ -1,15 +1,10 @@
 #!/bin/bash
 set -e
 
-# 타임존 설정 (우선순위: TZ 환경변수 → /etc/localtime 마운트 → 기본값)
-DEFAULT_TZ="Asia/Seoul"
-if [ -n "$TZ" ]; then
+# 타임존 설정 (.env TZ 또는 기본값 Asia/Seoul — docker-compose.yaml에서 전달)
+if [ -n "$TZ" ] && [ -f "/usr/share/zoneinfo/$TZ" ]; then
   sudo ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime
   echo "$TZ" | sudo tee /etc/timezone > /dev/null
-elif [ ! -f /etc/localtime ]; then
-  sudo ln -snf "/usr/share/zoneinfo/$DEFAULT_TZ" /etc/localtime
-  echo "$DEFAULT_TZ" | sudo tee /etc/timezone > /dev/null
-  export TZ="$DEFAULT_TZ"
 fi
 
 # ── 인증 volume 심볼릭 링크 ──

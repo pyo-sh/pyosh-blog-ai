@@ -73,7 +73,7 @@ Auth symlinks:
 | Variable    | Purpose                                    |
 | ----------- | ------------------------------------------ |
 | `TMUX_ROOT` | tmuxinator session root directory          |
-| `TZ`        | Container timezone (default: `Asia/Seoul`) |
+| `TZ`        | Container timezone (default: `Asia/Seoul`). Set in `.env` to override. |
 
 ## Shell Aliases
 

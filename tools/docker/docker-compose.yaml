@@ -12,7 +12,7 @@ services:
       # tmux, bash_aliases는 /workspace 심링크로 연결 (entrypoint.sh)
       # 단일 파일 bind mount는 에디터가 inode를 교체하면 깨지므로 사용하지 않음
     environment:
-      - TZ=${TZ:-}
+      - TZ=${TZ:-Asia/Seoul}
     env_file:
       - ../../.env
     working_dir: /workspace
