@@ -1,60 +1,37 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: >
+  Write detailed implementation plans from specs or requirements before touching code.
+  Use when: (1) brainstorming skill produces a design doc, (2) user has a spec and needs
+  a step-by-step plan, (3) user says "/writing-plans", "create plan", "implementation plan".
 ---
 
 # Writing Plans
 
-## Overview
-
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
-
-Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+Write implementation plans with exact file paths, complete code, and test commands. Each task is one 2-5 minute action. DRY. YAGNI. TDD (server). Frequent commits.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** This should be run in the same worktree where the design doc was created (by brainstorming skill).
+**Context:** Run in the same worktree where the design doc was created (by brainstorming skill).
 
-**Save plans to:** `docs/{area}/plans/YYYY-MM-DD-<feature-name>.md`
+**Save to:** `docs/{area}/plans/YYYY-MM-DD-<feature-name>.md`
 
-## Project Context
+## Verify Commands
 
-This is a monorepo with independent Git repos per area. Always specify the target area.
-
-| Area | Tech Stack | Test Command | Build/Verify |
-|------|-----------|-------------|--------------|
-| `client` | Next.js 14, React 18, TypeScript, TailwindCSS 4 | `pnpm build && pnpm lint && pnpm compile:types` | `pnpm build` |
-| `server` | Fastify 5, Drizzle ORM, MySQL, Zod, Vitest | `pnpm test` | `pnpm dev` |
-| `workspace` | Skills, docs, config | N/A | N/A |
-
-- Package manager: **pnpm**
-- File naming: **kebab-case**
-- TypeScript Strict Mode
-- ESLint + Prettier auto-formatting
-
-## Bite-Sized Task Granularity
-
-**Each step is one action (2-5 minutes):**
-- "Write the failing test" — step
-- "Run it to make sure it fails" — step
-- "Implement the minimal code to make the test pass" — step
-- "Run the tests and make sure they pass" — step
-- "Commit" — step
+| Area | Test | Build |
+|------|------|-------|
+| `client` | N/A | `pnpm compile:types && pnpm lint && pnpm build` |
+| `server` | `pnpm test` | `pnpm dev` |
 
 ## Plan Document Header
-
-**Every plan MUST start with this header:**
 
 ```markdown
 # [Feature Name] Implementation Plan
 
-**Goal:** [One sentence describing what this builds]
-
+**Goal:** [One sentence]
 **Area:** [client | server | workspace]
-
-**Architecture:** [2-3 sentences about approach]
-
-**Tech Stack:** [Key technologies/libraries from the area]
+**Architecture:** [2-3 sentences]
+**Tech Stack:** [Key technologies]
 
 **References:**
 - Design doc: `docs/workspace/decisions/YYYY-MM-DD-<topic>-design.md`
@@ -65,7 +42,7 @@ This is a monorepo with independent Git repos per area. Always specify the targe
 
 ## Task Structure
 
-### Server Area (Vitest TDD)
+### Server (Vitest TDD)
 
 ````markdown
 ### Task N: [Component Name]
@@ -75,7 +52,7 @@ This is a monorepo with independent Git repos per area. Always specify the targe
 - Modify: `src/exact/path/to/existing.ts:123-145`
 - Test: `src/exact/path/to/__tests__/file.test.ts`
 
-**Step 1: Write the failing test**
+**Step 1: Write failing test**
 
 ```typescript
 import { describe, it, expect } from 'vitest';
@@ -88,12 +65,10 @@ describe('specificBehavior', () => {
 });
 ```
 
-**Step 2: Run test to verify it fails**
-
+**Step 2: Verify failure**
 Run: `pnpm test -- src/exact/path/to/__tests__/file.test.ts`
-Expected: FAIL with "functionUnderTest is not defined"
 
-**Step 3: Write minimal implementation**
+**Step 3: Implement**
 
 ```typescript
 export function functionUnderTest(input: InputType): OutputType {
@@ -101,22 +76,14 @@ export function functionUnderTest(input: InputType): OutputType {
 }
 ```
 
-**Step 4: Run test to verify it passes**
-
+**Step 4: Verify pass**
 Run: `pnpm test -- src/exact/path/to/__tests__/file.test.ts`
-Expected: PASS
 
 **Step 5: Commit**
-
-```bash
-git add src/exact/path/
-git commit -m "feat: add specific feature"
-```
+`git add src/exact/path/ && git commit -m "feat: add specific feature"`
 ````
 
-### Client Area (Build-Verify)
-
-Client has no test framework — verify via build + lint + type check.
+### Client (Build-Verify)
 
 ````markdown
 ### Task N: [Component Name]
@@ -132,9 +99,7 @@ Client has no test framework — verify via build + lint + type check.
 
 import { cn } from '@/shared/lib/utils';
 
-interface ExampleProps {
-  title: string;
-}
+interface ExampleProps { title: string; }
 
 export function Example({ title }: ExampleProps) {
   return <div className={cn('text-foreground-1')}>{title}</div>;
@@ -145,32 +110,21 @@ export function Example({ title }: ExampleProps) {
 
 ```tsx
 import { Example } from '@/features/example/ui/example-component';
-// ...
 ```
 
 **Step 3: Verify build**
-
 Run: `pnpm compile:types && pnpm lint && pnpm build`
-Expected: No errors
 
 **Step 4: Commit**
-
-```bash
-git add src/features/example/ src/app/example/
-git commit -m "feat: add example component"
-```
+`git add src/features/example/ src/app/example/ && git commit -m "feat: add example component"`
 ````
 
-## Remember
+## Rules
 
-- Exact file paths always (kebab-case)
-- Complete code in plan (not "add validation")
-- Exact commands with expected output
-- Server: TDD with Vitest (`pnpm test`)
-- Client: Build-verify (`pnpm compile:types && pnpm lint && pnpm build`)
-- Import direction (client FSD): `app → widgets → features → entities → shared`
+- Exact file paths (kebab-case), complete code, exact commands
+- Server: TDD with Vitest / Client: build-verify
+- Client FSD import direction: `app → widgets → features → entities → shared`
 - Commit messages: `{type}: {description}`
-- DRY, YAGNI, TDD (server), frequent commits
 
 ## Next Step
 
