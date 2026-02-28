@@ -18,6 +18,13 @@
   - SKILL.md: 237 → 179 lines (-24%)
   - recovery.md: 128 → 91 lines (-29%)
   - 중복 제거, 에러 핸들링 통합, 불필요한 prose 축약
+- [x] CLAUDE.md Task Rules repo별 분리 및 스킬 중복 제거
+  - root CLAUDE.md: Task Rules를 client/server(Issue-driven)와 root repo(사용자 지시 기반)로 분리
+  - 스킬(`/dev-build`, `/dev-pipeline`)이 내장한 브랜치/커밋/PR 네이밍 규칙을 CLAUDE.md에서 제거 (92줄 → 89줄)
+  - Git Workflow → Git Rules로 슬림화, Multi-Agent 규칙 한 줄로 통합
+  - root repo 워크플로우 추가: worktree 네이밍 `{type}-{description}`, 로컬 merge 또는 PR 선택 가능
+  - client/server CLAUDE.md: Workflow 섹션을 `/dev-pipeline` 직접 참조로 변경
+  - 3개 repo 동시 PR 생성 및 merge (pyosh-blog-ai#3, pyosh-blog-fe#20, pyosh-blog-be#23)
 
 ## Discoveries
 - tmux pane은 window별 레이아웃 독립 관리 — 다른 window에서 split해도 전환 시 정상 표시
