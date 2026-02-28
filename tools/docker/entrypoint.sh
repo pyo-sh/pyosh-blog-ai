@@ -24,8 +24,11 @@ mkdir -p /home/dev/.config
 ln -sfn "$AUTH/gh" /home/dev/.config/gh
 
 # Claude Code: ~/.claude (설정+인증), ~/.claude.json (온보딩/계정)
+# native installer가 실제 디렉터리를 생성했을 경우 제거 (ln -sfn은 실제 디렉터리를 교체 못함)
+[ -d /home/dev/.claude ] && [ ! -L /home/dev/.claude ] && rm -rf /home/dev/.claude
 ln -sfn "$AUTH/claude" /home/dev/.claude
 [ -f "$AUTH/claude.json" ] || echo '{}' > "$AUTH/claude.json"
+[ -f /home/dev/.claude.json ] && [ ! -L /home/dev/.claude.json ] && rm -f /home/dev/.claude.json
 ln -sfn "$AUTH/claude.json" /home/dev/.claude.json
 
 # Codex: ~/.codex
@@ -39,18 +42,27 @@ ln -sfn "$AUTH/gitconfig" /home/dev/.gitconfig
 ln -sfn "$AUTH/ssh" /home/dev/.ssh
 
 # Claude Code status line 설정
+# /workspace/scripts/context-bar.sh 를 직접 참조 (스크립트 복사 불필요, 항상 최신 유지)
+STATUSLINE_CMD="/workspace/scripts/context-bar.sh"
 claude_settings="$AUTH/claude/settings.json"
 if [ ! -f "$claude_settings" ]; then
-  cat > "$claude_settings" << 'SETTINGS'
+  cat > "$claude_settings" << SETTINGS
 {
   "statusLine": {
     "type": "command",
-    "command": "/workspace/scripts/context-bar.sh"
+    "command": "$STATUSLINE_CMD"
   }
 }
 SETTINGS
 elif ! jq -e '.statusLine' "$claude_settings" > /dev/null 2>&1; then
-  jq '. + {"statusLine": {"type": "command", "command": "/workspace/scripts/context-bar.sh"}}' \
+  # statusLine 없음 → 추가
+  jq --arg cmd "$STATUSLINE_CMD" \
+    '. + {"statusLine": {"type": "command", "command": $cmd}}' \
+    "$claude_settings" > "${claude_settings}.tmp" && mv "${claude_settings}.tmp" "$claude_settings"
+elif [ "$(jq -r '.statusLine.command' "$claude_settings")" != "$STATUSLINE_CMD" ]; then
+  # statusLine 있지만 다른 경로 → workspace 경로로 교정 (stale path 방지)
+  jq --arg cmd "$STATUSLINE_CMD" \
+    '.statusLine.command = $cmd' \
     "$claude_settings" > "${claude_settings}.tmp" && mv "${claude_settings}.tmp" "$claude_settings"
 fi
 
