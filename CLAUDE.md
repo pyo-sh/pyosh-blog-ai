@@ -66,6 +66,10 @@ When you need context about past work, technical decisions, or known issues, **r
 worktree 생성 → 작업 → 사용자 선택 (로컬 merge 또는 PR) → /dev-log
 ```
 
+> **IMPORTANT**: 파일 수정이 포함된 작업은 반드시 **worktree를 먼저 생성**한 후 시작한다.
+> 분석·조사 후 수정이 필요하다고 판단되는 순간, 편집 전에 worktree로 전환한다.
+> main에서 직접 파일을 편집하지 않는다.
+
 - Worktree: `.workspace/worktrees/{type}-{description}`
 - Branch: `{type}/{description}`
 - Commit: `{type}: {description}`
