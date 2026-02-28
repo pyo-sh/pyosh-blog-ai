@@ -54,21 +54,21 @@ When you need context about past work, technical decisions, or known issues, **r
 
 ### client / server (Issue-driven)
 
-`/dev-pipeline`이 전체 사이클을 관리: build → review → resolve → merge.
-브랜치/커밋/PR/워크트리 규칙은 스킬 내장.
+`/dev-pipeline` manages the full cycle: build → review → resolve → merge.
+Branch, commit, PR, and worktree rules are built into the skill.
 
-### root repo (사용자 지시 기반)
+### root repo (user-directed)
 
-사용자가 지시한 작업을 수행한다. 경중에 따라 Issue를 작성할 수도 있다.
-작업 완료 후 `/dev-log`로 `docs/workspace/`에 기록.
+Perform tasks as directed by the user. An Issue may be created depending on scope.
+After completing work, record it in `docs/workspace/` with `/dev-log`.
 
 ```
-worktree 생성 → 작업 → 사용자 선택 (로컬 merge 또는 PR) → /dev-log
+create worktree → work → user choice (local merge or PR) → /dev-log
 ```
 
-> **IMPORTANT**: 파일 수정이 포함된 작업은 반드시 **worktree를 먼저 생성**한 후 시작한다.
-> 분석·조사 후 수정이 필요하다고 판단되는 순간, 편집 전에 worktree로 전환한다.
-> main에서 직접 파일을 편집하지 않는다.
+> **IMPORTANT**: Any task involving file edits must start by **creating a worktree first**.
+> The moment you determine that edits are needed — even mid-analysis — switch to a worktree before making any changes.
+> Never edit files directly on main.
 
 - Worktree: `.workspace/worktrees/{type}-{description}`
 - Branch: `{type}/{description}`
@@ -78,8 +78,8 @@ worktree 생성 → 작업 → 사용자 선택 (로컬 merge 또는 PR) → /de
 
 - main + feature branches only. Never push directly to main.
 - All work must go through a worktree (`.workspace/worktrees/`).
-- main에 merge 전 반드시 `git pull origin main`으로 remote 동기화.
-- Multi-agent: 1 agent = 1 task, worktree isolation. 같은 파일을 동시에 수정하지 않는다.
+- Always run `git pull origin main` to sync with remote before merging into main.
+- Multi-agent: 1 agent = 1 task, worktree isolation. Never modify the same file concurrently.
 
 ## Skills
 
