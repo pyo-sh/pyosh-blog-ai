@@ -45,6 +45,13 @@
   - client/server CLAUDE.md: Workflow 섹션을 `/dev-pipeline` 직접 참조로 변경
   - 3개 repo 동시 PR 생성 및 merge (pyosh-blog-ai#3, pyosh-blog-fe#20, pyosh-blog-be#23)
 
+- [x] dev-issue 스킬 리비전
+  - 입력 소스 확장: decisions 전용 → decisions + plans + user direct request
+  - decisions 상태 검사(Status 기반 분류) 유지
+  - 이슈 포맷: 하드코딩된 마크다운 템플릿 → 각 repo의 `.github/ISSUE_TEMPLATE/*.yml` 참조로 변경
+  - `references/priority-guide.md` 삭제 (0-7 체계가 ISSUE_TEMPLATE의 0-4와 불일치)
+  - skill-creator 기반 구조 최적화: description 트리거 강화, 중복 제거, 84행 → 52행 (-38%)
+
 - [x] Feature Spec v1 리비전 + Implementation Plan → GitHub Issues 마이그레이션
   - `docs/client/feature_spec.md` 서버 API 대조 검토 후 리비전 (12건 인터뷰 Q&A 반영)
   - Phase 1-4 client implementation plans 작성 (`docs/client/plans/`)
