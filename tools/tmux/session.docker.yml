@@ -54,3 +54,9 @@ windows:
         - # pane 2
         - # pane 3
         - # pane 4
+
+  - tracker:
+      layout: even-horizontal
+      panes:
+        - bash scripts/agent-tracker.sh  # left: agent tracker dashboard (auto-start)
+        - # right: free pane
