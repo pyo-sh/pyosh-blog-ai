@@ -1,21 +1,33 @@
 ---
 name: dev-issue
-description: Convert decision files in decisions/ directory to GitHub Issues. Establish tasks from decision files, register Issues, and clean up files. Used as a pre-step before /dev-build. Activates on "/dev-issue", "create issues", "convert decisions to issues", etc.
+description: Create GitHub Issues from docs/{area}/{plans,decisions} files or user requests. Activates on "/dev-issue", "create issues", "convert to issues", etc.
 ---
 
 # Dev-Issue
 
-Convert decision files → GitHub Issues → clean up. Pre-step for `/dev-build`. Git remote rules in `CLAUDE.md`.
+Create GitHub Issues from documentation files or user requests. Git remote rules in `CLAUDE.md`.
+
+## Input Sources
+
+1. **docs files**: `docs/{area}/plans/*.md` or `docs/{area}/decisions/*.md`
+2. **User request**: Direct description from the user
+
+When invoked, determine input from argument. If no argument or ambiguous, **ask the user** which source to use.
 
 ## Workflow
 
-### 1. Detect Target Area
+### 1. Determine Input Source & Area
 
-Use argument if provided. Otherwise infer from context, scan both `docs/{client,server}/decisions/`, or ask user.
+- If argument specifies a source (file path, area, or direct request), use it.
+- Otherwise ask the user:
+  - Which source? (decisions / plans / direct request)
+  - Which area? (client / server / workspace)
 
-### 2. Scan & Classify Decision Files
+### 2. Gather Content
 
-Read all `.md` in `docs/{area}/decisions/`. Extract status from `> **Status**: {status}` line.
+#### From `decisions/` files
+
+Read `.md` files in `docs/{area}/decisions/`. Extract status from `> **Status**: {status}` line.
 
 | Status | Action |
 |--------|--------|
@@ -23,47 +35,49 @@ Read all `.md` in `docs/{area}/decisions/`. Extract status from `> **Status**: {
 | `pending`, `deferred` | Do not touch |
 | `draft`, no status | **Convert to GitHub Issue** |
 
-### 3. Determine Priority
+#### From `plans/` files
 
-1. Query existing: `gh issue list --state open --repo {repo} --json number,title,labels`
-2. AI judges priority based on phase, dependencies, impact
-3. **Present to user for approval** before creating
+Read `.md` files in `docs/{area}/plans/`. All files are candidates for conversion. Present list to user for selection.
 
-Reference: [priority-guide.md](references/priority-guide.md)
+#### From user request
+
+Use the user's description directly as Issue content.
+
+### 3. Determine Issue Type & Format
+
+Read the target repository's `.github/ISSUE_TEMPLATE/*.yml` files to determine:
+- Available issue types (bug, feature, refactor, etc.)
+- Required and optional fields per type
+- Available labels
+
+Select the appropriate template based on the content. Compose the Issue body following the template's field structure.
 
 ### 4. Create Issues
 
-May group related decisions into a single Issue. Use `--repo` flag.
+1. Query existing issues: `gh issue list --state open --repo {repo} --json number,title,labels`
+2. **Present draft Issues to user for approval** before creating
+3. May group related items into a single Issue
+4. Use `--repo` flag for `gh` commands
+5. Apply type label + priority label via `--label`
 
-```markdown
-## Overview
-{decision goals/background}
+### 5. Clean Up (docs files only)
 
-## Scope
-{decision scope}
-
-## Tasks
-- [ ] Item 1
-- [ ] Item 2
-
-## References
-- Decision filename, phase, dependencies
-```
-
-Apply type label + priority label via `--label`.
-
-### 5. Clean Up
-
-1. Delete converted decision files
+For `decisions/` files:
+1. Delete converted decision files (`draft` / no status)
 2. Delete `accepted`/`rejected` files
 3. Update `decisions.index.md`
 
+For `plans/` files:
+1. Delete converted plan files
+2. Update `plans.index.md` if it exists
+
 ### 6. Report
 
-Output created Issues (number + URL + priority) and cleaned-up files.
+Output created Issues (number + URL + labels) and cleaned-up files.
 
 ## Constraints
 
-- Never modify/delete `pending` or `deferred` files
-- Always get priority approval before creating Issues
+- Never modify/delete `pending` or `deferred` decision files
+- Always get user approval before creating Issues
 - Always use `--repo` flag for `gh` commands
+- Always reference the target repo's `.github/ISSUE_TEMPLATE` for Issue format
