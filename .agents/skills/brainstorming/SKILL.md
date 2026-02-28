@@ -28,7 +28,7 @@ You MUST create a task for each of these items and complete them in order:
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — save to `docs/plans/YYYY-MM-DD-<topic>-design.md` and commit
+6. **Write design doc** — save to `docs/workspace/decisions/YYYY-MM-DD-<topic>-design.md` and commit
 7. **Transition to implementation** — invoke `/writing-plans` skill to create implementation plan
 
 ## Area Selection
@@ -97,7 +97,7 @@ digraph brainstorming {
 ## After the Design
 
 **Documentation:**
-- Write the validated design to `docs/plans/YYYY-MM-DD-<topic>-design.md`
+- Write the validated design to `docs/workspace/decisions/YYYY-MM-DD-<topic>-design.md`
 - Commit: `docs: design - <topic>`
 
 **Implementation:**
