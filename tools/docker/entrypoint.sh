@@ -44,6 +44,7 @@ ln -sfn "$AUTH/ssh" /home/dev/.ssh
 # Claude Code status line 설정
 # /workspace/scripts/context-bar.sh 를 직접 참조 (스크립트 복사 불필요, 항상 최신 유지)
 STATUSLINE_CMD="/workspace/scripts/context-bar.sh"
+chmod +x "$STATUSLINE_CMD" 2>/dev/null || true
 claude_settings="$AUTH/claude/settings.json"
 if [ ! -f "$claude_settings" ]; then
   cat > "$claude_settings" << SETTINGS
