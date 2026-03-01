@@ -7,7 +7,7 @@
 #   -i INTERVAL  refresh interval in seconds (default: 2)
 
 SESSION="lab"
-INTERVAL=2
+INTERVAL=1
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null \
   || cd "$SCRIPT_DIR/.." && pwd)"
@@ -46,7 +46,7 @@ while getopts ":s:i:h" opt; do
     h)
       printf 'Usage: %s [-s SESSION] [-i INTERVAL]\n' "$(basename "$0")"
       printf '  -s SESSION   tmux session name (default: lab)\n'
-      printf '  -i INTERVAL  refresh interval in seconds (default: 2)\n'
+      printf '  -i INTERVAL  refresh interval in seconds (default: 1)\n'
       exit 0 ;;
     \?) printf 'Unknown option: -%s\n' "$OPTARG"; exit 1 ;;
   esac
@@ -70,13 +70,31 @@ make_line() {
   printf '%s' "$s"
 }
 
-# trunc <string> <width> — truncate to width; pad with spaces if shorter
+# display_width <string> — terminal display columns (CJK=2, ASCII=1)
+display_width() { printf '%s' "$1" | wc -L; }
+
+# trunc <string> <width> — truncate by display width; pad with spaces if shorter
 trunc() {
   local s="$1" w="$2"
-  if (( ${#s} > w )); then
-    printf '%s…' "${s:0:$((w - 1))}"
+  local dw
+  dw=$(display_width "$s")
+  if (( dw <= w )); then
+    printf '%s%*s' "$s" "$(( w - dw ))" ""
   else
-    printf '%-*s' "$w" "$s"
+    # binary search: longest prefix whose display width fits in w-1 (room for …)
+    local lo=0 hi=${#s} mid best=0
+    while (( lo <= hi )); do
+      mid=$(( (lo + hi) / 2 ))
+      if (( $(display_width "${s:0:$mid}") <= w - 1 )); then
+        best=$mid; lo=$(( mid + 1 ))
+      else
+        hi=$(( mid - 1 ))
+      fi
+    done
+    local prefix="${s:0:$best}"
+    local pad=$(( w - $(display_width "$prefix") - 1 ))
+    printf '%s…' "$prefix"
+    (( pad > 0 )) && printf '%*s' "$pad" ""
   fi
 }
 
@@ -107,15 +125,48 @@ status_badge() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 # find_claude_transcript <pane_id>
-# Map a Claude pane to its most recent transcript JSONL via cwd → project dir
+# Map a Claude pane to its own transcript JSONL via TTY → PID → /proc/fd scan.
+# Falls back to most-recent file when PID mapping is unavailable.
 find_claude_transcript() {
   local pane_id="$1"
-  local pane_cwd project_dir
+  local pane_tty claude_pid session_uuid
 
+  # 1. pane TTY → Claude PID
+  pane_tty=$(tmux display-message -t "$pane_id" -p "#{pane_tty}" 2>/dev/null)
+  if [[ -n "$pane_tty" ]]; then
+    local pts="${pane_tty#/dev/}"
+    claude_pid=$(ps -a -o pid,tty,comm 2>/dev/null \
+      | awk -v pts="$pts" '$2==pts && $3=="claude" {print $1; exit}')
+  fi
+
+  # 2. /proc/PID/fd scan → session UUID
+  if [[ -n "$claude_pid" && -d "/proc/$claude_pid/fd" ]]; then
+    local pane_cwd project_dir fd_target
+    pane_cwd=$(readlink "/proc/$claude_pid/cwd" 2>/dev/null)
+    [[ -z "$pane_cwd" ]] && pane_cwd=$(tmux display-message -t "$pane_id" \
+      -p '#{pane_current_path}' 2>/dev/null)
+    project_dir="${pane_cwd//\//-}"
+
+    for fd_path in /proc/"$claude_pid"/fd/*; do
+      fd_target=$(readlink "$fd_path" 2>/dev/null) || continue
+      # tasks/{UUID} held open via flock(), or projects/{dir}/{UUID} session subdir
+      if [[ "$fd_target" =~ /tasks/([0-9a-f-]{36}) ]] || \
+         [[ "$fd_target" =~ /projects/${project_dir}/([0-9a-f-]{36}) ]]; then
+        session_uuid="${BASH_REMATCH[1]}"
+        break
+      fi
+    done
+
+    if [[ -n "$session_uuid" ]]; then
+      local t="${HOME}/.claude/projects/${project_dir}/${session_uuid}.jsonl"
+      [[ -f "$t" ]] && { printf '%s' "$t"; return; }
+    fi
+  fi
+
+  # 3. Fallback: most recent JSONL for this project dir
+  local pane_cwd project_dir
   pane_cwd=$(tmux display-message -t "$pane_id" -p '#{pane_current_path}' 2>/dev/null)
   [[ -z "$pane_cwd" ]] && return
-
-  # /workspace → -workspace  (Claude project dir naming convention)
   project_dir="${pane_cwd//\//-}"
   ls -t "${HOME}/.claude/projects/$project_dir"/*.jsonl 2>/dev/null | head -1
 }
@@ -129,52 +180,61 @@ parse_claude_pane() {
   local status="idle"
   local bottom8
   bottom8=$(printf '%s' "$captured" | tail -8)
-  if printf '%s' "$bottom8" | grep -qE '✻|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏'; then
+  if printf '%s' "$bottom8" | grep -qE '✢|✶|✻|✽|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏'; then
     status="working"
   elif printf '%s' "$bottom8" | grep -qE '⏸|plan mode'; then
     status="plan"
   fi
 
-  # ── Engine: "Opus 4.6", "Sonnet 4.6", "Haiku 4.5" ────────────────────────
-  local model
-  model=$(printf '%s' "$captured" \
-    | grep -oE '(Opus|Sonnet|Haiku)[[:space:]]+[0-9]+\.[0-9]+' | tail -1)
-  [[ -z "$model" ]] && model="Claude"
-
-  # ── Token + Task: transcript 직접 읽기 ───────────────────────────────────
-  local pct=0 tok_k=0 task="—"
+  # ── Model + Token + Task: transcript 직접 읽기 ──────────────────────────
+  local model="Claude" pct=0 tok_k=0 task="—"
   local transcript
   transcript=$(find_claude_transcript "$pane_id")
 
   if [[ -n "$transcript" && -f "$transcript" ]]; then
-    local ctx_len
-    ctx_len=$(jq -s '
-      map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
-      last |
-      if . then
-        (.message.usage.input_tokens // 0) +
-        (.message.usage.cache_read_input_tokens // 0) +
-        (.message.usage.cache_creation_input_tokens // 0)
-      else 0 end
+    # Single jq pass: model, ctx_len, last user message
+    # Fields separated by RS (0x1e); task is base64-encoded to survive embedded newlines
+    local raw_data raw_model ctx_len task_raw
+    raw_data=$(jq -rs '
+      . as $all |
+      [$all[] | select(.type == "assistant" and .isSidechain != true
+                and .isApiErrorMessage != true)] as $a |
+      ($a | last | .message.model // "") as $m |
+      ($a | map(select(.message.usage)) | last |
+        if . then
+          (.message.usage.input_tokens // 0) +
+          (.message.usage.cache_read_input_tokens // 0) +
+          (.message.usage.cache_creation_input_tokens // 0)
+        else 0 end) as $ctx |
+      ([$all[] | select(.type == "user") |
+        .message.content |
+        if type == "string" then .
+        elif type == "array" then
+          [.[] | select(.type == "text") | .text] | join(" ")
+        else "" end
+      ] | last // "") as $task |
+      "\($m)\u001e\($ctx)\u001e\($task | @base64)"
     ' < "$transcript" 2>/dev/null)
-    if [[ -n "$ctx_len" && "$ctx_len" -gt 0 ]]; then
+
+    IFS=$'\x1e' read -r raw_model ctx_len task_raw <<< "$raw_data"
+    # Decode base64 task so embedded newlines are preserved for normalization below
+    task_raw=$(base64 -d <<< "$task_raw" 2>/dev/null)
+
+    # "claude-opus-4-6" → "Opus 4.6" (handles date-suffixed IDs like claude-haiku-4-5-20251001)
+    if [[ -n "$raw_model" && "$raw_model" =~ ^claude-([a-z]+)-([0-9]+)-([0-9]+) ]]; then
+      model="${BASH_REMATCH[1]^} ${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+    fi
+
+    if [[ -n "$ctx_len" && "$ctx_len" -gt 0 ]] 2>/dev/null; then
       pct=$(( ctx_len * 100 / 200000 ))
       (( pct > 100 )) && pct=100
       tok_k=$(( ctx_len / 1000 ))
     fi
 
-    local last_msg
-    last_msg=$(jq -rs '
-      [.[] | select(.type == "user") |
-       select(.message.content | type == "string" or
-              (type == "array" and any(.[]; .type == "text")))] |
-      map(.message.content |
-          if type == "string" then .
-          else [.[] | select(.type == "text") | .text] | join(" ") end |
-          gsub("\n"; " ") | gsub("  +"; " ")) |
-      last // ""
-    ' < "$transcript" 2>/dev/null)
-    [[ -n "$last_msg" ]] && task="$last_msg"
+    if [[ -n "$task_raw" ]]; then
+      task="${task_raw//$'\n'/ }"   # newlines → spaces (faster than jq gsub)
+      task="${task//  / }"          # collapse double spaces
+    fi
   else
     # Fallback: pane 스크래핑
     local tok
@@ -188,6 +248,12 @@ parse_claude_pane() {
     local ptask
     ptask=$(printf '%s' "$captured" | grep -o '💬 .*' | sed 's/.*💬 //' | tail -1)
     [[ -n "$ptask" ]] && task="$ptask"
+
+    # Model: startup screen may still be visible
+    local pane_model
+    pane_model=$(printf '%s' "$captured" \
+      | grep -oE '(Opus|Sonnet|Haiku)[[:space:]]+[0-9]+\.[0-9]+' | tail -1)
+    [[ -n "$pane_model" ]] && model="$pane_model"
   fi
 
   printf '%s|%s|%d|%d|%s' "$model" "$status" "$pct" "$tok_k" "$task"
@@ -317,12 +383,12 @@ render_dashboard() {
   (( COLS < 82 )) && COLS=82
   local INNER=$(( COLS - 2 ))   # inside ║...║
 
-  # ── Column widths: PANE | TASK | ENGINE | STATUS | TOKENS ─────────────────
-  # STATUS = 6 visible ("● work"), TOKENS = 10 ("▰▰▱▱▱ 122k")
-  # margins: 2 left + 2 right = 4, gaps: 4 × 1 = 4  → fixed cost = 4+4+11+12+6+10 = 47
-  local W_PANE=11 W_ENGINE=12 W_STATUS=6 W_TOKENS=10
-  local W_TASK=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 8 ))
-  (( W_TASK < 15 )) && W_TASK=15
+  # ── Fixed column widths (PANE, ENGINE, STATUS) ────────────────────────────
+  # TOKENS: named content = bar(5)+sp(1)+str(N), trailing 2sp in printf absorbed into -8
+  # TASK: fills remaining space
+  # Fixed formula: W_TASK = INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 8
+  #   where -8 = left_margin(2) + 4_seps(4) + right_margin_2sp(2)
+  local W_PANE=11 W_ENGINE=12 W_STATUS=6 W_TOKENS_MIN=10
 
   local now
   now=$(date '+%Y-%m-%d %H:%M:%S')
@@ -361,6 +427,18 @@ render_dashboard() {
 
   local n_total=${#rows[@]}
 
+  # ── TOKENS column: min width, grows with content ───────────────────────────
+  local W_TOKENS=$W_TOKENS_MIN
+  local _tok_k _tok_str _tok_w _row_tok_k _row_pct
+  for _row in "${rows[@]}"; do
+    IFS='|' read -r _ _ _ _ _ _row_pct _row_tok_k _ <<< "$_row"
+    if (( _row_tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$_row_tok_k"; fi
+    _tok_w=$(( 5 + 1 + ${#_tok_str} ))   # bar(5) + sp(1) + str(N); trailing 2sp in printf is in -8
+    (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
+  done
+  local W_TASK=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 8 ))
+  (( W_TASK < 15 )) && W_TASK=15
+
   # ── Pipeline ───────────────────────────────────────────────────────────────
   local pipeline_str
   pipeline_str=$(get_pipeline_summary)
@@ -370,7 +448,7 @@ render_dashboard() {
   eqline=$(make_line '═' "$INNER")
   hline=$(make_line '─' "$INNER")
 
-  # ── Column header/divider strings ─────────────────────────────────────────
+  # ── Column header/divider strings (computed after W_TOKENS is known) ───────
   local h_pane h_task h_engine h_status h_tokens
   h_pane=$(pad_right "PANE"   $W_PANE)
   h_task=$(pad_right "TASK"   $W_TASK)
