@@ -199,7 +199,7 @@ parse_claude_pane() {
     [[ -n "$pane_model" ]] && model="$pane_model"
   fi
 
-  printf '%s|%s|%d|%d|%s|%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
+  printf '%s\x1e%s\x1e%d\x1e%d\x1e%s\x1e%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ parse_codex_pane() {
     status="working"
   fi
 
-  printf '%s|%s|%d|%d|%s|%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
+  printf '%s\x1e%s\x1e%d\x1e%d\x1e%s\x1e%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -399,7 +399,7 @@ render_dashboard() {
     fi
 
     local model status pct tok_k task activity
-    IFS='|' read -r model status pct tok_k task activity <<< "$data"
+    IFS=$'\x1e' read -r model status pct tok_k task activity <<< "$data"
 
     case "$status" in
       working)      (( n_working++ )) ;;
@@ -408,7 +408,8 @@ render_dashboard() {
       *)            (( n_idle++ ))    ;;
     esac
 
-    rows+=("${pane_addr}|${pane_id}|${etype}|${model}|${status}|${pct}|${tok_k}|${task}|${activity}")
+    rows+=("$(printf '%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s' \
+      "$pane_addr" "$pane_id" "$etype" "$model" "$status" "$pct" "$tok_k" "$task" "$activity")")
   done < <(tmux list-panes -s -t "$SESSION" \
     -F '#{window_index}:#{pane_index} #{pane_id} #{pane_current_command}' 2>/dev/null)
 
@@ -418,7 +419,7 @@ render_dashboard() {
   local W_TOKENS=$W_TOKENS_MIN
   local _tok_k _tok_str _tok_w _row_tok_k _row_pct
   for _row in "${rows[@]}"; do
-    IFS='|' read -r _ _ _ _ _ _row_pct _row_tok_k _ <<< "$_row"
+    IFS=$'\x1e' read -r _ _ _ _ _ _row_pct _row_tok_k _ <<< "$_row"
     if (( _row_tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$_row_tok_k"; fi
     _tok_w=$(( 5 + 1 + ${#_tok_str} ))
     (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
@@ -482,7 +483,7 @@ render_dashboard() {
     printf "${GRAY}║${R}%-*s${GRAY}║${R}" "$INNER" "$no_msg"; tput el; echo
   else
     for row in "${rows[@]}"; do
-      IFS='|' read -r pane_addr pane_id etype model status pct tok_k task activity <<< "$row"
+      IFS=$'\x1e' read -r pane_addr pane_id etype model status pct tok_k task activity <<< "$row"
 
       local ecol
       [[ "$etype" == "claude" ]] && ecol="$BLUE" || ecol="$CYAN"

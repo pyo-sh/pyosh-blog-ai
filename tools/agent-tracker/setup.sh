@@ -20,6 +20,13 @@ BACKUP_FILE="${SETTINGS_FILE}.bak.$(date +%Y%m%d%H%M%S)"
 AUTO_YES=false
 [[ "${1:-}" == "--yes" ]] && AUTO_YES=true
 
+# Check dependencies
+if ! command -v jq >/dev/null; then
+  printf 'Error: jq is required but not installed.\n' >&2
+  printf 'Install: apt install jq / brew install jq\n' >&2
+  exit 1
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Resolve absolute paths for hooks
 # ─────────────────────────────────────────────────────────────────────────────
