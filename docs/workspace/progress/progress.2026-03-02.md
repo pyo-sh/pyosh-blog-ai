@@ -153,7 +153,50 @@ dev-review/SKILL.md (#11):
 - PR #29 squash merge → main
 - Closes #28
 - 총 4라운드 리뷰 (Codex review / Sonnet resolve)
-  - 1차: WARNING — awk 공백 경로 취약점 → `sub(/^worktree /, "")` 수정
-  - 2차: WARNING — `LAST_COMMIT_SHA` 빈값 미검증 → 즉시 오류 처리 추가
-  - 3차: CRITICAL — `git worktree list` area repo 오탐 → `BASH_SOURCE` 기반 역추적으로 교체
+  - 1차: WARNING - awk 공백 경로 취약점 → `sub(/^worktree /, "")` 수정
+  - 2차: WARNING - `LAST_COMMIT_SHA` 빈값 미검증 → 즉시 오류 처리 추가
+  - 3차: CRITICAL - `git worktree list` area repo 오탐 → `BASH_SOURCE` 기반 역추적으로 교체
   - 4차: CRITICAL 0 / WARNING 0 / SUGGESTION 0 - 통과
+
+---
+
+## agent-tracker push architecture + Activity column - PR #27
+
+### 작업 내용
+
+**#25 - push architecture (hooks + sidecar)**
+- `on-statusline.sh`: StatusLine JSON → sidecar 파일 (`/tmp/agent-tracker/{pane}.json`)
+- `on-status.sh`: UserPromptSubmit/Stop/PreToolUse hooks → status + task 필드
+- `statusline-wrapper.sh`: context-bar.sh 래핑 + sidecar 쓰기 트리거
+- `setup.sh`: `~/.claude/settings.json` 자동 설정
+- 대시보드: sidecar 파일 직접 읽기 (zero /proc scanning)
+
+**#26 - Activity column**
+- `on-status.sh`: PreToolUse → `activity: "{ToolName}: {key_arg}"`, PostToolUse → clear
+- 대시보드: ACTIVITY column (W=18) TASK과 ENGINE 사이
+- 도구별 표시: Bash→description, Read/Edit/Write→basename, Grep/Glob→pattern, Agent→description
+- idle 상태 `— (idle)` 표시, 최소 터미널 폭 82→86
+- Bug A: Codex task fallback (response_item + role=="user")
+
+**12라운드 Codex 리뷰 수정**
+
+| Round | C | W | 수정 내용 |
+|-------|---|---|----------|
+| 1 | 0 | 2 | flock 추가, setup.sh merge 방식 |
+| 2 | 0 | 1 | tostring 추가 |
+| 3 | 0 | 1 | flock -n (non-blocking for statusline) |
+| 4 | 1 | 0 | tool_input type guard |
+| 5 | 0 | 1 | Skill args tostring |
+| 6 | 0 | 1 | RS `\x1e` delimiter, jq dep check |
+| 7 | 0 | 1 | Codex global fallback 제거 |
+| 8 | 0 | 1 | setup.sh hook shape 정규화 |
+| 9 | 0 | 1 | non-object entry guard |
+| 10 | 0 | 1 | hooks normalize + trailing colon 제거 |
+| 11 | 1 | 0 | PreToolUse migration 사용자 hook 보존 |
+| 12 | 0 | 1 | control char sanitization |
+
+### 결과
+
+- PR #27 squash merge → main
+- Closes #25, #26
+- 14 commits → 1 squash commit

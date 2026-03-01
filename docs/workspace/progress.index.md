@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-02 | PR #27 머지 완료 - agent-tracker push architecture (#25) + Activity column (#26), 12라운드 Codex 리뷰 | done |
 | 2026-03-02 | PR #29 머지 완료 — dev-pipeline 스킬 버그 수정 4라운드 리뷰 통과 (#28) | done |
 | 2026-03-02 | PR #29 3차 리뷰 수정 — MONOREPO_ROOT 감지 git worktree list → BASH_SOURCE 역추적 교체 (#28) | done |
 | 2026-03-02 | dev-pipeline 스킬 버그 수정 10개 항목 - eval 인젝션, awk 파싱, MONOREPO_ROOT, gh api 오류, tmux 체크, state 충돌 등 (#28) | done |
