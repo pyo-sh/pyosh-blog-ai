@@ -213,15 +213,9 @@ orch_check_completion() {
   fi
 
   # 2. Pipeline state gone = pipeline finished (check PR status)
-  # Path matches pipeline-helpers.sh convention (non-namespaced).
-  # Area field inside the state JSON is checked to avoid cross-area collisions.
-  local pipeline_state="$PIPELINE_DIR/issue-${issue}.state.json"
-  local state_area=""
-  if [ -f "$pipeline_state" ]; then
-    state_area=$(jq -r '.area // empty' "$pipeline_state" 2>/dev/null)
-  fi
-  # Treat as absent if file missing OR area field doesn't match (cross-area collision guard)
-  if [ ! -f "$pipeline_state" ] || { [ -n "$state_area" ] && [ "$state_area" != "$area" ]; }; then
+  # Path is area-namespaced: .workspace/pipeline/{area}/issue-{N}.state.json
+  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+  if [ ! -f "$pipeline_state" ]; then
     # Grace window: if recently dispatched, pipeline may not have created state yet
     local dispatch_time
     dispatch_time=$(orch_state_read "$area" | jq -r ".dispatched[\"$issue\"].dispatchedAt // empty")

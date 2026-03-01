@@ -26,7 +26,7 @@ Store in state as `"agent": "claude"` or `"agent": "codex"`.
 ### 0. Check Existing State
 
 ```bash
-STATE_FILE=".workspace/pipeline/issue-{N}.state.json"
+STATE_FILE=".workspace/pipeline/{area}/issue-{N}.state.json"
 ```
 
 Exists → **resume** ([recovery.md](references/recovery.md)). Not exists → Step 1.
@@ -183,7 +183,7 @@ State → `"step": "log"`.
 
 ### 7. Record + Clean Up
 
-Run `/dev-log`, then `rm .workspace/pipeline/issue-{N}.state.json`.
+Run `/dev-log`, then `rm .workspace/pipeline/{area}/issue-{N}.state.json`.
 
 ## Constraints
 

@@ -18,27 +18,31 @@ WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
 pipeline_state_path() {
   local issue=$1
-  echo "$PIPELINE_DIR/issue-${issue}.state.json"
+  local area=$2
+  echo "$PIPELINE_DIR/${area}/issue-${issue}.state.json"
 }
 
 pipeline_init() {
-  mkdir -p "$PIPELINE_DIR" "$WORKTREE_DIR"
-  # Ensure area's .gitignore doesn't need updating — worktrees live at monorepo root
+  local area=$1
+  mkdir -p "$PIPELINE_DIR/$area" "$WORKTREE_DIR"
 }
 
 pipeline_state_exists() {
   local issue=$1
-  [ -f "$(pipeline_state_path "$issue")" ]
+  local area=$2
+  [ -f "$(pipeline_state_path "$issue" "$area")" ]
 }
 
 pipeline_state_read() {
   local issue=$1
-  cat "$(pipeline_state_path "$issue")"
+  local area=$2
+  cat "$(pipeline_state_path "$issue" "$area")"
 }
 
 pipeline_state_delete() {
   local issue=$1
-  rm -f "$(pipeline_state_path "$issue")"
+  local area=$2
+  rm -f "$(pipeline_state_path "$issue" "$area")"
 }
 
 # ──────────────────────────────────────────────
@@ -358,7 +362,7 @@ pipeline_cleanup() {
   cd "$MONOREPO_ROOT/$area" && git branch -d "$branch" 2>/dev/null
 
   # Remove state file
-  pipeline_state_delete "$issue"
+  pipeline_state_delete "$issue" "$area"
 }
 
 # ──────────────────────────────────────────────
@@ -367,13 +371,17 @@ pipeline_cleanup() {
 
 pipeline_list() {
   if [ -d "$PIPELINE_DIR" ]; then
-    for f in "$PIPELINE_DIR"/issue-*.state.json; do
+    local found=0
+    for f in "$PIPELINE_DIR"/*/issue-*.state.json; do
       [ -f "$f" ] || continue
-      local issue step
+      found=1
+      local issue step area
       issue=$(jq -r '.issue' "$f")
+      area=$(jq -r '.area' "$f")
       step=$(jq -r '.step' "$f")
-      echo "Issue #${issue}: step=${step}"
+      echo "Issue #${issue} (${area}): step=${step}"
     done
+    [ "$found" -eq 0 ] && echo "No active pipelines"
   else
     echo "No active pipelines"
   fi
