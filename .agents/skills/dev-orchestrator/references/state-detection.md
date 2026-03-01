@@ -25,7 +25,7 @@ If the pipeline AI does not write the signal file (older version), fall back to 
 
 ### 2. Pipeline State + PR Status
 
-If no signal file and `.workspace/pipeline/issue-{N}.state.json` is absent:
+If no signal file and `.workspace/pipeline/{area}/issue-{N}.state.json` is absent:
 
 ```bash
 # Check for merged PR

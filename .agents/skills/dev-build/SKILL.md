@@ -5,68 +5,69 @@ description: GitHub Issue-based development workflow. Issue → Worktree → Cod
 
 # Dev-Build
 
-Issue → Worktree → Code → Push → PR. Review/merge handled by separate skills. Git remote and branch rules in `CLAUDE.md`.
+Issue → Worktree → Code → Push → PR. Review/merge handled by separate skills.
 
 ## Workflow
 
-### 0. Verify/Create Issue
+### 0. Verify/create issue
+
 Run `gh issue list --assignee @me` in the target area. If none exists, get user approval before creating.
 
-### 1. Create Worktree
+### 1. Create worktree
 
-**IMPORTANT: `cd {area}` first** — each area is an independent Git repo.
-**NOTE: Worktrees live at the monorepo root `.workspace/`, NOT inside the area.**
+**`cd {area}` first** — each area is an independent Git repo. Worktrees live at monorepo root `.workspace/`, not inside the area.
 
 ```bash
 cd {area}
 git worktree add -b {type}/issue-{N}-{desc} ../.workspace/worktrees/issue-{N} main
 cd ../.workspace/worktrees/issue-{N}
 ```
-→ Branch rules: [branch-naming.md](references/branch-naming.md)
+
+→ [branch-naming.md](references/branch-naming.md)
 
 ### 2. Code
-- Follow `{area}/CLAUDE.md` rules
-- On technical investigation/decision → record via `/dev-log`
 
-### 3. Record Progress (required)
-**Must** run `/dev-log` to record progress before pushing.
+Follow `{area}/CLAUDE.md`. Record technical decisions via `/dev-log`.
 
-### 4. Push & Create PR
+### 2.5. Check Definition of Done (feat issues only)
+
+After implementation, mark completed DoD items in the Issue body:
+
+```bash
+BODY=$(gh issue view {N} --json body -q '.body')
+BODY=$(echo "$BODY" | sed 's/- \[ \] Completed item/- [x] Completed item/')
+gh issue edit {N} --body "$BODY"
+```
+
+Only check fully implemented items. Leave partial or future items unchecked.
+
+### 3. Record progress (required)
+
+Run `/dev-log` before pushing.
+
+### 4. Push & create PR
+
 ```bash
 git push -u origin {type}/issue-{N}-{desc}
 ```
 
-**`--body-file` required** — inline `--body` causes shell escape issues. **Must** use `.workspace/messages/`:
+Write body to `.workspace/messages/pr-{N}-body.md`, then:
 
 ```bash
-mkdir -p .workspace/messages
-cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
-## Summary
-Closes #{N}
-- Change description
-## Test plan
-- [ ] Test item
-PREOF
-
-gh pr create \
-  --title "{type}: description (#{N})" \
-  --body-file .workspace/messages/pr-{N}-body.md
-
+gh pr create --title "{type}: description (#{N})" --body-file .workspace/messages/pr-{N}-body.md
 rm .workspace/messages/pr-{N}-body.md
 ```
 
-→ Full template: [pr-template.md](references/pr-template.md)
+→ [pr-template.md](references/pr-template.md)
 
-### 5. Next Step
-Instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration. Do not review in this session.
+### 5. Next step
+
+Instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration.
 
 ### 6. Cleanup
+
 ```bash
 cd {area}
 git worktree remove ../.workspace/worktrees/issue-{N}
 git branch -d {type}/issue-{N}-{desc}
 ```
-
-## References
-- [Branch & commit rules](references/branch-naming.md)
-- [PR template](references/pr-template.md)

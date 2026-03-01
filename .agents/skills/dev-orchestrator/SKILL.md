@@ -27,7 +27,7 @@ Store in state as `"agent": "claude"` or `"agent": "codex"`.
 .workspace/orchestrate/{area}/issue-{N}.exit     # signal: pipeline completed (content: "ok" or "fail")
 ```
 
-Pipeline state at `.workspace/pipeline/issue-{N}.state.json` is read-only from the orchestrator's perspective. The `area` field inside the state JSON is checked to avoid cross-area collisions when client/server share the same issue number.
+Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
 
 ## Workflow
 
@@ -61,7 +61,7 @@ gh issue list --assignee @me --state open --json number,title,body,labels \
   --jq '.[] | select(.labels[].name == "{area}")'
 ```
 
-Exclude issues already in pipeline state (`.workspace/pipeline/issue-*.state.json`).
+Exclude issues already in pipeline state (`.workspace/pipeline/{area}/issue-*.state.json`).
 
 Present list to user for confirmation before proceeding.
 

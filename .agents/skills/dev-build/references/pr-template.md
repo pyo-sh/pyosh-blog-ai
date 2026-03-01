@@ -13,9 +13,9 @@ Closes #{N}
 - **file1**: Description
 - **file2**: Description
 
-## Test plan
-- [ ] Test item 1
-- [ ] Test item 2
+## Check plan
+- Verification step 1
+- Verification step 2
 
 ## Screenshots
 (Attach if UI changes)
@@ -24,7 +24,7 @@ Closes #{N}
 ## Required
 1. `Closes #{N}` — Auto-closes the Issue
 2. **Summary** — 1-3 bullet points
-3. **Test plan** — Verification method
+3. **Check plan** — Post-merge verification steps (plain list, no checkboxes)
 
 ## PR Title
 ```
@@ -41,8 +41,8 @@ cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
 ## Summary
 Closes #{N}
 - Change description
-## Test plan
-- [ ] Test item
+## Check plan
+- Verification step
 PREOF
 
 gh pr create \

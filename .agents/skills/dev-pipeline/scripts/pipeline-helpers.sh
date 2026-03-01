@@ -18,27 +18,38 @@ WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
 pipeline_state_path() {
   local issue=$1
-  echo "$PIPELINE_DIR/issue-${issue}.state.json"
+  local area=$2
+  echo "$PIPELINE_DIR/${area}/issue-${issue}.state.json"
 }
 
 pipeline_init() {
-  mkdir -p "$PIPELINE_DIR" "$WORKTREE_DIR"
-  # Ensure area's .gitignore doesn't need updating — worktrees live at monorepo root
+  local area=$1
+  mkdir -p "$PIPELINE_DIR/$area" "$WORKTREE_DIR"
 }
 
 pipeline_state_exists() {
   local issue=$1
-  [ -f "$(pipeline_state_path "$issue")" ]
+  local area=$2
+  [ -f "$(pipeline_state_path "$issue" "$area")" ]
 }
 
 pipeline_state_read() {
   local issue=$1
-  cat "$(pipeline_state_path "$issue")"
+  local area=$2
+  cat "$(pipeline_state_path "$issue" "$area")"
+}
+
+pipeline_state_write() {
+  local issue=$1
+  local area=$2
+  local json=$3
+  echo "$json" > "$(pipeline_state_path "$issue" "$area")"
 }
 
 pipeline_state_delete() {
   local issue=$1
-  rm -f "$(pipeline_state_path "$issue")"
+  local area=$2
+  rm -f "$(pipeline_state_path "$issue" "$area")"
 }
 
 # ──────────────────────────────────────────────
@@ -348,17 +359,18 @@ pipeline_cleanup() {
   pipeline_kill_pane "$review_pane"
   pipeline_kill_pane "$resolve_pane"
 
-  # Remove worktree (must run from the area repo that owns it)
+  # Remove worktree (--force handles uncommitted changes or detached HEAD post-merge)
   local wt="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$wt" ]; then
-    cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" 2>/dev/null
+    cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" --force
+    git worktree prune
   fi
 
-  # Delete branch (may already be deleted by --delete-branch)
-  cd "$MONOREPO_ROOT/$area" && git branch -d "$branch" 2>/dev/null
+  # Delete branch (-D required after squash merge; branch commits not in main ancestry)
+  cd "$MONOREPO_ROOT/$area" && git branch -D "$branch" 2>/dev/null
 
   # Remove state file
-  pipeline_state_delete "$issue"
+  pipeline_state_delete "$issue" "$area"
 }
 
 # ──────────────────────────────────────────────
@@ -367,13 +379,17 @@ pipeline_cleanup() {
 
 pipeline_list() {
   if [ -d "$PIPELINE_DIR" ]; then
-    for f in "$PIPELINE_DIR"/issue-*.state.json; do
+    local found=0
+    for f in "$PIPELINE_DIR"/*/issue-*.state.json; do
       [ -f "$f" ] || continue
-      local issue step
+      found=1
+      local issue step area
       issue=$(jq -r '.issue' "$f")
+      area=$(jq -r '.area' "$f")
       step=$(jq -r '.step' "$f")
-      echo "Issue #${issue}: step=${step}"
+      echo "Issue #${issue} (${area}): step=${step}"
     done
+    [ "$found" -eq 0 ] && echo "No active pipelines"
   else
     echo "No active pipelines"
   fi

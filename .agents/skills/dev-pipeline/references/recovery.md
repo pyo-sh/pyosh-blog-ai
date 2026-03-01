@@ -5,7 +5,7 @@ Resume from state file when orchestrator crashes or disconnects.
 ## Entry
 
 ```bash
-ls .workspace/pipeline/issue-*.state.json 2>/dev/null
+ls .workspace/pipeline/*/issue-*.state.json 2>/dev/null
 ```
 
 If found → read state, resume by `step` field. First, clean orphaned panes:
@@ -88,4 +88,4 @@ Re-run `/dev-log`. Idempotent.
 
 ## Stale State
 
-If PR already merged and logged → `rm .workspace/pipeline/issue-{N}.state.json`, report completed.
+If PR already merged and logged → `rm .workspace/pipeline/{area}/issue-{N}.state.json`, report completed.
