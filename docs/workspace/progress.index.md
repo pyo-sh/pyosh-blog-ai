@@ -6,6 +6,8 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | dev-pipeline pane 관리 결함 수정 및 test plan 검증 루프 추가 — PR #20 머지 (#17, #18) | done |
+| 2026-03-01 | PR #15 10차 리뷰 수정 — pipeline state area 네임스페이싱 (pipeline-helpers + orchestrate-helpers) (#14) | done |
 | 2026-03-01 | PR #19 머지 완료 — agent-tracker Codex 감지 / Task·Token 표시 / /clear 토큰 리셋 (#16) | done |
 | 2026-03-01 | PR #15 최종(8-9차) 리뷰 수정 — retry dispatchedAt 초기화, orch_print_summary 문서 인자 추가 (#14) | done |
 | 2026-03-01 | PR #20 [SUGGESTION] 수정 — pipeline_orchestrator_pane() $TMUX_PANE 미설정 시 tmux display-message 폴백 (#17, #18) | done |
