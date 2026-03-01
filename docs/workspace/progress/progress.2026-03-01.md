@@ -227,3 +227,24 @@
 ## Discoveries (10)
 - bash 스크립트에서 `--flag` 분기는 positional 인자 파싱 이전에 처리해야 함 — `$1`을 변수로 할당 후 체크하면 다른 로직이 먼저 `$1`을 소비할 수 있음
 - `grep -oE | ... | sort | tr | sed` 파이프라인의 첫 `grep`이 무매칭 시 전체 파이프라인이 pipefail로 종료 → `|| true`를 파이프라인 끝에 배치해 빈 출력을 정상 케이스로 처리
+
+---
+
+## Completed (11)
+- [x] PR #15 2차 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **[CRITICAL] `orchestrate-helpers.sh:305` — `orch_unblock()` 내부 dep_status 판별 미완:**
+  - 1차 수정(Completed 10)은 `orch_poll_cycle`의 외부 조건(`if completed || failed → orch_unblock()` 호출)은 고쳤으나,
+    `orch_unblock()` 내부 loop에서 잔여 dep가 "해소됐는지" 판별 시 `completed`만 허용
+    (`if [ "$dep_status" != "completed" ]; then still_blocked=1`)
+  - **재현 시나리오**: `dag[3]=[1,2]`, `status[1]=failed`, `status[2]=failed` → `#3`이 영구 `blocked`
+  - **Fix**: `orchestrate-helpers.sh:305` — `completed` 단독 비교 → `completed` OR `failed` 허용
+    ```bash
+    if [ "$dep_status" != "completed" ] && [ "$dep_status" != "failed" ]; then
+    ```
+  - **SKILL.md:141** — `orch_unblock "$ISSUE"` (1개 인자) → `orch_unblock "$AREA" "$ISSUE"` (2개) 문서 정정
+
+## Discoveries (11)
+- `orch_poll_cycle`에서 `orch_unblock` 호출 자체는 `completed|failed` 양쪽에서 발생해도,
+  `orch_unblock` 내부 remaining-deps 루프가 `completed`만 "통과"로 간주하면 여전히 deadlock 발생
+  → 외부 트리거와 내부 판별을 동시에 수정해야 상태 머신이 올바르게 동작함
