@@ -40,7 +40,20 @@ state 파일 namespace 충돌 (#23):
 - dev-pipeline: 189 → 166 lines, `references/pane-lifecycle.md` 분리
 - dev-build: 중복 PR body 예시 제거 (pr-template.md 참조)
 
+**Codex 리뷰 대응 (2차, 3차)**
+
+1차 리뷰 (Warning 3개) 수정:
+- `dev-orchestrator/SKILL.md`, `recovery.md`, `state-detection.md`, `dependency-resolution.md` 구 경로 → `{area}/issue-{N}` 네임스페이스 적용
+
+2차 리뷰 (Warning 2개) 수정:
+- `pipeline_cleanup()`: `git worktree remove --force` + `git worktree prune` + `git branch -D`
+- `pipeline_state_write()` 헬퍼 추가
+- SKILL.md Step 6: merge 실패 시 `exit 1` 전 `merge-failed` state 저장
+- Step 5 Check plan `grep || true` (섹션 없는 구 PR body 안전 처리)
+
+3차 리뷰: CRITICAL 0, WARNING 0, SUGGESTION 3 (런타임 검증 항목만 남음)
+
 ### 결과
 
-- PR #24 생성: `fix/pipeline-merge-robustness` → main
+- PR #24 머지: `fix/pipeline-merge-robustness` → main
 - Closes #21, #22, #23
