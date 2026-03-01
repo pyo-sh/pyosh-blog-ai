@@ -37,6 +37,19 @@ cd .workspace/worktrees/issue-{N}
 - **Fix only reviewed items** — no unrelated changes
 - Commit: `fix: address review comments (#{N})`
 
+### 3.5. Update Test Plan Checkboxes
+
+After fixing code, update verified `- [ ]` items in the PR body to `- [x]`:
+
+```bash
+BODY=$(gh pr view {PR#} --json body --jq '.body')
+# Replace verified items (one per line as needed)
+BODY=$(echo "$BODY" | sed 's/- \[ \] Verified item text/- [x] Verified item text/')
+gh pr edit {PR#} --body "$BODY"
+```
+
+Only check items that can be verified from the current code state. Leave runtime-dependent items as `- [ ]`.
+
 ### 4. Record Progress (required)
 
 **Must** run `/dev-log` before pushing. Include which comments were addressed and any technical decisions.

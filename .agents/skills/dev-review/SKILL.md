@@ -23,24 +23,19 @@ Read diff + surrounding context. Check compliance with `{area}/CLAUDE.md`.
 
 **Focus**: Security (OWASP Top 10), type safety, edge cases, error handling, performance (N+1), conventions.
 
-### 2.5. Verify Test Plan
+### 2.5. Check Test Plan
 
-Read PR body and check `- [ ]` test plan items:
-
-```bash
-BODY=$(gh pr view {PR#} --json body --jq '.body')
-```
-
-For each `- [ ]` item, determine if it can be verified by reading the diff and reasoning about correctness. Mark verified items by updating the PR body (replace `- [ ]` with `- [x]`):
+Read PR body and assess each `- [ ]` test plan item:
 
 ```bash
-# Update a verified item (repeat for each verified line)
-BODY=$(echo "$BODY" | sed 's/- \[ \] Verified item description/- [x] Verified item description/')
-gh pr edit {PR#} --body "$BODY"
+gh pr view {PR#} --json body --jq '.body' | grep '^- \[ \]'
 ```
 
-- Items verifiable from the diff → check and update PR body
-- Items requiring runtime/manual testing → leave as `- [ ]`, note as `[SUGGESTION]` in review
+For each item:
+- **Verifiable from diff** — confirm coverage in review body (note which items are addressed by the changes)
+- **Requires manual testing** — flag as `[SUGGESTION]` in review body
+
+Do **not** modify the PR body. Checkbox updates (`- [ ]` → `- [x]`) happen in `/dev-resolve` after all fixes are applied.
 
 ### 3. Classify Severity
 
