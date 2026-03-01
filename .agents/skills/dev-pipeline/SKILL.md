@@ -38,7 +38,7 @@ Exists → **resume** ([recovery.md](references/recovery.md)). Not exists → St
 Capture orchestrator pane (anchors all future splits):
 
 ```bash
-ORCHESTRATOR_PANE=$(tmux display-message -p '#{pane_id}')
+ORCHESTRATOR_PANE=$(pipeline_orchestrator_pane)
 ```
 
 Execute `/dev-build`. After PR creation, write state:
@@ -79,9 +79,10 @@ rc=$?
 - `rc=1` (TIMEOUT) → kill pane, report to user
 - `rc=2` (PANE_DEAD) → auto-retry: re-open via `pipeline_open_pane_verified()`, re-poll. Second failure → report to user.
 
-On success:
+On success — kill review pane immediately, then analyze:
 
 ```bash
+pipeline_kill_pane "$REVIEW_PANE"
 eval "$(pipeline_analyze_review "{area_dir}" {PR#} "$REVIEW_ID")"
 # $STATE, $CRITICAL, $WARNING, $SUGGESTION
 ```
@@ -98,7 +99,6 @@ Update state: `"lastReviewId": REVIEW_ID`.
 Triggered by: Step 3 (`CHANGES_REQUESTED`), Step 5 ("Fix & Re-review" or "Fix & Merge" with `skipReview: true`).
 
 ```bash
-pipeline_kill_pane "$REVIEW_PANE"
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
 
 RESOLVE_PANE=$(pipeline_open_pane_verified \
@@ -121,13 +121,22 @@ rc=$?
 Handle `rc` same as Step 3 (TIMEOUT → report, PANE_DEAD → auto-retry once).
 
 When new commits appear:
-1. Show diff: `gh pr diff {PR#}`
-2. `skipReview: true` → Step 6
-3. `skipReview: false` → **ask user**: "Apply & Re-review" (→ Step 2) | "Merge as-is" (→ Step 6) | "Manual edit" (→ user edits, then Step 2)
+1. Kill resolve pane immediately: `pipeline_kill_pane "$RESOLVE_PANE"`
+2. Show diff: `gh pr diff {PR#}`
+3. `skipReview: true` → Step 6
+4. `skipReview: false` → **ask user**: "Apply & Re-review" (→ Step 2) | "Merge as-is" (→ Step 6) | "Manual edit" (→ user edits, then Step 2)
 
 ### 5. No Critical — User Decision
 
-Show review summary + severity counts. **Ask user**:
+Show review summary + severity counts. Check for unchecked test plan items:
+
+```bash
+UNCHECKED=$(gh pr view {PR#} --json body \
+  --jq '[.body | split("\n")[] | select(startswith("- [ ]"))] | length')
+[ "$UNCHECKED" -gt 0 ] && echo "⚠️  ${UNCHECKED} unchecked test plan item(s) remain"
+```
+
+**Ask user**:
 - **"Merge"** → Step 6
 - **"Fix & Re-review"** → Step 4a
 - **"Fix & Merge"** → Step 4a with `skipReview: true`
