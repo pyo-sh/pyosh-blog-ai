@@ -213,7 +213,8 @@ orch_check_completion() {
   fi
 
   # 2. Pipeline state gone = pipeline finished (check PR status)
-  local pipeline_state="$PIPELINE_DIR/issue-${issue}.state.json"
+  # State is namespaced by area to avoid collisions across repos with same issue numbers.
+  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
   if [ ! -f "$pipeline_state" ]; then
     # Grace window: if recently dispatched, pipeline may not have created state yet
     local dispatch_time
