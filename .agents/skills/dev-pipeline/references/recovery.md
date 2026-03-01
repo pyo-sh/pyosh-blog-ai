@@ -48,14 +48,14 @@ source scripts/pipeline-helpers.sh
 if [ -n "{resolvePane}" ] && pipeline_pane_alive "{resolvePane}"; then
   NEW_SHA=$(pipeline_poll_commits "{area_dir}" {PR#} "{lastCommitSha}" 900 "{resolvePane}")
 else
-  REVIEW_DATE=$(gh api repos/{owner}/{repo}/pulls/{PR#}/reviews --jq '.[-1].submitted_at')
-  LAST_COMMIT_DATE=$(gh api repos/{owner}/{repo}/pulls/{PR#}/commits --jq '.[-1].commit.committer.date')
+  # Check whether resolve already completed — new commits after lastCommitSha?
+  CURRENT_SHA=$(cd {area_dir} && gh api "repos/{owner}/{repo}/pulls/{PR#}/commits" --jq '.[-1].sha')
 fi
 ```
 
-- New commits after review → Step 2 (re-review)
+- `CURRENT_SHA` differs from `lastCommitSha` → resolve completed → re-open review pane (Step 2)
+- `CURRENT_SHA` equals `lastCommitSha` → resolve not done → re-trigger resolve pane via `pipeline_open_pane_verified()`
 - PANE_DEAD during poll → re-trigger via `pipeline_open_pane_verified()`
-- No new commits, pane dead → re-trigger resolve pane
 
 ### step: "merge"
 

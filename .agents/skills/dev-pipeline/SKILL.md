@@ -17,11 +17,21 @@ Ask the user: **Claude** (`claude --dangerously-skip-permissions`) or **Codex** 
 
 ### 0. Check existing state
 
+Verify tmux session first:
+
+```bash
+[ -z "$TMUX" ] && echo "ERROR: tmux session required. Start tmux and retry." && exit 1
+```
+
+Check for existing pipeline:
+
 ```bash
 STATE_FILE=".workspace/pipeline/{area}/issue-{N}.state.json"
 ```
 
-Exists → resume ([recovery.md](references/recovery.md)). Not exists → Step 1.
+If state file exists → show the current `step` and `pr` to the user, then ask: **"Resume from step X?"** or **"Start fresh?"**. If "Start fresh" → delete state file, proceed to Step 1. If "Resume" → follow ([recovery.md](references/recovery.md)).
+
+Not exists → Step 1.
 
 ### 1. Run /dev-build
 
@@ -31,7 +41,11 @@ Exists → resume ([recovery.md](references/recovery.md)). Not exists → Step 1
 ORCHESTRATOR_PANE=$(pipeline_orchestrator_pane)
 ```
 
-After PR creation, write state:
+After PR creation, capture the initial commit SHA and write state:
+
+```bash
+LAST_COMMIT_SHA=$(cd {area_dir} && gh api "repos/{owner}/{repo}/pulls/{PR#}/commits" --jq '.[-1].sha')
+```
 
 ```json
 {
@@ -40,6 +54,7 @@ After PR creation, write state:
   "worktree": ".workspace/worktrees/issue-42",
   "agent": "claude", "orchestratorPane": "%0",
   "step": "review", "reviewRound": 1, "lastReviewId": 0,
+  "lastCommitSha": "{LAST_COMMIT_SHA}",
   "skipReview": false,
   "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
 }
@@ -67,15 +82,20 @@ rc=$?
 - `rc=1` (TIMEOUT) → kill pane, report to user
 - `rc=2` (PANE_DEAD) → auto-retry once. Second failure → report to user.
 
-On success — kill pane, analyze:
+On success — kill pane, fetch and read review directly:
 
 ```bash
 pipeline_kill_pane "$REVIEW_PANE"
-eval "$(pipeline_analyze_review "{area_dir}" {PR#} "$REVIEW_ID")"
-# $STATE, $CRITICAL, $WARNING, $SUGGESTION
+pipeline_fetch_review "{area_dir}" {PR#} "$REVIEW_ID"
 ```
 
-Update `"lastReviewId": REVIEW_ID`. Decision: `CHANGES_REQUESTED` or `COMMENTED+CRITICAL>0` → Step 4a | `COMMENTED+CRITICAL=0` → Step 5.
+Read `state` and severity counts (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`) from the returned JSON body. Update `"lastReviewId": REVIEW_ID`.
+
+Decision:
+- `CHANGES_REQUESTED` or `COMMENTED` + `CRITICAL > 0` → Step 4a
+- `COMMENTED` + `CRITICAL = 0` → Step 5
+- `APPROVED` → Step 5 (treat as no critical)
+- `PENDING` or `DISMISSED` → report unexpected state to user, stop
 
 ### 4a. Trigger resolve
 

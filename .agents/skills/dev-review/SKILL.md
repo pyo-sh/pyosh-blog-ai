@@ -40,3 +40,4 @@ Summarize counts. If Critical → advise `/dev-resolve`. If none → advise appr
 - Comments only — never modify code
 - Cite `file:line` with problem and alternative
 - Don't flag trivial style differences as Critical/Warning
+- Review body **must start with `## Review Summary`** — the pipeline polls for this exact prefix to detect review completion
