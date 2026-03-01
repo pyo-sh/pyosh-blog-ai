@@ -28,6 +28,18 @@ cd ../.workspace/worktrees/issue-{N}
 - Follow `{area}/CLAUDE.md` rules
 - On technical investigation/decision → record via `/dev-log`
 
+### 2.5. Check Definition of Done (feat issues only)
+
+After implementation, mark completed DoD items in the Issue body:
+
+```bash
+BODY=$(gh issue view {N} --json body -q '.body')
+BODY=$(echo "$BODY" | sed 's/- \[ \] Completed item/- [x] Completed item/')
+gh issue edit {N} --body "$BODY"
+```
+
+Only check items that are fully implemented. Leave partial or future items unchecked.
+
 ### 3. Record Progress (required)
 **Must** run `/dev-log` to record progress before pushing.
 
@@ -44,8 +56,8 @@ cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
 ## Summary
 Closes #{N}
 - Change description
-## Test plan
-- [ ] Test item
+## Check plan
+- Verification step
 PREOF
 
 gh pr create \

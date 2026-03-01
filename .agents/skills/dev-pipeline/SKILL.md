@@ -128,12 +128,10 @@ When new commits appear:
 
 ### 5. No Critical — User Decision
 
-Show review summary + severity counts. Check for unchecked test plan items:
+Show review summary + severity counts. Show check plan from PR body if present:
 
 ```bash
-UNCHECKED=$(gh pr view {PR#} --json body \
-  --jq '[.body | split("\n")[] | select(startswith("- [ ]"))] | length')
-[ "$UNCHECKED" -gt 0 ] && echo "⚠️  ${UNCHECKED} unchecked test plan item(s) remain"
+gh pr view {PR#} --json body --jq '.body' | grep -A999 '## Check plan' | tail -n +2
 ```
 
 **Ask user**:
