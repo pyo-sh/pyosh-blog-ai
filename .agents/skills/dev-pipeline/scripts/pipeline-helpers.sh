@@ -4,7 +4,7 @@
 
 # Detect monorepo root via git worktree list — always returns the main worktree path,
 # regardless of whether this script is sourced from a linked worktree or an area repo.
-MONOREPO_ROOT="$(git worktree list --porcelain | awk 'NR==1{print $2}')"
+MONOREPO_ROOT="$(git worktree list --porcelain | awk 'NR==1{sub(/^worktree /, ""); print; exit}')"
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
