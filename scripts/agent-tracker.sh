@@ -379,11 +379,53 @@ get_pipeline_summary() {
   fi
 }
 
+# _get_cmdline <pid> — print full command line for a process (cross-platform)
+_get_cmdline() {
+  local pid=$1
+  # Linux: /proc/{pid}/cmdline (NUL-separated)
+  if [[ -f /proc/"$pid"/cmdline ]]; then
+    tr '\0' ' ' < /proc/"$pid"/cmdline 2>/dev/null
+    return
+  fi
+  # macOS / cross-platform: ps -o command=
+  ps -o command= -p "$pid" 2>/dev/null
+}
+
+# _get_exe_name <pid> — print executable basename (cross-platform)
+_get_exe_name() {
+  local pid=$1
+  # Linux: /proc/{pid}/exe symlink
+  if [[ -L /proc/"$pid"/exe ]]; then
+    local p
+    p=$(readlink /proc/"$pid"/exe 2>/dev/null) && printf '%s' "${p##*/}"
+    return
+  fi
+  # macOS / cross-platform: ps -o comm=
+  ps -o comm= -p "$pid" 2>/dev/null | xargs basename 2>/dev/null
+}
+
+# _match_agent <cmdline> <exe_name> — print "claude" or "codex" if matched
+_match_agent() {
+  local cmdline="$1" exe="$2"
+  # Claude Code
+  if [[ "$exe" == "claude" ]] || \
+     [[ "$cmdline" =~ @anthropic-ai/claude-code|claude-code/cli ]]; then
+    printf 'claude'; return 0
+  fi
+  # Codex
+  if [[ "$exe" == "codex" ]] || \
+     [[ "$cmdline" =~ @openai/codex|codex\.js ]]; then
+    printf 'codex'; return 0
+  fi
+  return 1
+}
+
 # detect_agent_type <pane_pid> — print "claude" or "codex" if found in process tree
 # Scans the pane's entire process tree (cmdline + exe) to detect agent type regardless
 # of installation method (native binary, npm global, npx, bunx, etc.).
+# Works on both Linux (/proc) and macOS (ps fallback).
 detect_agent_type() {
-  local pids=() queue=("$1") pid child cmdline exepath
+  local pids=() queue=("$1") pid child cmdline exename result
   # BFS: collect all descendant PIDs
   while (( ${#queue[@]} > 0 )); do
     pid="${queue[0]}"; queue=("${queue[@]:1}")
@@ -394,18 +436,9 @@ detect_agent_type() {
   done
   # Check each process for known agent signatures
   for pid in "${pids[@]}"; do
-    cmdline=$(tr '\0' ' ' < /proc/"$pid"/cmdline 2>/dev/null) || continue
-    exepath=$(readlink /proc/"$pid"/exe 2>/dev/null) || true
-    # Claude Code: binary named "claude" or cmdline contains claude CLI patterns
-    if [[ "${exepath##*/}" == "claude" ]] || \
-       [[ "$cmdline" =~ @anthropic-ai/claude-code|claude-code/cli ]]; then
-      printf 'claude'; return 0
-    fi
-    # Codex: binary named "codex" or cmdline contains codex CLI patterns
-    if [[ "${exepath##*/}" == "codex" ]] || \
-       [[ "$cmdline" =~ @openai/codex|codex\.js ]]; then
-      printf 'codex'; return 0
-    fi
+    cmdline=$(_get_cmdline "$pid") || continue
+    exename=$(_get_exe_name "$pid") || true
+    result=$(_match_agent "$cmdline" "$exename") && { printf '%s' "$result"; return 0; }
   done
   return 1
 }
