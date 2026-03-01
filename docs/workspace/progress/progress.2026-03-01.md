@@ -297,3 +297,35 @@
   - 해결책: `/proc/{pid}/cmdline` argv 스캔으로 `@openai/codex` 또는 `codex.js` 경로 포함 여부 확인
 - 재귀 `codex_in_descendants()`가 필요한 이유: shell → npx → node 같은 중간 프로세스가 있을 수 있음
   - 직접 자식(`pgrep -P`)만 체크하면 중간 프로세스가 있는 경우 누락 가능
+
+---
+
+## Completed (14)
+- [x] PR #15 5-7차 리뷰 코멘트 최종 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **7차 리뷰에서 남은 2가지 수정 (이번 커밋):**
+
+  **[CRITICAL] `orchestrate-helpers.sh:103` — `orch_find_idle_panes` 세션 범위 오류:**
+  - 기존: `tmux list-panes -s -F '#{pane_id} #{pane_current_command}'` — `-s` 플래그는 현재 세션 범위이나,
+    다중 tmux 세션 환경에서 `#{session_id}` 필터 없이 출력하면 의도치 않은 세션 pane 포함 가능
+  - **Fix**: `tmux display-message -p '#{session_id}'`로 현재 세션 ID 추출 →
+    `tmux list-panes -s -F '#{session_id} #{pane_id} #{pane_current_command}'` 출력 후
+    awk에서 `$1 == sess` 필터링으로 현재 세션 pane만 선택
+
+  **[WARNING] `orchestrate-helpers.sh:80-81` — `orch_state_update` 비원자적 쓰기:**
+  - 기존: `tmp=$(jq ...)` + `echo "$tmp" > "$path"` — jq 실패 시 빈 내용으로 `batch.state.json` 덮어씀
+  - **Fix**: `mktemp` → jq 출력을 임시 파일에 저장 → 성공 시 `mv`(원자적) → 실패 시 `rm` + 에러 메시지 + `return 1`
+
+  **이전 커밋들에서 이미 처리된 수정 (5-6차 리뷰):**
+  - **[WARNING] `orch_detect_stall` false stall when no PR**: no PR → `return 1` (early return)
+  - **[WARNING] `parse-dependencies.sh:97`** 대소문자 구분 헤딩: `tolower($0) ~ /^### *dependencies/` 적용
+  - **[SUGGESTION] `recovery.md`**: `failed` dep도 unblock 수행 명시 (`# both completed and failed unblock dependents` 주석)
+  - **[CRITICAL] `orch_dispatch` cd area_dir 누락**: `cd '$area_dir' &&` 선행 추가
+  - **[WARNING] auto-retry 미구현**: `retryCount` 기반 bounded retry 구현 (max 1회)
+  - **[WARNING] `gh issue view` pipefail 종료**: `|| true` 추가
+
+## Discoveries (14)
+- `tmux list-panes -s` 는 현재 session 범위이나, 명시적 `#{session_id}` 필터링 없이는 다중 세션 환경에서
+  세션 경계가 모호할 수 있음 → `tmux display-message -p '#{session_id}'` + awk `$1 == sess` 조합이 안전
+- `mktemp` + `mv` 패턴이 배시 `echo > file` 대비 원자적: 다른 프로세스/에이전트가 state 파일을 읽는 도중에도
+  부분 쓰기(partial write)나 빈 파일 노출이 발생하지 않음
