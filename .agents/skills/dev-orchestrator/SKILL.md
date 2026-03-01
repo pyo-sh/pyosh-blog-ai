@@ -151,7 +151,7 @@ done
 All issues `completed` or `failed`:
 
 ```bash
-orch_print_summary
+orch_print_summary "$AREA" "$AREA_DIR"
 ```
 
 Show table: issue → status → PR URL. For failed issues, ask user to handle manually.

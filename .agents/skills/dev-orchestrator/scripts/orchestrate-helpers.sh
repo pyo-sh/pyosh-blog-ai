@@ -411,8 +411,10 @@ orch_poll_cycle() {
         local retried=0
         for p in $idle_panes; do
           if orch_dispatch "$issue" "$p" "$area_dir" "$agent"; then
+            local retry_now
+            retry_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             orch_state_update "$area" \
-              ".dispatched[\"$issue\"].pane = \"$p\" | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].lastActivity = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""
+              ".dispatched[\"$issue\"].pane = \"$p\" | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].dispatchedAt = \"$retry_now\" | .dispatched[\"$issue\"].lastActivity = \"$retry_now\""
             >&2 echo "[orchestrator] Re-dispatched #${issue} → pane $p"
             retried=1
             break
