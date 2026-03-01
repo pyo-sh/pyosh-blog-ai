@@ -379,19 +379,34 @@ get_pipeline_summary() {
   fi
 }
 
-# codex_in_descendants <pid> — true if any descendant's argv contains @openai/codex or codex.js
-# Codex CLI is a Node shebang script so its exe resolves to .../node, not .../codex;
-# matching /proc/<pid>/cmdline is the reliable way to identify it.
-codex_in_descendants() {
-  local parent=$1 child
-  while IFS= read -r child; do
-    [[ -z "$child" ]] && continue
-    if tr '\0' ' ' < /proc/"$child"/cmdline 2>/dev/null \
-        | grep -qE '@openai/codex|codex\.js'; then
-      return 0
+# detect_agent_type <pane_pid> — print "claude" or "codex" if found in process tree
+# Scans the pane's entire process tree (cmdline + exe) to detect agent type regardless
+# of installation method (native binary, npm global, npx, bunx, etc.).
+detect_agent_type() {
+  local pids=() queue=("$1") pid child cmdline exepath
+  # BFS: collect all descendant PIDs
+  while (( ${#queue[@]} > 0 )); do
+    pid="${queue[0]}"; queue=("${queue[@]:1}")
+    pids+=("$pid")
+    while IFS= read -r child; do
+      [[ -n "$child" ]] && queue+=("$child")
+    done < <(pgrep -P "$pid" 2>/dev/null)
+  done
+  # Check each process for known agent signatures
+  for pid in "${pids[@]}"; do
+    cmdline=$(tr '\0' ' ' < /proc/"$pid"/cmdline 2>/dev/null) || continue
+    exepath=$(readlink /proc/"$pid"/exe 2>/dev/null) || true
+    # Claude Code: binary named "claude" or cmdline contains claude CLI patterns
+    if [[ "${exepath##*/}" == "claude" ]] || \
+       [[ "$cmdline" =~ @anthropic-ai/claude-code|claude-code/cli ]]; then
+      printf 'claude'; return 0
     fi
-    codex_in_descendants "$child" && return 0
-  done < <(pgrep -P "$parent" 2>/dev/null)
+    # Codex: binary named "codex" or cmdline contains codex CLI patterns
+    if [[ "${exepath##*/}" == "codex" ]] || \
+       [[ "$cmdline" =~ @openai/codex|codex\.js ]]; then
+      printf 'codex'; return 0
+    fi
+  done
   return 1
 }
 
@@ -421,19 +436,16 @@ render_dashboard() {
 
   while IFS=' ' read -r pane_addr pane_id pane_cmd; do
     local etype
+    # Quick path: pane command is the agent binary itself
     case "$pane_cmd" in
       claude) etype="claude" ;;
       codex)  etype="codex"  ;;
-      node)
-        # Codex CLI is a Node shebang script — detect by matching argv of descendant processes
-        local _pane_pid
+      *)
+        # Slow path: agents may run via node/npx/bunx wrappers — scan process tree
+        local _pane_pid _detected
         _pane_pid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
-        if [[ -n "$_pane_pid" ]] && codex_in_descendants "$_pane_pid"; then
-          etype="codex"
-        else
-          continue
-        fi ;;
-      *)      continue ;;
+        _detected=$(detect_agent_type "$_pane_pid" 2>/dev/null) || continue
+        etype="$_detected" ;;
     esac
 
     local data
