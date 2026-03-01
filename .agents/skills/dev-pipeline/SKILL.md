@@ -45,6 +45,10 @@ After PR creation, capture the initial commit SHA and write state:
 
 ```bash
 LAST_COMMIT_SHA=$(cd {area_dir} && gh api "repos/{owner}/{repo}/pulls/{PR#}/commits" --jq '.[-1].sha')
+if [ -z "$LAST_COMMIT_SHA" ] || [ "$LAST_COMMIT_SHA" = "null" ]; then
+  echo "ERROR: Failed to capture initial commit SHA for PR #{PR#}. Aborting."
+  exit 1
+fi
 ```
 
 ```json
