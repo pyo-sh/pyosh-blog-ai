@@ -85,12 +85,12 @@ updated=$(printf '%s' "$existing" | jq \
   --arg wrapper "$WRAPPER_PATH" \
   --arg on_status "$ON_STATUS_PATH" \
   '
-  # Helper: check if hook entry has our command
-  def has_cmd: .hooks | if type == "array" then any(.command == $on_status) else false end;
+  # Helper: check if hook entry has our command (guards non-object/non-array)
+  def has_cmd: if type != "object" then false else .hooks | if type == "array" then any(.command == $on_status) else false end end;
 
   # Helper: append tracker hook to event array if not present
   def ensure_hook(matcher):
-    if any(.[]; .matcher == matcher and has_cmd)
+    if any(.[]; type == "object" and .matcher == matcher and has_cmd)
     then .
     else . + [{
       matcher: matcher,
@@ -121,7 +121,7 @@ updated=$(printf '%s' "$existing" | jq \
   .hooks.PreToolUse = (
     (.hooks.PreToolUse // []) |
     # Remove old AskUserQuestion-only entry if present
-    [.[] | select(.matcher != "AskUserQuestion" or (has_cmd | not))] |
+    [.[] | select(type != "object" or .matcher != "AskUserQuestion" or (has_cmd | not))] |
     ensure_hook("")
   ) |
 
