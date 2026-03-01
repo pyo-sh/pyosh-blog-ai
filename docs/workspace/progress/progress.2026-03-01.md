@@ -137,6 +137,32 @@
     - 복원 후 기존 `${task_raw//$'\n'/ }` 정규화(개행→공백)가 그대로 동작
   - RS(0x1e) 구분자 유지 — model/ctx_len 필드는 개행 없으므로 변경 불필요
 
+## Completed (8)
+- [x] PR #13 리뷰 라운드 2 — 도움말 텍스트 interval 수정 후 머지 (#12)
+
+  **Codex 2라운드 리뷰 결과:**
+  - [WARNING] `scripts/agent-tracker.sh:49` — 도움말 텍스트에 기본 interval이 `2`초로 표기되나 실제 `INTERVAL=1`로 변경됨
+  - [SUGGESTION] 모델 ID 파싱 패턴이 `claude-{name}-{major}-{minor}` 형식만 처리
+
+  **Fix (Claude Sonnet resolve):** `default: 2` → `default: 1` (1줄 변경)
+
+  **Pipeline 완료:**
+  - PR #13 squash merge (pyo-sh/pyosh-blog-ai#13)
+  - 브랜치 `fix/issue-12-agent-tracker-improvements` 삭제
+  - 워크트리 `.workspace/worktrees/issue-12` 제거
+  - 이슈 #12 종료
+
+## Discoveries (8)
+- `pipeline-helpers.sh`의 `MONOREPO_ROOT`는 source 시점 CWD 기반 `git rev-parse --show-toplevel` 결과
+  - 워크트리 내부에서 source하면 워크트리 경로(`/workspace/.workspace/worktrees/issue-12`)가 MONOREPO_ROOT로 설정됨
+  - `WORKTREE_DIR` 계산이 꼬여 `pipeline_resolve_worktree_path`가 PATH_INVALID 반환 → PATH_INVALID 에러의 근본 원인
+  - 대책: **반드시 monorepo root(`/workspace`)에서 `cd /workspace && source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`**
+- `pipeline_open_pane_verified` 첫 pane이 3s 내 죽어도 retry path(`WORKTREE_DIR/issue-12`)로 열면 성공하는 패턴 확인
+  - 첫 pane workdir=`/workspace`로 열린 codex가 빠르게 실패, 재시도 workdir=worktree로 성공
+  - 원인 미확정: tmux pane 분할 타이밍 또는 codex startup 경로 이슈 가능성
+
+---
+
 ## Discoveries (7)
 - bash `<<<` here-string은 변수 내 첫 번째 `\n`에서 멈춤 → field separator가 `\x1e`여도 task 내 개행이 read를 조기 종료시킴
 - jq `@base64` 필터는 출력에 개행 없는 단일 라인 문자열 반환 → bash read와 완전 호환
