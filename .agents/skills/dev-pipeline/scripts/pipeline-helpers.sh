@@ -2,12 +2,14 @@
 # pipeline-helpers.sh — Shell helpers for dev-pipeline skill
 # Source this file or use functions individually via the AI's Bash tool.
 
-# Detect monorepo root — if inside area repo (server/client), go up one level
-_GIT_ROOT="$(git rev-parse --show-toplevel)"
-if [ -d "$_GIT_ROOT/../server" ] && [ -f "$_GIT_ROOT/../CLAUDE.md" ]; then
-  MONOREPO_ROOT="$(cd "$_GIT_ROOT/.." && pwd)"
-else
-  MONOREPO_ROOT="$_GIT_ROOT"
+# Detect monorepo root from script location: this file lives at
+# {MONOREPO_ROOT}/.agents/skills/dev-pipeline/scripts/pipeline-helpers.sh
+# so MONOREPO_ROOT is always 4 levels up — independent of cwd or which repo is active.
+_PIPELINE_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MONOREPO_ROOT="$(cd "$_PIPELINE_HELPERS_DIR/../../../.." && pwd)"
+# If sourced from inside a linked worktree (.workspace/worktrees/…), lift to real root.
+if [[ "$MONOREPO_ROOT" == *"/.workspace/worktrees/"* ]]; then
+  MONOREPO_ROOT="${MONOREPO_ROOT%%/.workspace/worktrees/*}"
 fi
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
@@ -236,7 +238,7 @@ pipeline_poll_review() {
     review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
       --jq "[.[] | select(.id > ${last_review_id})
                  | select(.body | startswith(\"## Review Summary\"))]
-            | last // empty | .id" 2>/dev/null)
+            | last // empty | .id")
 
     if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
       echo "$review_id"
@@ -249,7 +251,7 @@ pipeline_poll_review() {
       review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
         --jq "[.[] | select(.id > ${last_review_id})
                    | select(.body | startswith(\"## Review Summary\"))]
-              | last // empty | .id" 2>/dev/null)
+              | last // empty | .id")
       if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
         echo "$review_id"
         return 0
@@ -267,34 +269,16 @@ pipeline_poll_review() {
   done
 }
 
-pipeline_analyze_review() {
-  # Usage: pipeline_analyze_review <area_dir> <pr> <review_id>
-  # Fetches a specific review by ID and parses severity counts from body table.
-  # Output (eval-friendly):
-  #   STATE=COMMENTED|CHANGES_REQUESTED|APPROVED
-  #   CRITICAL=N
-  #   WARNING=N
-  #   SUGGESTION=N
+pipeline_fetch_review() {
+  # Usage: pipeline_fetch_review <area_dir> <pr> <review_id>
+  # Fetches a specific review by ID and outputs raw JSON (state + body).
+  # The AI reads STATE and severity counts directly from the output.
   local area_dir=$1
   local pr=$2
   local review_id=$3
 
-  local review_json
-  review_json=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" 2>/dev/null)
-
-  local state body
-  state=$(echo "$review_json" | jq -r '.state')
-  body=$(echo "$review_json" | jq -r '.body')
-
-  local critical warning suggestion
-  critical=$(echo "$body" | awk -F'|' '/\[CRITICAL\]/{gsub(/ /,"",$3); print $3}')
-  warning=$(echo "$body" | awk -F'|' '/\[WARNING\]/{gsub(/ /,"",$3); print $3}')
-  suggestion=$(echo "$body" | awk -F'|' '/\[SUGGESTION\]/{gsub(/ /,"",$3); print $3}')
-
-  echo "STATE=${state}"
-  echo "CRITICAL=${critical:-0}"
-  echo "WARNING=${warning:-0}"
-  echo "SUGGESTION=${suggestion:-0}"
+  cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" \
+    --jq '{state: .state, body: .body}'
 }
 
 pipeline_poll_commits() {
@@ -314,7 +298,7 @@ pipeline_poll_commits() {
     # 1. Check for new commits first
     local latest_sha
     latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
-      --jq '.[-1].sha' 2>/dev/null)
+      --jq '.[-1].sha')
 
     if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
       echo "$latest_sha"
@@ -325,7 +309,7 @@ pipeline_poll_commits() {
     if [ -n "$resolve_pane_id" ] && ! pipeline_pane_alive "$resolve_pane_id"; then
       # Final commit check
       latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
-        --jq '.[-1].sha' 2>/dev/null)
+        --jq '.[-1].sha')
       if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
         echo "$latest_sha"
         return 0
