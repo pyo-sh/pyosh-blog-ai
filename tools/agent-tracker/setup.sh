@@ -108,25 +108,28 @@ updated=$(printf '%s' "$existing" | jq \
     command: $wrapper
   } |
 
-  # Initialize hooks object if missing
-  .hooks //= {} |
+  # Normalize: .hooks must be object, each event must be array
+  .hooks |= (if type == "object" then . else {} end) |
+  .hooks.UserPromptSubmit |= (if type == "array" then . else [] end) |
+  .hooks.Stop |= (if type == "array" then . else [] end) |
+  .hooks.PreToolUse |= (if type == "array" then . else [] end) |
+  .hooks.PostToolUse |= (if type == "array" then . else [] end) |
 
   # UserPromptSubmit → working status (append, preserve existing hooks)
-  .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) | ensure_hook("")) |
+  .hooks.UserPromptSubmit |= ensure_hook("") |
 
   # Stop → idle status (append, preserve existing hooks)
-  .hooks.Stop = ((.hooks.Stop // []) | ensure_hook("")) |
+  .hooks.Stop |= ensure_hook("") |
 
   # PreToolUse (all tools) → activity tracking + needs-input for AskUserQuestion
-  .hooks.PreToolUse = (
-    (.hooks.PreToolUse // []) |
+  .hooks.PreToolUse |= (
     # Remove old AskUserQuestion-only entry if present
     [.[] | select(type != "object" or .matcher != "AskUserQuestion" or (has_cmd | not))] |
     ensure_hook("")
   ) |
 
   # PostToolUse (all tools) → clear activity
-  .hooks.PostToolUse = ((.hooks.PostToolUse // []) | ensure_hook(""))
+  .hooks.PostToolUse |= ensure_hook("")
 ')
 
 # ─────────────────────────────────────────────────────────────────────────────

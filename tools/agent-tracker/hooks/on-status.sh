@@ -78,7 +78,11 @@ case "$event" in
         gsub("\n"; " ") | gsub("  +"; " ") |
         ltrimstr(" ") | rtrimstr(" ")
       ')
-      activity="${tool_name}: ${key_arg}"
+      if [[ -n "$key_arg" ]]; then
+        activity="${tool_name}: ${key_arg}"
+      else
+        activity="${tool_name}"
+      fi
     else
       activity=""
     fi
