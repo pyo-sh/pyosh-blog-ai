@@ -54,3 +54,31 @@
     - 오른쪽 pane: 빈 pane (자유 사용)
   - `tools/ARCHITECTURE.md`: tmux lab 세션 window 5 설명 추가
   - squash merge → `pyo-sh/pyosh-blog-ai#8`
+
+---
+
+## Completed (5)
+- [x] agent-tracker 컬럼 정렬 수정 + transcript 기반 Task/Token 갱신 (#9, #10, PR #11)
+
+  **Issue #9 — 컬럼 정렬 버그 3건 수정:**
+  - `W_TOKENS` 9→10: `122k` 형태 토큰 수량 표시 공간 확보
+  - `col_pane`: `pad_right`→`trunc` — PANE 컬럼 overflow 방지
+  - `col_engine`: `printf "%-*s"` → `trunc` — 긴 Codex 모델명(예: `codex-mini-latest`) 절삭
+  - STATUS badge 뒤 패딩 3칸→1칸 — `%b   ` 3-space 버그 수정
+  - TOKENS 표시: `%2d%%`→`%3dk` — pct=100 overflow 수정 + 실제 수량(k) 표시
+
+  **Issue #10 — transcript 직접 읽기로 Task/Token 갱신 신뢰성 개선:**
+  - `find_claude_transcript()`: pane cwd를 `~/.claude/projects/{dir}` 경로로 변환, 최신 JSONL 반환
+  - `parse_claude_pane()`: transcript에서 `input_tokens + cache_*` 합산 → `tok_k`; `map()|last//""` 방식으로 마지막 user 메시지 추출 (null-safe)
+  - `parse_codex_pane()`: `tok_k` 필드 추가 (`total_tok / 1000`)
+  - `render_dashboard()`: `model|status|pct|tok_k|task` 5-필드 파싱 반영
+  - tok_k > 999 시 `"999+"` 표시로 W_TOKENS=10 overflow 방지
+
+  Codex 2라운드 리뷰 통과 (round 1: WARNING×2 → round 2: CLEAN)
+
+## Discoveries (5)
+- Claude Code는 transcript JSONL FD를 열어두지 않음 → `/proc/PID/fd` 방식으로 파일 특정 불가
+  - 해결책: pane cwd를 읽어 `pane_cwd//\\//-` 변환 → `~/.claude/projects/{dir}/*.jsonl` 최신 파일 선택
+  - 참고: findings 007 (`findings/findings.007-claude-transcript-jsonl.md`)
+- `printf "%-*s"` 는 padding만 하고 truncate 없음 → 모델명 overflow의 실제 원인
+  - 기존 `trunc()` 함수 활용으로 padding+truncation 동시 처리
