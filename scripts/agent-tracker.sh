@@ -105,6 +105,21 @@ status_badge() {
 # ─────────────────────────────────────────────────────────────────────────────
 # Data extraction: Claude Code
 # ─────────────────────────────────────────────────────────────────────────────
+
+# find_claude_transcript <pane_id>
+# Map a Claude pane to its most recent transcript JSONL via cwd → project dir
+find_claude_transcript() {
+  local pane_id="$1"
+  local pane_cwd project_dir
+
+  pane_cwd=$(tmux display-message -t "$pane_id" -p '#{pane_current_path}' 2>/dev/null)
+  [[ -z "$pane_cwd" ]] && return
+
+  # /workspace → -workspace  (Claude project dir naming convention)
+  project_dir="${pane_cwd//\//-}"
+  ls -t "${HOME}/.claude/projects/$project_dir"/*.jsonl 2>/dev/null | head -1
+}
+
 parse_claude_pane() {
   local pane_id="$1"
   local captured
@@ -126,19 +141,56 @@ parse_claude_pane() {
     | grep -oE '(Opus|Sonnet|Haiku)[[:space:]]+[0-9]+\.[0-9]+' | tail -1)
   [[ -z "$model" ]] && model="Claude"
 
-  # ── Token %: "31% of 200k tokens" ────────────────────────────────────────
-  local pct=0
-  local tok
-  tok=$(printf '%s' "$captured" \
-    | grep -oE '[0-9]+% of [0-9]+k tokens' | sed 's/%.*//' | tail -1)
-  [[ -n "$tok" ]] && pct=$tok
+  # ── Token + Task: transcript 직접 읽기 ───────────────────────────────────
+  local pct=0 tok_k=0 task="—"
+  local transcript
+  transcript=$(find_claude_transcript "$pane_id")
 
-  # ── Task: 💬 line from context-bar hook ──────────────────────────────────
-  local task
-  task=$(printf '%s' "$captured" | grep -o '💬 .*' | sed 's/.*💬 //' | tail -1)
-  [[ -z "$task" ]] && task="—"
+  if [[ -n "$transcript" && -f "$transcript" ]]; then
+    local ctx_len
+    ctx_len=$(jq -s '
+      map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
+      last |
+      if . then
+        (.message.usage.input_tokens // 0) +
+        (.message.usage.cache_read_input_tokens // 0) +
+        (.message.usage.cache_creation_input_tokens // 0)
+      else 0 end
+    ' < "$transcript" 2>/dev/null)
+    if [[ -n "$ctx_len" && "$ctx_len" -gt 0 ]]; then
+      pct=$(( ctx_len * 100 / 200000 ))
+      (( pct > 100 )) && pct=100
+      tok_k=$(( ctx_len / 1000 ))
+    fi
 
-  printf '%s|%s|%d|%s' "$model" "$status" "$pct" "$task"
+    local last_msg
+    last_msg=$(jq -rs '
+      [.[] | select(.type == "user") |
+       select(.message.content | type == "string" or
+              (type == "array" and any(.[]; .type == "text")))] |
+      map(.message.content |
+          if type == "string" then .
+          else [.[] | select(.type == "text") | .text] | join(" ") end |
+          gsub("\n"; " ") | gsub("  +"; " ")) |
+      last // ""
+    ' < "$transcript" 2>/dev/null)
+    [[ -n "$last_msg" ]] && task="$last_msg"
+  else
+    # Fallback: pane 스크래핑
+    local tok
+    tok=$(printf '%s' "$captured" \
+      | grep -oE '[0-9]+% of [0-9]+k tokens' | sed 's/%.*//' | tail -1)
+    if [[ -n "$tok" ]]; then
+      pct=$tok
+      tok_k=$(( pct * 200 / 100 ))
+    fi
+
+    local ptask
+    ptask=$(printf '%s' "$captured" | grep -o '💬 .*' | sed 's/.*💬 //' | tail -1)
+    [[ -n "$ptask" ]] && task="$ptask"
+  fi
+
+  printf '%s|%s|%d|%d|%s' "$model" "$status" "$pct" "$tok_k" "$task"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -193,7 +245,7 @@ parse_codex_pane() {
   local captured
   captured=$(tmux capture-pane -p -t "$pane_id" -S -50 2>/dev/null)
 
-  local model="Codex" status="idle" pct=0 task="—"
+  local model="Codex" status="idle" pct=0 tok_k=0 task="—"
 
   # Pane-specific session JSONL (falls back to globally most recent)
   local session_file
@@ -214,6 +266,7 @@ parse_codex_pane() {
     if [[ -n "$total_tok" && "$total_tok" -gt 0 ]]; then
       pct=$(( total_tok * 100 / 128000 ))
       (( pct > 100 )) && pct=100
+      tok_k=$(( total_tok / 1000 ))
     fi
 
     # ── Task ─────────────────────────────────────────────────────────────────
@@ -232,7 +285,7 @@ parse_codex_pane() {
     status="working"
   fi
 
-  printf '%s|%s|%d|%s' "$model" "$status" "$pct" "$task"
+  printf '%s|%s|%d|%d|%s' "$model" "$status" "$pct" "$tok_k" "$task"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -265,9 +318,9 @@ render_dashboard() {
   local INNER=$(( COLS - 2 ))   # inside ║...║
 
   # ── Column widths: PANE | TASK | ENGINE | STATUS | TOKENS ─────────────────
-  # STATUS = 6 visible ("● work"), TOKENS = 9 ("▰▰▰▱▱ 31%")
-  # margins: 2 left + 2 right = 4, gaps: 4 × 1 = 4  → fixed cost = 4+4+11+12+6+9 = 46
-  local W_PANE=11 W_ENGINE=12 W_STATUS=6 W_TOKENS=9
+  # STATUS = 6 visible ("● work"), TOKENS = 10 ("▰▰▱▱▱ 122k")
+  # margins: 2 left + 2 right = 4, gaps: 4 × 1 = 4  → fixed cost = 4+4+11+12+6+10 = 47
+  local W_PANE=11 W_ENGINE=12 W_STATUS=6 W_TOKENS=10
   local W_TASK=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 8 ))
   (( W_TASK < 15 )) && W_TASK=15
 
@@ -293,8 +346,8 @@ render_dashboard() {
       data=$(parse_codex_pane "$pane_id")
     fi
 
-    local model status pct task
-    IFS='|' read -r model status pct task <<< "$data"
+    local model status pct tok_k task
+    IFS='|' read -r model status pct tok_k task <<< "$data"
 
     case "$status" in
       working) (( n_working++ )) ;;
@@ -302,7 +355,7 @@ render_dashboard() {
       *)       (( n_idle++ ))    ;;
     esac
 
-    rows+=("${pane_addr}|${pane_id}|${etype}|${model}|${status}|${pct}|${task}")
+    rows+=("${pane_addr}|${pane_id}|${etype}|${model}|${status}|${pct}|${tok_k}|${task}")
   done < <(tmux list-panes -s -t "$SESSION" \
     -F '#{window_index}:#{pane_index} #{pane_id} #{pane_current_command}' 2>/dev/null)
 
@@ -369,15 +422,15 @@ render_dashboard() {
     printf "${GRAY}║${R}%-*s${GRAY}║${R}" "$INNER" "$no_msg"; tput el; echo
   else
     for row in "${rows[@]}"; do
-      IFS='|' read -r pane_addr pane_id etype model status pct task <<< "$row"
+      IFS='|' read -r pane_addr pane_id etype model status pct tok_k task <<< "$row"
 
       local ecol
       [[ "$etype" == "claude" ]] && ecol="$BLUE" || ecol="$CYAN"
 
       local col_pane col_task col_engine tok_bar_str badge
-      col_pane=$(pad_right "${pane_addr} ${pane_id}" $W_PANE)
+      col_pane=$(trunc "${pane_addr} ${pane_id}" $W_PANE)
       col_task=$(trunc "$task" $W_TASK)
-      col_engine=$(printf "${ecol}%-*s${R}" $W_ENGINE "$model")
+      col_engine=$(printf "${ecol}%s${R}" "$(trunc "$model" $W_ENGINE)")
       tok_bar_str=$(token_bar "$pct" "$ecol")
       badge=$(status_badge "$status")
 
@@ -385,8 +438,10 @@ render_dashboard() {
       printf "${GRAY}%s${R} " "$col_pane"          # PANE
       printf "%s "            "$col_task"           # TASK
       printf "%b "            "$col_engine"         # ENGINE
-      printf "%b   "          "$badge"              # STATUS (6 chars + 3 pad)
-      printf "%b %2d%%  "     "$tok_bar_str" "$pct" # TOKENS
+      printf "%b "            "$badge"              # STATUS (6 chars + 1 pad)
+      local tok_str
+      if (( tok_k > 999 )); then tok_str="999+"; else printf -v tok_str "%3dk" "$tok_k"; fi
+      printf "%b %s  "       "$tok_bar_str" "$tok_str" # TOKENS (5 bar + 1 sp + 4 str + 2 sp)
       printf "${GRAY}║${R}"
       tput el; echo
     done
