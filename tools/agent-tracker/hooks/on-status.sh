@@ -58,7 +58,7 @@ case "$event" in
     tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
     if [[ -n "$tool_name" ]]; then
       key_arg=$(printf '%s' "$input" | jq -r --arg tn "$tool_name" '
-        .tool_input // {} |
+        (.tool_input // {}) | if type != "object" then {} else . end |
         if   $tn == "Bash"         then .description // .command // ""
         elif $tn == "Read"         then (.file_path // "" | split("/") | last)
         elif $tn == "Edit"         then (.file_path // "" | split("/") | last)
