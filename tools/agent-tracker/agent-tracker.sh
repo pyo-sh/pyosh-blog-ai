@@ -232,7 +232,7 @@ find_codex_session_file() {
     fi
   fi
 
-  ls -t ~/.codex/sessions/*/*/*-*.jsonl 2>/dev/null | head -1
+  # No global fallback — avoids cross-contamination in multi-pane setups
 }
 
 parse_codex_pane() {
