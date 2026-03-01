@@ -46,9 +46,15 @@ pipeline_state_delete() {
 # ──────────────────────────────────────────────
 
 pipeline_orchestrator_pane() {
-  # Capture the current pane ID — use $TMUX_PANE (process's own pane),
-  # not tmux display-message (focused pane, which differs on --continue sessions)
-  echo "$TMUX_PANE"
+  # Capture the current pane ID — prefer $TMUX_PANE (process's own pane,
+  # not the focused pane, which differs on --continue sessions).
+  # Fall back to tmux display-message for atypical invocation contexts where
+  # $TMUX_PANE is unset (e.g. sourced from a non-tmux shell inside a tmux session).
+  if [ -n "$TMUX_PANE" ]; then
+    echo "$TMUX_PANE"
+  else
+    tmux display-message -p '#{pane_id}' 2>/dev/null
+  fi
 }
 
 pipeline_open_pane() {
