@@ -174,21 +174,8 @@ Run `/dev-log` to record batch completion.
 - **Max concurrency** = number of idle panes found at dispatch time
 - On unrecoverable error: save state, report to user
 
-## Pane Detection
-
-Idle pane = pane in the current tmux session where the shell prompt is active (no foreground process).
-
-```bash
-# Check if pane is idle (at shell prompt)
-tmux list-panes -a -F '#{pane_id} #{pane_current_command}' | awk '$2 == "bash" || $2 == "zsh" {print $1}'
-```
-
-Exclude the orchestrator's own pane. Exclude panes already running a dispatched pipeline.
-
 ## References
 
-- [Dependency resolution](references/dependency-resolution.md) — DAG construction and cycle detection
-- [State detection](references/state-detection.md) — completion and stall detection strategy
-- [Recovery strategy](references/recovery.md) — crash recovery from batch state file
-- [Orchestrate helpers](scripts/orchestrate-helpers.sh) — shell functions
-- [Parse dependencies](scripts/parse-dependencies.sh) — issue body parser
+- [Dependency resolution](references/dependency-resolution.md) — DAG construction, cycle detection, edge cases
+- [State detection](references/state-detection.md) — completion/stall detection, status state machine
+- [Recovery strategy](references/recovery.md) — crash recovery, auto-retry policy

@@ -47,14 +47,19 @@ for N in $ISSUES; do
 done
 ```
 
-Convert to JSON for state file:
+Convert to JSON for `orch_init`:
 
 ```bash
-dag_json=$(jq -n \
-  --argjson issues "$(echo "$ISSUES" | jq -R 'split(" ")')" \
-  'reduce $issues[] as $n ({};
-    . + {($n): (env["DEPS_"+$n] // "" | split(" ") | map(select(length > 0)) | map(tonumber))}
-  )')
+# Build dag_json: {"N": [dep1, dep2], ...}
+dag_json="{"
+for N in $ISSUES; do
+  DEPS=$(bash scripts/parse-dependencies.sh "$N" "$AREA_DIR")
+  deps_arr=$(echo "$DEPS" | tr ' ' '\n' | grep -E '^[0-9]+$' | jq -R 'tonumber' | jq -sc '.')
+  dag_json="${dag_json}\"${N}\": ${deps_arr},"
+done
+dag_json="${dag_json%,}}"  # trim trailing comma
+
+issues_json=$(echo "$ISSUES" | tr ' ' '\n' | jq -R 'tonumber' | jq -sc '.')
 ```
 
 ## Cycle Detection
@@ -90,11 +95,11 @@ Issues already in `.workspace/pipeline/issue-N.state.json` → skip (already run
 
 ## Dependency Satisfaction Check
 
-An issue transitions from `blocked` → `pending` when all its dependencies are `completed`:
+An issue transitions from `blocked` → `pending` when all its dependencies are `completed` or `failed`:
 
 ```bash
 for dep in ${dag[$N]}; do
-  if [ "${status[$dep]}" != "completed" ]; then
+  if [ "${status[$dep]}" != "completed" ] && [ "${status[$dep]}" != "failed" ]; then
     still_blocked=1; break
   fi
 done
@@ -102,6 +107,7 @@ done
 ```
 
 `orch_unblock()` in `orchestrate-helpers.sh` automates this check on each completion event.
+Both `completed` and `failed` are terminal states that unblock dependents.
 
 ## Edge Cases
 

@@ -104,14 +104,11 @@ pending
                     └─(stall + skip)──────► failed
 
 blocked
-  └─(all deps completed)──► pending
+  └─(all deps completed OR failed)──► pending
 
-completed ──(triggers unblock of dependents)
-failed    ──(triggers unblock of dependents, treated as completed for DAG)
+completed ──(triggers orch_unblock)
+failed    ──(triggers orch_unblock — dependency was attempted, downstream unblocked)
 ```
-
-> Note: `failed` issues DO unblock their dependents (dependency was attempted).
-> The orchestrator reports failures in the summary so the user can re-run manually.
 
 ## Polling Interval
 
