@@ -167,3 +167,108 @@
 - bash `<<<` here-string은 변수 내 첫 번째 `\n`에서 멈춤 → field separator가 `\x1e`여도 task 내 개행이 read를 조기 종료시킴
 - jq `@base64` 필터는 출력에 개행 없는 단일 라인 문자열 반환 → bash read와 완전 호환
 - `base64 -d <<< "$b64"` 역시 안전: 입력이 base64(개행 없음)이므로 here-string 잘림 위험 없음
+
+---
+
+## Completed (9)
+- [x] `/dev-orchestrator` 스킬 구현 (#14)
+
+  **파일 구성:**
+  - `SKILL.md` — 7단계 워크플로우: area 감지 → 이슈 필터 → DAG 구성 → 초기 dispatch → 폴링 사이클 → 완료 요약 → /dev-log
+  - `scripts/orchestrate-helpers.sh` — 핵심 함수 구현:
+    - `orch_init`: 초기 batch.state.json 생성 (pending/blocked 자동 분류)
+    - `orch_find_idle_panes`: bash/zsh 쉘 프롬프트 대기 pane 탐지
+    - `orch_dispatch`: idle pane에 `send-keys`로 `/dev-pipeline #{N}` 전송
+    - `orch_check_completion`: signal 파일 → pipeline 상태 파일 → PR 머지 상태 순으로 완료 판별
+    - `orch_detect_stall`: 10분 무변동 감지 + 최신 commit SHA 갱신 확인
+    - `orch_unblock`: 완료 이슈를 의존하던 blocked 이슈들을 pending으로 전환
+    - `orch_poll_cycle`: 단일 폴링 반복 (완료 체크 → stall 감지 → unblock → dispatch)
+    - `orch_print_summary`: 배치 완료 후 issue/status/PR URL 표 출력
+  - `scripts/parse-dependencies.sh` — 이슈 body `### Dependencies` 섹션 파싱:
+    - `#N`, `Closes #N`, `Fixes #N`, `Resolves #N` 패턴 인식
+    - `없음/none/N/A` 마커 처리
+    - `--check-cycles` 모드: Kahn's algorithm(jq 구현)으로 DAG 사이클 감지
+  - `references/dependency-resolution.md` — DAG 구성 및 사이클 감지 문서
+  - `references/state-detection.md` — 완료/stall 감지 전략 문서
+  - `references/recovery.md` — batch.state.json 기반 크래시 복구 문서
+  - `.claude/skills/dev-orchestrator` → symlink
+
+  **설계 결정:**
+  - 완료 판별: signal 파일(`issue-N.exit`) > pipeline state 삭제 + PR 머지 상태 순서로 확인
+  - 상태 머신: `pending → dispatched → completed/failed`, `blocked → pending`(의존성 해소 시)
+  - failed 이슈도 downstream unblock 수행 (의존성 시도로 간주)
+  - 자동 재시도 최대 1회 (`retryCount` 추적)
+
+## Discoveries (9)
+- `tmux list-panes -s -F '#{pane_id} #{pane_current_command}'`에서 bash/zsh process가 foreground인 pane = idle pane (자식 프로세스 없는 쉘)
+- Kahn's algorithm을 jq 단독으로 구현 가능: `reduce` + in-degree 배열로 위상 정렬 + 방문 count로 사이클 판별
+
+---
+
+## Completed (10)
+- [x] PR #15 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **[CRITICAL] `parse-dependencies.sh` — `--check-cycles` 모드 도달 불가:**
+  - `$1`을 이슈 번호로 바로 할당 후 `gh issue view "$ISSUE"` 호출 → `--check-cycles` 전달 시 body 조회 실패로 `:29-31`에서 `exit 0` 조기 종료
+  - **Fix**: `--check-cycles` 분기를 스크립트 최상단(`set -euo pipefail` 직후)으로 이동 → 이슈 파싱 로직 전에 처리
+
+  **[CRITICAL] `orchestrate-helpers.sh:345` — `failed` 상태 시 downstream deadlock:**
+  - `if [ "$result" = "completed" ]` 조건만 unblock 수행 → upstream이 `failed`일 때 dependent 이슈가 영구 `blocked` 상태 유지
+  - **Fix**: `if [ "$result" = "completed" ] || [ "$result" = "failed" ]` — 두 종료 상태 모두 unblock 수행 (문서 상태 머신과 일치)
+
+  **[WARNING] `parse-dependencies.sh:52` — `grep` 무매치 시 `set -euo pipefail` 강제 종료:**
+  - `grep -oE '...'` 가 매칭 없으면 exit 1 반환 → `set -euo pipefail` 환경에서 "의존성 없음" 정상 케이스가 스크립트 실패로 처리됨
+  - **Fix**: 추출 파이프라인 끝에 `|| true` 추가
+
+  **[SUGGESTION] `SKILL.md:126` — `orch_poll_cycle` 호출 인자 불일치:**
+  - 문서 예시: `orch_poll_cycle "$AREA_DIR" "$AGENT"` (2개) vs 실제 함수 시그니처: `<area> <area_dir> <agent> <orchestrator_pane>` (4개)
+  - **Fix**: `orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT" "$ORCH_PANE"` 로 정정 + Unblock 설명에 `failed` 추가
+
+## Discoveries (10)
+- bash 스크립트에서 `--flag` 분기는 positional 인자 파싱 이전에 처리해야 함 — `$1`을 변수로 할당 후 체크하면 다른 로직이 먼저 `$1`을 소비할 수 있음
+- `grep -oE | ... | sort | tr | sed` 파이프라인의 첫 `grep`이 무매칭 시 전체 파이프라인이 pipefail로 종료 → `|| true`를 파이프라인 끝에 배치해 빈 출력을 정상 케이스로 처리
+
+---
+
+## Completed (11)
+- [x] PR #15 2차 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **[CRITICAL] `orchestrate-helpers.sh:305` — `orch_unblock()` 내부 dep_status 판별 미완:**
+  - 1차 수정(Completed 10)은 `orch_poll_cycle`의 외부 조건(`if completed || failed → orch_unblock()` 호출)은 고쳤으나,
+    `orch_unblock()` 내부 loop에서 잔여 dep가 "해소됐는지" 판별 시 `completed`만 허용
+    (`if [ "$dep_status" != "completed" ]; then still_blocked=1`)
+  - **재현 시나리오**: `dag[3]=[1,2]`, `status[1]=failed`, `status[2]=failed` → `#3`이 영구 `blocked`
+  - **Fix**: `orchestrate-helpers.sh:305` — `completed` 단독 비교 → `completed` OR `failed` 허용
+    ```bash
+    if [ "$dep_status" != "completed" ] && [ "$dep_status" != "failed" ]; then
+    ```
+  - **SKILL.md:141** — `orch_unblock "$ISSUE"` (1개 인자) → `orch_unblock "$AREA" "$ISSUE"` (2개) 문서 정정
+
+## Discoveries (11)
+- `orch_poll_cycle`에서 `orch_unblock` 호출 자체는 `completed|failed` 양쪽에서 발생해도,
+  `orch_unblock` 내부 remaining-deps 루프가 `completed`만 "통과"로 간주하면 여전히 deadlock 발생
+  → 외부 트리거와 내부 판별을 동시에 수정해야 상태 머신이 올바르게 동작함
+
+---
+
+## Completed (12)
+- [x] PR #15 3-4차 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **3차 리뷰 수정 (이전 커밋에서 처리):**
+  - **[CRITICAL] `parse-dependencies.sh:33`** — 외부 의존성(batch 밖 이슈)을 사이클 엣지로 오판:
+    `$issues` 목록에 없는 dep 노드가 indegree만 올리고 queue에 들어가지 못해 CYCLE_DETECTED 오보
+    → jq `select(. as $d | $issues | any(. == $d))` 필터로 in-batch 엣지만 포함
+  - **[CRITICAL] `orchestrate-helpers.sh:205`** — 방금 dispatch된 이슈를 pipeline state 파일 미생성 상태에서 `failed`로 오판:
+    → 60초 grace window 추가 (`dispatchedAt` 기반 경과 시간 체크)
+  - **[WARNING] `orchestrate-helpers.sh:329`** — terminal 이슈가 `.dispatched`에 남아 매 사이클 재체크:
+    → terminal 상태 도달 시 `del(.dispatched["$issue"])` 로 즉시 제거
+
+  **4차 리뷰 수정 (이번 커밋):**
+  - **[CRITICAL] `parse-dependencies.sh:26`** — `DAG_JSON="${3:-{}}"` 파라미터 확장 버그:
+    bash가 `:-` 뒤 첫 `}`를 확장 종료로 해석 → `$3` 제공 시 뒤에 `}` 추가됨 → jq 파싱 실패
+    → 2줄 분리: `DAG_JSON="${3:-}"` + `[ -z "$DAG_JSON" ] && DAG_JSON='{}'`
+  - **[CRITICAL] `orchestrate-helpers.sh:80`** — `orch_state_update` jq 연산자 우선순위 버그:
+    `"$filter + {updatedAt: ...}"` 에서 `+`가 `=`보다 높은 우선순위 → `orch_status_set` 호출 시 string+object 타입 에러
+    → `"($filter) | .updatedAt = ..."` 파이프 체이닝으로 교체
+  - **[SUGGESTION] `parse-dependencies.sh:113`** — 의존성 키워드 대소문자 미구분:
+    `grep -oE` → `grep -oiE` 로 변경 (`closes #12` 등 소문자 형식 허용)
