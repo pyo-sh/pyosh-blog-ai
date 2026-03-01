@@ -346,3 +346,26 @@
   tmux 세션 내에서 `exec bash`나 외부 스크립트 경유 시 상속되지 않을 수 있음
 - `tmux display-message -p '#{pane_id}'`는 현재 포커스 pane ID를 반환 — `--continue` 세션에서는
   focused pane이 orchestrator pane과 다를 수 있어 $TMUX_PANE이 우선순위를 가져야 함
+
+---
+
+## Completed (16)
+- [x] PR #15 최종(8-9차) 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **[CRITICAL] `orchestrate-helpers.sh:414` — retry 시 `dispatchedAt` 미초기화:**
+  - 기존: pane 재배정 시 `pane`, `retryCount`, `lastActivity`만 갱신 → `dispatchedAt`은 최초 dispatch 시각 유지
+  - **문제**: `orch_check_completion`의 60초 grace window는 `dispatchedAt` 기준으로 계산 →
+    재시도 후에도 이전 `dispatchedAt`이 60초 초과 상태이면 grace window 무시되어
+    pipeline state 미생성 단계에서 `failed`로 오판 → downstream 이슈가 조기 unblock됨
+  - **Fix**: `retry_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)` 변수로 단일 타임스탬프 생성 →
+    `dispatchedAt`과 `lastActivity`를 동일 값으로 함께 갱신
+
+  **[WARNING] `SKILL.md:154` — `orch_print_summary` 문서 인자 누락:**
+  - 기존 예시: `orch_print_summary` (인자 없음) vs 실제 시그니처: `<area> <area_dir>` (2개 필수)
+  - **Fix**: `orch_print_summary "$AREA" "$AREA_DIR"` 로 정정
+
+## Discoveries (16)
+- retry 시 `dispatchedAt` 갱신을 별도 변수에 한 번만 캡처해 `dispatchedAt`과 `lastActivity` 양쪽에 사용하면
+  두 필드 간 타임스탬프 미세 차이(date 호출 순서)를 제거할 수 있음
+- `orch_check_completion` grace window는 최초 dispatch뿐 아니라 retry dispatch 시각도 기준으로 삼아야
+  재시도 직후 false failure를 방지할 수 있음
