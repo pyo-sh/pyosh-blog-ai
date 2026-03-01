@@ -369,3 +369,45 @@
   두 필드 간 타임스탬프 미세 차이(date 호출 순서)를 제거할 수 있음
 - `orch_check_completion` grace window는 최초 dispatch뿐 아니라 retry dispatch 시각도 기준으로 삼아야
   재시도 직후 false failure를 방지할 수 있음
+
+---
+
+## Completed (17)
+- [x] PR #19 머지 완료 — agent-tracker Codex 감지 / Task·Token 표시 / /clear 토큰 리셋 수정 (#16)
+
+  **Issue #16 전체 수정 사항 (3 commits → squash merge):**
+
+  **Bug 1: Codex 에이전트 미인식 → 범용 프로세스 트리 탐지**
+  - 기존: `pane_current_command == "codex"`만 매칭 → Node 래퍼 실행 시 `node`로 표시되어 skip
+  - 1차 수정: `/proc/*/exe` 기반 → exe가 `node`로 resolve되어 여전히 실패 (Review R1 CRITICAL)
+  - 2차 수정: `codex_in_descendants()` 재귀 함수로 `/proc/*/cmdline` argv 매칭 (`@openai/codex|codex.js`)
+  - 최종 수정: `detect_agent_type()` BFS 범용 함수로 재설계
+    - Claude Code + Codex 모두 감지 (exe basename + cmdline 패턴 이중 체크)
+    - Cross-platform: Linux `/proc` + macOS `ps -o command=/comm=` fallback
+    - 헬퍼 분리: `_get_cmdline()`, `_get_exe_name()`, `_match_agent()`
+    - `case` 문: quick path (direct match) + slow path (BFS tree scan)
+
+  **Bug 2a: Claude Task = `—`**
+  - 원인: jq가 모든 `type == "user"` 메시지 수집 → 대부분 `tool_result` 배열(content type=array)이라 빈 문자열 → `last`가 빈 문자열 선택
+  - Fix: `select(.type == "user" and (.message.content | type) == "string")` 필터
+  - 추가: `gsub("<command-[^>]*>[^<]*</command-[^>]*>"; "")` 로 스킬 호출 XML 태그 정리
+
+  **Bug 2b: Codex Task/Token = `—`/0**
+  - 원인: JSONL 구조가 `event_msg` 래핑인데 스크립트는 top-level `user_message`/`token_count` 가정
+  - Token fix: `select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens`
+  - Context window fix: 하드코딩 `128000` → `.payload.info.model_context_window` 동적 읽기
+  - Task fix: `select(.payload.type == "user_message") | .payload.message`
+
+  **Bug 3: `/clear` 후 토큰 미초기화**
+  - 원인: `/clear`는 같은 JSONL에 `compact_boundary` 마커 추가 (새 파일 미생성). `/clear` 직후 post-compact assistant 없어서 `last`가 pre-compact 높은 값 반환
+  - Fix: 마지막 `compact_boundary` timestamp 이후 assistant만 필터. post-compact assistant 없으면 0 반환
+
+  **Pipeline 경과**: Issue #16 → PR #19 (3 commits) → Review R1 (CRITICAL 1: exe→argv) → Resolve R1 → Review R2 (WARNING 1: macOS /proc) → Resolve R2 (직접 수정) → Review R3 (Clean pass) → Squash merge
+
+## Discoveries (17)
+- Claude Code `/clear`는 새 JSONL 파일을 생성하지 않음 — 같은 파일에 `compact_boundary` 마커(type=system, subtype=compact_boundary)를 append 후 합성 user 메시지로 컴팩트 요약 주입
+- `compact_boundary.compactMetadata.trigger` 값: `"manual"` = 사용자 `/clear`, `"auto"` = context limit 도달 시 자동 압축
+- Claude Code JSONL에서 사람이 입력한 태스크는 항상 `message.content`가 string 타입, tool_result는 항상 array 타입 — 이를 이용해 user message 필터링 가능
+- Codex CLI JSONL은 이중 래핑 구조: top-level `.type == "event_msg"` + 실제 데이터는 `.payload.type`/`.payload.info`에 위치
+- 프로세스 트리 기반 에이전트 감지에서 `/proc/{pid}/exe`는 인터프리터 바이너리를 가리킴 (node, python 등) → exe 기반 판별은 네이티브 바이너리에만 유효. 범용 감지는 `/proc/{pid}/cmdline` argv 패턴 매칭이 필수
+- macOS에는 `/proc` 없음 → `ps -o command=` (full cmdline)과 `ps -o comm=` (exe name)으로 동일 정보 획득 가능

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | PR #19 머지 완료 — agent-tracker Codex 감지 / Task·Token 표시 / /clear 토큰 리셋 (#16) | done |
 | 2026-03-01 | PR #15 최종(8-9차) 리뷰 수정 — retry dispatchedAt 초기화, orch_print_summary 문서 인자 추가 (#14) | done |
 | 2026-03-01 | PR #20 [SUGGESTION] 수정 — pipeline_orchestrator_pane() $TMUX_PANE 미설정 시 tmux display-message 폴백 (#17, #18) | done |
 | 2026-03-01 | PR #15 5-7차 리뷰 최종 수정 — orch_find_idle_panes 세션 범위 필터, orch_state_update 원자적 쓰기 (#14) | done |
