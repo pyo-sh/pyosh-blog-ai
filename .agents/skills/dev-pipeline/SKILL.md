@@ -143,13 +143,37 @@ UNCHECKED=$(gh pr view {PR#} --json body \
 
 ### 6. Merge + Cleanup
 
+Kill side panes first (before merge - prevents orphaned panes on merge failure):
+
+```bash
+tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
+tmux kill-pane -t "$RESOLVE_PANE" 2>/dev/null
+```
+
+Merge and validate:
+
 ```bash
 cd {area}
 gh pr merge {PR#} --squash --delete-branch
-git worktree remove ../.workspace/worktrees/issue-{N}
-git branch -d {branch} 2>/dev/null
-tmux kill-pane -t "$REVIEW_PANE" 2>/dev/null
-tmux kill-pane -t "$RESOLVE_PANE" 2>/dev/null
+if [ $? -ne 0 ]; then
+  echo "ERROR: gh pr merge failed. Aborting cleanup. Check PR #{PR#} status."
+  # Update state to "merge-failed", report to user. Do not proceed.
+  exit 1
+fi
+
+PR_STATE=$(gh pr view {PR#} --json state -q .state)
+if [ "$PR_STATE" != "MERGED" ]; then
+  echo "ERROR: PR #{PR#} state is '$PR_STATE', expected 'MERGED'. Aborting cleanup."
+  exit 1
+fi
+```
+
+Cleanup:
+
+```bash
+git fetch --prune
+git worktree remove ../.workspace/worktrees/issue-{N} --force
+git worktree prune
 ```
 
 State → `"step": "log"`.
