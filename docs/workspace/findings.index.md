@@ -12,6 +12,7 @@
 | 004 | Claude Code vs Codex CLI Hook 비교                        | 2026-02-28 | #claude-code #codex #hooks #comparison      |
 | 005 | tmux OSC 52 드래그 복사 설정 문제                         | 2026-02-28 | #tmux #osc52 #clipboard #nested-tmux        |
 | 006 | Docker 컨테이너 타임존 UTC 고정 버그                      | 2026-03-01 | #docker #timezone #entrypoint #dead-branch  |
+| 007 | Claude Code Transcript JSONL 접근 방법                    | 2026-03-01 | #claude-code #transcript #jsonl #tmux #jq   |
 
 ## 상세 문서
 
@@ -21,6 +22,7 @@
 - [findings.004-claude-code-vs-codex-hooks.md](./findings/findings.004-claude-code-vs-codex-hooks.md) - Claude Code vs Codex CLI Hook 아키텍처 비교
 - [findings.005-tmux-osc52-clipboard.md](./findings/findings.005-tmux-osc52-clipboard.md) - tmux OSC 52 드래그 복사: set-clipboard scope, Ms 포맷, mode-keys 수정
 - [findings.006-docker-tz-dead-branch.md](./findings/findings.006-docker-tz-dead-branch.md) - Docker 컨테이너 TZ 기본값 미적용: entrypoint.sh 데드 브랜치 + docker-compose 빈 기본값
+- [findings.007-claude-transcript-jsonl.md](./findings/findings.007-claude-transcript-jsonl.md) - Claude Code transcript JSONL: cwd→project dir 매핑, null-safe jq 쿼리, user message 형식
 
 ## 주요 원칙
 
