@@ -77,7 +77,7 @@ orch_state_update() {
   local path
   path=$(orch_state_path "$area")
   local tmp
-  tmp=$(jq "$filter + {updatedAt: \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" "$path")
+  tmp=$(jq "($filter) | .updatedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$path")
   echo "$tmp" > "$path"
 }
 

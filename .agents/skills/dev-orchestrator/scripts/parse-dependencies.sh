@@ -23,7 +23,8 @@ set -euo pipefail
 
 if [ "${1:-}" = "--check-cycles" ]; then
   ISSUES_JSON="${2:-[]}"
-  DAG_JSON="${3:-{}}"
+  DAG_JSON="${3:-}"
+  [ -z "$DAG_JSON" ] && DAG_JSON='{}'
 
   # Use jq to run topological sort (Kahn's algorithm)
   CYCLE_RESULT=$(jq -rn \
@@ -110,7 +111,7 @@ fi
 # Extract issue numbers — match patterns: #N, Closes #N, Fixes #N, Resolves #N
 # Use || true so grep returning 1 (no matches) does not abort under set -euo pipefail
 echo "$DEPS_SECTION" \
-  | grep -oE '(Closes|Fixes|Resolves|#)\s*#?[0-9]+' \
+  | grep -oiE '(Closes|Fixes|Resolves|#)\s*#?[0-9]+' \
   | grep -oE '[0-9]+' \
   | sort -un \
   | tr '\n' ' ' \
