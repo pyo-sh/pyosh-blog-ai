@@ -168,11 +168,11 @@ parse_claude_pane() {
       [.[] | select(.type == "user") |
        select(.message.content | type == "string" or
               (type == "array" and any(.[]; .type == "text")))] |
-      last |
-      .message.content |
-      if type == "string" then .
-      else [.[] | select(.type == "text") | .text] | join(" ") end |
-      gsub("\n"; " ") | gsub("  +"; " ")
+      map(.message.content |
+          if type == "string" then .
+          else [.[] | select(.type == "text") | .text] | join(" ") end |
+          gsub("\n"; " ") | gsub("  +"; " ")) |
+      last // ""
     ' < "$transcript" 2>/dev/null)
     [[ -n "$last_msg" ]] && task="$last_msg"
   else
@@ -439,7 +439,9 @@ render_dashboard() {
       printf "%s "            "$col_task"           # TASK
       printf "%b "            "$col_engine"         # ENGINE
       printf "%b "            "$badge"              # STATUS (6 chars + 1 pad)
-      printf "%b %3dk  "     "$tok_bar_str" "$tok_k" # TOKENS (5 bar + 1 sp + 3 num + k + 2 sp)
+      local tok_str
+      if (( tok_k > 999 )); then tok_str="999+"; else printf -v tok_str "%3dk" "$tok_k"; fi
+      printf "%b %s  "       "$tok_bar_str" "$tok_str" # TOKENS (5 bar + 1 sp + 4 str + 2 sp)
       printf "${GRAY}║${R}"
       tput el; echo
     done
