@@ -191,6 +191,20 @@ orch_check_completion() {
   # 2. Pipeline state gone = pipeline finished (check PR status)
   local pipeline_state="$PIPELINE_DIR/issue-${issue}.state.json"
   if [ ! -f "$pipeline_state" ]; then
+    # Grace window: if recently dispatched, pipeline may not have created state yet
+    local dispatch_time
+    dispatch_time=$(orch_state_read "$area" | jq -r ".dispatched[\"$issue\"].dispatchedAt // empty")
+    if [ -n "$dispatch_time" ]; then
+      local dispatch_ts now_ts elapsed
+      dispatch_ts=$(date -d "$dispatch_time" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$dispatch_time" +%s 2>/dev/null)
+      now_ts=$(date +%s)
+      elapsed=$(( now_ts - dispatch_ts ))
+      if [ "$elapsed" -lt 60 ]; then
+        # Within startup grace window — pipeline may not have written state yet
+        echo "running"; return 1
+      fi
+    fi
+
     # Check if PR is merged
     local pr_state
     pr_state=$(cd "$area_dir" && gh pr list \
@@ -334,19 +348,24 @@ orch_poll_cycle() {
   local dispatched_issues
   dispatched_issues=$(echo "$state" | jq -r '.dispatched | keys[]')
 
-  # 1. Check completion for all dispatched issues
+  # 1. Check completion for dispatched (non-terminal) issues only
   for issue in $dispatched_issues; do
+    local cur_status
+    cur_status=$(echo "$state" | jq -r ".status[\"$issue\"]")
+    # Skip already-terminal issues
+    [ "$cur_status" = "completed" ] || [ "$cur_status" = "failed" ] && continue
+
     local result
     result=$(orch_check_completion "$issue" "$area_dir")
     if [ "$result" = "completed" ] || [ "$result" = "failed" ]; then
       orch_status_set "$area" "$issue" "$result"
+      # Remove from dispatched to avoid re-checking
+      orch_state_update "$area" "del(.dispatched[\"$issue\"])"
       >&2 echo "[orchestrator] Issue #${issue}: ${result}"
 
-      if [ "$result" = "completed" ] || [ "$result" = "failed" ]; then
-        local newly_unblocked
-        newly_unblocked=$(orch_unblock "$area" "$issue")
-        [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
-      fi
+      local newly_unblocked
+      newly_unblocked=$(orch_unblock "$area" "$issue")
+      [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
     fi
   done
 

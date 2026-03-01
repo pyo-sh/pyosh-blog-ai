@@ -31,12 +31,14 @@ if [ "${1:-}" = "--check-cycles" ]; then
     --argjson dag "$DAG_JSON" \
     '
     # Build adjacency list and in-degree map
+    # Only include edges where both endpoints are in $issues
+    # (external/out-of-batch deps are ignored for cycle detection)
     def build_graph:
       reduce $issues[] as $n (
         {adj: {}, indegree: {}};
         .adj[($n|tostring)] //= [] |
         .indegree[($n|tostring)] //= 0 |
-        reduce ($dag[($n|tostring)] // [])[] as $dep (
+        reduce ([($dag[($n|tostring)] // [])[] | select(. as $d | $issues | any(. == $d))]) [] as $dep (
           .;
           .adj[($dep|tostring)] += [$n|tostring] |
           .indegree[($n|tostring)] += 1
