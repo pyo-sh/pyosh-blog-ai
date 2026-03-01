@@ -72,13 +72,20 @@ orch_state_read() {
 orch_state_update() {
   # Usage: orch_state_update <area> <jq_filter>
   # Applies a jq filter to update the state file in place.
+  # Writes atomically via temp file + mv to prevent state corruption on jq failure.
   local area=$1
   local filter=$2
   local path
   path=$(orch_state_path "$area")
-  local tmp
-  tmp=$(jq "($filter) | .updatedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$path")
-  echo "$tmp" > "$path"
+  local tmp_file
+  tmp_file=$(mktemp)
+  if jq "($filter) | .updatedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$path" > "$tmp_file"; then
+    mv "$tmp_file" "$path"
+  else
+    rm -f "$tmp_file"
+    >&2 echo "[orchestrator] orch_state_update: jq failed for area=$area, filter=$filter"
+    return 1
+  fi
 }
 
 orch_status_set() {
@@ -96,14 +103,18 @@ orch_status_set() {
 
 orch_find_idle_panes() {
   # Usage: orch_find_idle_panes [exclude_pane]
-  # Returns space-separated list of idle pane IDs in the current session.
+  # Returns space-separated list of idle pane IDs in the current session only.
   # Idle = shell (bash/zsh/sh/fish) with no foreground job.
   local exclude=${1:-""}
 
-  tmux list-panes -s -F '#{pane_id} #{pane_current_command}' 2>/dev/null \
-    | awk -v excl="$exclude" '
-        $2 == "bash" || $2 == "zsh" || $2 == "sh" || $2 == "fish" {
-          if ($1 != excl) print $1
+  # Explicitly capture current session ID to avoid including panes from other sessions
+  local current_session
+  current_session=$(tmux display-message -p '#{session_id}' 2>/dev/null)
+
+  tmux list-panes -s -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null \
+    | awk -v sess="$current_session" -v excl="$exclude" '
+        $1 == sess && ($3 == "bash" || $3 == "zsh" || $3 == "sh" || $3 == "fish") {
+          if ($2 != excl) print $2
         }' \
     | tr '\n' ' '
 }
