@@ -50,7 +50,7 @@ jq_expr='
 
 # Locked read-modify-write to prevent race with on-status.sh
 (
-  flock -w 2 9 || exit 0
+  flock -n 9 || exit 0
 
   existing="{}"
   [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")

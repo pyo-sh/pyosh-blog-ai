@@ -103,7 +103,7 @@ esac
 # ── Locked read-modify-write ──────────────────────────────────────────────
 
 (
-  flock -w 2 9 || exit 0
+  flock -w 1 9 || exit 0
 
   existing="{}"
   [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
