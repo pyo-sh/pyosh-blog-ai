@@ -248,3 +248,27 @@
 - `orch_poll_cycle`에서 `orch_unblock` 호출 자체는 `completed|failed` 양쪽에서 발생해도,
   `orch_unblock` 내부 remaining-deps 루프가 `completed`만 "통과"로 간주하면 여전히 deadlock 발생
   → 외부 트리거와 내부 판별을 동시에 수정해야 상태 머신이 올바르게 동작함
+
+---
+
+## Completed (12)
+- [x] PR #15 3-4차 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **3차 리뷰 수정 (이전 커밋에서 처리):**
+  - **[CRITICAL] `parse-dependencies.sh:33`** — 외부 의존성(batch 밖 이슈)을 사이클 엣지로 오판:
+    `$issues` 목록에 없는 dep 노드가 indegree만 올리고 queue에 들어가지 못해 CYCLE_DETECTED 오보
+    → jq `select(. as $d | $issues | any(. == $d))` 필터로 in-batch 엣지만 포함
+  - **[CRITICAL] `orchestrate-helpers.sh:205`** — 방금 dispatch된 이슈를 pipeline state 파일 미생성 상태에서 `failed`로 오판:
+    → 60초 grace window 추가 (`dispatchedAt` 기반 경과 시간 체크)
+  - **[WARNING] `orchestrate-helpers.sh:329`** — terminal 이슈가 `.dispatched`에 남아 매 사이클 재체크:
+    → terminal 상태 도달 시 `del(.dispatched["$issue"])` 로 즉시 제거
+
+  **4차 리뷰 수정 (이번 커밋):**
+  - **[CRITICAL] `parse-dependencies.sh:26`** — `DAG_JSON="${3:-{}}"` 파라미터 확장 버그:
+    bash가 `:-` 뒤 첫 `}`를 확장 종료로 해석 → `$3` 제공 시 뒤에 `}` 추가됨 → jq 파싱 실패
+    → 2줄 분리: `DAG_JSON="${3:-}"` + `[ -z "$DAG_JSON" ] && DAG_JSON='{}'`
+  - **[CRITICAL] `orchestrate-helpers.sh:80`** — `orch_state_update` jq 연산자 우선순위 버그:
+    `"$filter + {updatedAt: ...}"` 에서 `+`가 `=`보다 높은 우선순위 → `orch_status_set` 호출 시 string+object 타입 에러
+    → `"($filter) | .updatedAt = ..."` 파이프 체이닝으로 교체
+  - **[SUGGESTION] `parse-dependencies.sh:113`** — 의존성 키워드 대소문자 미구분:
+    `grep -oE` → `grep -oiE` 로 변경 (`closes #12` 등 소문자 형식 허용)
