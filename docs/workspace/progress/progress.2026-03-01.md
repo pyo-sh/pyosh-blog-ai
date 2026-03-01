@@ -123,3 +123,21 @@
 - Claude Code spinner: `✢ · ✶ ✻ ✽` (5개). `·`은 context bar separator와 혼재 → false positive 위험
 - `jq -rs` 단일 호출로 model+tokens+task 통합 시 RS(0x1e) 구분자 사용이 안전 (`|` 등 special char 포함 task 대응)
 - W_TOKENS 공식에서 trailing 2sp는 -8 overhead에 흡수: `W_TOKENS` = bar+sp+str_len (trailing 제외), `-8` = left(2)+4seps(4)+right(2)
+
+---
+
+## Completed (7)
+- [x] PR #13 리뷰 코멘트 수정 — `scripts/agent-tracker.sh` (#12)
+
+  **[WARNING] `parse_claude_pane()` 멀티라인 task 잘림 버그:**
+  - `IFS=$'\x1e' read -r raw_model ctx_len task_raw <<< "$raw_data"` 에서
+    `<<<` here-string이 첫 번째 내장 개행 문자에서 멈춰 multi-line 사용자 메시지가 잘림
+  - **Fix**: jq에서 task 필드를 `@base64`로 인코딩 → read 이후 `base64 -d` 복원
+    - `"\($m)\u001e\($ctx)\u001e\($task | @base64)"` → IFS split 중 개행 영향 없음
+    - 복원 후 기존 `${task_raw//$'\n'/ }` 정규화(개행→공백)가 그대로 동작
+  - RS(0x1e) 구분자 유지 — model/ctx_len 필드는 개행 없으므로 변경 불필요
+
+## Discoveries (7)
+- bash `<<<` here-string은 변수 내 첫 번째 `\n`에서 멈춤 → field separator가 `\x1e`여도 task 내 개행이 read를 조기 종료시킴
+- jq `@base64` 필터는 출력에 개행 없는 단일 라인 문자열 반환 → bash read와 완전 호환
+- `base64 -d <<< "$b64"` 역시 안전: 입력이 base64(개행 없음)이므로 here-string 잘림 위험 없음

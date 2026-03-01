@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | PR #13 리뷰 수정 — parse_claude_pane() 멀티라인 task 잘림: @base64 인코딩으로 해결 (#12) | done |
 | 2026-03-01 | agent-tracker 다중 에이전트 트래킹 오류 및 대시보드 개선 (#12, PR 진행 중) | in-progress |
 | 2026-03-01 | agent-tracker 컬럼 정렬 수정 + transcript 기반 Task/Token 갱신 (#9, #10, PR #11) | done |
 | 2026-03-01 | PR #8 머지 완료 — tracker window 추가 (session.docker.yml + ARCHITECTURE.md), Issue #7 종료 | done |
