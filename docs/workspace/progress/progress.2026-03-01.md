@@ -202,3 +202,28 @@
 ## Discoveries (9)
 - `tmux list-panes -s -F '#{pane_id} #{pane_current_command}'`에서 bash/zsh process가 foreground인 pane = idle pane (자식 프로세스 없는 쉘)
 - Kahn's algorithm을 jq 단독으로 구현 가능: `reduce` + in-degree 배열로 위상 정렬 + 방문 count로 사이클 판별
+
+---
+
+## Completed (10)
+- [x] PR #15 리뷰 코멘트 수정 — `dev-orchestrator` 스킬 (#14)
+
+  **[CRITICAL] `parse-dependencies.sh` — `--check-cycles` 모드 도달 불가:**
+  - `$1`을 이슈 번호로 바로 할당 후 `gh issue view "$ISSUE"` 호출 → `--check-cycles` 전달 시 body 조회 실패로 `:29-31`에서 `exit 0` 조기 종료
+  - **Fix**: `--check-cycles` 분기를 스크립트 최상단(`set -euo pipefail` 직후)으로 이동 → 이슈 파싱 로직 전에 처리
+
+  **[CRITICAL] `orchestrate-helpers.sh:345` — `failed` 상태 시 downstream deadlock:**
+  - `if [ "$result" = "completed" ]` 조건만 unblock 수행 → upstream이 `failed`일 때 dependent 이슈가 영구 `blocked` 상태 유지
+  - **Fix**: `if [ "$result" = "completed" ] || [ "$result" = "failed" ]` — 두 종료 상태 모두 unblock 수행 (문서 상태 머신과 일치)
+
+  **[WARNING] `parse-dependencies.sh:52` — `grep` 무매치 시 `set -euo pipefail` 강제 종료:**
+  - `grep -oE '...'` 가 매칭 없으면 exit 1 반환 → `set -euo pipefail` 환경에서 "의존성 없음" 정상 케이스가 스크립트 실패로 처리됨
+  - **Fix**: 추출 파이프라인 끝에 `|| true` 추가
+
+  **[SUGGESTION] `SKILL.md:126` — `orch_poll_cycle` 호출 인자 불일치:**
+  - 문서 예시: `orch_poll_cycle "$AREA_DIR" "$AGENT"` (2개) vs 실제 함수 시그니처: `<area> <area_dir> <agent> <orchestrator_pane>` (4개)
+  - **Fix**: `orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT" "$ORCH_PANE"` 로 정정 + Unblock 설명에 `failed` 추가
+
+## Discoveries (10)
+- bash 스크립트에서 `--flag` 분기는 positional 인자 파싱 이전에 처리해야 함 — `$1`을 변수로 할당 후 체크하면 다른 로직이 먼저 `$1`을 소비할 수 있음
+- `grep -oE | ... | sort | tr | sed` 파이프라인의 첫 `grep`이 무매칭 시 전체 파이프라인이 pipefail로 종료 → `|| true`를 파이프라인 끝에 배치해 빈 출력을 정상 케이스로 처리
