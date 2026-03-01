@@ -23,6 +23,20 @@ Read diff + surrounding context. Check compliance with `{area}/CLAUDE.md`.
 
 **Focus**: Security (OWASP Top 10), type safety, edge cases, error handling, performance (N+1), conventions.
 
+### 2.5. Check Test Plan
+
+Read PR body and assess each `- [ ]` test plan item:
+
+```bash
+gh pr view {PR#} --json body --jq '.body' | grep '^- \[ \]'
+```
+
+For each item:
+- **Verifiable from diff** — confirm coverage in review body (note which items are addressed by the changes)
+- **Requires manual testing** — flag as `[SUGGESTION]` in review body
+
+Do **not** modify the PR body. Checkbox updates (`- [ ]` → `- [x]`) happen in `/dev-resolve` after all fixes are applied.
+
 ### 3. Classify Severity
 
 | Tag | Meaning |

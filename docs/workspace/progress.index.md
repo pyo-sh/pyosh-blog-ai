@@ -6,8 +6,19 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | dev-pipeline pane 관리 결함 수정 및 test plan 검증 루프 추가 — PR #20 머지 (#17, #18) | done |
+| 2026-03-01 | PR #15 10차 리뷰 수정 — pipeline state area 네임스페이싱 (pipeline-helpers + orchestrate-helpers) (#14) | done |
+| 2026-03-01 | PR #19 머지 완료 — agent-tracker Codex 감지 / Task·Token 표시 / /clear 토큰 리셋 (#16) | done |
+| 2026-03-01 | PR #15 최종(8-9차) 리뷰 수정 — retry dispatchedAt 초기화, orch_print_summary 문서 인자 추가 (#14) | done |
+| 2026-03-01 | PR #20 [SUGGESTION] 수정 — pipeline_orchestrator_pane() $TMUX_PANE 미설정 시 tmux display-message 폴백 (#17, #18) | done |
+| 2026-03-01 | PR #15 5-7차 리뷰 최종 수정 — orch_find_idle_panes 세션 범위 필터, orch_state_update 원자적 쓰기 (#14) | done |
+| 2026-03-01 | PR #19 [CRITICAL] 수정 — Codex 감지: exe 경로 → argv 기반 재귀 탐색으로 교체 (#16) | done |
+| 2026-03-01 | PR #15 3-4차 리뷰 수정 — DAG_JSON 파라미터 확장, jq 우선순위, 대소문자 키워드 (#14) | done |
+| 2026-03-01 | PR #15 2차 리뷰 수정 — orch_unblock() dep_status 판별: completed 단독 → completed\|failed 허용, deadlock 완전 수정 | done |
+| 2026-03-01 | PR #15 리뷰 수정 — dev-orchestrator: --check-cycles 도달 불가 / failed deadlock / grep pipefail / SKILL.md 인자 정정 | done |
+| 2026-03-01 | `/dev-orchestrator` 스킬 구현 — 다중 이슈 병렬 배치 오케스트레이터 (#14) | done |
 | 2026-03-01 | PR #13 리뷰 수정 — parse_claude_pane() 멀티라인 task 잘림: @base64 인코딩으로 해결 (#12) | done |
-| 2026-03-01 | agent-tracker 다중 에이전트 트래킹 오류 및 대시보드 개선 (#12, PR 진행 중) | in-progress |
+| 2026-03-01 | agent-tracker 다중 에이전트 트래킹 오류 및 대시보드 개선 (#12, PR #13 머지 완료) | done |
 | 2026-03-01 | agent-tracker 컬럼 정렬 수정 + transcript 기반 Task/Token 갱신 (#9, #10, PR #11) | done |
 | 2026-03-01 | PR #8 머지 완료 — tracker window 추가 (session.docker.yml + ARCHITECTURE.md), Issue #7 종료 | done |
 | 2026-03-01 | PR #8 리뷰 코멘트 수정 — agent-tracker.sh: PIPELINE_DIR 경로, grep -P 이식성, Codex 세션 매핑, INTERVAL 검증 | done |
