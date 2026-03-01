@@ -200,18 +200,20 @@ parse_claude_pane() {
       [$all[] | select(.type == "assistant" and .isSidechain != true
                 and .isApiErrorMessage != true)] as $a |
       ($a | last | .message.model // "") as $m |
-      ($a | map(select(.message.usage)) | last |
+      # Token: only count assistants after last compact_boundary
+      ([$all[] | select(.subtype == "compact_boundary") | .timestamp] | last) as $boundary |
+      [$a[] | select(if $boundary then .timestamp > $boundary else true end)] as $post_a |
+      ($post_a | map(select(.message.usage)) | last |
         if . then
           (.message.usage.input_tokens // 0) +
           (.message.usage.cache_read_input_tokens // 0) +
           (.message.usage.cache_creation_input_tokens // 0)
         else 0 end) as $ctx |
-      ([$all[] | select(.type == "user") |
+      # Task: only string-type user messages (skip tool_result arrays)
+      ([$all[] | select(.type == "user" and (.message.content | type) == "string") |
         .message.content |
-        if type == "string" then .
-        elif type == "array" then
-          [.[] | select(.type == "text") | .text] | join(" ")
-        else "" end
+        gsub("<command-[^>]*>[^<]*</command-[^>]*>"; "") |
+        gsub("\\s+"; " ") | ltrimstr(" ") | rtrimstr(" ")
       ] | last // "") as $task |
       "\($m)\u001e\($ctx)\u001e\($task | @base64)"
     ' < "$transcript" 2>/dev/null)
@@ -324,13 +326,17 @@ parse_codex_pane() {
       "$session_file" 2>/dev/null | tail -1)
     [[ -n "$raw_model" ]] && model="$raw_model"
 
-    # ── Token % (assuming 128k context) ──────────────────────────────────────
-    local total_tok
+    # ── Token % (dynamic context window) ─────────────────────────────────────
+    local total_tok ctx_window
     total_tok=$(jq -r \
-      'select(.type == "token_count") | .payload.info.total_token_usage // empty' \
+      'select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens // empty' \
       "$session_file" 2>/dev/null | tail -1)
-    if [[ -n "$total_tok" && "$total_tok" -gt 0 ]]; then
-      pct=$(( total_tok * 100 / 128000 ))
+    ctx_window=$(jq -r \
+      'select(.payload.info | type == "object") | .payload.info.model_context_window // empty' \
+      "$session_file" 2>/dev/null | tail -1)
+    [[ -z "$ctx_window" || "$ctx_window" -le 0 ]] 2>/dev/null && ctx_window=200000
+    if [[ -n "$total_tok" && "$total_tok" -gt 0 ]] 2>/dev/null; then
+      pct=$(( total_tok * 100 / ctx_window ))
       (( pct > 100 )) && pct=100
       tok_k=$(( total_tok / 1000 ))
     fi
@@ -338,7 +344,7 @@ parse_codex_pane() {
     # ── Task ─────────────────────────────────────────────────────────────────
     local last_msg
     last_msg=$(jq -r \
-      'select(.type == "user_message") | .payload.message // empty' \
+      'select(.payload.type == "user_message") | .payload.message // empty' \
       "$session_file" 2>/dev/null | tail -1 | tr '\n' ' ')
     [[ -n "$last_msg" ]] && task="$last_msg"
   fi
@@ -373,6 +379,70 @@ get_pipeline_summary() {
   fi
 }
 
+# _get_cmdline <pid> — print full command line for a process (cross-platform)
+_get_cmdline() {
+  local pid=$1
+  # Linux: /proc/{pid}/cmdline (NUL-separated)
+  if [[ -f /proc/"$pid"/cmdline ]]; then
+    tr '\0' ' ' < /proc/"$pid"/cmdline 2>/dev/null
+    return
+  fi
+  # macOS / cross-platform: ps -o command=
+  ps -o command= -p "$pid" 2>/dev/null
+}
+
+# _get_exe_name <pid> — print executable basename (cross-platform)
+_get_exe_name() {
+  local pid=$1
+  # Linux: /proc/{pid}/exe symlink
+  if [[ -L /proc/"$pid"/exe ]]; then
+    local p
+    p=$(readlink /proc/"$pid"/exe 2>/dev/null) && printf '%s' "${p##*/}"
+    return
+  fi
+  # macOS / cross-platform: ps -o comm=
+  ps -o comm= -p "$pid" 2>/dev/null | xargs basename 2>/dev/null
+}
+
+# _match_agent <cmdline> <exe_name> — print "claude" or "codex" if matched
+_match_agent() {
+  local cmdline="$1" exe="$2"
+  # Claude Code
+  if [[ "$exe" == "claude" ]] || \
+     [[ "$cmdline" =~ @anthropic-ai/claude-code|claude-code/cli ]]; then
+    printf 'claude'; return 0
+  fi
+  # Codex
+  if [[ "$exe" == "codex" ]] || \
+     [[ "$cmdline" =~ @openai/codex|codex\.js ]]; then
+    printf 'codex'; return 0
+  fi
+  return 1
+}
+
+# detect_agent_type <pane_pid> — print "claude" or "codex" if found in process tree
+# Scans the pane's entire process tree (cmdline + exe) to detect agent type regardless
+# of installation method (native binary, npm global, npx, bunx, etc.).
+# Works on both Linux (/proc) and macOS (ps fallback).
+detect_agent_type() {
+  local pids=() queue=("$1") pid child cmdline exename result
+  # BFS: collect all descendant PIDs
+  while (( ${#queue[@]} > 0 )); do
+    pid="${queue[0]}"; queue=("${queue[@]:1}")
+    pids+=("$pid")
+    while IFS= read -r child; do
+      [[ -n "$child" ]] && queue+=("$child")
+    done < <(pgrep -P "$pid" 2>/dev/null)
+  done
+  # Check each process for known agent signatures
+  for pid in "${pids[@]}"; do
+    cmdline=$(_get_cmdline "$pid") || continue
+    exename=$(_get_exe_name "$pid") || true
+    result=$(_match_agent "$cmdline" "$exename") && { printf '%s' "$result"; return 0; }
+  done
+  return 1
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard renderer
 # ─────────────────────────────────────────────────────────────────────────────
@@ -399,10 +469,16 @@ render_dashboard() {
 
   while IFS=' ' read -r pane_addr pane_id pane_cmd; do
     local etype
+    # Quick path: pane command is the agent binary itself
     case "$pane_cmd" in
       claude) etype="claude" ;;
       codex)  etype="codex"  ;;
-      *)      continue ;;
+      *)
+        # Slow path: agents may run via node/npx/bunx wrappers — scan process tree
+        local _pane_pid _detected
+        _pane_pid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
+        _detected=$(detect_agent_type "$_pane_pid" 2>/dev/null) || continue
+        etype="$_detected" ;;
     esac
 
     local data
