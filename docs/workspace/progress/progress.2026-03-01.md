@@ -329,3 +329,20 @@
   세션 경계가 모호할 수 있음 → `tmux display-message -p '#{session_id}'` + awk `$1 == sess` 조합이 안전
 - `mktemp` + `mv` 패턴이 배시 `echo > file` 대비 원자적: 다른 프로세스/에이전트가 state 파일을 읽는 도중에도
   부분 쓰기(partial write)나 빈 파일 노출이 발생하지 않음
+
+---
+
+## Completed (15)
+- [x] PR #20 리뷰 코멘트 수정 — `pipeline-helpers.sh` `pipeline_orchestrator_pane()` 방어적 폴백 (#17, #18)
+
+  **[SUGGESTION] `pipeline-helpers.sh:50` — `$TMUX_PANE` 비어있을 때 빈 target pane 반환:**
+  - 기존: `echo "$TMUX_PANE"` 단순 반환 — 비표준 호출 컨텍스트(tmux 세션 내 비-tmux 쉘에서 source)에서 `$TMUX_PANE` 미설정 시 빈 문자열 반환
+  - **Fix**: `[ -n "$TMUX_PANE" ]` 분기 추가 → 설정된 경우 `$TMUX_PANE` 반환,
+    미설정 시 `tmux display-message -p '#{pane_id}' 2>/dev/null` 폴백으로 현재 포커스 pane ID 획득
+  - 주석에 `$TMUX_PANE` 우선 이유(focused pane과 달리 `--continue` 세션에서 변하지 않음) 명시 유지
+
+## Discoveries (15)
+- `$TMUX_PANE`은 tmux가 pane 시작 시 환경 변수로 설정함 — 직접 fork한 쉘에는 존재하나,
+  tmux 세션 내에서 `exec bash`나 외부 스크립트 경유 시 상속되지 않을 수 있음
+- `tmux display-message -p '#{pane_id}'`는 현재 포커스 pane ID를 반환 — `--continue` 세션에서는
+  focused pane이 orchestrator pane과 다를 수 있어 $TMUX_PANE이 우선순위를 가져야 함

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | PR #20 [SUGGESTION] 수정 — pipeline_orchestrator_pane() $TMUX_PANE 미설정 시 tmux display-message 폴백 (#17, #18) | done |
 | 2026-03-01 | PR #15 5-7차 리뷰 최종 수정 — orch_find_idle_panes 세션 범위 필터, orch_state_update 원자적 쓰기 (#14) | done |
 | 2026-03-01 | PR #19 [CRITICAL] 수정 — Codex 감지: exe 경로 → argv 기반 재귀 탐색으로 교체 (#16) | done |
 | 2026-03-01 | PR #15 3-4차 리뷰 수정 — DAG_JSON 파라미터 확장, jq 우선순위, 대소문자 키워드 (#14) | done |
