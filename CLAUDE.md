@@ -41,7 +41,46 @@ When you need context about past work, technical decisions, or known issues, **r
 - `workspace` area covers root repo changes (tools/, Docker, tmux, skills, workflow config)
 - CI/CD is recorded under the respective area (`client` or `server`), not `workspace`
 
-## Common Dev Principles
+## Writing style
+
+- Use sentence case for headers, not title case
+- Never use em dashes (—). Use spaced hyphens ` - ` (space, hyphen, space) instead.
+- Don't make up or add content I didn't say. Stick to what I've said. Rephrasing is okay, but don't embellish.
+
+## Behavior
+
+When I paste large content with no instructions, just summarize it.
+
+For a complex bash command, break it down into multiple simple commands so the user doesn't have to approve each one individually. Alternatively, put it in a bash script file and run it with `bash /tmp/<script>.sh`.
+
+Example - instead of:
+```bash
+sleep 60 && ps aux | grep foo | wc -l && echo "---" && ls -la /some/path
+```
+
+Do this:
+```bash
+sleep 60
+```
+```bash
+ps aux | grep foo | wc -l
+```
+```bash
+ls -la /some/path
+```
+
+Also avoid complex pipes. Instead of:
+```bash
+grep "file: '" patch-cli.js | sed "s/.*file: '\([^']*\)'.*/\1/" | sort > /tmp/used.txt
+```
+
+Either run each step individually or put it in a script file and run with `bash {PROJECT ROOT}/.workspace/scripts/YYYY-MM-DD-{TASK}-{ID}.sh`. This temporary file should be deleted after work.
+
+For git operations in other directories, use `cd <path> && git ...` instead of `git -C <path>`.
+
+Never use `2>&1` in bash commands. Keep stderr and stdout separate.
+
+## Common dev principles
 
 - TypeScript Strict Mode
 - pnpm package manager
