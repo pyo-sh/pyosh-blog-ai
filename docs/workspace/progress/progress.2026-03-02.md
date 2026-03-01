@@ -57,3 +57,58 @@ state 파일 namespace 충돌 (#23):
 
 - PR #24 머지: `fix/pipeline-merge-robustness` → main
 - Closes #21, #22, #23
+
+---
+
+## dev-pipeline 스킬 버그 수정 — issue #28
+
+### 작업 내용
+
+**분석 단계**
+- dev-pipeline 스킬 전체 코드 리뷰: 15개 잠재 버그/위험 항목 발견
+- 인터뷰 형식으로 사용자와 해결 방향 결정 (11개 수정, 2개 현행 유지, 2개 무시)
+- GitHub Issue #28 등록 (`refactor`, `priority:1`)
+
+**PR #24에서 이미 수정된 항목 확인**
+- `git worktree remove --force`, `pipeline_state_write()`, state 경로 네임스페이스 등 선행 수정 확인
+
+**수정 사항 (`refactor/issue-28-dev-pipeline-fixes`)**
+
+helpers.sh (#6):
+- `MONOREPO_ROOT` 감지: `git rev-parse --show-toplevel` → `git worktree list --porcelain` 역추적으로 교체
+- 워크트리 내부에서 소싱해도 정확한 루트 반환 확인
+
+helpers.sh (#2, 함수 리네임):
+- `pipeline_analyze_review()` 제거 — eval 포맷 출력 삭제
+- `pipeline_fetch_review()` 추가 — raw JSON(`{state, body}`)만 반환, AI가 직접 파싱
+
+helpers.sh (#8):
+- `pipeline_poll_review()`, `pipeline_poll_commits()` 내 `gh api` 호출에서 `2>/dev/null` 제거 - 오류가 stderr로 출력되도록
+
+SKILL.md (#9):
+- Step 0 시작 시 `$TMUX` 미설정 체크 추가 - 명확한 에러 메시지 출력 후 exit
+
+SKILL.md (#4):
+- Step 0: 기존 state 파일 발견 시 step/pr 정보 출력 후 "Resume / Start fresh" 사용자 선택 추가
+
+SKILL.md (#3):
+- Step 1: PR 생성 후 `lastCommitSha` 캡처 - state JSON에 필드 추가
+
+SKILL.md (#1, #2):
+- Step 3: `eval "$(pipeline_analyze_review ...)"` 제거
+- `pipeline_fetch_review`로 JSON 가져온 후 AI가 STATE/severity 직접 판단하도록 변경
+
+SKILL.md (#5):
+- Step 3 결정 로직: `APPROVED` → Step 5 통일, `PENDING`/`DISMISSED` → 오류 보고 추가
+
+recovery.md (#10):
+- resolve step 복구 로직: 날짜 비교(`submitted_at` vs `committer.date`) 제거
+- 최신 커밋 SHA vs `lastCommitSha` 비교로 교체 - 명확하고 단순한 완료 판단
+
+dev-review/SKILL.md (#11):
+- Constraints에 `## Review Summary` 필수 접두사 규칙 명시 - 폴링 감지 조건과 연동 명시
+
+### 결과
+
+- `refactor/issue-28-dev-pipeline-fixes` 브랜치 PR 생성
+- Closes #28
