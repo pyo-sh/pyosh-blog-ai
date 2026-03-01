@@ -39,6 +39,13 @@ pipeline_state_read() {
   cat "$(pipeline_state_path "$issue" "$area")"
 }
 
+pipeline_state_write() {
+  local issue=$1
+  local area=$2
+  local json=$3
+  echo "$json" > "$(pipeline_state_path "$issue" "$area")"
+}
+
 pipeline_state_delete() {
   local issue=$1
   local area=$2
@@ -352,14 +359,15 @@ pipeline_cleanup() {
   pipeline_kill_pane "$review_pane"
   pipeline_kill_pane "$resolve_pane"
 
-  # Remove worktree (must run from the area repo that owns it)
+  # Remove worktree (--force handles uncommitted changes or detached HEAD post-merge)
   local wt="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$wt" ]; then
-    cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" 2>/dev/null
+    cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" --force
+    git worktree prune
   fi
 
-  # Delete branch (may already be deleted by --delete-branch)
-  cd "$MONOREPO_ROOT/$area" && git branch -d "$branch" 2>/dev/null
+  # Delete branch (-D required after squash merge; branch commits not in main ancestry)
+  cd "$MONOREPO_ROOT/$area" && git branch -D "$branch" 2>/dev/null
 
   # Remove state file
   pipeline_state_delete "$issue" "$area"

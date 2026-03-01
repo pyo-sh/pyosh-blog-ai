@@ -104,7 +104,7 @@ Handle `rc` same as Step 3. When new commits appear: kill pane → show diff (`g
 Show review summary. Show check plan:
 
 ```bash
-gh pr view {PR#} --json body --jq '.body' | grep -A999 '## Check plan' | tail -n +2
+gh pr view {PR#} --json body --jq '.body' | grep -A999 '## Check plan' | tail -n +2 || true
 ```
 
 Ask user: **"Merge"** → Step 6 | **"Fix & Re-review"** → Step 4a | **"Fix & Merge"** → Step 4a with `skipReview: true`.
@@ -125,13 +125,14 @@ cd {area}
 gh pr merge {PR#} --squash --delete-branch
 if [ $? -ne 0 ]; then
   echo "ERROR: gh pr merge failed. Aborting cleanup. Check PR #{PR#} status."
-  # Update state to "merge-failed", report to user. Do not proceed.
+  pipeline_state_write "$ISSUE" "$AREA" "$(pipeline_state_read "$ISSUE" "$AREA" | jq '.step = "merge-failed"')"
   exit 1
 fi
 
 PR_STATE=$(gh pr view {PR#} --json state -q .state)
 if [ "$PR_STATE" != "MERGED" ]; then
   echo "ERROR: PR #{PR#} state is '$PR_STATE', expected 'MERGED'. Aborting cleanup."
+  pipeline_state_write "$ISSUE" "$AREA" "$(pipeline_state_read "$ISSUE" "$AREA" | jq '.step = "merge-failed"')"
   exit 1
 fi
 ```
