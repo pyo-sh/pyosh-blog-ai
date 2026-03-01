@@ -14,8 +14,8 @@ Closes #{N}
 - **file2**: Description
 
 ## Test plan
-- [ ] Test item 1
-- [ ] Test item 2
+- Test item 1
+- Test item 2
 
 ## Screenshots
 (Attach if UI changes)
@@ -42,7 +42,7 @@ cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
 Closes #{N}
 - Change description
 ## Test plan
-- [ ] Test item
+- Test item
 PREOF
 
 gh pr create \

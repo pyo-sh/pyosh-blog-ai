@@ -46,8 +46,9 @@ pipeline_state_delete() {
 # ──────────────────────────────────────────────
 
 pipeline_orchestrator_pane() {
-  # Capture the current pane ID — call at pipeline start to anchor splits
-  tmux display-message -p '#{pane_id}'
+  # Capture the current pane ID — use $TMUX_PANE (process's own pane),
+  # not tmux display-message (focused pane, which differs on --continue sessions)
+  echo "$TMUX_PANE"
 }
 
 pipeline_open_pane() {
@@ -67,10 +68,10 @@ pipeline_open_pane() {
   fi
 
   if [ -n "$target_pane" ]; then
-    tmux split-window -h -t "$target_pane" -P -F '#{pane_id}' \
+    tmux split-window -h -d -t "$target_pane" -P -F '#{pane_id}' \
       "cd '$workdir' && $cmd"
   else
-    tmux split-window -h -P -F '#{pane_id}' \
+    tmux split-window -h -d -P -F '#{pane_id}' \
       "cd '$workdir' && $cmd"
   fi
 }
