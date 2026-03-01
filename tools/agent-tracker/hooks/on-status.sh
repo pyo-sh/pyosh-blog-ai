@@ -66,7 +66,7 @@ case "$event" in
         elif $tn == "Grep"         then .pattern // ""
         elif $tn == "Glob"         then .pattern // ""
         elif $tn == "Agent"        then .description // ""
-        elif $tn == "Skill"        then ((.skill // "") + (if .args then " " + .args else "" end))
+        elif $tn == "Skill"        then ((.skill // "") + (if .args == null then "" else " " + (.args | tostring) end))
         elif $tn == "WebSearch"    then .query // ""
         elif $tn == "WebFetch"     then .url // ""
         elif $tn == "NotebookEdit" then (.notebook_path // "" | split("/") | last)
