@@ -455,3 +455,44 @@
 - `pipeline_orchestrator_pane()`과 `SKILL.md` 문서 코드의 캡처 방식이 달라지면 `claude --continue` 재접속 시 side pane이 엉뚱한 위치에 생성 → 문서와 구현을 동일 헬퍼 호출로 통일 필수
 - `grep -c pattern || echo 0` 패턴은 매칭 없을 때 `"0\n0"` 출력 → `[ -gt 0 ]` 비교 실패. jq 카운팅이 안전
 - review 단계에서 PR body를 수정(`gh pr edit`)하면 non-mutating 원칙에 위배 → 체크박스 업데이트는 resolve 단계로 분리
+
+---
+
+## Completed (20)
+- [x] PR #15 최종 resolve — pipeline state 호환성 복원 (Option A) + 범위 밖 변경 제거 → PR #15 머지 (#14)
+
+  **Option A 결정: pipeline state 경로 호환성 유지**
+  - Completed (18)의 area 네임스페이싱 접근(pipeline-helpers.sh 수정)을 **철회**
+  - 기존 `pipeline-helpers.sh` 호환 유지: `.workspace/pipeline/issue-{N}.state.json` (non-namespaced)
+  - 대신 state JSON 내 `.area` 필드로 cross-area 충돌 방지:
+    ```bash
+    state_area=$(jq -r '.area // empty' "$pipeline_state" 2>/dev/null)
+    if [ -n "$state_area" ] && [ "$state_area" != "$area" ]; then
+      # 다른 area의 state → 이 area에서는 "없음"으로 처리
+    fi
+    ```
+  - `orchestrate-helpers.sh:217` 경로 복원 + area 필드 체크 로직 추가
+  - `SKILL.md:30` 문서 정정
+
+  **범위 밖 변경 제거:**
+  - Resolve agent side effect로 변경된 `dev-pipeline/SKILL.md`, `pipeline-helpers.sh`, `dev-review/SKILL.md`, `dev-resolve/SKILL.md`, `agent-tracker.sh`, progress docs를 모두 `git checkout main --`으로 복원
+  - PR diff가 dev-orchestrator 스킬 7개 파일 + symlink만 포함하도록 정리
+
+  **Codex review round 13 결과: CRITICAL 0 / WARNING 1 / SUGGESTION 2**
+  - WARNING: agent-tracker 변경 포함 경고 → 이미 제거 완료 (커밋 히스토리에만 잔존)
+  - SUGGESTION: 수동 테스트 필요 항목 안내, progress log 분리 권장
+
+  **Pipeline 전체 경과 (13 rounds):**
+  - Round 1-4: 기본 버그 수정 (도달 불가 코드, deadlock, 파라미터 확장, jq 우선순위)
+  - Round 5: /skill-creator 최적화 중간 삽입
+  - Round 6-7: dispatch cd 누락, 세션 범위, 원자적 쓰기
+  - Round 8-9: stall 감지 개선, retry dispatchedAt 초기화
+  - Round 10: PR 키워드 확장
+  - Round 11: pipeline state 네임스페이싱 (후에 Option A로 철회)
+  - Round 12-13: 문서 경로 정합성, 범위 밖 변경 제거 → CRITICAL 0 → 머지
+
+## Discoveries (20)
+- 다중 스킬 간 공유 상태 파일(pipeline state)의 경로 규약 변경은 단일 PR로 수행하면 안 됨
+  → 한쪽(orchestrate-helpers)만 수정하고 다른 쪽(pipeline-helpers)은 다른 PR에서 이미 merge된 코드를 override하면 불일치 발생
+- Resolve agent가 side pane에서 CRITICAL 수정 시 PR 범위 밖 파일까지 변경하는 패턴 관찰
+  → review-resolve 사이클 후 `git diff main --stat`으로 범위 검증 단계 필요
