@@ -17,9 +17,11 @@ Claude Code session
   │
   └─ hooks (on events)
        └─ hooks/on-status.sh
-            ├─ UserPromptSubmit → status: working, task: prompt text
-            ├─ Stop             → status: idle
-            └─ PreToolUse       → status: needs-input (AskUserQuestion only)
+            ├─ UserPromptSubmit → status: working, task: prompt text, clear activity
+            ├─ Stop             → status: idle, clear activity
+            ├─ PreToolUse       → activity: "{ToolName}: {key_arg}"
+            │                     + status: needs-input (AskUserQuestion only)
+            └─ PostToolUse      → clear activity
 
 agent-tracker.sh (dashboard)
   └─ reads /tmp/agent-tracker/*.json → renders table
@@ -54,6 +56,7 @@ Location: `/tmp/agent-tracker/{pane_id}.json` (pane_id without `%` prefix)
   "status": "working",
   "tokens": { "used": 62000, "max": 200000, "pct": 31 },
   "task": "implement hooks for agent-tracker",
+  "activity": "Edit: on-status.sh",
   "cwd": "/workspace",
   "transcript_path": "/home/dev/.claude/projects/-workspace/9ce2db1d.jsonl",
   "updated_at": 1772376267
@@ -98,7 +101,15 @@ Add to `~/.claude/settings.json`:
       }]
     }],
     "PreToolUse": [{
-      "matcher": "AskUserQuestion",
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": "/workspace/tools/agent-tracker/hooks/on-status.sh",
+        "timeout": 5
+      }]
+    }],
+    "PostToolUse": [{
+      "matcher": "",
       "hooks": [{
         "type": "command",
         "command": "/workspace/tools/agent-tracker/hooks/on-status.sh",

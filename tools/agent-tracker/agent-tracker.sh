@@ -135,7 +135,7 @@ parse_claude_pane() {
   local pane_file="${pane_id#%}"
   local sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 
-  local model="Claude" status="idle" pct=0 tok_k=0 task="—"
+  local model="Claude" status="idle" pct=0 tok_k=0 task="—" activity=""
 
   if [[ -f "$sidecar_path" ]]; then
     # Sidecar exists — read all fields in a single jq pass
@@ -145,11 +145,12 @@ parse_claude_pane() {
       .status // "idle",
       (.tokens.pct // 0 | tostring),
       ((.tokens.used // 0) / 1000 | floor | tostring),
-      .task // "—"
+      .task // "—",
+      .activity // ""
     ] | join("\u001e")' "$sidecar_path" 2>/dev/null)
 
     if [[ -n "$raw" ]]; then
-      IFS=$'\x1e' read -r model status pct tok_k task <<< "$raw"
+      IFS=$'\x1e' read -r model status pct tok_k task activity <<< "$raw"
     fi
 
     # Override status from pane if sidecar status seems stale
@@ -198,7 +199,7 @@ parse_claude_pane() {
     [[ -n "$pane_model" ]] && model="$pane_model"
   fi
 
-  printf '%s|%s|%d|%d|%s' "$model" "$status" "$pct" "$tok_k" "$task"
+  printf '%s|%s|%d|%d|%s|%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ parse_codex_pane() {
   local captured
   captured=$(tmux capture-pane -p -t "$pane_id" -S -50 2>/dev/null)
 
-  local model="Codex" status="idle" pct=0 tok_k=0 task="—"
+  local model="Codex" status="idle" pct=0 tok_k=0 task="—" activity=""
 
   local session_file
   session_file=$(find_codex_session_file "$pane_id")
@@ -264,10 +265,17 @@ parse_codex_pane() {
       tok_k=$(( total_tok / 1000 ))
     fi
 
+    # Bug A fix: try user_message first, then response_item with role=="user"
     local last_msg
     last_msg=$(jq -r \
       'select(.payload.type == "user_message") | .payload.message // empty' \
       "$session_file" 2>/dev/null | tail -1 | tr '\n' ' ')
+    if [[ -z "$last_msg" ]]; then
+      last_msg=$(jq -r \
+        'select(.type == "response_item" and .payload.role == "user") |
+         .payload.content // .payload.message // empty' \
+        "$session_file" 2>/dev/null | tail -1 | tr '\n' ' ')
+    fi
     [[ -n "$last_msg" ]] && task="$last_msg"
   fi
 
@@ -278,7 +286,7 @@ parse_codex_pane() {
     status="working"
   fi
 
-  printf '%s|%s|%d|%d|%s' "$model" "$status" "$pct" "$tok_k" "$task"
+  printf '%s|%s|%d|%d|%s|%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -359,10 +367,10 @@ detect_agent_type() {
 render_dashboard() {
   local COLS
   COLS=$(tput cols 2>/dev/null || echo 100)
-  (( COLS < 82 )) && COLS=82
+  (( COLS < 86 )) && COLS=86
   local INNER=$(( COLS - 2 ))
 
-  local W_PANE=11 W_ENGINE=12 W_STATUS=6 W_TOKENS_MIN=10
+  local W_PANE=11 W_ACTIVITY=18 W_ENGINE=12 W_STATUS=6 W_TOKENS_MIN=10
 
   local now
   now=$(date '+%Y-%m-%d %H:%M:%S')
@@ -390,8 +398,8 @@ render_dashboard() {
       data=$(parse_codex_pane "$pane_id")
     fi
 
-    local model status pct tok_k task
-    IFS='|' read -r model status pct tok_k task <<< "$data"
+    local model status pct tok_k task activity
+    IFS='|' read -r model status pct tok_k task activity <<< "$data"
 
     case "$status" in
       working)      (( n_working++ )) ;;
@@ -400,7 +408,7 @@ render_dashboard() {
       *)            (( n_idle++ ))    ;;
     esac
 
-    rows+=("${pane_addr}|${pane_id}|${etype}|${model}|${status}|${pct}|${tok_k}|${task}")
+    rows+=("${pane_addr}|${pane_id}|${etype}|${model}|${status}|${pct}|${tok_k}|${task}|${activity}")
   done < <(tmux list-panes -s -t "$SESSION" \
     -F '#{window_index}:#{pane_index} #{pane_id} #{pane_current_command}' 2>/dev/null)
 
@@ -415,7 +423,7 @@ render_dashboard() {
     _tok_w=$(( 5 + 1 + ${#_tok_str} ))
     (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
   done
-  local W_TASK=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 8 ))
+  local W_TASK=$(( INNER - W_PANE - W_ACTIVITY - W_ENGINE - W_STATUS - W_TOKENS - 10 ))
   (( W_TASK < 15 )) && W_TASK=15
 
   # ── Pipeline ───────────────────────────────────────────────────────────────
@@ -427,16 +435,18 @@ render_dashboard() {
   eqline=$(make_line '═' "$INNER")
 
   # ── Column header/divider strings ──────────────────────────────────────────
-  local h_pane h_task h_engine h_status h_tokens
-  h_pane=$(pad_right "PANE"   $W_PANE)
-  h_task=$(pad_right "TASK"   $W_TASK)
-  h_engine=$(pad_right "ENGINE" $W_ENGINE)
-  h_status=$(pad_right "STATUS" $W_STATUS)
-  h_tokens=$(pad_right "TOKENS" $W_TOKENS)
+  local h_pane h_task h_activity h_engine h_status h_tokens
+  h_pane=$(pad_right "PANE"     $W_PANE)
+  h_task=$(pad_right "TASK"     $W_TASK)
+  h_activity=$(pad_right "ACTIVITY" $W_ACTIVITY)
+  h_engine=$(pad_right "ENGINE"  $W_ENGINE)
+  h_status=$(pad_right "STATUS"  $W_STATUS)
+  h_tokens=$(pad_right "TOKENS"  $W_TOKENS)
 
-  local d_pane d_task d_engine d_status d_tokens
+  local d_pane d_task d_activity d_engine d_status d_tokens
   d_pane=$(make_line '─' $W_PANE)
   d_task=$(make_line '─' $W_TASK)
+  d_activity=$(make_line '─' $W_ACTIVITY)
   d_engine=$(make_line '─' $W_ENGINE)
   d_status=$(make_line '─' $W_STATUS)
   d_tokens=$(make_line '─' $W_TOKENS)
@@ -457,12 +467,12 @@ render_dashboard() {
 
   printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
 
-  printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s${R}  ${GRAY}║${R}" \
-    "$h_pane" "$h_task" "$h_engine" "$h_status" "$h_tokens"
+  printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s %s${R}  ${GRAY}║${R}" \
+    "$h_pane" "$h_task" "$h_activity" "$h_engine" "$h_status" "$h_tokens"
   tput el; echo
 
-  printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s${R}  ${GRAY}║${R}" \
-    "$d_pane" "$d_task" "$d_engine" "$d_status" "$d_tokens"
+  printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s %s${R}  ${GRAY}║${R}" \
+    "$d_pane" "$d_task" "$d_activity" "$d_engine" "$d_status" "$d_tokens"
   tput el; echo
 
   # ── Agent rows ─────────────────────────────────────────────────────────────
@@ -472,14 +482,27 @@ render_dashboard() {
     printf "${GRAY}║${R}%-*s${GRAY}║${R}" "$INNER" "$no_msg"; tput el; echo
   else
     for row in "${rows[@]}"; do
-      IFS='|' read -r pane_addr pane_id etype model status pct tok_k task <<< "$row"
+      IFS='|' read -r pane_addr pane_id etype model status pct tok_k task activity <<< "$row"
 
       local ecol
       [[ "$etype" == "claude" ]] && ecol="$BLUE" || ecol="$CYAN"
 
-      local col_pane col_task col_engine tok_bar_str badge
+      # Activity display: show tool action or idle indicator
+      local act_display
+      if [[ -z "$activity" || "$activity" == "null" ]]; then
+        if [[ "$status" == "idle" ]]; then
+          act_display="— (idle)"
+        else
+          act_display="—"
+        fi
+      else
+        act_display="$activity"
+      fi
+
+      local col_pane col_task col_activity col_engine tok_bar_str badge
       col_pane=$(trunc "${pane_addr} ${pane_id}" $W_PANE)
       col_task=$(trunc "$task" $W_TASK)
+      col_activity=$(trunc "$act_display" $W_ACTIVITY)
       col_engine=$(printf "${ecol}%s${R}" "$(trunc "$model" $W_ENGINE)")
       tok_bar_str=$(token_bar "$pct" "$ecol")
       badge=$(status_badge "$status")
@@ -487,6 +510,7 @@ render_dashboard() {
       printf "${GRAY}║${R}  "
       printf "${GRAY}%s${R} " "$col_pane"
       printf "%s "            "$col_task"
+      printf "%s "            "$col_activity"
       printf "%b "            "$col_engine"
       printf "%b "            "$badge"
       local tok_str

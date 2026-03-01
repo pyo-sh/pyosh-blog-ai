@@ -5,7 +5,7 @@
 # What it does:
 #   1. Backs up ~/.claude/settings.json
 #   2. Sets statusLine to use statusline-wrapper.sh (wraps existing context-bar.sh)
-#   3. Adds hooks for UserPromptSubmit, Stop, PreToolUse (AskUserQuestion)
+#   3. Adds hooks for UserPromptSubmit, Stop, PreToolUse, PostToolUse
 #
 # Usage:
 #   bash tools/agent-tracker/setup.sh           # interactive
@@ -40,7 +40,8 @@ if [[ "$AUTO_YES" != true ]]; then
   printf '  - statusLine → %s\n' "$WRAPPER_PATH"
   printf '  - hooks.UserPromptSubmit → %s\n' "$ON_STATUS_PATH"
   printf '  - hooks.Stop → %s\n' "$ON_STATUS_PATH"
-  printf '  - hooks.PreToolUse (AskUserQuestion) → %s\n' "$ON_STATUS_PATH"
+  printf '  - hooks.PreToolUse (all tools) → %s\n' "$ON_STATUS_PATH"
+  printf '  - hooks.PostToolUse (all tools) → %s\n' "$ON_STATUS_PATH"
   printf '\nProceed? [y/N] '
   read -r answer
   [[ "$answer" != [yY]* ]] && { printf 'Aborted.\n'; exit 0; }
@@ -106,14 +107,31 @@ updated=$(printf '%s' "$existing" | jq \
     }]
   }] |
 
-  # PreToolUse (AskUserQuestion only) → needs-input status
+  # PreToolUse (all tools) → activity tracking + needs-input for AskUserQuestion
   .hooks.PreToolUse = (
-    # Preserve existing PreToolUse hooks, add ours if not present
     (.hooks.PreToolUse // []) |
-    if any(.[]; .matcher == "AskUserQuestion" and (.hooks | any(.command == $on_status)))
+    # Remove old AskUserQuestion-only entry if present
+    [.[] | select(.matcher != "AskUserQuestion" or (.hooks | any(.command == $on_status) | not))] |
+    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
     then .
     else . + [{
-      matcher: "AskUserQuestion",
+      matcher: "",
+      hooks: [{
+        type: "command",
+        command: $on_status,
+        timeout: 5
+      }]
+    }]
+    end
+  ) |
+
+  # PostToolUse (all tools) → clear activity
+  .hooks.PostToolUse = (
+    (.hooks.PostToolUse // []) |
+    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
+    then .
+    else . + [{
+      matcher: "",
       hooks: [{
         type: "command",
         command: $on_status,
