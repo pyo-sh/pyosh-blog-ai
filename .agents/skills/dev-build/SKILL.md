@@ -45,7 +45,7 @@ cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
 Closes #{N}
 - Change description
 ## Test plan
-- Test item
+- [ ] Test item
 PREOF
 
 gh pr create \

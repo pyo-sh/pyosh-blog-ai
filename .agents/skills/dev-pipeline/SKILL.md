@@ -128,7 +128,14 @@ When new commits appear:
 
 ### 5. No Critical — User Decision
 
-Show review summary + severity counts. **Ask user**:
+Show review summary + severity counts. Check for unchecked test plan items:
+
+```bash
+UNCHECKED=$(gh pr view {PR#} --json body --jq '.body' | grep -c '^- \[ \]' 2>/dev/null || echo 0)
+[ "$UNCHECKED" -gt 0 ] && echo "⚠️  ${UNCHECKED} unchecked test plan item(s) remain"
+```
+
+**Ask user**:
 - **"Merge"** → Step 6
 - **"Fix & Re-review"** → Step 4a
 - **"Fix & Merge"** → Step 4a with `skipReview: true`
