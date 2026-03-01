@@ -200,18 +200,20 @@ parse_claude_pane() {
       [$all[] | select(.type == "assistant" and .isSidechain != true
                 and .isApiErrorMessage != true)] as $a |
       ($a | last | .message.model // "") as $m |
-      ($a | map(select(.message.usage)) | last |
+      # Token: only count assistants after last compact_boundary
+      ([$all[] | select(.subtype == "compact_boundary") | .timestamp] | last) as $boundary |
+      [$a[] | select(if $boundary then .timestamp > $boundary else true end)] as $post_a |
+      ($post_a | map(select(.message.usage)) | last |
         if . then
           (.message.usage.input_tokens // 0) +
           (.message.usage.cache_read_input_tokens // 0) +
           (.message.usage.cache_creation_input_tokens // 0)
         else 0 end) as $ctx |
-      ([$all[] | select(.type == "user") |
+      # Task: only string-type user messages (skip tool_result arrays)
+      ([$all[] | select(.type == "user" and (.message.content | type) == "string") |
         .message.content |
-        if type == "string" then .
-        elif type == "array" then
-          [.[] | select(.type == "text") | .text] | join(" ")
-        else "" end
+        gsub("<command-[^>]*>[^<]*</command-[^>]*>"; "") |
+        gsub("\\s+"; " ") | ltrimstr(" ") | rtrimstr(" ")
       ] | last // "") as $task |
       "\($m)\u001e\($ctx)\u001e\($task | @base64)"
     ' < "$transcript" 2>/dev/null)
@@ -324,13 +326,17 @@ parse_codex_pane() {
       "$session_file" 2>/dev/null | tail -1)
     [[ -n "$raw_model" ]] && model="$raw_model"
 
-    # ── Token % (assuming 128k context) ──────────────────────────────────────
-    local total_tok
+    # ── Token % (dynamic context window) ─────────────────────────────────────
+    local total_tok ctx_window
     total_tok=$(jq -r \
-      'select(.type == "token_count") | .payload.info.total_token_usage // empty' \
+      'select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens // empty' \
       "$session_file" 2>/dev/null | tail -1)
-    if [[ -n "$total_tok" && "$total_tok" -gt 0 ]]; then
-      pct=$(( total_tok * 100 / 128000 ))
+    ctx_window=$(jq -r \
+      'select(.payload.info | type == "object") | .payload.info.model_context_window // empty' \
+      "$session_file" 2>/dev/null | tail -1)
+    [[ -z "$ctx_window" || "$ctx_window" -le 0 ]] 2>/dev/null && ctx_window=200000
+    if [[ -n "$total_tok" && "$total_tok" -gt 0 ]] 2>/dev/null; then
+      pct=$(( total_tok * 100 / ctx_window ))
       (( pct > 100 )) && pct=100
       tok_k=$(( total_tok / 1000 ))
     fi
@@ -338,7 +344,7 @@ parse_codex_pane() {
     # ── Task ─────────────────────────────────────────────────────────────────
     local last_msg
     last_msg=$(jq -r \
-      'select(.type == "user_message") | .payload.message // empty' \
+      'select(.payload.type == "user_message") | .payload.message // empty' \
       "$session_file" 2>/dev/null | tail -1 | tr '\n' ' ')
     [[ -n "$last_msg" ]] && task="$last_msg"
   fi
@@ -402,6 +408,16 @@ render_dashboard() {
     case "$pane_cmd" in
       claude) etype="claude" ;;
       codex)  etype="codex"  ;;
+      node)
+        # Codex CLI runs as node wrapper → check child processes for native codex binary
+        local _cpid
+        _cpid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
+        if [[ -n "$_cpid" ]] && pgrep -P "$_cpid" 2>/dev/null \
+            | xargs -I{} readlink /proc/{}/exe 2>/dev/null | grep -q '/codex$'; then
+          etype="codex"
+        else
+          continue
+        fi ;;
       *)      continue ;;
     esac
 
