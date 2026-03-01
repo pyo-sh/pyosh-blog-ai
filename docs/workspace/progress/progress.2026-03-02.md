@@ -143,3 +143,17 @@ dev-review/SKILL.md (#11):
 
 - commit: `fix: address review comments (#29)`
 - 수정 파일: `.agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`
+
+---
+
+## dev-pipeline 스킬 버그 수정 PR #29 머지 완료 — issue #28
+
+### 결과
+
+- PR #29 squash merge → main
+- Closes #28
+- 총 4라운드 리뷰 (Codex review / Sonnet resolve)
+  - 1차: WARNING — awk 공백 경로 취약점 → `sub(/^worktree /, "")` 수정
+  - 2차: WARNING — `LAST_COMMIT_SHA` 빈값 미검증 → 즉시 오류 처리 추가
+  - 3차: CRITICAL — `git worktree list` area repo 오탐 → `BASH_SOURCE` 기반 역추적으로 교체
+  - 4차: CRITICAL 0 / WARNING 0 / SUGGESTION 0 - 통과
