@@ -78,7 +78,7 @@ orch_state_update() {
   local path
   path=$(orch_state_path "$area")
   local tmp_file
-  tmp_file=$(mktemp)
+  tmp_file=$(mktemp "$(dirname "$path")/.tmp.state.XXXXXX")
   if jq "($filter) | .updatedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$path" > "$tmp_file"; then
     mv "$tmp_file" "$path"
   else
@@ -172,6 +172,19 @@ orch_record_dispatch() {
 }
 
 # ──────────────────────────────────────────────
+# PR lookup helper
+# ──────────────────────────────────────────────
+
+_orch_pr_list() {
+  # Usage: _orch_pr_list <area_dir> <issue> <state> <json_fields> <jq_filter>
+  # Finds PRs that close the given issue, matching Closes/Fixes/Resolves #N.
+  local area_dir=$1 issue=$2 state=$3 json_fields=$4 jq_filter=$5
+  cd "$area_dir" && gh pr list \
+    --search "\"Closes #${issue}\" OR \"Fixes #${issue}\" OR \"Resolves #${issue}\"" \
+    --state "$state" --json "$json_fields" --jq "$jq_filter" 2>/dev/null
+}
+
+# ──────────────────────────────────────────────
 # Completion detection
 # ──────────────────────────────────────────────
 
@@ -218,15 +231,13 @@ orch_check_completion() {
 
     # Check if PR is merged
     local pr_state
-    pr_state=$(cd "$area_dir" && gh pr list \
-      --search "Closes #${issue}" --state merged --json number --jq 'length' 2>/dev/null)
+    pr_state=$(_orch_pr_list "$area_dir" "$issue" merged number 'length')
     if [ "${pr_state:-0}" -gt 0 ] 2>/dev/null; then
       echo "completed"; return 0
     fi
     # PR exists but not merged = pipeline may have cleaned up without merging
     local pr_open
-    pr_open=$(cd "$area_dir" && gh pr list \
-      --search "Closes #${issue}" --state open --json number --jq 'length' 2>/dev/null)
+    pr_open=$(_orch_pr_list "$area_dir" "$issue" open number 'length')
     if [ "${pr_open:-0}" -eq 0 ] 2>/dev/null; then
       # No state file, no open PR, no merged PR → failed or never started
       echo "failed"; return 0
@@ -277,9 +288,7 @@ orch_detect_stall() {
     local last_sha
     last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
     local pr_number
-    pr_number=$(cd "$area_dir" && gh pr list \
-      --search "Closes #${issue}" --state open \
-      --json number --jq '.[0].number' 2>/dev/null)
+    pr_number=$(_orch_pr_list "$area_dir" "$issue" open number '.[0].number')
 
     # No open PR yet — apply extended stall threshold (2x normal) for pre-PR phase
     if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
@@ -486,9 +495,7 @@ orch_print_summary() {
     status=$(echo "$state" | jq -r ".status[\"$issue\"]")
     local pr_url=""
     if [ "$status" = "completed" ]; then
-      pr_url=$(cd "$area_dir" && gh pr list \
-        --search "Closes #${issue}" --state merged \
-        --json url --jq '.[0].url' 2>/dev/null)
+      pr_url=$(_orch_pr_list "$area_dir" "$issue" merged url '.[0].url')
     fi
     printf "%-8s %-12s %s\n" "#${issue}" "$status" "$pr_url"
   done
