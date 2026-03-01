@@ -193,7 +193,7 @@ parse_claude_pane() {
 
   if [[ -n "$transcript" && -f "$transcript" ]]; then
     # Single jq pass: model, ctx_len, last user message
-    # Fields separated by RS (0x1e) to safely handle | in task text
+    # Fields separated by RS (0x1e); task is base64-encoded to survive embedded newlines
     local raw_data raw_model ctx_len task_raw
     raw_data=$(jq -rs '
       . as $all |
@@ -213,10 +213,12 @@ parse_claude_pane() {
           [.[] | select(.type == "text") | .text] | join(" ")
         else "" end
       ] | last // "") as $task |
-      "\($m)\u001e\($ctx)\u001e\($task)"
+      "\($m)\u001e\($ctx)\u001e\($task | @base64)"
     ' < "$transcript" 2>/dev/null)
 
     IFS=$'\x1e' read -r raw_model ctx_len task_raw <<< "$raw_data"
+    # Decode base64 task so embedded newlines are preserved for normalization below
+    task_raw=$(base64 -d <<< "$task_raw" 2>/dev/null)
 
     # "claude-opus-4-6" → "Opus 4.6" (handles date-suffixed IDs like claude-haiku-4-5-20251001)
     if [[ -n "$raw_model" && "$raw_model" =~ ^claude-([a-z]+)-([0-9]+)-([0-9]+) ]]; then
