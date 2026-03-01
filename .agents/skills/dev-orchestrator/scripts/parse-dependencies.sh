@@ -15,47 +15,6 @@
 
 set -euo pipefail
 
-ISSUE="${1:-}"
-AREA_DIR="${2:-.}"
-
-if [ -z "$ISSUE" ]; then
-  echo "Usage: $0 <issue_number> [area_dir]" >&2
-  exit 1
-fi
-
-# Fetch issue body
-BODY=$(cd "$AREA_DIR" && gh issue view "$ISSUE" --json body --jq '.body' 2>/dev/null)
-
-if [ -z "$BODY" ]; then
-  # No body or issue not found — no dependencies
-  exit 0
-fi
-
-# Extract content after "### Dependencies" heading
-# Stops at the next "###" heading or end of string
-DEPS_SECTION=$(echo "$BODY" | awk '
-  /^### Dependencies/ { found=1; next }
-  found && /^###/ { exit }
-  found { print }
-')
-
-if [ -z "$DEPS_SECTION" ]; then
-  exit 0
-fi
-
-# Check for "no dependencies" markers
-if echo "$DEPS_SECTION" | grep -qiE '^\s*(없음|none|n\/a|no dependencies|-\s*없음|-\s*none)\s*$'; then
-  exit 0
-fi
-
-# Extract issue numbers — match patterns: #N, Closes #N, Fixes #N, Resolves #N
-echo "$DEPS_SECTION" \
-  | grep -oE '(Closes|Fixes|Resolves|#)\s*#?[0-9]+' \
-  | grep -oE '[0-9]+' \
-  | sort -un \
-  | tr '\n' ' ' \
-  | sed 's/ $//'
-
 # ──────────────────────────────────────────────
 # Cycle detection helper (Kahn's algorithm)
 # Called separately: bash parse-dependencies.sh --check-cycles <issues_json> <dag_json>
@@ -112,3 +71,46 @@ if [ "${1:-}" = "--check-cycles" ]; then
   fi
   exit 0
 fi
+
+ISSUE="${1:-}"
+AREA_DIR="${2:-.}"
+
+if [ -z "$ISSUE" ]; then
+  echo "Usage: $0 <issue_number> [area_dir]" >&2
+  exit 1
+fi
+
+# Fetch issue body
+BODY=$(cd "$AREA_DIR" && gh issue view "$ISSUE" --json body --jq '.body' 2>/dev/null)
+
+if [ -z "$BODY" ]; then
+  # No body or issue not found — no dependencies
+  exit 0
+fi
+
+# Extract content after "### Dependencies" heading
+# Stops at the next "###" heading or end of string
+DEPS_SECTION=$(echo "$BODY" | awk '
+  /^### Dependencies/ { found=1; next }
+  found && /^###/ { exit }
+  found { print }
+')
+
+if [ -z "$DEPS_SECTION" ]; then
+  exit 0
+fi
+
+# Check for "no dependencies" markers
+if echo "$DEPS_SECTION" | grep -qiE '^\s*(없음|none|n\/a|no dependencies|-\s*없음|-\s*none)\s*$'; then
+  exit 0
+fi
+
+# Extract issue numbers — match patterns: #N, Closes #N, Fixes #N, Resolves #N
+# Use || true so grep returning 1 (no matches) does not abort under set -euo pipefail
+echo "$DEPS_SECTION" \
+  | grep -oE '(Closes|Fixes|Resolves|#)\s*#?[0-9]+' \
+  | grep -oE '[0-9]+' \
+  | sort -un \
+  | tr '\n' ' ' \
+  | sed 's/ $//' \
+  || true

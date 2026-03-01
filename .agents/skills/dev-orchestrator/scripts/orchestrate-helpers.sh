@@ -342,7 +342,7 @@ orch_poll_cycle() {
       orch_status_set "$area" "$issue" "$result"
       >&2 echo "[orchestrator] Issue #${issue}: ${result}"
 
-      if [ "$result" = "completed" ]; then
+      if [ "$result" = "completed" ] || [ "$result" = "failed" ]; then
         local newly_unblocked
         newly_unblocked=$(orch_unblock "$area" "$issue")
         [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"

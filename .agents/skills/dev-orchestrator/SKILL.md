@@ -123,7 +123,7 @@ Run continuously (30-second interval):
 
 ```bash
 while true; do
-  orch_poll_cycle "$AREA_DIR" "$AGENT"
+  orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT" "$ORCH_PANE"
   sleep 30
 done
 ```
@@ -138,7 +138,7 @@ done
 2. **Stall detection** → `orch_detect_stall "$ISSUE" "$AREA_DIR"`
    - No new commits in 10 min → warn user, offer retry
 
-3. **Unblock** → on any `completed`, call `orch_unblock "$ISSUE"`
+3. **Unblock** → on any `completed` or `failed`, call `orch_unblock "$ISSUE"`
    - Find issues whose only remaining blocker was this issue
    - For each newly-unblocked issue + idle pane → dispatch
 
