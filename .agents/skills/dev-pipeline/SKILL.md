@@ -38,7 +38,7 @@ Exists → **resume** ([recovery.md](references/recovery.md)). Not exists → St
 Capture orchestrator pane (anchors all future splits):
 
 ```bash
-ORCHESTRATOR_PANE="$TMUX_PANE"
+ORCHESTRATOR_PANE=$(pipeline_orchestrator_pane)
 ```
 
 Execute `/dev-build`. After PR creation, write state:
