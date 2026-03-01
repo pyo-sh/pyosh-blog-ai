@@ -131,7 +131,8 @@ When new commits appear:
 Show review summary + severity counts. Check for unchecked test plan items:
 
 ```bash
-UNCHECKED=$(gh pr view {PR#} --json body --jq '.body' | grep -c '^- \[ \]' 2>/dev/null || echo 0)
+UNCHECKED=$(gh pr view {PR#} --json body \
+  --jq '[.body | split("\n")[] | select(startswith("- [ ]"))] | length')
 [ "$UNCHECKED" -gt 0 ] && echo "⚠️  ${UNCHECKED} unchecked test plan item(s) remain"
 ```
 
