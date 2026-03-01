@@ -168,13 +168,16 @@ if [ "$PR_STATE" != "MERGED" ]; then
 fi
 ```
 
-Cleanup:
+Cleanup (run inside `{area}` dir):
 
 ```bash
 git fetch --prune
 git worktree remove ../.workspace/worktrees/issue-{N} --force
 git worktree prune
+git branch -D {branch}
 ```
+
+> `--delete-branch` removes the remote branch. `git fetch --prune` cleans the remote tracking ref. `git branch -D` removes the local branch after worktree removal (squash merge requires `-D` since feature commits are not ancestors of main).
 
 State → `"step": "log"`.
 
