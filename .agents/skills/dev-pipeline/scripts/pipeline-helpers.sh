@@ -2,9 +2,15 @@
 # pipeline-helpers.sh — Shell helpers for dev-pipeline skill
 # Source this file or use functions individually via the AI's Bash tool.
 
-# Detect monorepo root via git worktree list — always returns the main worktree path,
-# regardless of whether this script is sourced from a linked worktree or an area repo.
-MONOREPO_ROOT="$(git worktree list --porcelain | awk 'NR==1{sub(/^worktree /, ""); print; exit}')"
+# Detect monorepo root from script location: this file lives at
+# {MONOREPO_ROOT}/.agents/skills/dev-pipeline/scripts/pipeline-helpers.sh
+# so MONOREPO_ROOT is always 4 levels up — independent of cwd or which repo is active.
+_PIPELINE_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MONOREPO_ROOT="$(cd "$_PIPELINE_HELPERS_DIR/../../../.." && pwd)"
+# If sourced from inside a linked worktree (.workspace/worktrees/…), lift to real root.
+if [[ "$MONOREPO_ROOT" == *"/.workspace/worktrees/"* ]]; then
+  MONOREPO_ROOT="${MONOREPO_ROOT%%/.workspace/worktrees/*}"
+fi
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
