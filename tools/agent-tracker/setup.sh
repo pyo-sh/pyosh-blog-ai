@@ -85,6 +85,23 @@ updated=$(printf '%s' "$existing" | jq \
   --arg wrapper "$WRAPPER_PATH" \
   --arg on_status "$ON_STATUS_PATH" \
   '
+  # Helper: check if hook entry has our command
+  def has_cmd: .hooks | if type == "array" then any(.command == $on_status) else false end;
+
+  # Helper: append tracker hook to event array if not present
+  def ensure_hook(matcher):
+    if any(.[]; .matcher == matcher and has_cmd)
+    then .
+    else . + [{
+      matcher: matcher,
+      hooks: [{
+        type: "command",
+        command: $on_status,
+        timeout: 5
+      }]
+    }]
+    end;
+
   # Set statusLine to wrapper
   .statusLine = {
     type: "command",
@@ -95,70 +112,21 @@ updated=$(printf '%s' "$existing" | jq \
   .hooks //= {} |
 
   # UserPromptSubmit → working status (append, preserve existing hooks)
-  .hooks.UserPromptSubmit = (
-    (.hooks.UserPromptSubmit // []) |
-    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
-    then .
-    else . + [{
-      matcher: "",
-      hooks: [{
-        type: "command",
-        command: $on_status,
-        timeout: 5
-      }]
-    }]
-    end
-  ) |
+  .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) | ensure_hook("")) |
 
   # Stop → idle status (append, preserve existing hooks)
-  .hooks.Stop = (
-    (.hooks.Stop // []) |
-    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
-    then .
-    else . + [{
-      matcher: "",
-      hooks: [{
-        type: "command",
-        command: $on_status,
-        timeout: 5
-      }]
-    }]
-    end
-  ) |
+  .hooks.Stop = ((.hooks.Stop // []) | ensure_hook("")) |
 
   # PreToolUse (all tools) → activity tracking + needs-input for AskUserQuestion
   .hooks.PreToolUse = (
     (.hooks.PreToolUse // []) |
     # Remove old AskUserQuestion-only entry if present
-    [.[] | select(.matcher != "AskUserQuestion" or (.hooks | any(.command == $on_status) | not))] |
-    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
-    then .
-    else . + [{
-      matcher: "",
-      hooks: [{
-        type: "command",
-        command: $on_status,
-        timeout: 5
-      }]
-    }]
-    end
+    [.[] | select(.matcher != "AskUserQuestion" or (has_cmd | not))] |
+    ensure_hook("")
   ) |
 
   # PostToolUse (all tools) → clear activity
-  .hooks.PostToolUse = (
-    (.hooks.PostToolUse // []) |
-    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
-    then .
-    else . + [{
-      matcher: "",
-      hooks: [{
-        type: "command",
-        command: $on_status,
-        timeout: 5
-      }]
-    }]
-    end
-  )
+  .hooks.PostToolUse = ((.hooks.PostToolUse // []) | ensure_hook(""))
 ')
 
 # ─────────────────────────────────────────────────────────────────────────────
