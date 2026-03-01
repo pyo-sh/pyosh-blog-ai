@@ -302,7 +302,7 @@ orch_unblock() {
       [ "$dep" = "$done_issue" ] && continue
       local dep_status
       dep_status=$(echo "$state" | jq -r ".status[\"$dep\"]")
-      if [ "$dep_status" != "completed" ]; then
+      if [ "$dep_status" != "completed" ] && [ "$dep_status" != "failed" ]; then
         still_blocked=1
         break
       fi

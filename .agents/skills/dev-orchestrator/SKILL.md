@@ -138,7 +138,7 @@ done
 2. **Stall detection** → `orch_detect_stall "$ISSUE" "$AREA_DIR"`
    - No new commits in 10 min → warn user, offer retry
 
-3. **Unblock** → on any `completed` or `failed`, call `orch_unblock "$ISSUE"`
+3. **Unblock** → on any `completed` or `failed`, call `orch_unblock "$AREA" "$ISSUE"`
    - Find issues whose only remaining blocker was this issue
    - For each newly-unblocked issue + idle pane → dispatch
 
