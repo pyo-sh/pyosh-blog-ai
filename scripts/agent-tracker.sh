@@ -379,6 +379,22 @@ get_pipeline_summary() {
   fi
 }
 
+# codex_in_descendants <pid> — true if any descendant's argv contains @openai/codex or codex.js
+# Codex CLI is a Node shebang script so its exe resolves to .../node, not .../codex;
+# matching /proc/<pid>/cmdline is the reliable way to identify it.
+codex_in_descendants() {
+  local parent=$1 child
+  while IFS= read -r child; do
+    [[ -z "$child" ]] && continue
+    if tr '\0' ' ' < /proc/"$child"/cmdline 2>/dev/null \
+        | grep -qE '@openai/codex|codex\.js'; then
+      return 0
+    fi
+    codex_in_descendants "$child" && return 0
+  done < <(pgrep -P "$parent" 2>/dev/null)
+  return 1
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard renderer
 # ─────────────────────────────────────────────────────────────────────────────
@@ -409,11 +425,10 @@ render_dashboard() {
       claude) etype="claude" ;;
       codex)  etype="codex"  ;;
       node)
-        # Codex CLI runs as node wrapper → check child processes for native codex binary
-        local _cpid
-        _cpid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
-        if [[ -n "$_cpid" ]] && pgrep -P "$_cpid" 2>/dev/null \
-            | xargs -I{} readlink /proc/{}/exe 2>/dev/null | grep -q '/codex$'; then
+        # Codex CLI is a Node shebang script — detect by matching argv of descendant processes
+        local _pane_pid
+        _pane_pid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
+        if [[ -n "$_pane_pid" ]] && codex_in_descendants "$_pane_pid"; then
           etype="codex"
         else
           continue
