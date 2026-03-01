@@ -46,7 +46,7 @@ while getopts ":s:i:h" opt; do
     h)
       printf 'Usage: %s [-s SESSION] [-i INTERVAL]\n' "$(basename "$0")"
       printf '  -s SESSION   tmux session name (default: lab)\n'
-      printf '  -i INTERVAL  refresh interval in seconds (default: 2)\n'
+      printf '  -i INTERVAL  refresh interval in seconds (default: 1)\n'
       exit 0 ;;
     \?) printf 'Unknown option: -%s\n' "$OPTARG"; exit 1 ;;
   esac
