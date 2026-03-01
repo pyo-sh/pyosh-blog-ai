@@ -167,3 +167,38 @@
 - bash `<<<` here-string은 변수 내 첫 번째 `\n`에서 멈춤 → field separator가 `\x1e`여도 task 내 개행이 read를 조기 종료시킴
 - jq `@base64` 필터는 출력에 개행 없는 단일 라인 문자열 반환 → bash read와 완전 호환
 - `base64 -d <<< "$b64"` 역시 안전: 입력이 base64(개행 없음)이므로 here-string 잘림 위험 없음
+
+---
+
+## Completed (9)
+- [x] `/dev-orchestrator` 스킬 구현 (#14)
+
+  **파일 구성:**
+  - `SKILL.md` — 7단계 워크플로우: area 감지 → 이슈 필터 → DAG 구성 → 초기 dispatch → 폴링 사이클 → 완료 요약 → /dev-log
+  - `scripts/orchestrate-helpers.sh` — 핵심 함수 구현:
+    - `orch_init`: 초기 batch.state.json 생성 (pending/blocked 자동 분류)
+    - `orch_find_idle_panes`: bash/zsh 쉘 프롬프트 대기 pane 탐지
+    - `orch_dispatch`: idle pane에 `send-keys`로 `/dev-pipeline #{N}` 전송
+    - `orch_check_completion`: signal 파일 → pipeline 상태 파일 → PR 머지 상태 순으로 완료 판별
+    - `orch_detect_stall`: 10분 무변동 감지 + 최신 commit SHA 갱신 확인
+    - `orch_unblock`: 완료 이슈를 의존하던 blocked 이슈들을 pending으로 전환
+    - `orch_poll_cycle`: 단일 폴링 반복 (완료 체크 → stall 감지 → unblock → dispatch)
+    - `orch_print_summary`: 배치 완료 후 issue/status/PR URL 표 출력
+  - `scripts/parse-dependencies.sh` — 이슈 body `### Dependencies` 섹션 파싱:
+    - `#N`, `Closes #N`, `Fixes #N`, `Resolves #N` 패턴 인식
+    - `없음/none/N/A` 마커 처리
+    - `--check-cycles` 모드: Kahn's algorithm(jq 구현)으로 DAG 사이클 감지
+  - `references/dependency-resolution.md` — DAG 구성 및 사이클 감지 문서
+  - `references/state-detection.md` — 완료/stall 감지 전략 문서
+  - `references/recovery.md` — batch.state.json 기반 크래시 복구 문서
+  - `.claude/skills/dev-orchestrator` → symlink
+
+  **설계 결정:**
+  - 완료 판별: signal 파일(`issue-N.exit`) > pipeline state 삭제 + PR 머지 상태 순서로 확인
+  - 상태 머신: `pending → dispatched → completed/failed`, `blocked → pending`(의존성 해소 시)
+  - failed 이슈도 downstream unblock 수행 (의존성 시도로 간주)
+  - 자동 재시도 최대 1회 (`retryCount` 추적)
+
+## Discoveries (9)
+- `tmux list-panes -s -F '#{pane_id} #{pane_current_command}'`에서 bash/zsh process가 foreground인 pane = idle pane (자식 프로세스 없는 쉘)
+- Kahn's algorithm을 jq 단독으로 구현 가능: `reduce` + in-degree 배열로 위상 정렬 + 방문 count로 사이클 판별
