@@ -44,6 +44,7 @@ case "$event" in
     task=$(printf '%s' "$input" | jq -r '
       .prompt // "" |
       gsub("\n"; " ") | gsub("  +"; " ") |
+      gsub("[\\u0000-\\u001f\\u007f]"; "") |
       ltrimstr(" ") | rtrimstr(" ") |
       if length > 200 then .[:200] + "..." else . end
     ')
@@ -76,6 +77,7 @@ case "$event" in
         end |
         tostring |
         gsub("\n"; " ") | gsub("  +"; " ") |
+        gsub("[\\u0000-\\u001f\\u007f]"; "") |
         ltrimstr(" ") | rtrimstr(" ")
       ')
       if [[ -n "$key_arg" ]]; then
