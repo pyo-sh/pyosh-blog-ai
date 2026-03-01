@@ -123,8 +123,12 @@ updated=$(printf '%s' "$existing" | jq \
 
   # PreToolUse (all tools) → activity tracking + needs-input for AskUserQuestion
   .hooks.PreToolUse |= (
-    # Remove old AskUserQuestion-only entry if present
-    [.[] | select(type != "object" or .matcher != "AskUserQuestion" or (has_cmd | not))] |
+    # Migrate: remove only our command from old AskUserQuestion entries (preserve other hooks)
+    [.[] | if (type == "object" and .matcher == "AskUserQuestion" and has_cmd)
+      then .hooks |= [.[] | select(type != "object" or .command != $on_status)]
+      else . end] |
+    # Drop entries left with empty hooks array
+    [.[] | select(type != "object" or (.hooks | type != "array") or (.hooks | length > 0))] |
     ensure_hook("")
   ) |
 
