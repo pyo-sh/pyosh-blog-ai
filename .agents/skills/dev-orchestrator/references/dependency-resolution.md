@@ -91,7 +91,7 @@ After DAG construction, assign initial status to each issue:
 | `dag[N]` is empty | `pending` |
 | `dag[N]` has one or more deps | `blocked` |
 
-Issues already in `.workspace/pipeline/issue-N.state.json` → skip (already running).
+Issues already in `.workspace/pipeline/{area}/issue-N.state.json` → skip (already running).
 
 ## Dependency Satisfaction Check
 
