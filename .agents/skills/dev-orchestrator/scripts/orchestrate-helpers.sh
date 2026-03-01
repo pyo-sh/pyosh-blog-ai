@@ -281,8 +281,10 @@ orch_detect_stall() {
       --search "Closes #${issue}" --state open \
       --json number --jq '.[0].number' 2>/dev/null)
 
-    # No open PR yet — pipeline is still in early stages, not stalled
+    # No open PR yet — apply extended stall threshold (2x normal) for pre-PR phase
     if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+      local extended_stall=$(( stall_seconds * 2 ))
+      [ "$elapsed" -gt "$extended_stall" ] && return 0
       return 1
     fi
 
@@ -447,12 +449,13 @@ orch_poll_cycle() {
       [ $pane_idx -ge ${#pane_array[@]} ] && break
       local pane="${pane_array[$pane_idx]}"
 
-      orch_dispatch "$issue" "$pane" "$area_dir" "$agent"
-      if [ $? -eq 0 ]; then
+      if orch_dispatch "$issue" "$pane" "$area_dir" "$agent"; then
         orch_record_dispatch "$area" "$issue" "$pane"
         >&2 echo "[orchestrator] Dispatched #${issue} → pane $pane"
-        pane_idx=$((pane_idx + 1))
+      else
+        >&2 echo "[orchestrator] Pane $pane dead — skipping for issue #${issue}"
       fi
+      pane_idx=$((pane_idx + 1))  # always advance to skip dead panes
     done
   fi
 }
