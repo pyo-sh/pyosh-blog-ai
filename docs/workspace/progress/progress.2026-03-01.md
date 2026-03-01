@@ -82,3 +82,44 @@
   - 참고: findings 007 (`findings/findings.007-claude-transcript-jsonl.md`)
 - `printf "%-*s"` 는 padding만 하고 truncate 없음 → 모델명 overflow의 실제 원인
   - 기존 `trunc()` 함수 활용으로 padding+truncation 동시 처리
+
+---
+
+## Completed (6)
+- [x] agent-tracker 다중 에이전트 트래킹 오류 및 대시보드 개선 (#12, PR 진행 중)
+
+  **Issue #12 — 5가지 버그 수정 + 개선:**
+
+  **1. Transcript 매핑 (Task/Token 공유 버그):**
+  - `find_claude_transcript()` 전체 교체: TTY → Claude PID → `/proc/PID/fd` 스캔
+  - `tasks/{UUID}` fd (flock 유지) 또는 `projects/{dir}/{UUID}` 서브디렉토리 패턴으로 session UUID 추출
+  - 동일 CWD에서 여러 Claude 인스턴스가 각자의 transcript를 정확히 참조
+
+  **2. CJK display width (trunc 깨짐):**
+  - `display_width()` 함수 추가: `printf '%s' "$s" | wc -L` (GNU coreutils, CJK=2칸)
+  - `trunc()` 교체: binary search로 `w-1` 이하의 display width prefix 탐색 후 `…` 접미
+
+  **3. Engine 모델명 (Claude 폴백 버그):**
+  - pane 스크래핑 제거 → transcript `message.model` 필드에서 추출
+  - `claude-opus-4-6` → `Opus 4.6` 변환 (date-suffix IDs 포함: `claude-haiku-4-5-20251001`)
+  - model/token/task를 **단일 jq 호출**로 통합 (RS `\u001e` 구분자로 `|` 충돌 방지)
+  - 기존 2회 jq: ~150ms/pane → 1회: ~35ms/pane (성능 ~4× 향상)
+
+  **4. Status 감지 오류 (spinner 80% miss):**
+  - Claude Code 스피너 문자 추가: `✢|✶|✻|✽` (기존 `✻`만 → 4개)
+  - `·` (middle dot) 제외: context bar separator와 false positive 방지
+
+  **5. 반응형 레이아웃 + 1초 refresh:**
+  - PANE/ENGINE/STATUS 고정, TASK fill, TOKENS min(=10)+grow 동적 계산
+  - W_TOKENS = max(min, max over rows of bar(5)+sp(1)+str_len)
+  - W_TASK = INNER - fixed_cols - 8 (trailing 2sp는 -8에 흡수)
+  - `INTERVAL=2` → `INTERVAL=1`
+
+## Discoveries (6)
+- Claude Code는 `tasks/{UUID}` 디렉토리를 flock으로 session 동안 열어둠 → `/proc/PID/fd` 스캔으로 session UUID 추출 가능
+  - `tasks/{UUID}/.lock` 또는 `tasks/{UUID}` 디렉토리 자체의 fd가 노출됨
+  - 이전 발견(findings 007)과 달리 JSONL FD가 아닌 tasks/ FD를 활용
+- `wc -L`(GNU coreutils)이 CJK double-width를 정확히 계산 → bash 순수 `${#s}` 대비 terminal columns 정확히 반영
+- Claude Code spinner: `✢ · ✶ ✻ ✽` (5개). `·`은 context bar separator와 혼재 → false positive 위험
+- `jq -rs` 단일 호출로 model+tokens+task 통합 시 RS(0x1e) 구분자 사용이 안전 (`|` 등 special char 포함 task 대응)
+- W_TOKENS 공식에서 trailing 2sp는 -8 overhead에 흡수: `W_TOKENS` = bar+sp+str_len (trailing 제외), `-8` = left(2)+4seps(4)+right(2)

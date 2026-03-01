@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-01 | agent-tracker 다중 에이전트 트래킹 오류 및 대시보드 개선 (#12, PR 진행 중) | in-progress |
 | 2026-03-01 | agent-tracker 컬럼 정렬 수정 + transcript 기반 Task/Token 갱신 (#9, #10, PR #11) | done |
 | 2026-03-01 | PR #8 머지 완료 — tracker window 추가 (session.docker.yml + ARCHITECTURE.md), Issue #7 종료 | done |
 | 2026-03-01 | PR #8 리뷰 코멘트 수정 — agent-tracker.sh: PIPELINE_DIR 경로, grep -P 이식성, Codex 세션 매핑, INTERVAL 검증 | done |
