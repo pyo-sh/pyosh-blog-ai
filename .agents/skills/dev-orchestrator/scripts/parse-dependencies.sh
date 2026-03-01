@@ -84,7 +84,7 @@ if [ -z "$ISSUE" ]; then
 fi
 
 # Fetch issue body
-BODY=$(cd "$AREA_DIR" && gh issue view "$ISSUE" --json body --jq '.body' 2>/dev/null)
+BODY=$(cd "$AREA_DIR" && gh issue view "$ISSUE" --json body --jq '.body' 2>/dev/null) || true
 
 if [ -z "$BODY" ]; then
   # No body or issue not found — no dependencies

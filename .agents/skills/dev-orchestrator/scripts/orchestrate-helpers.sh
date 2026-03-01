@@ -137,11 +137,11 @@ orch_dispatch() {
   if [ "$agent" = "codex" ]; then
     prompt="/dev-pipeline ${area} #${issue}"
     tmux send-keys -t "$pane_id" \
-      "codex exec --dangerously-bypass-approvals-and-sandbox '${prompt}'" Enter
+      "cd '${area_dir}' && codex exec --dangerously-bypass-approvals-and-sandbox '${prompt}'" Enter
   else
     prompt="/dev-pipeline ${area} #${issue}"
     tmux send-keys -t "$pane_id" \
-      "claude --dangerously-skip-permissions '${prompt}'" Enter
+      "cd '${area_dir}' && claude --dangerously-skip-permissions '${prompt}'" Enter
   fi
 
   return 0
@@ -376,7 +376,7 @@ orch_poll_cycle() {
     fi
   done
 
-  # 2. Stall detection for still-dispatched issues
+  # 2. Stall detection + bounded auto-retry for still-dispatched issues
   state=$(orch_state_read "$area")
   dispatched_issues=$(echo "$state" | jq -r '.dispatched | keys[]')
   for issue in $dispatched_issues; do
@@ -385,8 +385,39 @@ orch_poll_cycle() {
     [ "$cur_status" != "dispatched" ] && continue
 
     if orch_detect_stall "$area" "$issue" "$area_dir"; then
-      >&2 echo "[orchestrator] STALL detected: Issue #${issue} — no activity for 10+ minutes"
-      >&2 echo "[orchestrator] Consider: inspect pane, retry, or skip"
+      local pane_id
+      pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane")
+      local retry_count
+      retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
+
+      if ! orch_pane_alive "$pane_id" && [ "$retry_count" -lt 1 ]; then
+        # Pane died — attempt bounded retry (max 1)
+        >&2 echo "[orchestrator] STALL: Issue #${issue} pane dead — retrying (attempt $((retry_count + 1)))"
+        local idle_panes
+        idle_panes=$(orch_find_idle_panes "$orch_pane")
+        local retried=0
+        for p in $idle_panes; do
+          if orch_dispatch "$issue" "$p" "$area_dir" "$agent"; then
+            orch_state_update "$area" \
+              ".dispatched[\"$issue\"].pane = \"$p\" | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].lastActivity = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""
+            >&2 echo "[orchestrator] Re-dispatched #${issue} → pane $p"
+            retried=1
+            break
+          fi
+        done
+        [ "$retried" -eq 0 ] && >&2 echo "[orchestrator] STALL: Issue #${issue} — no idle panes for retry"
+      elif [ "$retry_count" -ge 1 ]; then
+        # Already retried once — mark as failed
+        >&2 echo "[orchestrator] STALL: Issue #${issue} — retry exhausted, marking failed"
+        orch_status_set "$area" "$issue" "failed"
+        orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+        local newly_unblocked
+        newly_unblocked=$(orch_unblock "$area" "$issue")
+        [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+      else
+        >&2 echo "[orchestrator] STALL detected: Issue #${issue} — no activity for 10+ minutes"
+        >&2 echo "[orchestrator] Consider: inspect pane, retry, or skip"
+      fi
     fi
   done
 
