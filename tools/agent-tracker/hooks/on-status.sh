@@ -9,6 +9,8 @@
 #   PreToolUse       → activity: "{ToolName}: {key_arg}"
 #                      + needs-input (AskUserQuestion only)
 #   PostToolUse      → clears activity
+#
+# Uses flock to prevent race conditions with on-statusline.sh.
 
 set -euo pipefail
 
@@ -30,33 +32,29 @@ event=$(printf '%s' "$input" | jq -r '.hook_event_name // empty')
 mkdir -p "$SIDECAR_DIR"
 
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
+lock_path="${sidecar_path}.lock"
 
-# Read existing sidecar (may not exist yet if on-statusline hasn't run)
-existing="{}"
-[[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
+# ── Prepare update fields from input (outside lock to minimize lock time) ──
+
+jq_args=()
+jq_expr=""
 
 case "$event" in
   UserPromptSubmit)
-    # Extract user prompt as task, truncate to 200 chars; clear activity
     task=$(printf '%s' "$input" | jq -r '
       .prompt // "" |
       gsub("\n"; " ") | gsub("  +"; " ") |
       ltrimstr(" ") | rtrimstr(" ") |
       if length > 200 then .[:200] + "..." else . end
     ')
-    updated=$(printf '%s' "$existing" | jq \
-      --arg status "working" \
-      --arg task "$task" \
-      --arg pane_id "$pane_id" \
-      '. + {status: $status, task: $task, activity: null, pane_id: $pane_id, updated_at: now}')
+    jq_args=(--arg status "working" --arg task "$task" --arg pane_id "$pane_id")
+    jq_expr='. + {status: $status, task: $task, activity: null, pane_id: $pane_id, updated_at: now}'
     ;;
   Stop)
-    updated=$(printf '%s' "$existing" | jq \
-      --arg pane_id "$pane_id" \
-      '. + {status: "idle", activity: null, pane_id: $pane_id, updated_at: now}')
+    jq_args=(--arg pane_id "$pane_id")
+    jq_expr='. + {status: "idle", activity: null, pane_id: $pane_id, updated_at: now}'
     ;;
   PreToolUse)
-    # Build activity string: "{ToolName}: {key_arg}"
     tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
     if [[ -n "$tool_name" ]]; then
       key_arg=$(printf '%s' "$input" | jq -r --arg tn "$tool_name" '
@@ -84,35 +82,36 @@ case "$event" in
       activity=""
     fi
 
-    # AskUserQuestion → also set needs-input status
     if [[ "$tool_name" == "AskUserQuestion" ]]; then
-      updated=$(printf '%s' "$existing" | jq \
-        --arg activity "$activity" \
-        --arg pane_id "$pane_id" \
-        '. + {status: "needs-input", activity: $activity, pane_id: $pane_id, updated_at: now}')
+      jq_args=(--arg activity "$activity" --arg pane_id "$pane_id")
+      jq_expr='. + {status: "needs-input", activity: $activity, pane_id: $pane_id, updated_at: now}'
     else
-      updated=$(printf '%s' "$existing" | jq \
-        --arg activity "$activity" \
-        --arg pane_id "$pane_id" \
-        '. + {activity: $activity, pane_id: $pane_id, updated_at: now}')
+      jq_args=(--arg activity "$activity" --arg pane_id "$pane_id")
+      jq_expr='. + {activity: $activity, pane_id: $pane_id, updated_at: now}'
     fi
     ;;
   PostToolUse)
-    # Clear activity after tool completes
-    updated=$(printf '%s' "$existing" | jq \
-      --arg pane_id "$pane_id" \
-      '. + {activity: null, pane_id: $pane_id, updated_at: now}')
+    jq_args=(--arg pane_id "$pane_id")
+    jq_expr='. + {activity: null, pane_id: $pane_id, updated_at: now}'
     ;;
   *)
     exit 0
     ;;
 esac
 
-# Atomic write
-if [[ -n "${updated:-}" ]]; then
+# ── Locked read-modify-write ──────────────────────────────────────────────
+
+(
+  flock -w 2 9 || exit 0
+
+  existing="{}"
+  [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
+
+  updated=$(printf '%s' "$existing" | jq "${jq_args[@]}" "$jq_expr")
+
   tmp="${sidecar_path}.tmp.$$"
   printf '%s\n' "$updated" > "$tmp"
   mv -f "$tmp" "$sidecar_path"
-fi
+) 9>"$lock_path"
 
 exit 0

@@ -87,25 +87,37 @@ updated=$(printf '%s' "$existing" | jq \
   # Initialize hooks object if missing
   .hooks //= {} |
 
-  # UserPromptSubmit → working status
-  .hooks.UserPromptSubmit = [{
-    matcher: "",
-    hooks: [{
-      type: "command",
-      command: $on_status,
-      timeout: 5
+  # UserPromptSubmit → working status (append, preserve existing hooks)
+  .hooks.UserPromptSubmit = (
+    (.hooks.UserPromptSubmit // []) |
+    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
+    then .
+    else . + [{
+      matcher: "",
+      hooks: [{
+        type: "command",
+        command: $on_status,
+        timeout: 5
+      }]
     }]
-  }] |
+    end
+  ) |
 
-  # Stop → idle status
-  .hooks.Stop = [{
-    matcher: "",
-    hooks: [{
-      type: "command",
-      command: $on_status,
-      timeout: 5
+  # Stop → idle status (append, preserve existing hooks)
+  .hooks.Stop = (
+    (.hooks.Stop // []) |
+    if any(.[]; .matcher == "" and (.hooks | any(.command == $on_status)))
+    then .
+    else . + [{
+      matcher: "",
+      hooks: [{
+        type: "command",
+        command: $on_status,
+        timeout: 5
+      }]
     }]
-  }] |
+    end
+  ) |
 
   # PreToolUse (all tools) → activity tracking + needs-input for AskUserQuestion
   .hooks.PreToolUse = (
