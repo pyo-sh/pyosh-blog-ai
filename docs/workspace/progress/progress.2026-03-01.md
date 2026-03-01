@@ -272,3 +272,28 @@
     → `"($filter) | .updatedAt = ..."` 파이프 체이닝으로 교체
   - **[SUGGESTION] `parse-dependencies.sh:113`** — 의존성 키워드 대소문자 미구분:
     `grep -oE` → `grep -oiE` 로 변경 (`closes #12` 등 소문자 형식 허용)
+
+---
+
+## Completed (13)
+- [x] PR #19 [CRITICAL] 리뷰 수정 — `scripts/agent-tracker.sh` Codex 감지 (#16)
+
+  **[CRITICAL] `scripts/agent-tracker.sh:412` — `node)` 분기 Codex 감지 실패:**
+  - 기존 구현: `pgrep -P "$_cpid"` → `readlink /proc/{}/exe` → `/codex$` 매칭
+  - **근본 원인**: Codex CLI는 Node.js shebang 스크립트 (`#!/usr/bin/env node`)이므로
+    프로세스 실행 파일이 `.../node`로 resolve됨 — `.../codex` 경로는 존재하지 않음
+    → `/codex$` 패턴이 절대 매칭되지 않아 Codex 패인이 항상 필터링됨 (기본 버그 미수정)
+  - **Fix 1**: `codex_in_descendants()` 헬퍼 함수 추가 (line 382)
+    - `pgrep -P "$parent"` 로 직접 자식 PID 획득
+    - `/proc/{child}/cmdline`을 `tr '\0' ' '`로 변환 후 `@openai/codex|codex\.js` 정규식 매칭
+    - 미매칭 시 재귀 호출로 후손 프로세스까지 탐색 (`codex_in_descendants "$child"`)
+  - **Fix 2**: `node)` 분기를 `codex_in_descendants "$_pane_pid"` 호출로 교체
+    - `_cpid` → `_pane_pid` (변수명 정정)
+    - exe 경로 체인 제거 → argv 기반 탐지로 완전 교체
+
+## Discoveries (13)
+- Codex CLI는 npm 글로벌 설치 시 Node.js shebang 스크립트로 배포됨 → OS가 실행하는 바이너리는 `.../node`
+  - `/proc/{pid}/exe` 는 항상 node 인터프리터를 가리킴 → 실행 파일 경로로 Codex를 구분 불가
+  - 해결책: `/proc/{pid}/cmdline` argv 스캔으로 `@openai/codex` 또는 `codex.js` 경로 포함 여부 확인
+- 재귀 `codex_in_descendants()`가 필요한 이유: shell → npx → node 같은 중간 프로세스가 있을 수 있음
+  - 직접 자식(`pgrep -P`)만 체크하면 중간 프로세스가 있는 경우 누락 가능
