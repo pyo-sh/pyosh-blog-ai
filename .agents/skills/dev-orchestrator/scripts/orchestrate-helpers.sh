@@ -265,12 +265,19 @@ orch_detect_stall() {
     # Verify no new commits since last check
     local last_sha
     last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
-    local latest_sha
-    latest_sha=$(cd "$area_dir" && gh pr list \
+    local pr_number
+    pr_number=$(cd "$area_dir" && gh pr list \
       --search "Closes #${issue}" --state open \
-      --json number --jq '.[0].number' 2>/dev/null \
-      | xargs -I{} gh api "repos/{owner}/{repo}/pulls/{}/commits" \
-          --jq '.[-1].sha' 2>/dev/null)
+      --json number --jq '.[0].number' 2>/dev/null)
+
+    # No open PR yet — pipeline is still in early stages, not stalled
+    if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+      return 1
+    fi
+
+    local latest_sha
+    latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr_number}/commits" \
+      --jq '.[-1].sha' 2>/dev/null)
 
     if [ -n "$latest_sha" ] && [ "$latest_sha" != "$last_sha" ]; then
       orch_update_last_activity "$area" "$issue" "$latest_sha"

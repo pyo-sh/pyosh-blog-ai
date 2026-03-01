@@ -94,7 +94,7 @@ fi
 # Extract content after "### Dependencies" heading
 # Stops at the next "###" heading or end of string
 DEPS_SECTION=$(echo "$BODY" | awk '
-  /^### Dependencies/ { found=1; next }
+  tolower($0) ~ /^### *dependencies/ { found=1; next }
   found && /^###/ { exit }
   found { print }
 ')

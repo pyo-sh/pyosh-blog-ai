@@ -37,7 +37,7 @@ for ISSUE in $DISPATCHED; do
   RESULT=$(orch_check_completion "$ISSUE" "$AREA_DIR")
   if [ "$RESULT" = "completed" ] || [ "$RESULT" = "failed" ]; then
     orch_status_set "$AREA" "$ISSUE" "$RESULT"
-    [ "$RESULT" = "completed" ] && orch_unblock "$AREA" "$ISSUE"
+    orch_unblock "$AREA" "$ISSUE"  # both completed and failed unblock dependents
   else
     # Still running — check pane
     PANE=$(echo "$STATE" | jq -r ".dispatched[\"$ISSUE\"].pane")
