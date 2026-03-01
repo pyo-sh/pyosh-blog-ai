@@ -27,7 +27,7 @@ Store in state as `"agent": "claude"` or `"agent": "codex"`.
 .workspace/orchestrate/{area}/issue-{N}.exit     # signal: pipeline completed (content: "ok" or "fail")
 ```
 
-Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective (area-namespaced to prevent collisions when client/server have the same issue number).
+Pipeline state at `.workspace/pipeline/issue-{N}.state.json` is read-only from the orchestrator's perspective. The `area` field inside the state JSON is checked to avoid cross-area collisions when client/server share the same issue number.
 
 ## Workflow
 
