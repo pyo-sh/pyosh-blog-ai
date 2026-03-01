@@ -112,3 +112,34 @@ dev-review/SKILL.md (#11):
 
 - `refactor/issue-28-dev-pipeline-fixes` 브랜치 PR 생성
 - Closes #28
+
+---
+
+## dev-pipeline PR #29 리뷰 수정 (3차) — dev-resolve
+
+### 작업 내용
+
+**리뷰 분석**
+
+3차 리뷰 (commit `1352dad`, [CRITICAL] 1):
+- `MONOREPO_ROOT`가 `git worktree list --porcelain` 첫 항목으로 파생됨 - area repo(`/workspace/client`, `/workspace/server`) 내부에서 소싱 시 해당 repo의 main worktree를 반환하여 모노레포 루트(`/workspace`)가 아닌 값 할당
+
+**수정 사항**
+
+`pipeline-helpers.sh` MONOREPO_ROOT 감지 교체:
+- `git worktree list` 방식 제거
+- `BASH_SOURCE[0]` 기반 스크립트 위치 역추적으로 교체 (`_PIPELINE_HELPERS_DIR/../../../..`)
+- 링크드 워크트리(`.workspace/worktrees/`) 내부에서 소싱된 경우 `%%/.workspace/worktrees/*` 패턴으로 실제 루트 복원
+- 세 시나리오 검증: (1) 워크트리 내부 절대경로 소싱, (2) area repo에서 소싱, (3) 모노레포 루트에서 소싱 → 모두 `/workspace` 반환 확인
+
+**기술적 결정**
+
+`git worktree list` vs `BASH_SOURCE` 비교:
+- `git worktree list`: area repo에서 소싱 시 해당 repo의 main worktree 반환 → 실패
+- `BASH_SOURCE`: 스크립트 실제 경로 기반 → area repo에서도 올바른 루트 반환 ✓
+- 워크트리 내부 소싱 예외 처리: `.workspace/worktrees/` 경로 감지 후 prefix 제거로 복원
+
+### 결과
+
+- commit: `fix: address review comments (#29)`
+- 수정 파일: `.agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-02 | PR #29 3차 리뷰 수정 — MONOREPO_ROOT 감지 git worktree list → BASH_SOURCE 역추적 교체 (#28) | done |
 | 2026-03-02 | dev-pipeline 스킬 버그 수정 10개 항목 - eval 인젝션, awk 파싱, MONOREPO_ROOT, gh api 오류, tmux 체크, state 충돌 등 (#28) | done |
 | 2026-03-02 | dev-pipeline merge 단계 버그 수정 (exit code check, state namespace, cleanup 순서) + Check plan 개편 + skill-creator 최적화 — PR #24 (#21, #22, #23) | done |
 | 2026-03-01 | PR #15 최종 resolve (Option A 호환성 복원) + 범위 밖 변경 제거 → PR #15 머지 (#14) | done |
