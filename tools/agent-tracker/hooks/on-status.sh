@@ -74,6 +74,7 @@ case "$event" in
         elif $tn == "TaskUpdate"   then .taskId // ""
         else ""
         end |
+        tostring |
         gsub("\n"; " ") | gsub("  +"; " ") |
         ltrimstr(" ") | rtrimstr(" ")
       ')
