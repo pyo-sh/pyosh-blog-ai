@@ -74,7 +74,15 @@ make_line() {
 }
 
 # display_width <string> — terminal display columns (CJK=2, ASCII=1)
-display_width() { printf '%s' "$1" | wc -L; }
+# ASCII fast path avoids subshell for pure-ASCII strings (#30)
+display_width() {
+  local s="$1"
+  if [[ "$s" != *[^[:ascii:]]* ]]; then
+    printf '%d' "${#s}"
+  else
+    printf '%s' "$s" | wc -L
+  fi
+}
 
 # trunc <string> <width> — truncate by display width; pad with spaces if shorter
 trunc() {
@@ -153,16 +161,18 @@ parse_claude_pane() {
       IFS=$'\x1e' read -r model status pct tok_k task activity <<< "$raw"
     fi
 
-    # Override status from pane if sidecar status seems stale
-    # (e.g., hooks didn't fire but spinner is visible)
-    local captured bottom8
-    captured=$(tmux capture-pane -p -t "$pane_id" -S -8 2>/dev/null)
-    bottom8=$(printf '%s' "$captured" | tail -8)
-    if [[ "$status" != "working" ]] && \
-       printf '%s' "$bottom8" | grep -qE '✢|✶|✻|✽|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏'; then
-      status="working"
-    elif printf '%s' "$bottom8" | grep -qE '⏸|plan mode'; then
-      status="plan"
+    # Only scrape pane when sidecar status is idle — prevents spinner false
+    # positives (spinner chars in code/output overriding non-idle sidecar
+    # status) and skips unnecessary capture-pane when already working (#30, #31)
+    if [[ "$status" == "idle" ]]; then
+      local captured bottom8
+      captured=$(tmux capture-pane -p -t "$pane_id" -S -8 2>/dev/null)
+      bottom8=$(printf '%s' "$captured" | tail -8)
+      if printf '%s' "$bottom8" | grep -qE '✢|✶|✻|✽|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏'; then
+        status="working"
+      elif printf '%s' "$bottom8" | grep -qE '⏸|plan mode'; then
+        status="plan"
+      fi
     fi
   else
     # No sidecar — full pane scraping fallback
@@ -246,37 +256,32 @@ parse_codex_pane() {
   session_file=$(find_codex_session_file "$pane_id")
 
   if [[ -n "$session_file" && -f "$session_file" ]]; then
-    local raw_model
-    raw_model=$(jq -r 'select(.type == "turn_context") | .payload.model // empty' \
-      "$session_file" 2>/dev/null | tail -1)
-    [[ -n "$raw_model" ]] && model="$raw_model"
+    # Merge all jq queries into a single pass over the session file (#30)
+    local raw_jq
+    raw_jq=$(jq -rs '
+      def last_ne(f): [.[] | f | select(. != null and . != "")] | if length == 0 then null else last end;
+      {
+        model:     last_ne(select(.type == "turn_context") | .payload.model),
+        total_tok: last_ne(select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens | tostring),
+        ctx_win:   last_ne(select(.payload.info | type == "object") | .payload.info.model_context_window | tostring),
+        msg:       (last_ne(select(.payload.type == "user_message") | .payload.message)
+                   // last_ne(select(.type == "response_item" and .payload.role == "user") | .payload.content // .payload.message))
+      } | [(.model // ""), (.total_tok // ""), (.ctx_win // ""), (.msg // "")] | join("\u001e")
+    ' "$session_file" 2>/dev/null)
 
-    local total_tok ctx_window
-    total_tok=$(jq -r \
-      'select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens // empty' \
-      "$session_file" 2>/dev/null | tail -1)
-    ctx_window=$(jq -r \
-      'select(.payload.info | type == "object") | .payload.info.model_context_window // empty' \
-      "$session_file" 2>/dev/null | tail -1)
-    [[ -z "$ctx_window" || "$ctx_window" -le 0 ]] 2>/dev/null && ctx_window=200000
-    if [[ -n "$total_tok" && "$total_tok" -gt 0 ]] 2>/dev/null; then
-      pct=$(( total_tok * 100 / ctx_window ))
-      (( pct > 100 )) && pct=100
-      tok_k=$(( total_tok / 1000 ))
+    if [[ -n "$raw_jq" ]]; then
+      local raw_model raw_total_tok raw_ctx_win raw_msg
+      IFS=$'\x1e' read -r raw_model raw_total_tok raw_ctx_win raw_msg <<< "$raw_jq"
+      [[ -n "$raw_model" ]] && model="$raw_model"
+      local ctx_window="${raw_ctx_win:-200000}"
+      [[ -z "$ctx_window" || "$ctx_window" -le 0 ]] 2>/dev/null && ctx_window=200000
+      if [[ -n "$raw_total_tok" && "$raw_total_tok" -gt 0 ]] 2>/dev/null; then
+        pct=$(( raw_total_tok * 100 / ctx_window ))
+        (( pct > 100 )) && pct=100
+        tok_k=$(( raw_total_tok / 1000 ))
+      fi
+      [[ -n "$raw_msg" ]] && task="$raw_msg"
     fi
-
-    # Bug A fix: try user_message first, then response_item with role=="user"
-    local last_msg
-    last_msg=$(jq -r \
-      'select(.payload.type == "user_message") | .payload.message // empty' \
-      "$session_file" 2>/dev/null | tail -1 | tr '\n' ' ')
-    if [[ -z "$last_msg" ]]; then
-      last_msg=$(jq -r \
-        'select(.type == "response_item" and .payload.role == "user") |
-         .payload.content // .payload.message // empty' \
-        "$session_file" 2>/dev/null | tail -1 | tr '\n' ' ')
-    fi
-    [[ -n "$last_msg" ]] && task="$last_msg"
   fi
 
   local bottom5
@@ -294,11 +299,13 @@ parse_codex_pane() {
 # ─────────────────────────────────────────────────────────────────────────────
 get_pipeline_summary() {
   local parts=()
-  for f in "$PIPELINE_DIR"/issue-*.state.json; do
+  # Search both flat and area-prefixed state file locations
+  for f in "$PIPELINE_DIR"/*/issue-*.state.json "$PIPELINE_DIR"/issue-*.state.json; do
     [[ -f "$f" ]] || continue
-    local issue step
-    issue=$(jq -r '.issue // empty' "$f" 2>/dev/null)
-    step=$(jq -r '.step  // empty' "$f" 2>/dev/null)
+    # Merge 2 jq calls into 1 per file (#30)
+    local raw issue step
+    raw=$(jq -r '[.issue // empty, .step // empty] | join("\u001e")' "$f" 2>/dev/null)
+    IFS=$'\x1e' read -r issue step <<< "$raw"
     [[ -z "$issue" ]] && continue
     parts+=("#${issue}(${step})")
   done
@@ -343,9 +350,20 @@ _match_agent() {
   return 1
 }
 
+# agent type cache — keyed by pane_pid, avoids repeated process tree traversal (#30)
+declare -A AGENT_TYPE_CACHE
+
 # detect_agent_type <pane_pid>
 detect_agent_type() {
-  local pids=() queue=("$1") pid child cmdline exename result
+  local root_pid="$1"
+
+  # Return cached result if available
+  if [[ -n "${AGENT_TYPE_CACHE[$root_pid]+x}" ]]; then
+    [[ -n "${AGENT_TYPE_CACHE[$root_pid]}" ]] && printf '%s' "${AGENT_TYPE_CACHE[$root_pid]}"
+    return 0
+  fi
+
+  local pids=() queue=("$root_pid") pid child cmdline exename result
   while (( ${#queue[@]} > 0 )); do
     pid="${queue[0]}"; queue=("${queue[@]:1}")
     pids+=("$pid")
@@ -356,21 +374,34 @@ detect_agent_type() {
   for pid in "${pids[@]}"; do
     cmdline=$(_get_cmdline "$pid") || continue
     exename=$(_get_exe_name "$pid") || true
-    result=$(_match_agent "$cmdline" "$exename") && { printf '%s' "$result"; return 0; }
+    result=$(_match_agent "$cmdline" "$exename") && {
+      AGENT_TYPE_CACHE[$root_pid]="$result"
+      printf '%s' "$result"
+      return 0
+    }
   done
+  AGENT_TYPE_CACHE[$root_pid]=""
   return 1
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard renderer
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Cached border/header strings — only recalculated when terminal width changes (#30)
+_PREV_COLS=-1
+_CACHE_eqline=""
+_CACHE_h_pane="" _CACHE_h_engine="" _CACHE_h_status="" _CACHE_h_tokens=""
+_CACHE_d_pane="" _CACHE_d_engine="" _CACHE_d_status="" _CACHE_d_tokens=""
+
 render_dashboard() {
   local COLS
   COLS=$(tput cols 2>/dev/null || echo 100)
   (( COLS < 86 )) && COLS=86
   local INNER=$(( COLS - 2 ))
 
-  local W_PANE=11 W_ACTIVITY=18 W_ENGINE=12 W_STATUS=6 W_TOKENS_MIN=10
+  local W_PANE=11 W_ENGINE=12 W_STATUS=6 W_TOKENS_MIN=10
+  local W_ACTIVITY_MIN=10
 
   local now
   now=$(date '+%Y-%m-%d %H:%M:%S')
@@ -417,45 +448,67 @@ render_dashboard() {
 
   # ── TOKENS column width ────────────────────────────────────────────────────
   local W_TOKENS=$W_TOKENS_MIN
-  local _tok_k _tok_str _tok_w _row_tok_k _row_pct
+  local _tok_str _tok_w _row_tok_k _row_pct
   for _row in "${rows[@]}"; do
-    IFS=$'\x1e' read -r _ _ _ _ _ _row_pct _row_tok_k _ <<< "$_row"
+    IFS=$'\x1e' read -r _ _ _ _ _ _row_pct _row_tok_k _ _ <<< "$_row"
     if (( _row_tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$_row_tok_k"; fi
     _tok_w=$(( 5 + 1 + ${#_tok_str} ))
     (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
   done
-  local W_TASK=$(( INNER - W_PANE - W_ACTIVITY - W_ENGINE - W_STATUS - W_TOKENS - 10 ))
+
+  # ── ACTIVITY column width — dynamic based on actual content (#32) ──────────
+  local W_ACTIVITY=$W_ACTIVITY_MIN
+  for _row in "${rows[@]}"; do
+    local _r_status _r_activity _act_disp _act_dw
+    IFS=$'\x1e' read -r _ _ _ _ _r_status _ _ _ _r_activity <<< "$_row"
+    if [[ -z "$_r_activity" || "$_r_activity" == "null" ]]; then
+      [[ "$_r_status" == "idle" ]] && _act_disp="— (idle)" || _act_disp="—"
+    else
+      _act_disp="$_r_activity"
+    fi
+    _act_dw=$(display_width "$_act_disp")
+    (( _act_dw > W_ACTIVITY )) && W_ACTIVITY=$_act_dw
+  done
+  # Cap W_ACTIVITY so W_TASK always has room for at least 15 chars (#33)
+  local W_ACTIVITY_MAX=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 9 - 15 ))
+  (( W_ACTIVITY_MAX < W_ACTIVITY_MIN )) && W_ACTIVITY_MAX=$W_ACTIVITY_MIN
+  (( W_ACTIVITY > W_ACTIVITY_MAX )) && W_ACTIVITY=$W_ACTIVITY_MAX
+
+  # W_TASK: INNER minus all fixed columns and separators.
+  # Overhead = left_pad(2) + 5 inter-col separators + trailing_2sp(2) = 9 (#31)
+  local W_TASK=$(( INNER - W_PANE - W_ACTIVITY - W_ENGINE - W_STATUS - W_TOKENS - 9 ))
   (( W_TASK < 15 )) && W_TASK=15
 
   # ── Pipeline ───────────────────────────────────────────────────────────────
   local pipeline_str
   pipeline_str=$(get_pipeline_summary)
 
-  # ── Border strings ─────────────────────────────────────────────────────────
-  local eqline hline
-  eqline=$(make_line '═' "$INNER")
+  # ── Recalculate fixed-width border strings only when terminal width changes (#30)
+  if (( COLS != _PREV_COLS )); then
+    _PREV_COLS=$COLS
+    _CACHE_eqline=$(make_line '═' "$INNER")
 
-  # ── Column header/divider strings ──────────────────────────────────────────
-  local h_pane h_task h_activity h_engine h_status h_tokens
-  h_pane=$(pad_right "PANE"     $W_PANE)
-  h_task=$(pad_right "TASK"     $W_TASK)
+    _CACHE_h_pane=$(pad_right "PANE"    $W_PANE)
+    _CACHE_h_engine=$(pad_right "ENGINE" $W_ENGINE)
+    _CACHE_h_status=$(pad_right "STATUS" $W_STATUS)
+    _CACHE_d_pane=$(make_line '─' $W_PANE)
+    _CACHE_d_engine=$(make_line '─' $W_ENGINE)
+    _CACHE_d_status=$(make_line '─' $W_STATUS)
+  fi
+
+  # Activity/task/tokens headers always reflect current dynamic widths
+  local h_activity h_task h_tokens d_activity d_task d_tokens
   h_activity=$(pad_right "ACTIVITY" $W_ACTIVITY)
-  h_engine=$(pad_right "ENGINE"  $W_ENGINE)
-  h_status=$(pad_right "STATUS"  $W_STATUS)
-  h_tokens=$(pad_right "TOKENS"  $W_TOKENS)
-
-  local d_pane d_task d_activity d_engine d_status d_tokens
-  d_pane=$(make_line '─' $W_PANE)
-  d_task=$(make_line '─' $W_TASK)
+  h_task=$(pad_right "TASK"         $W_TASK)
+  h_tokens=$(pad_right "TOKENS"     $W_TOKENS)
   d_activity=$(make_line '─' $W_ACTIVITY)
-  d_engine=$(make_line '─' $W_ENGINE)
-  d_status=$(make_line '─' $W_STATUS)
-  d_tokens=$(make_line '─' $W_TOKENS)
+  d_task=$(make_line '─'     $W_TASK)
+  d_tokens=$(make_line '─'   $W_TOKENS)
 
   # ── Draw ───────────────────────────────────────────────────────────────────
   tput cup 0 0
 
-  printf "${GRAY}╔%s╗${R}" "$eqline"; tput el; echo
+  printf "${GRAY}╔%s╗${R}" "$_CACHE_eqline"; tput el; echo
 
   local title_len=13
   local gap=$(( INNER - 2 - title_len - ${#now} - 1 ))
@@ -464,16 +517,16 @@ render_dashboard() {
     "$gap" "" "$now"
   tput el; echo
 
-  printf "${GRAY}╠%s╣${R}" "$eqline"; tput el; echo
+  printf "${GRAY}╠%s╣${R}" "$_CACHE_eqline"; tput el; echo
 
   printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
 
   printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s %s${R}  ${GRAY}║${R}" \
-    "$h_pane" "$h_task" "$h_activity" "$h_engine" "$h_status" "$h_tokens"
+    "$_CACHE_h_pane" "$h_task" "$h_activity" "$_CACHE_h_engine" "$_CACHE_h_status" "$h_tokens"
   tput el; echo
 
   printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s %s${R}  ${GRAY}║${R}" \
-    "$d_pane" "$d_task" "$d_activity" "$d_engine" "$d_status" "$d_tokens"
+    "$_CACHE_d_pane" "$d_task" "$d_activity" "$_CACHE_d_engine" "$_CACHE_d_status" "$d_tokens"
   tput el; echo
 
   # ── Agent rows ─────────────────────────────────────────────────────────────
@@ -524,7 +577,7 @@ render_dashboard() {
 
   printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
 
-  printf "${GRAY}╠%s╣${R}" "$eqline"; tput el; echo
+  printf "${GRAY}╠%s╣${R}" "$_CACHE_eqline"; tput el; echo
 
   local n_stat="(${n_working} working"
   (( n_plan > 0 )) && n_stat+=", ${n_plan} plan"
@@ -547,7 +600,7 @@ render_dashboard() {
     "$left_colored" "$right_colored" "$fpad" ""
   tput el; echo
 
-  printf "${GRAY}╚%s╝${R}" "$eqline"; tput el; echo
+  printf "${GRAY}╚%s╝${R}" "$_CACHE_eqline"; tput el; echo
 
   tput ed
 }
@@ -555,8 +608,25 @@ render_dashboard() {
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
-tput smcup
-tput civis
+
+# Suppress tput errors when TERM is unset (#31)
+tput smcup 2>/dev/null
+tput civis 2>/dev/null
+
+# Clean up orphan sidecar files for panes not in the current session (#32)
+# Smarter than rm -rf: preserves files for active panes
+mkdir -p "$SIDECAR_DIR"
+declare -A _active_panes=()
+while IFS= read -r _pid; do
+  _active_panes["$_pid"]=1
+done < <(tmux list-panes -s -t "$SESSION" -F '#{pane_id}' 2>/dev/null | sed 's/^%//')
+for _f in "$SIDECAR_DIR"/*.json; do
+  [[ -f "$_f" ]] || continue
+  _fname="${_f##*/}"
+  _pane="${_fname%.json}"
+  [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
+done
+unset _active_panes _fname _pane _f _pid
 
 while true; do
   render_dashboard

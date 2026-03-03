@@ -54,4 +54,8 @@ ENV PATH="/home/dev/.local/bin:$PATH"
 
 WORKDIR /workspace
 
+# agent-tracker hooks 사전 설정 (빌드 시 1회 실행)
+COPY --chown=dev:dev tools/agent-tracker /workspace/tools/agent-tracker
+RUN bash tools/agent-tracker/setup.sh --yes
+
 ENTRYPOINT ["entrypoint.sh"]
