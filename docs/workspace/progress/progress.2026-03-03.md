@@ -1,5 +1,22 @@
 # Workspace Progress - 2026-03-03
 
+## agent-tracker Task/Activity 영숫자 누락 수정 (#34)
+
+**Issue**: #34
+**Branch**: `fix/issue-34-gsub-regex`
+
+### 변경 파일
+
+- `tools/agent-tracker/hooks/on-status.sh` (line 55, 100)
+
+### 원인
+
+`on-status.sh`의 jq gsub 패턴 `gsub("[\\u0000-\\u001f\\u007f]"; "")` 에서 jq 1.7의 Oniguruma regex 엔진이 `\\u`를 유니코드 이스케이프로 인식하지 못하고 리터럴 `\`, `u`로 해석. character class에 `0-u` 범위(ASCII 0x30~0x75)가 포함되어 숫자(0-9), 영문 대문자(A-Z), 소문자 a~u가 모두 제거됨.
+
+### 수정
+
+`gsub("[\\u0000-\\u001f\\u007f]"; "")` → `gsub("[[:cntrl:]]"; "")` (POSIX control character class)로 교체. 2개소 (UserPromptSubmit task, PreToolUse key_arg).
+
 ## PR #33 머지 완료 - agent-tracker 버그 수정, 성능 최적화, lifecycle 개선 (#30 #31 #32)
 
 **Issues**: #30 (성능 최적화), #31 (버그 수정), #32 (UI/lifecycle 개선)

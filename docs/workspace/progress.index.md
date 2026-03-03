@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-03 | agent-tracker Task/Activity 영숫자 누락 수정 - jq gsub regex `[[:cntrl:]]` 교체 (#34) | done |
 | 2026-03-03 | PR #33 머지 완료 - agent-tracker 버그 수정, 성능 최적화, lifecycle 개선 4라운드 리뷰 통과 (#30 #31 #32) | done |
 | 2026-03-02 | PR #27 머지 완료 - agent-tracker push architecture (#25) + Activity column (#26), 12라운드 Codex 리뷰 | done |
 | 2026-03-02 | PR #29 머지 완료 — dev-pipeline 스킬 버그 수정 4라운드 리뷰 통과 (#28) | done |
