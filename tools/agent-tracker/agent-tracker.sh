@@ -259,14 +259,14 @@ parse_codex_pane() {
     # Merge all jq queries into a single pass over the session file (#30)
     local raw_jq
     raw_jq=$(jq -rs '
-      def last_ne(f): [.[] | f | select(. != null and . != "")] | last // "";
+      def last_ne(f): [.[] | f | select(. != null and . != "")] | last;
       {
         model:     last_ne(select(.type == "turn_context") | .payload.model),
         total_tok: last_ne(select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens | tostring),
         ctx_win:   last_ne(select(.payload.info | type == "object") | .payload.info.model_context_window | tostring),
         msg:       (last_ne(select(.payload.type == "user_message") | .payload.message)
                    // last_ne(select(.type == "response_item" and .payload.role == "user") | .payload.content // .payload.message))
-      } | [.model, .total_tok, .ctx_win, .msg] | join("\u001e")
+      } | [(.model // ""), (.total_tok // ""), (.ctx_win // ""), (.msg // "")] | join("\u001e")
     ' "$session_file" 2>/dev/null)
 
     if [[ -n "$raw_jq" ]]; then
