@@ -5,7 +5,7 @@
 # What it does:
 #   1. Backs up ~/.claude/settings.json
 #   2. Sets statusLine to use statusline-wrapper.sh (wraps existing context-bar.sh)
-#   3. Adds hooks for UserPromptSubmit, Stop, PreToolUse, PostToolUse
+#   3. Adds hooks for UserPromptSubmit, Stop, PreToolUse, PostToolUse, SessionEnd
 #
 # Usage:
 #   bash tools/agent-tracker/setup.sh           # interactive
@@ -49,6 +49,7 @@ if [[ "$AUTO_YES" != true ]]; then
   printf '  - hooks.Stop → %s\n' "$ON_STATUS_PATH"
   printf '  - hooks.PreToolUse (all tools) → %s\n' "$ON_STATUS_PATH"
   printf '  - hooks.PostToolUse (all tools) → %s\n' "$ON_STATUS_PATH"
+  printf '  - hooks.SessionEnd → %s\n' "$ON_STATUS_PATH"
   printf '\nProceed? [y/N] '
   read -r answer
   [[ "$answer" != [yY]* ]] && { printf 'Aborted.\n'; exit 0; }
@@ -114,6 +115,7 @@ updated=$(printf '%s' "$existing" | jq \
   .hooks.Stop |= (if type == "array" then . else [] end) |
   .hooks.PreToolUse |= (if type == "array" then . else [] end) |
   .hooks.PostToolUse |= (if type == "array" then . else [] end) |
+  .hooks.SessionEnd |= (if type == "array" then . else [] end) |
 
   # UserPromptSubmit → working status (append, preserve existing hooks)
   .hooks.UserPromptSubmit |= ensure_hook("") |
@@ -133,7 +135,10 @@ updated=$(printf '%s' "$existing" | jq \
   ) |
 
   # PostToolUse (all tools) → clear activity
-  .hooks.PostToolUse |= ensure_hook("")
+  .hooks.PostToolUse |= ensure_hook("") |
+
+  # SessionEnd → delete sidecar file for this pane
+  .hooks.SessionEnd |= ensure_hook("")
 ')
 
 # ─────────────────────────────────────────────────────────────────────────────

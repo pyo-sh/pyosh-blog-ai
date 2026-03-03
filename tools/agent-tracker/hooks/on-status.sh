@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # tools/agent-tracker/hooks/on-status.sh
-# Handles UserPromptSubmit / Stop / PreToolUse / PostToolUse hooks.
+# Handles UserPromptSubmit / Stop / PreToolUse / PostToolUse / SessionEnd hooks.
 # Updates status, task, and activity fields in the agent-tracker sidecar file.
 #
 # Status transitions:
 #   UserPromptSubmit → working (+ captures task from prompt, clears activity)
-#   Stop             → idle (clears activity)
+#                      /clear → resets sidecar to idle (#32)
+#   Stop             → idle (adds "(Done) " prefix to task if set, clears activity) (#32)
 #   PreToolUse       → activity: "{ToolName}: {key_arg}"
 #                      + needs-input (AskUserQuestion only)
 #   PostToolUse      → clears activity
+#   SessionEnd       → deletes sidecar file for this pane (#32)
 #
 # Uses flock to prevent race conditions with on-statusline.sh.
 
@@ -28,11 +30,17 @@ input=$(cat)
 event=$(printf '%s' "$input" | jq -r '.hook_event_name // empty')
 [[ -z "$event" ]] && exit 0
 
-# Ensure sidecar directory exists
-mkdir -p "$SIDECAR_DIR"
-
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
+
+# ── SessionEnd: delete sidecar file immediately, no lock needed (#32) ────────
+if [[ "$event" == "SessionEnd" ]]; then
+  rm -f "$sidecar_path" "$lock_path"
+  exit 0
+fi
+
+# Ensure sidecar directory exists
+mkdir -p "$SIDECAR_DIR"
 
 # ── Prepare update fields from input (outside lock to minimize lock time) ──
 
@@ -48,12 +56,24 @@ case "$event" in
       ltrimstr(" ") | rtrimstr(" ") |
       if length > 200 then .[:200] + "..." else . end
     ')
-    jq_args=(--arg status "working" --arg task "$task" --arg pane_id "$pane_id")
-    jq_expr='. + {status: $status, task: $task, activity: null, pane_id: $pane_id, updated_at: now}'
+    # /clear resets sidecar to initial state (#32)
+    if [[ "$task" == "/clear" ]]; then
+      jq_args=(--arg pane_id "$pane_id")
+      jq_expr='. + {status: "idle", task: "—", activity: null, pane_id: $pane_id, updated_at: now}'
+    else
+      jq_args=(--arg status "working" --arg task "$task" --arg pane_id "$pane_id")
+      jq_expr='. + {status: $status, task: $task, activity: null, pane_id: $pane_id, updated_at: now}'
+    fi
     ;;
   Stop)
+    # Add "(Done) " prefix to task when a task was active (#32)
     jq_args=(--arg pane_id "$pane_id")
-    jq_expr='. + {status: "idle", activity: null, pane_id: $pane_id, updated_at: now}'
+    jq_expr='
+      . + {status: "idle", activity: null, pane_id: $pane_id, updated_at: now} |
+      if (.task != null and .task != "—" and (.task | startswith("(Done) ") | not))
+      then .task = "(Done) " + .task
+      else . end
+    '
     ;;
   PreToolUse)
     tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
