@@ -491,20 +491,19 @@ render_dashboard() {
     _CACHE_h_pane=$(pad_right "PANE"    $W_PANE)
     _CACHE_h_engine=$(pad_right "ENGINE" $W_ENGINE)
     _CACHE_h_status=$(pad_right "STATUS" $W_STATUS)
-    _CACHE_h_tokens=$(pad_right "TOKENS" $W_TOKENS)
-
     _CACHE_d_pane=$(make_line '─' $W_PANE)
     _CACHE_d_engine=$(make_line '─' $W_ENGINE)
     _CACHE_d_status=$(make_line '─' $W_STATUS)
-    _CACHE_d_tokens=$(make_line '─' $W_TOKENS)
   fi
 
-  # Activity/task headers always reflect current dynamic widths
-  local h_activity h_task d_activity d_task
+  # Activity/task/tokens headers always reflect current dynamic widths
+  local h_activity h_task h_tokens d_activity d_task d_tokens
   h_activity=$(pad_right "ACTIVITY" $W_ACTIVITY)
   h_task=$(pad_right "TASK"         $W_TASK)
+  h_tokens=$(pad_right "TOKENS"     $W_TOKENS)
   d_activity=$(make_line '─' $W_ACTIVITY)
   d_task=$(make_line '─'     $W_TASK)
+  d_tokens=$(make_line '─'   $W_TOKENS)
 
   # ── Draw ───────────────────────────────────────────────────────────────────
   tput cup 0 0
@@ -523,11 +522,11 @@ render_dashboard() {
   printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
 
   printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s %s${R}  ${GRAY}║${R}" \
-    "$_CACHE_h_pane" "$h_task" "$h_activity" "$_CACHE_h_engine" "$_CACHE_h_status" "$_CACHE_h_tokens"
+    "$_CACHE_h_pane" "$h_task" "$h_activity" "$_CACHE_h_engine" "$_CACHE_h_status" "$h_tokens"
   tput el; echo
 
   printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s %s${R}  ${GRAY}║${R}" \
-    "$_CACHE_d_pane" "$d_task" "$d_activity" "$_CACHE_d_engine" "$_CACHE_d_status" "$_CACHE_d_tokens"
+    "$_CACHE_d_pane" "$d_task" "$d_activity" "$_CACHE_d_engine" "$_CACHE_d_status" "$d_tokens"
   tput el; echo
 
   # ── Agent rows ─────────────────────────────────────────────────────────────
