@@ -259,7 +259,7 @@ parse_codex_pane() {
     # Merge all jq queries into a single pass over the session file (#30)
     local raw_jq
     raw_jq=$(jq -rs '
-      def last_ne(f): [.[] | f | select(. != null and . != "")] | last;
+      def last_ne(f): [.[] | f | select(. != null and . != "")] | if length == 0 then null else last end;
       {
         model:     last_ne(select(.type == "turn_context") | .payload.model),
         total_tok: last_ne(select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens | tostring),
@@ -469,6 +469,10 @@ render_dashboard() {
     _act_dw=$(display_width "$_act_disp")
     (( _act_dw > W_ACTIVITY )) && W_ACTIVITY=$_act_dw
   done
+  # Cap W_ACTIVITY so W_TASK always has room for at least 15 chars (#33)
+  local W_ACTIVITY_MAX=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 9 - 15 ))
+  (( W_ACTIVITY_MAX < W_ACTIVITY_MIN )) && W_ACTIVITY_MAX=$W_ACTIVITY_MIN
+  (( W_ACTIVITY > W_ACTIVITY_MAX )) && W_ACTIVITY=$W_ACTIVITY_MAX
 
   # W_TASK: INNER minus all fixed columns and separators.
   # Overhead = left_pad(2) + 5 inter-col separators + trailing_2sp(2) = 9 (#31)
