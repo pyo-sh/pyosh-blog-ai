@@ -38,6 +38,25 @@ Use argument if provided. Otherwise ask the user:
 2. Select the matching template (bug / feature / refactor) based on content.
 3. Compose the Issue body following the template's field structure.
 
+#### Title rules
+
+- **No type prefix** in Issue titles. Do not prepend `feat:`, `fix:`, `refactor:`, etc.
+- Type is conveyed through GitHub labels, not the title.
+- Good: `Admin 댓글 관리 페이지`
+- Bad: `feat: Admin 댓글 관리 페이지`
+
+#### Labels
+
+Labels are GitHub labels defined in each repo's `.github/labels.json`.
+
+| Category | Labels |
+|----------|--------|
+| Type | `feat`, `bug`, `refactor`, `docs`, `test`, `chore` |
+| Priority | `priority:0` ~ `priority:4` |
+| Status | `fixed`, `duplicate`, `attention`, `question` |
+
+Always apply **type + priority** labels when creating an Issue.
+
 ### 4. Create Issues
 
 1. Check existing: `gh issue list --state open --repo {repo} --json number,title,labels`
