@@ -13,6 +13,7 @@
 | 005 | tmux OSC 52 드래그 복사 설정 문제                         | 2026-02-28 | #tmux #osc52 #clipboard #nested-tmux        |
 | 006 | Docker 컨테이너 타임존 UTC 고정 버그                      | 2026-03-01 | #docker #timezone #entrypoint #dead-branch  |
 | 007 | Claude Code Transcript JSONL 접근 방법                    | 2026-03-01 | #claude-code #transcript #jsonl #tmux #jq   |
+| 009 | Pipeline review/resolve pane workdir 설정               | 2026-03-04 | #pipeline #claude-code #skills #workdir #monorepo |
 | 008 | Claude Code statusLine의 total_input_tokens 부정확 문제  | 2026-03-04 | #claude-code #statusline #tokens #transcript |
 
 ## 상세 문서
@@ -24,6 +25,7 @@
 - [findings.005-tmux-osc52-clipboard.md](./findings/findings.005-tmux-osc52-clipboard.md) - tmux OSC 52 드래그 복사: set-clipboard scope, Ms 포맷, mode-keys 수정
 - [findings.006-docker-tz-dead-branch.md](./findings/findings.006-docker-tz-dead-branch.md) - Docker 컨테이너 TZ 기본값 미적용: entrypoint.sh 데드 브랜치 + docker-compose 빈 기본값
 - [findings.007-claude-transcript-jsonl.md](./findings/findings.007-claude-transcript-jsonl.md) - Claude Code transcript JSONL: cwd→project dir 매핑, null-safe jq 쿼리, user message 형식
+- [findings.009-pipeline-pane-workdir.md](./findings/findings.009-pipeline-pane-workdir.md) - review/resolve pane은 /workspace(모노레포 루트)에서 시작해야 skills 탐색 가능
 - [findings.008-statusline-total-input-tokens.md](./findings/findings.008-statusline-total-input-tokens.md) - Claude Code statusLine의 total_input_tokens가 시스템 프롬프트/도구/메모리 제외하여 부정확
 
 ## 주요 원칙
@@ -33,3 +35,4 @@
 - **Pane health check 순서: API 먼저 → health 나중** → 정상 종료 후 결과 누락 방지
 - **Claude Code Hook = 양방향 Gate** → Codex CLI는 단방향 Notify만 지원
 - **tmux set-clipboard은 server option** → `set -s` 사용, `Ms` 포맷에 `%p1%s` 필수
+- **Pipeline pane workdir = /workspace** → client/server는 독립 git repo라 `.claude/skills/` 탐색 불가. pane은 항상 모노레포 루트에서 시작.
