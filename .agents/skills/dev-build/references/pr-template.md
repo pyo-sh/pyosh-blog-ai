@@ -1,30 +1,6 @@
 # PR Template
 
-## Body
-
-```markdown
-## Summary
-Closes #{N}
-
-- Change 1
-- Change 2
-
-## Changes
-- **file1**: Description
-- **file2**: Description
-
-## Check plan
-- Verification step 1
-- Verification step 2
-
-## Screenshots
-(Attach if UI changes)
-```
-
-## Required
-1. `Closes #{N}` — Auto-closes the Issue
-2. **Summary** — 1-3 bullet points
-3. **Check plan** — Post-merge verification steps (plain list, no checkboxes)
+Use the area's `.github/PULL_REQUEST_TEMPLATE.md` as the base. Fill in each section; delete sections that don't apply.
 
 ## PR Title
 ```
@@ -33,7 +9,7 @@ Closes #{N}
 
 ## gh pr create
 
-**`--body-file` required** — inline `--body` causes shell escape conflicts with markdown backticks.
+**`--body-file` required** - inline `--body` causes shell escape conflicts with markdown backticks.
 
 ```bash
 mkdir -p .workspace/messages
@@ -41,8 +17,11 @@ cat > .workspace/messages/pr-{N}-body.md <<'PREOF'
 ## Summary
 Closes #{N}
 - Change description
-## Check plan
-- Verification step
+
+## Changes
+| File | Change |
+|------|--------|
+| `file` | description |
 PREOF
 
 gh pr create \

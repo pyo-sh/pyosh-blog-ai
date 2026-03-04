@@ -123,13 +123,9 @@ rc=$?
 
 Handle `rc` same as Step 3. When new commits appear: kill pane → show diff (`gh pr diff {PR#}`). `skipReview: true` → Step 6. `skipReview: false` → ask user: "Re-review" (→ Step 2) | "Merge as-is" (→ Step 6) | "Manual edit" (→ user edits, then Step 2).
 
-### 5. No critical — user decision
+### 5. No critical - user decision
 
-Show review summary. Show check plan:
-
-```bash
-gh pr view {PR#} --json body --jq '.body' | grep -A999 '## Check plan' | tail -n +2 || true
-```
+Show review summary.
 
 Ask user: **"Merge"** → Step 6 | **"Fix & Re-review"** → Step 4a | **"Fix & Merge"** → Step 4a with `skipReview: true`.
 
