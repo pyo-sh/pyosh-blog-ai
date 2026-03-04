@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-04 | agent-tracker 토큰 표시 수정 + transcript 읽기 최적화 (#42, PR #43) | done |
 | 2026-03-04 | Skill 간 중복된 monorepo 로직을 공유 reference + helper로 추출 (#40) | done |
 | 2026-03-03 | agent-tracker Task/Activity 영숫자 누락 수정 - jq gsub regex `[[:cntrl:]]` 교체 (#34) | done |
 | 2026-03-03 | PR #33 머지 완료 - agent-tracker 버그 수정, 성능 최적화, lifecycle 개선 4라운드 리뷰 통과 (#30 #31 #32) | done |
