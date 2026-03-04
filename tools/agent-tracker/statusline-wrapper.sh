@@ -15,22 +15,46 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Read stdin once
 input=$(cat)
 
-# Pre-compute tokens from transcript once, shared by both downstream scripts.
+# Pre-compute tokens + last user message from transcript in a single pass.
+# Uses tail to avoid slurping the entire file (O(fixed) instead of O(file size)).
 # total_input_tokens excludes system prompt/tools/memory — transcript is accurate.
 # See: github.com/anthropics/claude-code/issues/13652
 _tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
-export TRANSCRIPT_TOKENS=0
+export TRANSCRIPT_TOKENS=0 TRANSCRIPT_LAST_MSG=""
 if [[ -n "$_tp" && -f "$_tp" ]]; then
-  TRANSCRIPT_TOKENS=$(jq -s '
-    map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
-    last |
-    if . then
-      (.message.usage.input_tokens // 0) +
-      (.message.usage.cache_read_input_tokens // 0) +
-      (.message.usage.cache_creation_input_tokens // 0)
-    else 0 end
-  ' < "$_tp" 2>/dev/null || echo 0)
-  export TRANSCRIPT_TOKENS
+  _raw=$(tail -n 200 "$_tp" | jq -rs '
+    {
+      tokens: (
+        map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
+        last |
+        if . then
+          (.message.usage.input_tokens // 0) +
+          (.message.usage.cache_read_input_tokens // 0) +
+          (.message.usage.cache_creation_input_tokens // 0)
+        else 0 end
+      ),
+      last_msg: (
+        def is_unhelpful:
+          startswith("[Request interrupted") or
+          startswith("[Request cancelled") or
+          . == "";
+        [.[] | select(.type == "user") |
+         select(.message.content | type == "string" or
+                (type == "array" and any(.[]; .type == "text")))] |
+        reverse |
+        map(.message.content |
+          if type == "string" then .
+          else [.[] | select(.type == "text") | .text] | join(" ") end |
+          gsub("\n"; " ") | gsub("  +"; " ")) |
+        map(select(is_unhelpful | not)) |
+        first // ""
+      )
+    } | "\(.tokens)\u001e\(.last_msg)"
+  ' 2>/dev/null || echo "0")
+  if [[ -n "$_raw" ]]; then
+    IFS=$'\x1e' read -r TRANSCRIPT_TOKENS TRANSCRIPT_LAST_MSG <<< "$_raw"
+  fi
+  export TRANSCRIPT_TOKENS TRANSCRIPT_LAST_MSG
 fi
 
 # Write sidecar in background (fire-and-forget, never block display)
