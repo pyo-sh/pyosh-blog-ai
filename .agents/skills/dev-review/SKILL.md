@@ -23,10 +23,6 @@ Read diff + surrounding context. Check `{area}/CLAUDE.md` compliance.
 
 Focus: Security (OWASP Top 10), type safety, edge cases, error handling, performance (N+1), conventions.
 
-### 2.5. Check plan review
-
-Read Check plan items from PR body. For each item: note if covered by diff or requires post-merge verification.
-
 ### 3. Classify & submit
 
 Classify findings by severity and submit. → [review-template.md](references/review-template.md)

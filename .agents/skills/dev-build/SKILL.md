@@ -51,14 +51,14 @@ Run `/dev-log` before pushing.
 git push -u origin {type}/issue-{N}-{desc}
 ```
 
-Write body to `.workspace/messages/pr-{N}-body.md`, then:
+Read `{area}/.github/PULL_REQUEST_TEMPLATE.md` for the PR body structure. Write body to `.workspace/messages/pr-{N}-body.md`, then:
 
 ```bash
 gh pr create --title "{type}: description (#{N})" --body-file .workspace/messages/pr-{N}-body.md
 rm .workspace/messages/pr-{N}-body.md
 ```
 
-→ [pr-template.md](references/pr-template.md)
+→ [pr-template.md](references/pr-template.md) (title format, `gh pr create` usage)
 
 ### 5. Next step
 
