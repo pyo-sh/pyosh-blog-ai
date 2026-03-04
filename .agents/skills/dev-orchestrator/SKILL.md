@@ -7,6 +7,7 @@ description: Orchestrate multiple GitHub issues in parallel across tmux panes wi
 
 Batch orchestration: build dependency DAG from issues → dispatch to idle panes via `/dev-pipeline` → monitor completion → auto-unblock dependents.
 
+> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
 > Requires tmux session (`$TMUX`). Source helpers at start: `source scripts/orchestrate-helpers.sh`
 
 ## Agent Selection

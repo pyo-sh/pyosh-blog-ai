@@ -8,7 +8,7 @@ description: >
 
 # Dev-Issue
 
-Git remote rules and repo mapping in `CLAUDE.md`.
+Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
 
 ## Workflow
 
