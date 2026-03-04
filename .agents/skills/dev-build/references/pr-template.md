@@ -22,6 +22,9 @@ Closes #{N}
 | File | Change |
 |------|--------|
 | `file` | description |
+
+## Screenshots
+<!-- Attach if UI changes. Remove otherwise. -->
 PREOF
 
 gh pr create \
