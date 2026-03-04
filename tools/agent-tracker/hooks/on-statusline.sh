@@ -27,21 +27,11 @@ mkdir -p "$SIDECAR_DIR"
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
-# Calculate tokens from transcript (more accurate than total_input_tokens
-# which excludes system prompt/tools/memory).
-# See: github.com/anthropics/claude-code/issues/13652
-transcript_path=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
-used_tokens=0
-if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
-  used_tokens=$(jq -s '
-    map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
-    last |
-    if . then
-      (.message.usage.input_tokens // 0) +
-      (.message.usage.cache_read_input_tokens // 0) +
-      (.message.usage.cache_creation_input_tokens // 0)
-    else 0 end
-  ' < "$transcript_path" 2>/dev/null || echo 0)
+# Use pre-computed token count from statusline-wrapper.sh (avoids duplicate transcript read).
+# Falls back to total_input_tokens if env var is not set (standalone invocation).
+used_tokens="${TRANSCRIPT_TOKENS:-0}"
+if [[ "$used_tokens" -eq 0 ]]; then
+  used_tokens=$(printf '%s' "$input" | jq -r '.context_window.total_input_tokens // 0' 2>/dev/null)
 fi
 
 # Build jq expression for the merge
