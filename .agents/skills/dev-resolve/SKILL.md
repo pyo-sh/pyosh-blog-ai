@@ -7,6 +7,8 @@ description: Respond to PR review comments. Read review comments left by /dev-re
 
 Fix PR review comments → record → push → request re-review.
 
+> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
+
 ## Workflow
 
 ### 1. Read review

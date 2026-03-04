@@ -7,6 +7,8 @@ description: GitHub Issue-based development workflow. Issue → Worktree → Cod
 
 Issue → Worktree → Code → Push → PR. Review/merge handled by separate skills.
 
+> Area definitions, directory/repo mappings, worktree paths: [monorepo-layout.md](../../references/monorepo-layout.md)
+
 ## Workflow
 
 ### 0. Verify/create issue
