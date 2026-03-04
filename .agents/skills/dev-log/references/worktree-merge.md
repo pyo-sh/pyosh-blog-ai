@@ -13,17 +13,15 @@ Agent B: [create worktree] [write docs] [commit] ......[LOCK] [rebase+merge] [UN
 ## Constants
 
 ```bash
-# Detect monorepo root — if inside area repo (server/client), go up one level
-_GIT_ROOT="$(git rev-parse --show-toplevel)"
-if [ -d "$_GIT_ROOT/../server" ] && [ -f "$_GIT_ROOT/../CLAUDE.md" ]; then
-  ROOT_REPO="$(cd "$_GIT_ROOT/.." && pwd)"
-else
-  ROOT_REPO="$_GIT_ROOT"
-fi
+# Source shared monorepo helpers (→ .agents/references/monorepo-layout.md)
+source "$ROOT_REPO/.agents/scripts/monorepo-helpers.sh"
+ROOT_REPO="$MONOREPO_ROOT"
 LOCK_FILE="$ROOT_REPO/.workspace/dev-log.lock"
 LOCK_TIMEOUT=60   # seconds
 LOCK_INTERVAL=5   # seconds
 ```
+
+> **Note**: The AI must resolve `$ROOT_REPO` before sourcing. Use the monorepo root directory where `.agents/` lives. Do not use `git rev-parse` - this monorepo has multiple independent git repos.
 
 ## Phase 1: Create Worktree
 

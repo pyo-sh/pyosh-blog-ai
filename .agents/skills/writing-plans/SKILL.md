@@ -5,6 +5,8 @@ description: "Write detailed implementation plans from specs or requirements bef
 
 # Writing Plans
 
+> Area definitions, directory/repo mappings, verify commands: [monorepo-layout.md](../../references/monorepo-layout.md)
+
 Write implementation plans with exact file paths, complete code, and test commands. Each task is one 2-5 minute action. DRY. YAGNI. TDD (server). Frequent commits.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."

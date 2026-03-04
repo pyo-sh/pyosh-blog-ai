@@ -7,6 +7,8 @@ description: Manage progress/, findings/, and decisions/ records in the pyosh-bl
 
 Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md`.
 
+> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
+
 **Core strategy**: worktree isolation → scan indices → write records → lock merge → cleanup
 
 ## Directory Structure

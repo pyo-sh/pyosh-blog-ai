@@ -7,6 +7,8 @@ description: PR code review skill. Run in a separate session from the code autho
 
 Review PRs in a **different session** from the code author. Comments only — never modify code.
 
+> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
+
 ## Steps
 
 ### 1. Read PR

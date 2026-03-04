@@ -9,7 +9,7 @@ description: >-
 
 Save to `{root}/.workspace/handoffs/handoff_{summary}.md` where `{summary}` is a one-word topic.
 
-**Find root**: Walk up from CWD to find the directory containing `.agents/` (do NOT use `git rev-parse` — this monorepo has multiple independent git repos).
+**Find root**: Walk up from CWD to find the directory containing `.agents/` (do NOT use `git rev-parse` - this monorepo has multiple independent git repos). See [monorepo-layout.md](../../references/monorepo-layout.md).
 
 If the file already exists, read it first to preserve prior context.
 

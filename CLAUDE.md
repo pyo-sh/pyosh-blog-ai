@@ -4,6 +4,8 @@ Personal blog monorepo — Next.js frontend + Fastify API server.
 
 ## Git Repo Structure (Important)
 
+> Area definitions, directory/repo mappings, worktree paths, shell helpers: [monorepo-layout.md](.agents/references/monorepo-layout.md)
+
 Each directory is an **independent Git repo**. Run `gh` commands from the corresponding directory.
 
 | Path | GitHub Repo | Contents |

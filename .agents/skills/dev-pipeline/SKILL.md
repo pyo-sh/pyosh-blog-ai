@@ -7,6 +7,7 @@ description: Orchestrate the full dev cycle — code, review, resolve — with a
 
 Orchestrate: `/dev-build` → `/dev-review` → `/dev-resolve` → merge. Review/resolve run in a **sandboxed side pane**. State tracked per-issue for crash recovery.
 
+> Area definitions, directory/repo mappings, worktree paths: [monorepo-layout.md](../../references/monorepo-layout.md)
 > Requires tmux session (`$TMUX`). Source helpers: `source scripts/pipeline-helpers.sh`
 
 ## Agent selection

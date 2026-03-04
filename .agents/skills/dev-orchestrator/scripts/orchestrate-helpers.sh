@@ -2,13 +2,10 @@
 # orchestrate-helpers.sh — Shell helpers for dev-orchestrator skill
 # Source this file at orchestrator start.
 
-# Detect monorepo root
-_GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-if [ -d "$_GIT_ROOT/../server" ] && [ -f "$_GIT_ROOT/../CLAUDE.md" ]; then
-  MONOREPO_ROOT="$(cd "$_GIT_ROOT/.." && pwd)"
-else
-  MONOREPO_ROOT="$_GIT_ROOT"
-fi
+# Source shared monorepo helpers for MONOREPO_ROOT and area resolution.
+# → .agents/references/monorepo-layout.md
+_ORCH_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$_ORCH_HELPERS_DIR/../../../../.agents/scripts/monorepo-helpers.sh"
 ORCH_BASE="$MONOREPO_ROOT/.workspace/orchestrate"
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 
@@ -138,11 +135,7 @@ orch_dispatch() {
   fi
 
   local area
-  area=$(basename "$area_dir")
-  # workspace area dir is monorepo root; area label is "workspace"
-  if [ "$area_dir" = "$MONOREPO_ROOT" ]; then
-    area="workspace"
-  fi
+  area=$(monorepo_area_from_dir "$area_dir")
 
   local prompt
   if [ "$agent" = "codex" ]; then
@@ -196,8 +189,7 @@ orch_check_completion() {
   local issue=$1
   local area_dir=$2
   local area
-  area=$(basename "$area_dir")
-  [ "$area_dir" = "$MONOREPO_ROOT" ] && area="workspace"
+  area=$(monorepo_area_from_dir "$area_dir")
 
   # 1. Signal file
   local signal
