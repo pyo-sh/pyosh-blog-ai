@@ -24,7 +24,7 @@ windows:
         - # bottom-right
 
   - server1:
-      layout: even-vertical
+      layout: tiled
       panes:
         - # pane 1
         - # pane 2
@@ -32,7 +32,7 @@ windows:
         - # pane 4
 
   - server2:
-      layout: even-vertical
+      layout: tiled
       panes:
         - # pane 1
         - # pane 2
@@ -40,7 +40,7 @@ windows:
         - # pane 4
 
   - client1:
-      layout: even-vertical
+      layout: tiled
       panes:
         - # pane 1
         - # pane 2
@@ -48,7 +48,7 @@ windows:
         - # pane 4
 
   - client2:
-      layout: even-vertical
+      layout: tiled
       panes:
         - # pane 1
         - # pane 2
