@@ -137,15 +137,18 @@ orch_dispatch() {
   local area
   area=$(monorepo_area_from_dir "$area_dir")
 
+  # Always start from monorepo root so Claude/Codex can find root repo skills
+  # (dev-pipeline, dev-review, dev-resolve). The area param in the prompt
+  # tells /dev-pipeline which subdirectory to work in.
   local prompt
   if [ "$agent" = "codex" ]; then
-    prompt="/dev-pipeline ${area} #${issue}"
+    prompt="/dev-pipeline ${area} #${issue}. Use ${agent} for review and resolve panes."
     tmux send-keys -t "$pane_id" \
-      "cd '${area_dir}' && codex exec --dangerously-bypass-approvals-and-sandbox '${prompt}'" Enter
+      "cd '${MONOREPO_ROOT}' && codex exec --dangerously-bypass-approvals-and-sandbox '${prompt}'" Enter
   else
-    prompt="/dev-pipeline ${area} #${issue}"
+    prompt="/dev-pipeline ${area} #${issue}. Use ${agent} for review and resolve panes."
     tmux send-keys -t "$pane_id" \
-      "cd '${area_dir}' && claude --dangerously-skip-permissions '${prompt}'" Enter
+      "cd '${MONOREPO_ROOT}' && claude --dangerously-skip-permissions '${prompt}'" Enter
   fi
 
   return 0
@@ -186,12 +189,17 @@ orch_check_completion() {
   # Checks if a dispatched issue's pipeline has finished.
   # stdout: "completed", "failed", or "running"
   # Returns: 0 = completed/failed (terminal), 1 = still running
+  #
+  # Detection priority:
+  #   1. Signal file (written by pipeline AI at end)
+  #   2. Pane command (AI process still running?)
+  #   3. PR status (merged/open/absent)
   local issue=$1
   local area_dir=$2
   local area
   area=$(monorepo_area_from_dir "$area_dir")
 
-  # 1. Signal file
+  # 1. Signal file (highest priority - explicit completion signal)
   local signal
   signal=$(orch_signal_path "$area" "$issue")
   if [ -f "$signal" ]; then
@@ -204,40 +212,38 @@ orch_check_completion() {
     fi
   fi
 
-  # 2. Pipeline state gone = pipeline finished (check PR status)
-  # Path is area-namespaced: .workspace/pipeline/{area}/issue-{N}.state.json
-  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-  if [ ! -f "$pipeline_state" ]; then
-    # Grace window: if recently dispatched, pipeline may not have created state yet
-    local dispatch_time
-    dispatch_time=$(orch_state_read "$area" | jq -r ".dispatched[\"$issue\"].dispatchedAt // empty")
-    if [ -n "$dispatch_time" ]; then
-      local dispatch_ts now_ts elapsed
-      dispatch_ts=$(date -d "$dispatch_time" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$dispatch_time" +%s 2>/dev/null)
-      now_ts=$(date +%s)
-      elapsed=$(( now_ts - dispatch_ts ))
-      if [ "$elapsed" -lt 60 ]; then
-        # Within startup grace window — pipeline may not have written state yet
-        echo "running"; return 1
-      fi
-    fi
+  # 2. Pane command check - if AI process is still running, it's running
+  local state
+  state=$(orch_state_read "$area")
+  local pane_id
+  pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane // empty")
 
-    # Check if PR is merged
-    local pr_state
-    pr_state=$(_orch_pr_list "$area_dir" "$issue" merged number 'length')
-    if [ "${pr_state:-0}" -gt 0 ] 2>/dev/null; then
-      echo "completed"; return 0
+  if [ -n "$pane_id" ] && orch_pane_alive "$pane_id"; then
+    local cmd
+    cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
+    if [[ "$cmd" == "claude" ]] || [[ "$cmd" == "codex" ]] || [[ "$cmd" == "node" ]]; then
+      # AI process still running
+      echo "running"; return 1
     fi
-    # PR exists but not merged = pipeline may have cleaned up without merging
-    local pr_open
-    pr_open=$(_orch_pr_list "$area_dir" "$issue" open number 'length')
-    if [ "${pr_open:-0}" -eq 0 ] 2>/dev/null; then
-      # No state file, no open PR, no merged PR → failed or never started
-      echo "failed"; return 0
-    fi
+    # Pane alive but shell prompt (AI exited) - fall through to PR check
   fi
 
-  echo "running"; return 1
+  # 3. AI process exited or pane dead - check PR status
+  local pr_merged
+  pr_merged=$(_orch_pr_list "$area_dir" "$issue" merged number 'length')
+  if [ "${pr_merged:-0}" -gt 0 ] 2>/dev/null; then
+    echo "completed"; return 0
+  fi
+
+  local pr_open
+  pr_open=$(_orch_pr_list "$area_dir" "$issue" open number 'length')
+  if [ "${pr_open:-0}" -gt 0 ] 2>/dev/null; then
+    # PR exists but not merged - pipeline may still be cleaning up
+    echo "running"; return 1
+  fi
+
+  # No signal, no AI process, no PR - failed
+  echo "failed"; return 0
 }
 
 orch_update_last_activity() {

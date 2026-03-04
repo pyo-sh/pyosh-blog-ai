@@ -12,7 +12,7 @@ Orchestrate: `/dev-build` → `/dev-review` → `/dev-resolve` → merge. Review
 
 ## Agent selection
 
-Ask the user: **Claude** (`claude --dangerously-skip-permissions`) or **Codex** (`codex exec --dangerously-bypass-approvals-and-sandbox`). Store as `"agent": "claude"|"codex"` in state.
+If the prompt specifies an agent (e.g., "Use claude for review and resolve panes"), use that agent without asking. Otherwise, ask the user: **Claude** (`claude --dangerously-skip-permissions`) or **Codex** (`codex exec --dangerously-bypass-approvals-and-sandbox`). Store as `"agent": "claude"|"codex"` in state.
 
 ## Workflow
 
@@ -67,10 +67,12 @@ fi
 
 ### 2. Open review pane
 
+Always use **monorepo root** (`$MONOREPO_ROOT`) as workdir so the side-pane AI can find root repo skills (dev-review, dev-resolve).
+
 ```bash
 REVIEW_PANE=$(pipeline_open_pane_verified \
-  "$(pwd)/{area}" \
-  "Run /dev-review for PR #{PR#}. After review, exit." \
+  "$MONOREPO_ROOT" \
+  "Run /dev-review for PR #{PR#} in {area} repo. After review, exit." \
   "$AGENT" "$ORCHESTRATOR_PANE" "$ISSUE" "$AREA")
 rc=$?
 ```
@@ -107,8 +109,8 @@ Decision:
 ```bash
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
 RESOLVE_PANE=$(pipeline_open_pane_verified \
-  "$WORKTREE_PATH" \
-  "Run /dev-resolve for PR #{PR#}. After done, exit." \
+  "$MONOREPO_ROOT" \
+  "Run /dev-resolve for PR #{PR#} in worktree ${WORKTREE_PATH}. After done, exit." \
   "$AGENT" "$ORCHESTRATOR_PANE" "$ISSUE" "$AREA")
 rc=$?
 ```

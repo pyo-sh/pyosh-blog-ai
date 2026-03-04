@@ -7,7 +7,7 @@ failed, or stalled.
 
 `orch_check_completion <issue> <area_dir>` checks in priority order:
 
-### 1. Signal File (fastest)
+### 1. Signal file (highest priority)
 
 ```
 .workspace/orchestrate/{area}/issue-{N}.exit
@@ -23,37 +23,35 @@ echo "ok" > "$ORCH_BASE/$AREA/issue-${ISSUE}.exit"
 
 If the pipeline AI does not write the signal file (older version), fall back to method 2.
 
-### 2. Pipeline State + PR Status
+### 2. Pane command (AI process running?)
 
-If no signal file and `.workspace/pipeline/{area}/issue-{N}.state.json` is absent:
+Check the pane's current foreground command via tmux:
+
+```bash
+cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}')
+```
+
+| Command | Meaning |
+|---------|---------|
+| `claude`, `codex`, `node` | AI process still running → `running` |
+| `bash`, `zsh`, `sh`, `fish` | AI exited, shell prompt → fall through to PR check |
+| pane dead | Process crashed → fall through to PR check |
+
+This replaces the previous pipeline state file-based detection, which caused false `failed` judgments
+when the state file hadn't been created yet (grace period too short).
+
+### 3. PR status (AI process finished)
+
+After AI process exits or pane dies:
 
 ```bash
 # Check for merged PR
 gh pr list --search "Closes #${issue}" --state merged --json number --jq 'length'
 ```
 
-- Count > 0 → `completed`
-- Count = 0 and no open PR → `failed`
-- Count = 0 but open PR exists → still `running` (pipeline cleaning up)
-
-### 3. Still Running
-
-Pipeline state file exists → `running`. Poll again next cycle.
-
-## Pane Health
-
-Each dispatched issue's pane ID is stored in `batch.state.json` under `dispatched.{N}.pane`.
-
-Pane check (informational only — not used for completion):
-
-```bash
-tmux list-panes -a -F '#{pane_id}' | grep -qx "$PANE_ID"
-```
-
-If the pane is dead but the issue is still `dispatched` (not completed/failed):
-- Check completion via signal file / PR status first
-- If completion signal found → normal finish (pane closed after done)
-- If no completion signal → likely crash; retry or report
+- Merged PR exists → `completed`
+- Open PR exists → `running` (pipeline may still be cleaning up)
+- No PR at all → `failed`
 
 ## Stall Detection
 
