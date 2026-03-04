@@ -27,11 +27,27 @@ mkdir -p "$SIDECAR_DIR"
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
-# Build jq expression for the merge (input is already parsed, just need the expression ready)
+# Calculate tokens from transcript (more accurate than total_input_tokens
+# which excludes system prompt/tools/memory).
+# See: github.com/anthropics/claude-code/issues/13652
+transcript_path=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
+used_tokens=0
+if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
+  used_tokens=$(jq -s '
+    map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
+    last |
+    if . then
+      (.message.usage.input_tokens // 0) +
+      (.message.usage.cache_read_input_tokens // 0) +
+      (.message.usage.cache_creation_input_tokens // 0)
+    else 0 end
+  ' < "$transcript_path" 2>/dev/null || echo 0)
+fi
+
+# Build jq expression for the merge
 jq_expr='
   ($input.model.display_name // $input.model.id // "Claude") as $model |
   ($input.context_window.context_window_size // 200000) as $max_tokens |
-  ($input.context_window.total_input_tokens // 0) as $used_tokens |
   (if $max_tokens > 0 then ($used_tokens * 100 / $max_tokens | floor) else 0 end) as $pct |
   $existing * {
     pane_id: $pane_id,
@@ -56,7 +72,7 @@ jq_expr='
   [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
 
   updated=$(jq -n --argjson existing "$existing" --argjson input "$input" --arg pane_id "$pane_id" \
-    "$jq_expr" 2>/dev/null)
+    --argjson used_tokens "${used_tokens:-0}" "$jq_expr" 2>/dev/null)
 
   if [[ -n "$updated" ]]; then
     tmp="${sidecar_path}.tmp.$$"
