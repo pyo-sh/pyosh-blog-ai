@@ -14,8 +14,8 @@
 
 - `pipeline_open_pane_verified()`: validates dir, opens pane, 3s startup check. Single attempt only (no internal retry). On failure, captures dead pane output via `remain-on-exit` for diagnosis, then cleans up.
 - `pipeline_open_pane_with_retry()`: state-based retry wrapper. Reads `{field}Retries` from state, checks against `maxPaneRetries`, increments before attempting. Kills previous pane for the same field before opening new one.
-- `pipeline_pane_alive_verified()`: checks pane existence AND verifies the running command matches expected (claude/codex). Prevents false positives after tmux server restart.
-- `pipeline_poll_review()` / `pipeline_poll_commits()`: checks API first (catches normal exit), then pane health.
+- `pipeline_pane_alive_verified()`: checks pane existence AND verifies the running command is a known agent (claude/codex). Used only at recovery entry points to validate stale pane IDs from previous sessions. NOT used in polling (child processes like git/gh change `#{pane_current_command}` and cause false PANE_DEAD).
+- `pipeline_poll_review()` / `pipeline_poll_commits()`: checks API first (catches normal exit), then pane health via `pipeline_pane_alive()` (basic existence check).
 
 ## Orchestrator protocol for opening panes
 

@@ -84,9 +84,19 @@ fi
 REVIEW_ID=$(pipeline_check_review_exists "{area_dir}" {PR#} {lastReviewId})
 ```
 
-If found -> skip pane open, go directly to Step 3 (process review). Otherwise, continue below.
+If found -> skip pane open, go directly to Step 3 (process review).
 
-Kill any previous review pane, then open using the 3-layer protocol ([pane-lifecycle.md](references/pane-lifecycle.md)):
+If not found, check if a review pane from a previous session is still alive:
+
+```bash
+PREV_PANE=$(pipeline_state_read "$ISSUE" "$AREA" | jq -r '.reviewPane // empty')
+if [ -n "$PREV_PANE" ] && pipeline_pane_alive_verified "$PREV_PANE"; then
+  REVIEW_PANE="$PREV_PANE"
+  # Skip pane open, go directly to Step 3 (poll existing pane)
+fi
+```
+
+If neither review exists nor pane is alive, open using the 3-layer protocol ([pane-lifecycle.md](references/pane-lifecycle.md)):
 
 ```bash
 # Layer 1: Pre-defense
@@ -117,7 +127,7 @@ rc=$?
 
 - `rc=0` -> success, continue below
 - `rc=1` (TIMEOUT) -> kill pane, report to user
-- `rc=2` (PANE_DEAD) -> reset `reviewPaneRetries` to 0 in state, go back to Step 2
+- `rc=2` (PANE_DEAD) -> go back to Step 2 (do NOT reset `reviewPaneRetries` - let retries accumulate)
 
 On success - kill pane, fetch and read review:
 
@@ -147,7 +157,19 @@ Decision:
 NEW_SHA=$(pipeline_check_new_commits "{area_dir}" {PR#} "{lastCommitSha}")
 ```
 
-If found -> skip pane open, go directly to Step 4b (process commits). Otherwise, continue below.
+If found -> skip pane open, go directly to Step 4b (process commits).
+
+If not found, check if a resolve pane from a previous session is still alive:
+
+```bash
+PREV_PANE=$(pipeline_state_read "$ISSUE" "$AREA" | jq -r '.resolvePane // empty')
+if [ -n "$PREV_PANE" ] && pipeline_pane_alive_verified "$PREV_PANE"; then
+  RESOLVE_PANE="$PREV_PANE"
+  # Skip pane open, go directly to Step 4b (poll existing pane)
+fi
+```
+
+If neither new commits exist nor pane is alive, continue below.
 
 ```bash
 # Layer 1
@@ -177,9 +199,15 @@ rc=$?
 
 - `rc=0` -> continue below
 - `rc=1` (TIMEOUT) -> kill pane, report to user
-- `rc=2` (PANE_DEAD) -> reset `resolvePaneRetries` to 0, go back to Step 4a
+- `rc=2` (PANE_DEAD) -> go back to Step 4a (do NOT reset `resolvePaneRetries` - let retries accumulate)
 
-When new commits found: kill pane, update `lastCommitSha`, show diff (`gh pr diff {PR#}`).
+When new commits found: kill pane, update state, show diff (`gh pr diff {PR#}`):
+
+```bash
+pipeline_kill_pane "$RESOLVE_PANE"
+pipeline_state_update "$ISSUE" "$AREA" \
+  ".lastCommitSha = \"${NEW_SHA}\" | .resolvePaneRetries = 0"
+```
 
 - `skipReview: true` -> Step 6
 - `skipReview: false` -> ask user: "Re-review" (reset `reviewPaneRetries` to 0 -> Step 2) | "Merge as-is" (-> Step 6) | "Manual edit" (user edits, then Step 2)

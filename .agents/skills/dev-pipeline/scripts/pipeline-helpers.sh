@@ -58,7 +58,7 @@ pipeline_state_update() {
   local current
   current=$(pipeline_state_read "$issue" "$area")
   local updated
-  if ! updated=$(echo "$current" | jq "$jq_expr | .updatedAt = now | todate"); then
+  if ! updated=$(echo "$current" | jq "$jq_expr | .updatedAt = (now | todate)"); then
     >&2 echo "[pipeline] jq failed for expression: $jq_expr"
     return 1
   fi
@@ -342,7 +342,7 @@ pipeline_poll_review() {
       return 0
     fi
 
-    if [ -n "$review_pane_id" ] && ! pipeline_pane_alive_verified "$review_pane_id"; then
+    if [ -n "$review_pane_id" ] && ! pipeline_pane_alive "$review_pane_id"; then
       review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
         --jq "[.[] | select(.id > ${last_review_id})
                    | select(.body | startswith(\"## Review Summary\"))]
@@ -393,7 +393,7 @@ pipeline_poll_commits() {
       return 0
     fi
 
-    if [ -n "$resolve_pane_id" ] && ! pipeline_pane_alive_verified "$resolve_pane_id"; then
+    if [ -n "$resolve_pane_id" ] && ! pipeline_pane_alive "$resolve_pane_id"; then
       latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
         --jq '.[-1].sha')
       if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
