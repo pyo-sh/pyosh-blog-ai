@@ -104,6 +104,47 @@ pipeline_pane_alive() {
   tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx "$pane_id"
 }
 
+pipeline_pane_snapshot() {
+  # Usage: pipeline_pane_snapshot
+  # Outputs sorted list of all current tmux pane IDs.
+  # Use before/after pane creation to detect orphans.
+  tmux list-panes -a -F '#{pane_id}' 2>/dev/null | sort
+}
+
+pipeline_pane_orphan_cleanup() {
+  # Usage: pipeline_pane_orphan_cleanup <before_file> <after_file>
+  # Kills panes that appeared between two snapshots (orphans from failed opens).
+  # before_file/after_file: files containing sorted pane ID lists.
+  local before=$1
+  local after=$2
+  local orphans
+  orphans=$(comm -13 "$before" "$after")
+  local count=0
+  for p in $orphans; do
+    tmux kill-pane -t "$p" 2>/dev/null
+    count=$((count + 1))
+  done
+  if [ "$count" -gt 0 ]; then
+    >&2 echo "[pipeline] Cleaned up $count orphan pane(s): $orphans"
+  fi
+}
+
+pipeline_kill_state_pane() {
+  # Usage: pipeline_kill_state_pane <issue> <area> <field>
+  # Kills a pane recorded in state (e.g. reviewPane, resolvePane).
+  local issue=$1
+  local area=$2
+  local field=$3
+  if ! pipeline_state_exists "$issue" "$area"; then
+    return
+  fi
+  local pane_id
+  pane_id=$(pipeline_state_read "$issue" "$area" | jq -r ".${field} // empty")
+  if [ -n "$pane_id" ]; then
+    pipeline_kill_pane "$pane_id"
+  fi
+}
+
 pipeline_resolve_worktree_path() {
   # Usage: pipeline_resolve_worktree_path <issue> [area]
   # Resolves actual worktree directory, checking current path first, then legacy.
@@ -135,9 +176,11 @@ pipeline_resolve_worktree_path() {
 pipeline_open_pane_verified() {
   # Usage: pipeline_open_pane_verified <working_dir> <prompt> [agent] [target_pane] [issue] [area]
   # Opens a side pane and verifies it survives startup (3-second grace period).
-  # On failure, retries once with re-resolved worktree path (if issue/area provided).
+  # Single attempt only - no internal retry. On failure, captures dead pane output
+  # for diagnosis via remain-on-exit, then cleans up.
   # stdout: pane_id on success, diagnostic token on failure
-  # Returns: 0 = success, 2 = PANE_DEAD, 3 = PATH_INVALID, 4 = RETRY_FAILED
+  # stderr: diagnosis info on failure (last 20 lines of dead pane output)
+  # Returns: 0 = success, 2 = PANE_DEAD, 3 = PATH_INVALID
   local workdir=$1
   local prompt=$2
   local agent=${3:-claude}
@@ -159,7 +202,7 @@ pipeline_open_pane_verified() {
     fi
   fi
 
-  # Phase 2: Open pane
+  # Phase 2: Open pane with remain-on-exit for failure diagnosis
   local pane_id
   pane_id=$(pipeline_open_pane "$workdir" "$prompt" "$agent" "$target_pane")
 
@@ -168,41 +211,27 @@ pipeline_open_pane_verified() {
     return 2
   fi
 
+  # Enable remain-on-exit so dead panes stay visible for diagnosis
+  tmux set-option -t "$pane_id" remain-on-exit on 2>/dev/null
+
   # Phase 3: Verify startup (3-second grace period)
   sleep 3
   if pipeline_pane_alive "$pane_id"; then
+    # Pane survived - disable remain-on-exit for normal operation
+    tmux set-option -t "$pane_id" remain-on-exit off 2>/dev/null
     echo "$pane_id"
     return 0
   fi
 
-  # Pane died — attempt one retry with re-resolved path
+  # Phase 4: Pane died - capture output for diagnosis, then clean up
   >&2 echo "[pipeline] Pane $pane_id died within 3s of startup"
+  local diagnosis
+  diagnosis=$(tmux capture-pane -t "$pane_id" -p 2>/dev/null | tail -20)
+  tmux kill-pane -t "$pane_id" 2>/dev/null
 
-  if [ -n "$issue" ]; then
-    local resolved_path
-    resolved_path=$(pipeline_resolve_worktree_path "$issue" "$area")
-    if [ $? -ne 0 ]; then
-      echo "PATH_INVALID"
-      return 3
-    fi
-
-    >&2 echo "[pipeline] Retrying with resolved path: $resolved_path"
-    pane_id=$(pipeline_open_pane "$resolved_path" "$prompt" "$agent" "$target_pane")
-
-    if [ -z "$pane_id" ]; then
-      echo "RETRY_FAILED"
-      return 4
-    fi
-
-    sleep 3
-    if pipeline_pane_alive "$pane_id"; then
-      echo "$pane_id"
-      return 0
-    fi
-
-    >&2 echo "[pipeline] Retry pane $pane_id also died"
-    echo "RETRY_FAILED"
-    return 4
+  if [ -n "$diagnosis" ]; then
+    >&2 echo "[pipeline] Last output from dead pane:"
+    >&2 echo "$diagnosis"
   fi
 
   echo "PANE_DEAD"
