@@ -106,8 +106,9 @@ ORCH_WORK_WINDOWS="${ORCH_WORK_WINDOWS:-server1 server2 client1 client2}"
 orch_find_idle_panes() {
   # Usage: orch_find_idle_panes [exclude_pane]
   # Returns space-separated list of idle pane IDs (one per work window).
-  # Only considers pane index 0 (main pane) of each window to prevent
-  # dispatching to sub-panes within the same window.
+  # Only considers the first pane (lowest index) of each window to prevent
+  # dispatching to sub-panes. Uses head -1 instead of index == 0 to be
+  # independent of tmux pane-base-index setting.
   # Idle = shell (bash/zsh/sh/fish) with no foreground job.
   local exclude=${1:-""}
 
@@ -116,10 +117,11 @@ orch_find_idle_panes() {
 
   for win in $ORCH_WORK_WINDOWS; do
     tmux list-panes -t "$win" \
-      -F '#{session_id} #{pane_id} #{pane_current_command} #{pane_index}' 2>/dev/null
+      -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null \
+      | head -1
   done \
     | awk -v sess="$current_session" -v excl="$exclude" '
-        $1 == sess && $4 == "0" && ($3 == "bash" || $3 == "zsh" || $3 == "sh" || $3 == "fish") {
+        $1 == sess && ($3 == "bash" || $3 == "zsh" || $3 == "sh" || $3 == "fish") {
           if ($2 != excl) print $2
         }' \
     | tr '\n' ' '
