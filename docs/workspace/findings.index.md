@@ -16,6 +16,7 @@
 | 009 | Pipeline review/resolve pane workdir 설정               | 2026-03-04 | #pipeline #claude-code #skills #workdir #monorepo |
 | 008 | Claude Code statusLine의 total_input_tokens 부정확 문제  | 2026-03-04 | #claude-code #statusline #tokens #transcript |
 | 010 | Orchestrator dispatch 버그 3종 분석 및 수정              | 2026-03-05 | #orchestrator #dispatch #set-e #sub-pane #dag |
+| 011 | Pipeline pane orphan 증식 원인과 해결                    | 2026-03-06 | #pipeline #tmux #pane #orphan #remain-on-exit #retry |
 
 ## 상세 문서
 
@@ -29,6 +30,7 @@
 - [findings.009-pipeline-pane-workdir.md](./findings/findings.009-pipeline-pane-workdir.md) - review/resolve pane은 /workspace(모노레포 루트)에서 시작해야 skills 탐색 가능
 - [findings.008-statusline-total-input-tokens.md](./findings/findings.008-statusline-total-input-tokens.md) - Claude Code statusLine의 total_input_tokens가 시스템 프롬프트/도구/메모리 제외하여 부정확
 - [findings.010-orchestrator-dispatch-bugs.md](./findings/findings.010-orchestrator-dispatch-bugs.md) - set-e 크래시, sub-pane 과잉 dispatch, 외부 dep 영구 차단 3종 분석
+- [findings.011-pane-orphan-proliferation.md](./findings/findings.011-pane-orphan-proliferation.md) - pipeline pane orphan 증식: remain-on-exit 상호작용, alive vs verified 분리, jq 우선순위
 
 ## 주요 원칙
 
@@ -41,3 +43,6 @@
 - **Orchestrator helper 함수는 항상 return 0** → stdout으로만 상태 전달. `set -e` caller 안전.
 - **orch_find_idle_panes는 window당 1 pane** → sub-pane dispatch 방지. `head -1`로 `pane-base-index` 무관.
 - **orch_init DAG 자동 필터링** → batch에 없는 외부 dep을 자동 제거. AI 수동 필터 불필요.
+- **remain-on-exit on 상태에서 pane_alive는 dead pane도 true** → `#{pane_dead}` flag로 직접 확인 필요
+- **Polling은 pane_alive, recovery는 pane_alive_verified** → child process가 `#{pane_current_command}` 변경하므로 polling에서 verified 사용 금지
+- **State 기반 retry counter는 성공 시에만 reset** → PANE_DEAD에서 reset하면 무한 루프
