@@ -39,18 +39,26 @@ orch_init() {
   local batch_id
   batch_id="batch-$(date +%Y%m%d-%H%M%S)"
 
-  # Build initial status: pending for issues with no deps, blocked otherwise
-  local status_json
-  status_json=$(echo "$issues_json $dag_json" | jq -n \
+  # Filter DAG: remove deps not in the batch to prevent permanent blocks.
+  # External deps (closed issues, out-of-batch) are treated as already satisfied.
+  local filtered_dag
+  filtered_dag=$(jq -n \
     --argjson issues "$issues_json" \
     --argjson dag "$dag_json" \
+    '$dag | to_entries | map(.value |= map(select(. as $d | $issues | any(. == $d)))) | from_entries')
+
+  # Build initial status: pending for issues with no deps, blocked otherwise
+  local status_json
+  status_json=$(jq -n \
+    --argjson issues "$issues_json" \
+    --argjson dag "$filtered_dag" \
     'reduce $issues[] as $n ({}; . + {($n|tostring): (if ($dag[($n|tostring)] // []) | length > 0 then "blocked" else "pending" end)})')
 
   jq -n \
     --arg area "$area" \
     --arg batchId "$batch_id" \
     --argjson issues "$issues_json" \
-    --argjson dag "$dag_json" \
+    --argjson dag "$filtered_dag" \
     --argjson status "$status_json" \
     --arg agent "$agent" \
     --arg orchPane "$orch_pane" \
@@ -483,8 +491,14 @@ orch_poll_cycle() {
 
       if orch_dispatch "$issue" "$pane" "$area_dir" "$agent"; then
         orch_record_dispatch "$area" "$issue" "$pane"
-        >&2 echo "[orchestrator] Dispatched #${issue} → pane $pane"
-        dispatched_count=$((dispatched_count + 1))
+        if ! orch_verify_startup "$pane" 5; then
+          >&2 echo "[orchestrator] Startup failed for #${issue} on pane $pane — reverting to pending"
+          orch_status_set "$area" "$issue" "pending"
+          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+        else
+          >&2 echo "[orchestrator] Dispatched #${issue} → pane $pane"
+          dispatched_count=$((dispatched_count + 1))
+        fi
       else
         >&2 echo "[orchestrator] Pane $pane dead — skipping for issue #${issue}"
       fi

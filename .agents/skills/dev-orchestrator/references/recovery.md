@@ -63,11 +63,9 @@ while true; do
   orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT" "$ORCH_PANE"
 
   # Check batch completion
-  ALL_DONE=$(orch_state_read "$AREA" | jq -r '
-    .issues | map(tostring) | .[] as $n |
-    .status[$n] // "pending" | select(. == "pending" or . == "dispatched" or . == "blocked")
-  ' | wc -l)
-  [ "$ALL_DONE" -eq 0 ] && break
+  REMAINING=$(orch_state_read "$AREA" | jq \
+    '[.status | to_entries[] | select(.value == "pending" or .value == "dispatched" or .value == "blocked")] | length')
+  [ "$REMAINING" -eq 0 ] && break
 
   sleep 30
 done
