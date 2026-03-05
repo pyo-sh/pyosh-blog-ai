@@ -25,37 +25,48 @@ orch_signal_path() {
 }
 
 orch_init() {
-  # Usage: orch_init <area> <agent> <orchestrator_pane> <issues_json> <dag_json>
+  # Usage: orch_init <area> <agent> <orchestrator_pane> <issues_json> <dag_json> [max_concurrent]
   # Creates initial batch state file.
   local area=$1
   local agent=$2
   local orch_pane=$3
   local issues_json=$4  # JSON array e.g. '[1,2,3]'
   local dag_json=$5     # JSON object e.g. '{"3":[1,2]}'
+  local max_concurrent=${6:-99}  # default: no practical limit
 
   mkdir -p "$ORCH_BASE/$area"
 
   local batch_id
   batch_id="batch-$(date +%Y%m%d-%H%M%S)"
 
-  # Build initial status: pending for issues with no deps, blocked otherwise
-  local status_json
-  status_json=$(echo "$issues_json $dag_json" | jq -n \
+  # Filter DAG: remove deps not in the batch to prevent permanent blocks.
+  # External deps (closed issues, out-of-batch) are treated as already satisfied.
+  local filtered_dag
+  filtered_dag=$(jq -n \
     --argjson issues "$issues_json" \
     --argjson dag "$dag_json" \
+    '$dag | to_entries | map(.value |= map(select(. as $d | $issues | any(. == $d)))) | from_entries')
+
+  # Build initial status: pending for issues with no deps, blocked otherwise
+  local status_json
+  status_json=$(jq -n \
+    --argjson issues "$issues_json" \
+    --argjson dag "$filtered_dag" \
     'reduce $issues[] as $n ({}; . + {($n|tostring): (if ($dag[($n|tostring)] // []) | length > 0 then "blocked" else "pending" end)})')
 
   jq -n \
     --arg area "$area" \
     --arg batchId "$batch_id" \
     --argjson issues "$issues_json" \
-    --argjson dag "$dag_json" \
+    --argjson dag "$filtered_dag" \
     --argjson status "$status_json" \
     --arg agent "$agent" \
     --arg orchPane "$orch_pane" \
+    --argjson maxConcurrent "$max_concurrent" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
       status: $status, dispatched: {}, agent: $agent,
+      maxConcurrent: $maxConcurrent,
       orchestratorPane: $orchPane,
       createdAt: $now, updatedAt: $now}' \
     > "$(orch_state_path "$area")"
@@ -102,8 +113,10 @@ ORCH_WORK_WINDOWS="${ORCH_WORK_WINDOWS:-server1 server2 client1 client2}"
 
 orch_find_idle_panes() {
   # Usage: orch_find_idle_panes [exclude_pane]
-  # Returns space-separated list of idle pane IDs in visual order.
-  # Iterates work windows (ORCH_WORK_WINDOWS) to guarantee dispatch order.
+  # Returns space-separated list of idle pane IDs (one per work window).
+  # Only considers the first pane (lowest index) of each window to prevent
+  # dispatching to sub-panes. Uses head -1 instead of index == 0 to be
+  # independent of tmux pane-base-index setting.
   # Idle = shell (bash/zsh/sh/fish) with no foreground job.
   local exclude=${1:-""}
 
@@ -112,7 +125,8 @@ orch_find_idle_panes() {
 
   for win in $ORCH_WORK_WINDOWS; do
     tmux list-panes -t "$win" \
-      -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null
+      -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null \
+      | head -1
   done \
     | awk -v sess="$current_session" -v excl="$exclude" '
         $1 == sess && ($3 == "bash" || $3 == "zsh" || $3 == "sh" || $3 == "fish") {
@@ -193,7 +207,7 @@ orch_check_completion() {
   # Usage: orch_check_completion <issue> <area_dir>
   # Checks if a dispatched issue's pipeline has finished.
   # stdout: "completed", "failed", or "running"
-  # Returns: 0 = completed/failed (terminal), 1 = still running
+  # Always returns 0 (safe for set -e callers).
   #
   # Detection priority:
   #   1. Signal file (written by pipeline AI at end)
@@ -227,8 +241,7 @@ orch_check_completion() {
     local cmd
     cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
     if [[ "$cmd" == "claude" ]] || [[ "$cmd" == "codex" ]] || [[ "$cmd" == "node" ]]; then
-      # AI process still running
-      echo "running"; return 1
+      echo "running"; return 0
     fi
     # Pane alive but shell prompt (AI exited) - fall through to PR check
   fi
@@ -243,8 +256,7 @@ orch_check_completion() {
   local pr_open
   pr_open=$(_orch_pr_list "$area_dir" "$issue" open number 'length')
   if [ "${pr_open:-0}" -gt 0 ] 2>/dev/null; then
-    # PR exists but not merged - pipeline may still be cleaning up
-    echo "running"; return 1
+    echo "running"; return 0
   fi
 
   # No signal, no AI process, no PR - failed
@@ -268,7 +280,8 @@ orch_update_last_activity() {
 
 orch_detect_stall() {
   # Usage: orch_detect_stall <area> <issue> <area_dir>
-  # Returns: 0 = stalled (no activity > 10 min), 1 = active
+  # stdout: "stalled" or "active"
+  # Always returns 0 (safe for set -e callers).
   local area=$1
   local issue=$2
   local area_dir=$3
@@ -279,7 +292,9 @@ orch_detect_stall() {
 
   local last_activity
   last_activity=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastActivity // empty")
-  [ -z "$last_activity" ] && return 1
+  if [ -z "$last_activity" ]; then
+    echo "active"; return 0
+  fi
 
   local last_ts
   last_ts=$(date -d "$last_activity" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$last_activity" +%s 2>/dev/null)
@@ -294,11 +309,13 @@ orch_detect_stall() {
     local pr_number
     pr_number=$(_orch_pr_list "$area_dir" "$issue" open number '.[0].number')
 
-    # No open PR yet — apply extended stall threshold (2x normal) for pre-PR phase
+    # No open PR yet - apply extended stall threshold (2x normal) for pre-PR phase
     if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
       local extended_stall=$(( stall_seconds * 2 ))
-      [ "$elapsed" -gt "$extended_stall" ] && return 0
-      return 1
+      if [ "$elapsed" -gt "$extended_stall" ]; then
+        echo "stalled"; return 0
+      fi
+      echo "active"; return 0
     fi
 
     local latest_sha
@@ -307,11 +324,11 @@ orch_detect_stall() {
 
     if [ -n "$latest_sha" ] && [ "$latest_sha" != "$last_sha" ]; then
       orch_update_last_activity "$area" "$issue" "$latest_sha"
-      return 1
+      echo "active"; return 0
     fi
-    return 0
+    echo "stalled"; return 0
   fi
-  return 1
+  echo "active"; return 0
 }
 
 # ──────────────────────────────────────────────
@@ -410,7 +427,7 @@ orch_poll_cycle() {
     cur_status=$(echo "$state" | jq -r ".status[\"$issue\"]")
     [ "$cur_status" != "dispatched" ] && continue
 
-    if orch_detect_stall "$area" "$issue" "$area_dir"; then
+    if [ "$(orch_detect_stall "$area" "$issue" "$area_dir")" = "stalled" ]; then
       local pane_id
       pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane")
       local retry_count
@@ -449,24 +466,39 @@ orch_poll_cycle() {
     fi
   done
 
-  # 3. Dispatch pending issues to idle panes
+  # 3. Dispatch pending issues to idle panes (respecting maxConcurrent)
   state=$(orch_state_read "$area")
+  local max_concurrent
+  max_concurrent=$(echo "$state" | jq -r '.maxConcurrent // 99')
+  local active_count
+  active_count=$(echo "$state" | jq '[.status | to_entries[] | select(.value == "dispatched")] | length')
+
   local pending_issues
   pending_issues=$(echo "$state" | jq -r '.status | to_entries[] | select(.value == "pending") | .key')
 
-  if [ -n "$pending_issues" ]; then
+  if [ -n "$pending_issues" ] && [ "$active_count" -lt "$max_concurrent" ]; then
+    local slots_available=$(( max_concurrent - active_count ))
     local idle_panes
     idle_panes=$(orch_find_idle_panes "$orch_pane")
     local pane_array=($idle_panes)
     local pane_idx=0
+    local dispatched_count=0
 
     for issue in $pending_issues; do
+      [ "$dispatched_count" -ge "$slots_available" ] && break
       [ $pane_idx -ge ${#pane_array[@]} ] && break
       local pane="${pane_array[$pane_idx]}"
 
       if orch_dispatch "$issue" "$pane" "$area_dir" "$agent"; then
         orch_record_dispatch "$area" "$issue" "$pane"
-        >&2 echo "[orchestrator] Dispatched #${issue} → pane $pane"
+        if ! orch_verify_startup "$pane" 5; then
+          >&2 echo "[orchestrator] Startup failed for #${issue} on pane $pane — reverting to pending"
+          orch_status_set "$area" "$issue" "pending"
+          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+        else
+          >&2 echo "[orchestrator] Dispatched #${issue} → pane $pane"
+          dispatched_count=$((dispatched_count + 1))
+        fi
       else
         >&2 echo "[orchestrator] Pane $pane dead — skipping for issue #${issue}"
       fi
