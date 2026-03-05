@@ -1,9 +1,8 @@
 #!/bin/bash
-# pipeline-helpers.sh — Shell helpers for dev-pipeline skill
+# pipeline-helpers.sh - Shell helpers for dev-pipeline skill
 # Source this file or use functions individually via the AI's Bash tool.
 
 # Source shared monorepo helpers for MONOREPO_ROOT and area resolution.
-# → .agents/references/monorepo-layout.md
 _PIPELINE_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_PIPELINE_HELPERS_DIR/../../../../.agents/scripts/monorepo-helpers.sh"
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
@@ -37,10 +36,37 @@ pipeline_state_read() {
 }
 
 pipeline_state_write() {
+  # Atomic write: write to .tmp then mv (POSIX atomic rename).
+  # Prevents half-written JSON on crash.
   local issue=$1
   local area=$2
   local json=$3
-  echo "$json" > "$(pipeline_state_path "$issue" "$area")"
+  local path
+  path=$(pipeline_state_path "$issue" "$area")
+  local tmp
+  tmp=$(mktemp "${path}.XXXXXX")
+  echo "$json" > "$tmp" && mv "$tmp" "$path" || { rm -f "$tmp"; return 1; }
+}
+
+pipeline_state_update() {
+  # Update specific fields in state via jq expression.
+  # Usage: pipeline_state_update <issue> <area> <jq_expr>
+  # Example: pipeline_state_update 42 client '.step = "review" | .reviewRound += 1'
+  local issue=$1
+  local area=$2
+  local jq_expr=$3
+  local current
+  current=$(pipeline_state_read "$issue" "$area")
+  local updated
+  if ! updated=$(echo "$current" | jq "$jq_expr | .updatedAt = (now | todate)"); then
+    >&2 echo "[pipeline] jq failed for expression: $jq_expr"
+    return 1
+  fi
+  if [ -z "$updated" ] || [ "$updated" = "null" ]; then
+    >&2 echo "[pipeline] jq produced empty/null output for: $jq_expr"
+    return 1
+  fi
+  pipeline_state_write "$issue" "$area" "$updated"
 }
 
 pipeline_state_delete() {
@@ -54,10 +80,9 @@ pipeline_state_delete() {
 # ──────────────────────────────────────────────
 
 pipeline_orchestrator_pane() {
-  # Capture the current pane ID — prefer $TMUX_PANE (process's own pane,
-  # not the focused pane, which differs on --continue sessions).
-  # Fall back to tmux display-message for atypical invocation contexts where
-  # $TMUX_PANE is unset (e.g. sourced from a non-tmux shell inside a tmux session).
+  # Prefer $TMUX_PANE (process's own pane, not the focused pane, which
+  # differs on --continue sessions). Fall back to tmux display-message
+  # for contexts where $TMUX_PANE is unset.
   if [ -n "$TMUX_PANE" ]; then
     echo "$TMUX_PANE"
   else
@@ -67,8 +92,6 @@ pipeline_orchestrator_pane() {
 
 pipeline_open_pane() {
   # Usage: pipeline_open_pane <working_dir> <prompt> [agent] [target_pane]
-  # agent: "claude" (default) or "codex"
-  # target_pane: pane ID to split from (avoids splitting user's active pane)
   local workdir=$1
   local prompt=$2
   local agent=${3:-claude}
@@ -98,23 +121,36 @@ pipeline_kill_pane() {
 }
 
 pipeline_pane_alive() {
-  # Usage: pipeline_pane_alive <pane_id>
   # Returns 0 if pane exists (any window/session), 1 if dead.
   local pane_id=$1
   tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx "$pane_id"
 }
 
+pipeline_pane_alive_verified() {
+  # Returns 0 only if pane exists AND runs a known agent command.
+  # Prevents false positives after tmux server restart (pane ID reuse).
+  # Usage: pipeline_pane_alive_verified <pane_id>
+  local pane_id=$1
+  if ! pipeline_pane_alive "$pane_id"; then
+    return 1
+  fi
+  local actual_cmd
+  actual_cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
+  case "$actual_cmd" in
+    claude|codex) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 pipeline_pane_snapshot() {
-  # Usage: pipeline_pane_snapshot
   # Outputs sorted list of all current tmux pane IDs.
   # Use before/after pane creation to detect orphans.
   tmux list-panes -a -F '#{pane_id}' 2>/dev/null | sort
 }
 
 pipeline_pane_orphan_cleanup() {
-  # Usage: pipeline_pane_orphan_cleanup <before_file> <after_file>
   # Kills panes that appeared between two snapshots (orphans from failed opens).
-  # before_file/after_file: files containing sorted pane ID lists.
+  # Usage: pipeline_pane_orphan_cleanup <before_file> <after_file>
   local before=$1
   local after=$2
   local orphans
@@ -130,8 +166,8 @@ pipeline_pane_orphan_cleanup() {
 }
 
 pipeline_kill_state_pane() {
+  # Kills a pane recorded in state by field name.
   # Usage: pipeline_kill_state_pane <issue> <area> <field>
-  # Kills a pane recorded in state (e.g. reviewPane, resolvePane).
   local issue=$1
   local area=$2
   local field=$3
@@ -146,21 +182,18 @@ pipeline_kill_state_pane() {
 }
 
 pipeline_resolve_worktree_path() {
-  # Usage: pipeline_resolve_worktree_path <issue> [area]
   # Resolves actual worktree directory, checking current path first, then legacy.
   # stdout: absolute path on success, "PATH_INVALID" on failure
   # Returns: 0 = found, 3 = not found
   local issue=$1
   local area=$2
 
-  # Current path: $MONOREPO_ROOT/.workspace/worktrees/issue-{N}
   local current_path="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$current_path" ]; then
     echo "$current_path"
     return 0
   fi
 
-  # Legacy path: $MONOREPO_ROOT/{area}/.workspace/worktrees/issue-{N}
   if [ -n "$area" ]; then
     local legacy_path="$MONOREPO_ROOT/$area/.workspace/worktrees/issue-${issue}"
     if [ -d "$legacy_path" ]; then
@@ -174,7 +207,6 @@ pipeline_resolve_worktree_path() {
 }
 
 pipeline_open_pane_verified() {
-  # Usage: pipeline_open_pane_verified <working_dir> <prompt> [agent] [target_pane] [issue] [area]
   # Opens a side pane and verifies it survives startup (3-second grace period).
   # Single attempt only - no internal retry. On failure, captures dead pane output
   # for diagnosis via remain-on-exit, then cleans up.
@@ -215,8 +247,12 @@ pipeline_open_pane_verified() {
   tmux set-option -t "$pane_id" remain-on-exit on 2>/dev/null
 
   # Phase 3: Verify startup (3-second grace period)
+  # With remain-on-exit on, dead panes still appear in list-panes.
+  # Check #{pane_dead} flag instead of pane existence.
   sleep 3
-  if pipeline_pane_alive "$pane_id"; then
+  local is_dead
+  is_dead=$(tmux display-message -t "$pane_id" -p '#{pane_dead}' 2>/dev/null)
+  if [ "$is_dead" != "1" ]; then
     # Pane survived - disable remain-on-exit for normal operation
     tmux set-option -t "$pane_id" remain-on-exit off 2>/dev/null
     echo "$pane_id"
@@ -238,26 +274,63 @@ pipeline_open_pane_verified() {
   return 2
 }
 
+pipeline_open_pane_with_retry() {
+  # State-based retry wrapper around pipeline_open_pane_verified.
+  # Reads/increments retry count from state so retry limits survive across sessions.
+  # Usage: pipeline_open_pane_with_retry <issue> <area> <field> <workdir> <prompt> <agent> <target_pane>
+  # field: "reviewPane" or "resolvePane" (determines retry counter key)
+  # stdout: pane_id on success, diagnostic token on failure
+  # Returns: 0 = success, 2 = PANE_DEAD, 3 = PATH_INVALID, 5 = MAX_RETRIES
+  local issue=$1
+  local area=$2
+  local field=$3
+  local workdir=$4
+  local prompt=$5
+  local agent=$6
+  local target_pane=$7
+
+  # Read retry count and max from state (single read)
+  local retry_key="${field}Retries"
+  local state
+  state=$(pipeline_state_read "$issue" "$area")
+  local retries
+  retries=$(echo "$state" | jq -r ".${retry_key} // 0")
+  local max_retries
+  max_retries=$(echo "$state" | jq -r ".maxPaneRetries // 2")
+
+  if [ "$retries" -ge "$max_retries" ]; then
+    >&2 echo "[pipeline] Max retries ($max_retries) reached for $field"
+    echo "MAX_RETRIES"
+    return 5
+  fi
+
+  # Increment retry count BEFORE attempting (crash-safe)
+  pipeline_state_update "$issue" "$area" ".${retry_key} = $((retries + 1))"
+
+  # Kill previous pane for this field if still alive
+  pipeline_kill_state_pane "$issue" "$area" "$field"
+
+  # Single attempt
+  pipeline_open_pane_verified "$workdir" "$prompt" "$agent" "$target_pane" "$issue" "$area"
+}
+
 # ──────────────────────────────────────────────
 # Polling (review & commits)
 # ──────────────────────────────────────────────
 
 pipeline_poll_review() {
-  # Usage: pipeline_poll_review <area_dir> <pr> <last_review_id> [max_wait] [review_pane_id]
   # Polls for a new /dev-review submission (body starts with "## Review Summary")
   # that has an ID greater than last_review_id.
-  # Output: review ID on success, "TIMEOUT" on timeout, "PANE_DEAD" on pane death.
   # Returns: 0 = found, 1 = timeout, 2 = pane died
   local area_dir=$1
   local pr=$2
   local last_review_id=${3:-0}
-  local max_wait=${4:-900}  # default 15 minutes
-  local review_pane_id=$5   # optional: pane to monitor
+  local max_wait=${4:-900}
+  local review_pane_id=$5
   local interval=30
   local elapsed=0
 
   while true; do
-    # 1. Check API first — pane may have exited normally after posting review
     local review_id
     review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
       --jq "[.[] | select(.id > ${last_review_id})
@@ -269,9 +342,7 @@ pipeline_poll_review() {
       return 0
     fi
 
-    # 2. Then check pane health (only if no review found)
     if [ -n "$review_pane_id" ] && ! pipeline_pane_alive "$review_pane_id"; then
-      # Final API check — review might have been posted just before pane died
       review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
         --jq "[.[] | select(.id > ${last_review_id})
                    | select(.body | startswith(\"## Review Summary\"))]
@@ -294,21 +365,15 @@ pipeline_poll_review() {
 }
 
 pipeline_fetch_review() {
-  # Usage: pipeline_fetch_review <area_dir> <pr> <review_id>
-  # Fetches a specific review by ID and outputs raw JSON (state + body).
-  # The AI reads STATE and severity counts directly from the output.
   local area_dir=$1
   local pr=$2
   local review_id=$3
-
   cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" \
     --jq '{state: .state, body: .body}'
 }
 
 pipeline_poll_commits() {
-  # Usage: pipeline_poll_commits <area_dir> <pr> <last_commit_sha> [max_wait] [resolve_pane_id]
   # Polls for new commits on a PR after a known commit SHA.
-  # Output: new SHA on success, "TIMEOUT" on timeout, "PANE_DEAD" on pane death.
   # Returns: 0 = new commit, 1 = timeout, 2 = pane died
   local area_dir=$1
   local pr=$2
@@ -319,7 +384,6 @@ pipeline_poll_commits() {
   local elapsed=0
 
   while true; do
-    # 1. Check for new commits first
     local latest_sha
     latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
       --jq '.[-1].sha')
@@ -329,9 +393,7 @@ pipeline_poll_commits() {
       return 0
     fi
 
-    # 2. Then check pane health
     if [ -n "$resolve_pane_id" ] && ! pipeline_pane_alive "$resolve_pane_id"; then
-      # Final commit check
       latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
         --jq '.[-1].sha')
       if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
@@ -352,32 +414,68 @@ pipeline_poll_commits() {
 }
 
 # ──────────────────────────────────────────────
+# Pre-checks (recovery: detect work completed by previous session)
+# ──────────────────────────────────────────────
+
+pipeline_check_review_exists() {
+  # Check if a review already exists (from a previous session's pane that completed).
+  # Returns: 0 = found (review_id on stdout), 1 = not found
+  local area_dir=$1
+  local pr=$2
+  local last_review_id=${3:-0}
+
+  local review_id
+  review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
+    --jq "[.[] | select(.id > ${last_review_id})
+               | select(.body | startswith(\"## Review Summary\"))]
+          | last // empty | .id")
+
+  if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
+    echo "$review_id"
+    return 0
+  fi
+  return 1
+}
+
+pipeline_check_new_commits() {
+  # Check if new commits exist (from a previous session's resolve that completed).
+  # Returns: 0 = found (new_sha on stdout), 1 = not found
+  local area_dir=$1
+  local pr=$2
+  local last_commit_sha=$3
+
+  local latest_sha
+  latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
+    --jq '.[-1].sha')
+
+  if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
+    echo "$latest_sha"
+    return 0
+  fi
+  return 1
+}
+
+# ──────────────────────────────────────────────
 # Cleanup
 # ──────────────────────────────────────────────
 
 pipeline_cleanup() {
-  # Usage: pipeline_cleanup <issue> <area> <branch> <review_pane> <resolve_pane>
   local issue=$1
   local area=$2
   local branch=$3
   local review_pane=$4
   local resolve_pane=$5
 
-  # Kill panes
   pipeline_kill_pane "$review_pane"
   pipeline_kill_pane "$resolve_pane"
 
-  # Remove worktree (--force handles uncommitted changes or detached HEAD post-merge)
   local wt="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$wt" ]; then
     cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" --force
     git worktree prune
   fi
 
-  # Delete branch (-D required after squash merge; branch commits not in main ancestry)
   cd "$MONOREPO_ROOT/$area" && git branch -D "$branch" 2>/dev/null
-
-  # Remove state file
   pipeline_state_delete "$issue" "$area"
 }
 

@@ -1,6 +1,8 @@
-# Pipeline Recovery
+# Pipeline recovery
 
 Resume from state file when orchestrator crashes or disconnects.
+
+Recovery is integrated into each workflow step's entry point (see SKILL.md). Each step validates its own state before proceeding, so the orchestrator simply jumps to the current `step` field.
 
 ## Entry
 
@@ -8,84 +10,28 @@ Resume from state file when orchestrator crashes or disconnects.
 ls .workspace/pipeline/*/issue-*.state.json 2>/dev/null
 ```
 
-If found → read state, resume by `step` field. First, clean orphaned panes:
+If found, read state, then jump to the step indicated by the `step` field. Each step's self-validation handles the rest.
 
-```bash
-tmux kill-pane -t "{reviewPane}" 2>/dev/null
-tmux kill-pane -t "{resolvePane}" 2>/dev/null
-```
+## Step self-validation summary
 
-## By Step
+| step | Entry validation |
+|------|-----------------|
+| `build` | Check if PR exists via `gh pr list --head {branch}`. PR open -> jump to `review`. PR merged -> jump to `log`. No PR -> re-run `/dev-build`. |
+| `review` | `pipeline_check_review_exists` first. Found -> process review (skip pane open). Not found -> check if reviewPane alive -> poll or open new. |
+| `resolve` | `pipeline_check_new_commits` first. Found -> process commits (skip pane open). Not found -> check if resolvePane alive -> poll or open new. |
+| `merge` | `gh pr view --json state`. MERGED -> jump to `log`. OPEN -> ask user. |
+| `merge-failed` | Same as `merge`. |
+| `log` | Re-run `/dev-log` (idempotent). |
 
-### step: "build"
+## Pane failure recovery
 
-```bash
-cd {area} && gh pr list --head {branch} --json number,state --jq '.[0]'
-```
+When `pipeline_open_pane_with_retry` returns `MAX_RETRIES` (rc=5):
 
-- PR open → step=`review`, resume
-- PR merged → step=`log`, resume
-- No PR → re-run `/dev-build` from `.workspace/worktrees/issue-{N}`
+1. stderr contains diagnosis from dead pane output
+2. Check basics: `which claude`, `tmux list-sessions`, `pipeline_resolve_worktree_path`
+3. Report all diagnostics to user
+4. User decides: fix environment and retry (reset retries in state) or abort
 
-### step: "review"
+## Stale state
 
-```bash
-source scripts/pipeline-helpers.sh
-if [ -n "{reviewPane}" ] && pipeline_pane_alive "{reviewPane}"; then
-  REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId} 900 "{reviewPane}")
-else
-  REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId} 0)
-fi
-```
-
-- Review found → analyze, proceed per Step 3 decision logic
-- TIMEOUT → re-trigger via `pipeline_open_pane_verified()`
-
-### step: "resolve"
-
-```bash
-source scripts/pipeline-helpers.sh
-if [ -n "{resolvePane}" ] && pipeline_pane_alive "{resolvePane}"; then
-  NEW_SHA=$(pipeline_poll_commits "{area_dir}" {PR#} "{lastCommitSha}" 900 "{resolvePane}")
-else
-  # Check whether resolve already completed — new commits after lastCommitSha?
-  CURRENT_SHA=$(cd {area_dir} && gh api "repos/{owner}/{repo}/pulls/{PR#}/commits" --jq '.[-1].sha')
-fi
-```
-
-- `CURRENT_SHA` differs from `lastCommitSha` → resolve completed → re-open review pane (Step 2)
-- `CURRENT_SHA` equals `lastCommitSha` → resolve not done → re-trigger resolve pane via `pipeline_open_pane_verified()`
-- PANE_DEAD during poll → re-trigger via `pipeline_open_pane_verified()`
-
-### step: "merge"
-
-```bash
-cd {area} && gh pr view {PR#} --json state --jq '.state'
-```
-
-- `MERGED` → proceed to log
-- `OPEN` → ask user for merge approval
-
-### step: "log"
-
-Re-run `/dev-log`. Idempotent.
-
-## Pane Failure Recovery
-
-### PANE_DEAD / RETRY_FAILED
-
-1. `pipeline_resolve_worktree_path {issue} {area}` — verify path
-2. `which claude` or `which codex` — verify agent binary
-3. `tmux list-sessions` — verify tmux
-4. All OK → retry via `pipeline_open_pane_verified()`
-5. Still fails → report diagnostics to user
-
-### PATH_INVALID
-
-1. `git worktree list` from area repo — find actual location
-2. Found → use path directly
-3. Gone → re-run `/dev-build` from existing branch
-
-## Stale State
-
-If PR already merged and logged → `rm .workspace/pipeline/{area}/issue-{N}.state.json`, report completed.
+If PR already merged and logged, delete state file and report completed.
