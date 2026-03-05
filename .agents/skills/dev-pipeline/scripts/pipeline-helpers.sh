@@ -45,7 +45,7 @@ pipeline_state_write() {
   path=$(pipeline_state_path "$issue" "$area")
   local tmp
   tmp=$(mktemp "${path}.XXXXXX")
-  echo "$json" > "$tmp" && mv "$tmp" "$path"
+  echo "$json" > "$tmp" && mv "$tmp" "$path" || { rm -f "$tmp"; return 1; }
 }
 
 pipeline_state_update() {
@@ -58,7 +58,7 @@ pipeline_state_update() {
   local current
   current=$(pipeline_state_read "$issue" "$area")
   local updated
-  if ! updated=$(echo "$current" | jq "$jq_expr"); then
+  if ! updated=$(echo "$current" | jq "$jq_expr | .updatedAt = now | todate"); then
     >&2 echo "[pipeline] jq failed for expression: $jq_expr"
     return 1
   fi
@@ -289,12 +289,14 @@ pipeline_open_pane_with_retry() {
   local agent=$6
   local target_pane=$7
 
-  # Read retry count from state
+  # Read retry count and max from state (single read)
   local retry_key="${field}Retries"
+  local state
+  state=$(pipeline_state_read "$issue" "$area")
   local retries
-  retries=$(pipeline_state_read "$issue" "$area" | jq -r ".${retry_key} // 0")
+  retries=$(echo "$state" | jq -r ".${retry_key} // 0")
   local max_retries
-  max_retries=$(pipeline_state_read "$issue" "$area" | jq -r ".maxPaneRetries // 2")
+  max_retries=$(echo "$state" | jq -r ".maxPaneRetries // 2")
 
   if [ "$retries" -ge "$max_retries" ]; then
     >&2 echo "[pipeline] Max retries ($max_retries) reached for $field"
