@@ -80,6 +80,9 @@ pipeline_state_delete() {
 # ──────────────────────────────────────────────
 
 pipeline_orchestrator_pane() {
+  # Prefer $TMUX_PANE (process's own pane, not the focused pane, which
+  # differs on --continue sessions). Fall back to tmux display-message
+  # for contexts where $TMUX_PANE is unset.
   if [ -n "$TMUX_PANE" ]; then
     echo "$TMUX_PANE"
   else
@@ -124,17 +127,19 @@ pipeline_pane_alive() {
 }
 
 pipeline_pane_alive_verified() {
-  # Returns 0 only if pane exists AND runs the expected command.
+  # Returns 0 only if pane exists AND runs a known agent command.
   # Prevents false positives after tmux server restart (pane ID reuse).
-  # Usage: pipeline_pane_alive_verified <pane_id> [expected_cmd]
+  # Usage: pipeline_pane_alive_verified <pane_id>
   local pane_id=$1
-  local expected_cmd=${2:-claude}
   if ! pipeline_pane_alive "$pane_id"; then
     return 1
   fi
   local actual_cmd
   actual_cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
-  [ "$actual_cmd" = "$expected_cmd" ]
+  case "$actual_cmd" in
+    claude|codex) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 pipeline_pane_snapshot() {
@@ -242,8 +247,12 @@ pipeline_open_pane_verified() {
   tmux set-option -t "$pane_id" remain-on-exit on 2>/dev/null
 
   # Phase 3: Verify startup (3-second grace period)
+  # With remain-on-exit on, dead panes still appear in list-panes.
+  # Check #{pane_dead} flag instead of pane existence.
   sleep 3
-  if pipeline_pane_alive "$pane_id"; then
+  local is_dead
+  is_dead=$(tmux display-message -t "$pane_id" -p '#{pane_dead}' 2>/dev/null)
+  if [ "$is_dead" != "1" ]; then
     # Pane survived - disable remain-on-exit for normal operation
     tmux set-option -t "$pane_id" remain-on-exit off 2>/dev/null
     echo "$pane_id"
