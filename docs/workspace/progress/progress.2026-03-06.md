@@ -17,3 +17,19 @@
   - SKILL.md에 self-recovery entry point 통합 (각 step이 진입 시 자체 검증)
 - **Review**: Codex 2회, Claude Opus 2회, RAPHL self-fix 5 iteration
 - **Files**: `pipeline-helpers.sh`, `SKILL.md`, `pane-lifecycle.md`, `recovery.md`
+
+## agent-tracker 동적 pane 감지 실패 수정 (#47, PR #50)
+
+- **Issue**: 다른 pane에서 Claude Code를 동적 시작 시 tokens=0, status=idle 고정
+- **Root cause**: AGENT_TYPE_CACHE의 negative cache가 `return 0` 반환 (호출자가 성공으로 판단) + 캐시 무효화 없음
+- **Changes**:
+  - AGENT_TYPE_CACHE 완전 제거 - 매 사이클 재감지 (비용 무시 가능)
+  - PostToolUse에서 needs-input → working 상태 복구
+  - `AGENT_TRACKER_PANE` env var로 on-statusline.sh pane ID 안정화
+  - `updated_at` 기반 staleness 감지 (30초 초과 시 idle 전환)
+  - sidecar 디렉토리 `chmod 700` 일관 적용 (3곳)
+  - `make_line`/`token_bar` 변수 `i` local 선언
+  - `TRANSCRIPT_LAST_MSG` single-pass 복원 (context-bar.sh 소비 확인)
+- **Review**: 5단계 심층 검토 2회 실행 - TRANSCRIPT_LAST_MSG 삭제 회귀 발견 및 복원
+- **Files**: `agent-tracker.sh`, `on-status.sh`, `on-statusline.sh`, `statusline-wrapper.sh`
+- **Findings**: [findings.012](../findings/findings.012-agent-tracker-detection-failures.md)

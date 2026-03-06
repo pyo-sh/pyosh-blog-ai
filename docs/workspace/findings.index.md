@@ -17,6 +17,7 @@
 | 008 | Claude Code statusLine의 total_input_tokens 부정확 문제  | 2026-03-04 | #claude-code #statusline #tokens #transcript |
 | 010 | Orchestrator dispatch 버그 3종 분석 및 수정              | 2026-03-05 | #orchestrator #dispatch #set-e #sub-pane #dag |
 | 011 | Pipeline pane orphan 증식 원인과 해결                    | 2026-03-06 | #pipeline #tmux #pane #orphan #remain-on-exit #retry |
+| 012 | agent-tracker 동적 pane 감지 실패 원인 분석             | 2026-03-06 | #agent-tracker #sidecar #pane-id #cache #staleness |
 
 ## 상세 문서
 
@@ -31,6 +32,7 @@
 - [findings.008-statusline-total-input-tokens.md](./findings/findings.008-statusline-total-input-tokens.md) - Claude Code statusLine의 total_input_tokens가 시스템 프롬프트/도구/메모리 제외하여 부정확
 - [findings.010-orchestrator-dispatch-bugs.md](./findings/findings.010-orchestrator-dispatch-bugs.md) - set-e 크래시, sub-pane 과잉 dispatch, 외부 dep 영구 차단 3종 분석
 - [findings.011-pane-orphan-proliferation.md](./findings/findings.011-pane-orphan-proliferation.md) - pipeline pane orphan 증식: remain-on-exit 상호작용, alive vs verified 분리, jq 우선순위
+- [findings.012-agent-tracker-detection-failures.md](./findings/findings.012-agent-tracker-detection-failures.md) - agent-tracker 동적 pane 감지 실패: negative cache, PPID 불안정, TRANSCRIPT_LAST_MSG 회귀
 
 ## 주요 원칙
 
@@ -46,3 +48,6 @@
 - **remain-on-exit on 상태에서 pane_alive는 dead pane도 true** → `#{pane_dead}` flag로 직접 확인 필요
 - **Polling은 pane_alive, recovery는 pane_alive_verified** → child process가 `#{pane_current_command}` 변경하므로 polling에서 verified 사용 금지
 - **State 기반 retry counter는 성공 시에만 reset** → PANE_DEAD에서 reset하면 무한 루프
+- **캐시 제거가 캐시 무효화보다 낫다** → /proc 탐색 비용은 무시 가능. 캐시 무효화 버그 위험이 더 큼
+- **다단계 프로세스 체인에서 PPID는 불안정** → wrapper 경유 시 env var로 안정 식별자 전달
+- **env var export 삭제 전 소비처 확인 필수** → `grep -r VAR_NAME` 후 제거
