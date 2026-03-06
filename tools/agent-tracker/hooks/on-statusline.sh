@@ -12,7 +12,9 @@ set -euo pipefail
 SIDECAR_DIR="/tmp/agent-tracker"
 
 # Determine pane identifier
-pane_id="${TMUX_PANE:-pid-$$}"
+# PPID fallback: both on-statusline.sh and on-status.sh are children of the
+# same Claude Code process, so PPID is stable across invocations. (#47)
+pane_id="${TMUX_PANE:-pid-$PPID}"
 
 # Sanitize pane_id for filename (remove % prefix)
 pane_file="${pane_id#%}"

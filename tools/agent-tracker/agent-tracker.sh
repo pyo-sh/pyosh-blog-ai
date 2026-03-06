@@ -68,7 +68,7 @@ fi
 
 # make_line <char> <n> — repeat unicode char n times
 make_line() {
-  local char="$1" n="$2" s=""
+  local char="$1" n="$2" s="" i
   for ((i = 0; i < n; i++)); do s+="$char"; done
   printf '%s' "$s"
 }
@@ -350,20 +350,13 @@ _match_agent() {
   return 1
 }
 
-# agent type cache — keyed by pane_pid, avoids repeated process tree traversal (#30)
-declare -A AGENT_TYPE_CACHE
-
 # detect_agent_type <pane_pid>
+# No cache — re-detects each cycle so dynamic pane changes (agent start/stop)
+# are reflected immediately. Cost is negligible (~50 /proc reads/sec). (#47)
 detect_agent_type() {
   local root_pid="$1"
-
-  # Return cached result if available
-  if [[ -n "${AGENT_TYPE_CACHE[$root_pid]+x}" ]]; then
-    [[ -n "${AGENT_TYPE_CACHE[$root_pid]}" ]] && printf '%s' "${AGENT_TYPE_CACHE[$root_pid]}"
-    return 0
-  fi
-
   local pids=() queue=("$root_pid") pid child cmdline exename result
+
   while (( ${#queue[@]} > 0 )); do
     pid="${queue[0]}"; queue=("${queue[@]:1}")
     pids+=("$pid")
@@ -375,12 +368,10 @@ detect_agent_type() {
     cmdline=$(_get_cmdline "$pid") || continue
     exename=$(_get_exe_name "$pid") || true
     result=$(_match_agent "$cmdline" "$exename") && {
-      AGENT_TYPE_CACHE[$root_pid]="$result"
       printf '%s' "$result"
       return 0
     }
   done
-  AGENT_TYPE_CACHE[$root_pid]=""
   return 1
 }
 
