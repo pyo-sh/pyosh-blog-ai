@@ -31,14 +31,22 @@ mkdir -p "$SIDECAR_DIR"
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
-# Use total_input_tokens from statusLine JSON (accurate cumulative token count).
-used_tokens=$(printf '%s' "$input" | jq -r '.context_window.total_input_tokens // 0' 2>/dev/null)
-
-# Build jq expression for the merge
+# Build jq expression for the merge.
+# Token calculation uses current_usage (accurate per-request context tokens).
+# Fallback: used_percentage * context_window_size (when current_usage is null, e.g. before first API call).
 jq_expr='
   ($input.model.display_name // $input.model.id // "Claude") as $model |
   ($input.context_window.context_window_size // 200000) as $max_tokens |
-  (if $max_tokens > 0 then ($used_tokens * 100 / $max_tokens | floor) else 0 end) as $pct |
+  (($input.context_window.used_percentage // 0) | floor) as $pct |
+  (
+    if $input.context_window.current_usage != null then
+      (($input.context_window.current_usage.input_tokens // 0) +
+       ($input.context_window.current_usage.cache_creation_input_tokens // 0) +
+       ($input.context_window.current_usage.cache_read_input_tokens // 0))
+    elif $pct > 0 then
+      ($max_tokens * $pct / 100 | floor)
+    else 0 end
+  ) as $used_tokens |
   $existing * {
     pane_id: $pane_id,
     session_id: ($input.session_id // $existing.session_id // null),
@@ -62,7 +70,7 @@ jq_expr='
   [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
 
   updated=$(jq -n --argjson existing "$existing" --argjson input "$input" --arg pane_id "$pane_id" \
-    --argjson used_tokens "${used_tokens:-0}" "$jq_expr" 2>/dev/null)
+    "$jq_expr" 2>/dev/null)
 
   if [[ -n "$updated" ]]; then
     tmp="${sidecar_path}.tmp.$$"

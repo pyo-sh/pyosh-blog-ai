@@ -6,7 +6,7 @@
 #   "statusLine": { "type": "command", "command": ".../statusline-wrapper.sh" }
 #
 # Flow:
-#   stdin (JSON) → transcript token calc (once)
+#   stdin (JSON) → current_usage token calc + transcript last msg
 #               → on-statusline.sh (background, fire-and-forget)
 #               → context-bar.sh   (foreground, stdout for display)
 
@@ -20,7 +20,22 @@ input=$(cat)
 # Code PID) so on-statusline.sh can use the same ID as on-status.sh. (#47)
 export AGENT_TRACKER_PANE="${TMUX_PANE:-pid-$PPID}"
 
-# Pre-compute last user message from transcript for on-statusline.sh.
+# Pre-compute tokens from current_usage for context-bar.sh compatibility.
+# current_usage: accurate per-request context tokens (added in Claude Code v2.0.72).
+# Fallback: used_percentage reverse calculation (when current_usage is null).
+TRANSCRIPT_TOKENS=$(printf '%s' "$input" | jq -r '
+  .context_window |
+  if .current_usage != null then
+    ((.current_usage.input_tokens // 0) +
+     (.current_usage.cache_creation_input_tokens // 0) +
+     (.current_usage.cache_read_input_tokens // 0))
+  elif (.used_percentage // 0) > 0 then
+    ((.context_window_size // 200000) * (.used_percentage // 0) / 100 | floor)
+  else 0 end
+' 2>/dev/null)
+export TRANSCRIPT_TOKENS="${TRANSCRIPT_TOKENS:-0}"
+
+# Pre-compute last user message from transcript.
 # Uses tail to avoid slurping the entire file (O(fixed) instead of O(file size)).
 _tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
 export TRANSCRIPT_LAST_MSG=""
