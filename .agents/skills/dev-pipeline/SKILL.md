@@ -14,11 +14,11 @@ Orchestrate: `/dev-build` -> `/dev-review` -> `/dev-resolve` -> merge. Review/re
 
 ## Workflow
 
-### 0. Check existing state
+### 0. Check existing state (`pipeline_init` first)
 
-Check `.workspace/pipeline/{area}/issue-{N}.state.json`. If exists -> show `step` and `pr`, ask **"Resume?"** or **"Start fresh?"**. If resume -> jump to current `step`. Each step self-validates on entry.
+Run `pipeline_init {area}` to create directories. Check `.workspace/pipeline/{area}/issue-{N}.state.json`. If exists -> show `step` and `pr`, ask **"Resume?"** or **"Start fresh?"**. If resume -> jump to current `step`. Each step self-validates on entry.
 
-### 1. Run /dev-build
+### 1. Run /dev-build (step: `build`)
 
 **`cd {area}` first.** Sync before starting:
 
@@ -32,7 +32,7 @@ git rebase origin/main || git merge origin/main
 
 After PR creation, capture initial commit SHA and write state. -> [process-lifecycle.md](references/process-lifecycle.md) for state schema.
 
-### 2. Run review (headless)
+### 2. Run review (step: `review`)
 
 **Recovery entry**: `pipeline_check_review_exists` first. Found -> skip to Step 3.
 
@@ -50,7 +50,7 @@ REVIEW_ID=$(pipeline_check_review_exists "{area_dir}" {PR#} {lastReviewId})
 - Not found + `RC!=0` -> self-heal with `pipeline_stage_retry` / `pipeline_recovery_log`, retry or escalate
 - Not found + `RC=0` -> unexpected, report to user
 
-### 3. Process review
+### 3. Process review (step: `review`)
 
 Fetch review with `pipeline_fetch_review`. Count severities (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`). Update `lastReviewId`, reset `stageRetries.review`.
 
@@ -58,7 +58,7 @@ Fetch review with `pipeline_fetch_review`. Count severities (`[CRITICAL]`, `[WAR
 - `CRITICAL = 0` or `APPROVED` -> Step 5
 - `PENDING` / `DISMISSED` -> report to user, stop
 
-### 4. Run resolve (headless)
+### 4. Run resolve (step: `resolve`)
 
 **Recovery entry**: `pipeline_check_new_commits` first. Found -> skip to Step 4b.
 
@@ -73,7 +73,7 @@ LOG=$(pipeline_run_headless "$WORKTREE_PATH" \
 
 After exit -> `pipeline_check_new_commits`. Found -> Step 4b. Not found -> self-heal.
 
-### 4b. Process resolve result
+### 4b. Process resolve result (step: `resolve`)
 
 Update `lastCommitSha`, reset `stageRetries.resolve`. Show diff (`gh pr diff {PR#}`).
 
@@ -84,7 +84,7 @@ Update `lastCommitSha`, reset `stageRetries.resolve`. Show diff (`gh pr diff {PR
 
 Show review summary. Ask user: **"Merge"** -> Step 6 | **"Fix & Re-review"** -> Step 4 | **"Fix & Merge"** -> Step 4 with `skipReview: true`.
 
-### 6. Merge + cleanup
+### 6. Merge + cleanup (step: `merge`)
 
 **Recovery entry**: Check `gh pr view {PR#} --json state -q .state`. `MERGED` -> skip to cleanup. `OPEN` -> ask user for merge approval.
 
@@ -104,7 +104,7 @@ pipeline_cleanup "$ISSUE" "$AREA" "{branch}"
 
 State -> `"step": "log"`.
 
-### 7. Record + clean up
+### 7. Record + clean up (step: `log`)
 
 Run `/dev-log`, then delete state file.
 

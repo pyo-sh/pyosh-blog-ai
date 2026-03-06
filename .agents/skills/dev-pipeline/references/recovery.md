@@ -7,10 +7,10 @@ Resume from state file on crash/disconnect. Jump to the `step` field - each step
 | step | Entry validation |
 |------|-----------------|
 | `build` | `gh pr list --head {branch}`. PR open -> `review`. Merged -> `log`. None -> re-run `/dev-build`. |
-| `review` | `pipeline_check_review_exists`. Found -> process review. Not found -> run headless. |
-| `resolve` | `pipeline_check_new_commits`. Found -> process commits. Not found -> run headless. |
-| `merge` / `merge-failed` | `gh pr view --json state`. MERGED -> `log`. OPEN -> ask user. |
-| `log` | Re-run `/dev-log` (idempotent). |
+| `review` | `pipeline_check_review_exists`. Found -> process review (count severities, decide next). Not found -> run headless. |
+| `resolve` | `pipeline_check_new_commits`. Found -> process result (show diff, ask user). Not found -> run headless. |
+| `merge` | `gh pr view --json state`. MERGED -> `log`. OPEN -> ask user for merge approval. |
+| `log` | Re-run `/dev-log` (idempotent). Delete state file after. |
 
 ## Self-healing on failure
 
