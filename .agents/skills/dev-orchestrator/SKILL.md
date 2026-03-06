@@ -14,12 +14,15 @@ Batch orchestration: build dependency DAG from issues → dispatch to idle panes
 
 **Ask the user** which AI agent to use for dispatched panes:
 
-| Agent | Command pattern |
-|-------|----------------|
-| **Claude Code** | `claude --dangerously-skip-permissions '{prompt}'` |
-| **Codex** | `codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}'` |
+| Agent value | Command pattern |
+|-------------|----------------|
+| `claude` | `claude --dangerously-skip-permissions '{prompt}'` |
+| `claude:<model>` | `claude --model <model> --dangerously-skip-permissions '{prompt}'` |
+| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}'` |
 
-Store in state as `"agent": "claude"` or `"agent": "codex"`.
+Examples: `"claude"`, `"claude:sonnet"`, `"claude:opus"`, `"codex"`.
+
+Store in state as `"agent": "claude:sonnet"` etc. Model aliases (`sonnet`, `opus`) are resolved by the CLI.
 
 ## State Files
 
@@ -107,7 +110,11 @@ Write initial state:
 Find idle panes in the same tmux session:
 
 ```bash
+# Default: window-based discovery (one pane per work window)
 IDLE_PANES=$(orch_find_idle_panes)
+
+# Override: explicit pane IDs (for multiple panes in one window)
+ORCH_WORK_PANES="%4 %16" orch_find_idle_panes
 ```
 
 For each idle pane + each `pending` issue (no unmet deps), dispatch:

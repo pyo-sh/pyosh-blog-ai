@@ -104,20 +104,35 @@ User chooses:
 - **skip** → mark issue `failed`, unblock any dependents
 - **inspect** → user manually resolves, orchestrator resumes polling
 
+## Pane Release
+
+After marking an issue `completed` or `failed`, the orchestrator releases the
+pane so it becomes available for the next dispatch.
+
+Two-layer approach:
+
+1. **Primary**: The dispatch prompt includes `"After completing all steps, exit the session."` -
+   AI exits naturally, pane returns to shell prompt.
+2. **Fallback**: `orch_release_pane` sends Ctrl+C if the AI process is still running.
+   Called automatically by `orch_poll_cycle` after completion detection.
+
+`orch_release_pane` does NOT destroy the pane (unlike `pipeline_kill_pane`).
+The pane stays alive at a shell prompt, ready for the next dispatch.
+
 ## Status State Machine
 
 ```
 pending
   └─(dispatch)──► dispatched
-                    ├─(completion: ok)──► completed
-                    ├─(completion: fail)─► failed
-                    └─(stall + skip)──────► failed
+                    ├─(completion: ok)──► completed + release pane
+                    ├─(completion: fail)─► failed + release pane
+                    └─(stall + skip)──────► failed + release pane
 
 blocked
   └─(all deps completed OR failed)──► pending
 
 completed ──(triggers orch_unblock)
-failed    ──(triggers orch_unblock — dependency was attempted, downstream unblocked)
+failed    ──(triggers orch_unblock - dependency was attempted, downstream unblocked)
 ```
 
 ## Polling Interval

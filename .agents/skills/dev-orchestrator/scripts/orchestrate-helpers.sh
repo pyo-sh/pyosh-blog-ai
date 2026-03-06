@@ -113,21 +113,33 @@ ORCH_WORK_WINDOWS="${ORCH_WORK_WINDOWS:-server1 server2 client1 client2}"
 
 orch_find_idle_panes() {
   # Usage: orch_find_idle_panes [exclude_pane]
-  # Returns space-separated list of idle pane IDs (one per work window).
-  # Only considers the first pane (lowest index) of each window to prevent
-  # dispatching to sub-panes. Uses head -1 instead of index == 0 to be
-  # independent of tmux pane-base-index setting.
+  # Returns space-separated list of idle pane IDs.
   # Idle = shell (bash/zsh/sh/fish) with no foreground job.
+  #
+  # Two modes:
+  #   ORCH_WORK_PANES set   → use explicit pane IDs (user controls sub-pane safety)
+  #   ORCH_WORK_PANES unset → window-based discovery (head -1 per window, safe default)
   local exclude=${1:-""}
 
   local current_session
   current_session=$(tmux display-message -p '#{session_id}' 2>/dev/null)
 
-  for win in $ORCH_WORK_WINDOWS; do
-    tmux list-panes -t "$win" \
-      -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null \
-      | head -1
-  done \
+  if [ -n "${ORCH_WORK_PANES:-}" ]; then
+    # Explicit pane IDs
+    for pane_id in $ORCH_WORK_PANES; do
+      tmux display-message -t "$pane_id" \
+        -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null
+    done
+  else
+    # Window-based: first pane (lowest index) per window to prevent
+    # dispatching to sub-panes. Uses head -1 to be independent of
+    # tmux pane-base-index setting.
+    for win in $ORCH_WORK_WINDOWS; do
+      tmux list-panes -t "$win" \
+        -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null \
+        | head -1
+    done
+  fi \
     | awk -v sess="$current_session" -v excl="$exclude" '
         $1 == sess && ($3 == "bash" || $3 == "zsh" || $3 == "sh" || $3 == "fish") {
           if ($2 != excl) print $2
@@ -140,9 +152,21 @@ orch_pane_alive() {
   tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx "$pane_id"
 }
 
+_orch_parse_agent() {
+  # Usage: read -r tool model <<< "$(_orch_parse_agent "$agent")"
+  # Parses structured agent string: "codex" | "claude" | "claude:sonnet" | "claude:opus"
+  # stdout: two words - tool model (model may be empty)
+  local agent=$1
+  local tool="${agent%%:*}"
+  local model="${agent#*:}"
+  [ "$model" = "$agent" ] && model=""
+  echo "$tool" "$model"
+}
+
 orch_dispatch() {
   # Usage: orch_dispatch <issue> <pane_id> <area_dir> <agent>
   # Sends /dev-pipeline #{issue} to the target pane.
+  # Agent format: "codex" | "claude" | "claude:<model>" (e.g. "claude:sonnet")
   # Returns: 0 = sent, 1 = pane dead
   local issue=$1
   local pane_id=$2
@@ -156,21 +180,51 @@ orch_dispatch() {
   local area
   area=$(monorepo_area_from_dir "$area_dir")
 
+  local tool model
+  read -r tool model <<< "$(_orch_parse_agent "$agent")"
+
   # Always start from monorepo root so Claude/Codex can find root repo skills
   # (dev-pipeline, dev-review, dev-resolve). The area param in the prompt
   # tells /dev-pipeline which subdirectory to work in.
-  local prompt
-  if [ "$agent" = "codex" ]; then
-    prompt="/dev-pipeline ${area} #${issue}. Use ${agent} for review and resolve panes."
+  local prompt="/dev-pipeline ${area} #${issue}. Use ${tool} for review and resolve panes. After completing all steps, exit the session."
+
+  if [ "$tool" = "codex" ]; then
     tmux send-keys -t "$pane_id" \
       "cd '${MONOREPO_ROOT}' && codex exec --dangerously-bypass-approvals-and-sandbox '${prompt}'" Enter
   else
-    prompt="/dev-pipeline ${area} #${issue}. Use ${agent} for review and resolve panes."
+    local model_flag=""
+    [ -n "$model" ] && model_flag="--model ${model} "
     tmux send-keys -t "$pane_id" \
-      "cd '${MONOREPO_ROOT}' && claude --dangerously-skip-permissions '${prompt}'" Enter
+      "cd '${MONOREPO_ROOT}' && claude ${model_flag}--dangerously-skip-permissions '${prompt}'" Enter
   fi
 
   return 0
+}
+
+orch_release_pane() {
+  # Usage: orch_release_pane <pane_id>
+  # Terminates AI process in pane so it returns to shell prompt.
+  # Does NOT destroy the pane (unlike pipeline_kill_pane).
+  # Fallback for when the prompt "exit the session" instruction was not followed.
+  local pane_id=$1
+  if [ -z "$pane_id" ] || [ "$pane_id" = "null" ]; then return 0; fi
+  if ! orch_pane_alive "$pane_id"; then return 0; fi
+
+  local cmd
+  cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
+  if [[ "$cmd" != "claude" && "$cmd" != "codex" && "$cmd" != "node" ]]; then
+    return 0  # Already at shell prompt
+  fi
+
+  tmux send-keys -t "$pane_id" C-c
+  sleep 2
+
+  # Verify exit
+  cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
+  if [[ "$cmd" == "claude" || "$cmd" == "codex" || "$cmd" == "node" ]]; then
+    tmux send-keys -t "$pane_id" C-c
+    sleep 2
+  fi
 }
 
 orch_record_dispatch() {
@@ -435,10 +489,16 @@ orch_poll_cycle() {
     local result
     result=$(orch_check_completion "$issue" "$area_dir")
     if [ "$result" = "completed" ] || [ "$result" = "failed" ]; then
+      # Extract pane_id before removing from dispatched (needed for release)
+      local pane_id
+      pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane // empty")
+
       orch_status_set "$area" "$issue" "$result"
-      # Remove from dispatched to avoid re-checking
       orch_state_update "$area" "del(.dispatched[\"$issue\"])"
       >&2 echo "[orchestrator] Issue #${issue}: ${result}"
+
+      # Release pane so it returns to shell prompt and becomes available
+      [ -n "$pane_id" ] && orch_release_pane "$pane_id"
 
       local newly_unblocked
       newly_unblocked=$(orch_unblock "$area" "$issue")
@@ -483,6 +543,7 @@ orch_poll_cycle() {
         >&2 echo "[orchestrator] STALL: Issue #${issue} — retry exhausted, marking failed"
         orch_status_set "$area" "$issue" "failed"
         orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+        [ -n "$pane_id" ] && orch_release_pane "$pane_id"
         local newly_unblocked
         newly_unblocked=$(orch_unblock "$area" "$issue")
         [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
