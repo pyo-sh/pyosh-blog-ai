@@ -205,10 +205,12 @@ pipeline_stage_retry() {
   local issue=$1
   local area=$2
   local stage=$3
+  local state
+  state=$(pipeline_state_read "$issue" "$area")
   local retries
-  retries=$(pipeline_state_read "$issue" "$area" | jq -r ".stageRetries.${stage} // 0")
+  retries=$(echo "$state" | jq -r ".stageRetries.${stage} // 0")
   local max
-  max=$(pipeline_state_read "$issue" "$area" | jq -r ".maxStageRetries // 3")
+  max=$(echo "$state" | jq -r ".maxStageRetries // 3")
   if [ "$retries" -ge "$max" ]; then
     return 1
   fi
@@ -238,19 +240,20 @@ pipeline_format_escalation() {
   local stage=$3
   local state
   state=$(pipeline_state_read "$issue" "$area")
-  local max
-  max=$(echo "$state" | jq -r ".maxStageRetries // 3")
 
-  echo "[pipeline] Stage \"$stage\" failed after $max recovery attempts."
-  echo ""
-  echo "Recovery log:"
-  echo "$state" | jq -r '.recoveryLog[] | select(.stage == "'"$stage"'") | "  #\(.timestamp) \(.error) -> \(.action) -> \(.result)"'
-  echo ""
-  echo "Worktree: $(echo "$state" | jq -r '.worktree')"
-  echo "Branch: $(echo "$state" | jq -r '.branch')"
-  echo "PR: #$(echo "$state" | jq -r '.pr')"
-  echo ""
-  echo "Action needed: fix manually, then resume with /dev-pipeline"
+  local info
+  info=$(echo "$state" | jq -r --arg stage "$stage" '
+    "[pipeline] Stage \"\($stage)\" failed after \(.maxStageRetries // 3) recovery attempts.\n",
+    "Recovery log:",
+    (.recoveryLog // [] | map(select(.stage == $stage))
+      | .[] | "  #\(.timestamp) \(.error) -> \(.action) -> \(.result)"),
+    "",
+    "Worktree: \(.worktree)",
+    "Branch: \(.branch)",
+    "PR: #\(.pr)",
+    "",
+    "Action needed: fix manually, then resume with /dev-pipeline"')
+  echo "$info"
 }
 
 # ──────────────────────────────────────────────
@@ -263,10 +266,7 @@ pipeline_cleanup() {
   local branch=$3
 
   # Clean up log files
-  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-review.log"
-  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-review.err"
-  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-resolve.log"
-  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-resolve.err"
+  rm -f "$PIPELINE_LOG_DIR"/issue-"${issue}"-*.log "$PIPELINE_LOG_DIR"/issue-"${issue}"-*.err
 
   local wt="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$wt" ]; then
