@@ -10,26 +10,58 @@ alias ch="claude --chrome --dangerously-skip-permissions"
 
 alias cdx="codex --dangerously-bypass-approvals-and-sandbox"
 
-# 전체 업데이트 함수
+# 전체 업데이트 함수 (각 단계 독립 실행 - 하나 실패해도 나머지 계속)
 dev-update() {
   echo "=== Updating dev tools ==="
+  local failed=0
 
-  # System packages
-  sudo apt-get update && sudo apt-get upgrade -y && sudo rm -rf /var/lib/apt/lists/*
+  # System packages (손상된 apt lists 정리 후 업데이트)
+  echo "[1/4] System packages"
+  sudo rm -rf /var/lib/apt/lists/*
+  if sudo apt-get update && sudo apt-get upgrade -y; then
+    sudo rm -rf /var/lib/apt/lists/*
+    echo "  done"
+  else
+    echo "  SKIPPED (apt-get failed)"
+    sudo rm -rf /var/lib/apt/lists/*
+    ((failed++)) || true
+  fi
 
   # Claude Code CLI (native installer)
-  curl -fsSL https://claude.ai/install.sh | bash
+  echo "[2/4] Claude Code CLI"
+  if curl -fsSL https://claude.ai/install.sh | bash; then
+    echo "  done"
+  else
+    echo "  SKIPPED (install failed)"
+    ((failed++)) || true
+  fi
 
   # Codex CLI
-  sudo npm update -g @openai/codex
+  echo "[3/4] Codex CLI"
+  if sudo npm update -g @openai/codex; then
+    echo "  done"
+  else
+    echo "  SKIPPED (npm update failed)"
+    ((failed++)) || true
+  fi
 
   # pnpm (corepack)
-  sudo corepack prepare pnpm@latest --activate
+  echo "[4/4] pnpm"
+  if sudo corepack prepare pnpm@latest --activate; then
+    echo "  done"
+  else
+    echo "  SKIPPED (corepack failed)"
+    ((failed++)) || true
+  fi
 
   # 명령어 경로 캐시 초기화
   hash -r
 
-  echo "=== Update complete ==="
+  if [ "$failed" -gt 0 ]; then
+    echo "=== Update complete ($failed step(s) skipped) ==="
+  else
+    echo "=== Update complete ==="
+  fi
 }
 
 # 기존 tmux pane에서 환경 재로드
