@@ -2,7 +2,7 @@
 # tools/agent-tracker/agent-tracker.sh
 # Real-time tmux agent dashboard — reads from sidecar files (push model)
 #
-# Claude Code panes: data pushed by hooks → /tmp/agent-tracker/{pane_id}.json
+# Claude Code panes: data pushed by hooks → .workspace/agent-tracker/{pane_id}.json
 # Codex panes: pane scraping fallback (no hooks support)
 #
 # Usage: bash tools/agent-tracker/agent-tracker.sh [-s SESSION] [-i INTERVAL]
@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PIPELINE_DIR="${PIPELINE_DIR:-"$REPO_ROOT/.workspace/pipeline"}"
 ORCH_DIR="${ORCH_DIR:-"$REPO_ROOT/.workspace/orchestrate"}"
-SIDECAR_DIR="/tmp/agent-tracker"
+SIDECAR_DIR="$REPO_ROOT/.workspace/agent-tracker"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Colors (blue accent theme, matching context-bar.sh)
@@ -307,27 +307,6 @@ parse_codex_pane() {
   fi
 
   printf '%s\x1e%s\x1e%d\x1e%d\x1e%s\x1e%s' "$model" "$status" "$pct" "$tok_k" "$task" "$activity"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Pipeline summary for footer
-# ─────────────────────────────────────────────────────────────────────────────
-get_pipeline_summary() {
-  local parts=()
-  # Search both flat and area-prefixed state file locations
-  for f in "$PIPELINE_DIR"/*/issue-*.state.json "$PIPELINE_DIR"/issue-*.state.json; do
-    [[ -f "$f" ]] || continue
-    # Merge 2 jq calls into 1 per file (#30)
-    local raw issue step
-    raw=$(jq -r '[.issue // empty, .step // empty] | join("\u001e")' "$f" 2>/dev/null)
-    IFS=$'\x1e' read -r issue step <<< "$raw"
-    [[ -z "$issue" ]] && continue
-    parts+=("#${issue}(${step})")
-  done
-  if (( ${#parts[@]} > 0 )); then
-    local IFS=', '
-    printf '%s' "${parts[*]}"
-  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -685,10 +664,6 @@ render_dashboard() {
   local W_TASK=$(( INNER - W_PANE - W_ACTIVITY - W_ENGINE - W_STATUS - W_TOKENS - 9 ))
   (( W_TASK < 15 )) && W_TASK=15
 
-  # ── Pipeline ───────────────────────────────────────────────────────────────
-  local pipeline_str
-  pipeline_str=$(get_pipeline_summary)
-
   # ── Recalculate fixed-width border strings only when terminal width changes (#30)
   if (( COLS != _PREV_COLS )); then
     _PREV_COLS=$COLS
@@ -792,18 +767,12 @@ render_dashboard() {
   local left_colored="${GREEN}●${R} ${GRAY}Active: ${n_total} agents ${n_stat}${R}"
   local left_plain="● Active: ${n_total} agents ${n_stat}"
 
-  local right_colored="" right_plain=""
-  if [[ -n "$pipeline_str" ]]; then
-    right_colored="  ${GRAY}│${R}  ${GOLD}⚙ Pipeline: ${pipeline_str}${R}"
-    right_plain="  │  ⚙ Pipeline: ${pipeline_str}"
-  fi
-
-  local footer_len=$(( 2 + ${#left_plain} + ${#right_plain} ))
+  local footer_len=$(( 2 + ${#left_plain} ))
   local fpad=$(( INNER - footer_len - 1 ))
   (( fpad < 0 )) && fpad=0
 
-  printf "${GRAY}║${R}  %b%b%*s ${GRAY}║${R}" \
-    "$left_colored" "$right_colored" "$fpad" ""
+  printf "${GRAY}║${R}  %b%*s ${GRAY}║${R}" \
+    "$left_colored" "$fpad" ""
   tput el; echo
 
   # Orchestrator batch sections (#59)
@@ -825,7 +794,6 @@ tput civis 2>/dev/null
 # Clean up orphan sidecar files for panes not in the current session (#32)
 # Smarter than rm -rf: preserves files for active panes
 mkdir -p "$SIDECAR_DIR"
-chmod 700 "$SIDECAR_DIR" 2>/dev/null
 declare -A _active_panes=()
 while IFS= read -r _pid; do
   _active_panes["$_pid"]=1

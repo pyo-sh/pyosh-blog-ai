@@ -6,7 +6,7 @@
 #   "statusLine": { "type": "command", "command": ".../statusline-wrapper.sh" }
 #
 # Flow:
-#   stdin (JSON) → transcript token calc (once)
+#   stdin (JSON) → current_usage token calc + transcript last msg
 #               → on-statusline.sh (background, fire-and-forget)
 #               → context-bar.sh   (foreground, stdout for display)
 
@@ -20,46 +20,43 @@ input=$(cat)
 # Code PID) so on-statusline.sh can use the same ID as on-status.sh. (#47)
 export AGENT_TRACKER_PANE="${TMUX_PANE:-pid-$PPID}"
 
-# Pre-compute tokens + last user message from transcript in a single pass.
+# Pre-compute tokens from current_usage for context-bar.sh compatibility.
+# current_usage: accurate per-request context tokens (added in Claude Code v2.0.72).
+# Fallback: used_percentage reverse calculation (when current_usage is null).
+TRANSCRIPT_TOKENS=$(printf '%s' "$input" | jq -r '
+  .context_window |
+  if .current_usage != null then
+    ((.current_usage.input_tokens // 0) +
+     (.current_usage.cache_creation_input_tokens // 0) +
+     (.current_usage.cache_read_input_tokens // 0))
+  elif (.used_percentage // 0) > 0 then
+    ((.context_window_size // 200000) * (.used_percentage // 0) / 100 | floor)
+  else 0 end
+' 2>/dev/null)
+export TRANSCRIPT_TOKENS="${TRANSCRIPT_TOKENS:-0}"
+
+# Pre-compute last user message from transcript.
 # Uses tail to avoid slurping the entire file (O(fixed) instead of O(file size)).
-# total_input_tokens excludes system prompt/tools/memory — transcript is accurate.
-# See: github.com/anthropics/claude-code/issues/13652
 _tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
-export TRANSCRIPT_TOKENS=0 TRANSCRIPT_LAST_MSG=""
+export TRANSCRIPT_LAST_MSG=""
 if [[ -n "$_tp" && -f "$_tp" ]]; then
-  _raw=$(tail -n 200 "$_tp" | jq -rs '
-    {
-      tokens: (
-        map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) |
-        last |
-        if . then
-          (.message.usage.input_tokens // 0) +
-          (.message.usage.cache_read_input_tokens // 0) +
-          (.message.usage.cache_creation_input_tokens // 0)
-        else 0 end
-      ),
-      last_msg: (
-        def is_unhelpful:
-          startswith("[Request interrupted") or
-          startswith("[Request cancelled") or
-          . == "";
-        [.[] | select(.type == "user") |
-         select(.message.content | type == "string" or
-                (type == "array" and any(.[]; .type == "text")))] |
-        reverse |
-        map(.message.content |
-          if type == "string" then .
-          else [.[] | select(.type == "text") | .text] | join(" ") end |
-          gsub("\n"; " ") | gsub("  +"; " ")) |
-        map(select(is_unhelpful | not)) |
-        first // ""
-      )
-    } | "\(.tokens)\u001e\(.last_msg)"
-  ' 2>/dev/null || echo "0")
-  if [[ -n "$_raw" ]]; then
-    IFS=$'\x1e' read -r TRANSCRIPT_TOKENS TRANSCRIPT_LAST_MSG <<< "$_raw"
-  fi
-  export TRANSCRIPT_TOKENS TRANSCRIPT_LAST_MSG
+  TRANSCRIPT_LAST_MSG=$(tail -n 200 "$_tp" | jq -rs '
+    def is_unhelpful:
+      startswith("[Request interrupted") or
+      startswith("[Request cancelled") or
+      . == "";
+    [.[] | select(.type == "user") |
+     select(.message.content | type == "string" or
+            (type == "array" and any(.[]; .type == "text")))] |
+    reverse |
+    map(.message.content |
+      if type == "string" then .
+      else [.[] | select(.type == "text") | .text] | join(" ") end |
+      gsub("\n"; " ") | gsub("  +"; " ")) |
+    map(select(is_unhelpful | not)) |
+    first // ""
+  ' 2>/dev/null || echo "")
+  export TRANSCRIPT_LAST_MSG
 fi
 
 # Write sidecar in background (fire-and-forget, never block display)
