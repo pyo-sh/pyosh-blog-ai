@@ -244,17 +244,15 @@ orch_check_completion() {
     if [[ "$cmd" == "claude" ]] || [[ "$cmd" == "codex" ]] || [[ "$cmd" == "node" ]]; then
       # AI running - check if pipeline already completed (AI stays in session after finishing)
       local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+      local seen
+      seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
       if [ -f "$pipeline_state" ]; then
         # State file exists - pipeline in progress, mark as seen
-        local seen
-        seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
         if [ "$seen" != "true" ]; then
-          orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true"
+          orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true" || true
         fi
       else
         # State file absent - completed only if it was previously seen
-        local seen
-        seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
         if [ "$seen" = "true" ]; then
           echo "completed"; return 0
         fi
@@ -266,11 +264,7 @@ orch_check_completion() {
 
   # 3. Pipeline state file check (AI exited or pane dead)
   local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-  if [ -f "$pipeline_state" ]; then
-    # State file exists but AI exited - fall through to PR check
-    :
-  else
-    # State file absent - completed only if it was previously seen
+  if [ ! -f "$pipeline_state" ]; then
     local seen
     seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
     if [ "$seen" = "true" ]; then
@@ -477,7 +471,7 @@ orch_poll_cycle() {
             local retry_now
             retry_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             orch_state_update "$area" \
-              ".dispatched[\"$issue\"].pane = \"$p\" | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].dispatchedAt = \"$retry_now\" | .dispatched[\"$issue\"].lastActivity = \"$retry_now\""
+              ".dispatched[\"$issue\"].pane = \"$p\" | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].dispatchedAt = \"$retry_now\" | .dispatched[\"$issue\"].lastActivity = \"$retry_now\" | .dispatched[\"$issue\"].pipelineStarted = false"
             >&2 echo "[orchestrator] Re-dispatched #${issue} → pane $p"
             retried=1
             break
