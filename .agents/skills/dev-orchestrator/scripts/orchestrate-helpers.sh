@@ -151,11 +151,8 @@ orch_dispatch() {
   # No stdin available in -p mode, so pipeline must make autonomous decisions.
   local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}. Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
-  local model_flag=""
-  [ -n "$model" ] && model_flag="--model ${model} "
-
   cd "$MONOREPO_ROOT" && CLAUDECODE= timeout 3600 claude -p \
-    ${model_flag}--dangerously-skip-permissions \
+    ${model:+--model "$model"} --dangerously-skip-permissions \
     --no-session-persistence \
     --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \
     --max-turns 80 \
@@ -339,8 +336,6 @@ orch_detect_stall() {
     local last_sha
     last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
 
-    local repo
-    repo=$(monorepo_area_repo "$area")
     local pr_number
     pr_number=$(_orch_pr_list "$area" "$issue" open number '.[0].number')
 
@@ -353,7 +348,8 @@ orch_detect_stall() {
       echo "active"; return 0
     fi
 
-    # Use -R for explicit repo targeting instead of cd + {owner}/{repo} placeholder
+    local repo
+    repo=$(monorepo_area_repo "$area")
     local latest_sha
     latest_sha=$(gh api "repos/${repo}/pulls/${pr_number}/commits" \
       --jq '.[-1].sha' 2>/dev/null)

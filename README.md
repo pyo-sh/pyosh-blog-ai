@@ -181,6 +181,10 @@ Critical이 모두 해결되면 사용자에게 Warning/Suggestion 처리 방법
 
 Docker 컨테이너 안에서 AI 에이전트를 실행하는 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
 
+### tmux 환경 설정
+
+agent-tracker 대시보드 등 tmux 기반 도구를 사용하려면 [tools/tmux/README.md](tools/tmux/README.md)를 참조하세요. 파이프라인/오케스트레이터 실행에는 tmux가 필수가 아닙니다.
+
 ### 왜 세션을 분리하는가?
 
 같은 AI 세션이 코드 작성과 리뷰를 모두 수행하면, 작성 시의 컨텍스트가 리뷰를 편향시킵니다. 세션을 분리하면:
