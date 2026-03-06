@@ -1,67 +1,69 @@
 ---
 name: dev-orchestrator
-description: Orchestrate multiple GitHub issues in parallel across tmux panes with dependency-aware scheduling. Dispatches /dev-pipeline per issue to idle panes, monitors completion, and auto-unblocks dependent issues. Activates on "/dev-orchestrator", "run orchestrator", "batch issues", "parallel pipeline", etc.
+description: Orchestrate multiple GitHub issues in parallel via headless `claude -p` background processes with dependency-aware scheduling. Dispatches /dev-pipeline per issue as a subprocess, monitors completion, and auto-unblocks dependent issues. Activates on "/dev-orchestrator", "run orchestrator", "batch issues", "parallel pipeline", etc.
 ---
 
 # Dev-Orchestrator
 
-Batch orchestration: build dependency DAG from issues → dispatch to idle panes via `/dev-pipeline` → monitor completion → auto-unblock dependents.
+Batch orchestration: build dependency DAG from issues -> dispatch headless `claude -p` processes via `/dev-pipeline` -> monitor completion -> auto-unblock dependents.
 
 > Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
-> Requires tmux session (`$TMUX`). Source helpers at start: `source scripts/orchestrate-helpers.sh`
+> Source helpers at start: `source scripts/orchestrate-helpers.sh`
 
-## Agent Selection
+## Agent selection
 
-**Ask the user** which AI agent to use for dispatched panes:
+**Ask the user** which AI agent/model to use for dispatched processes:
 
-| Agent value | Command pattern |
-|-------------|----------------|
-| `claude` | `claude --dangerously-skip-permissions '{prompt}'` |
-| `claude:<model>` | `claude --model <model> --dangerously-skip-permissions '{prompt}'` |
-| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}'` |
+| Agent value | Headless command |
+|-------------|-----------------|
+| `claude` | `claude -p --dangerously-skip-permissions ...` |
+| `claude:<model>` | `claude -p --model <model> --dangerously-skip-permissions ...` |
 
-Examples: `"claude"`, `"claude:sonnet"`, `"claude:opus"`, `"codex"`.
+Examples: `"claude"`, `"claude:sonnet"`, `"claude:opus"`.
 
 Store in state as `"agent": "claude:sonnet"` etc. Model aliases (`sonnet`, `opus`) are resolved by the CLI.
 
-## State Files
+## State files
 
 ```
 .workspace/orchestrate/{area}/batch.state.json   # batch-level DAG + status
 .workspace/orchestrate/{area}/issue-{N}.exit     # signal: pipeline completed (content: "ok" or "fail")
+.workspace/orchestrate/{area}/issue-{N}.log      # stdout from headless process
+.workspace/orchestrate/{area}/issue-{N}.err      # stderr from headless process
 ```
 
 Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
 
 ## Workflow
 
-### 0. Check Existing State
+### 0. Check existing state
 
 ```bash
 STATE_FILE=".workspace/orchestrate/{area}/batch.state.json"
 ```
 
-Exists → **resume** ([recovery.md](references/recovery.md)). Not exists → Step 1.
+Exists -> **resume** ([recovery.md](references/recovery.md)). Not exists -> Step 1.
 
-### 1. Area Detection
+### 1. Area detection
 
-```bash
-WINDOW_NAME=$(tmux display-message -p '#{window_name}')
-```
+Determine area from user input or context (issue labels, current directory).
 
-| Window name pattern | Area |
-|---------------------|------|
-| `client*` | `client` |
-| `server*` | `server` |
-| other | ask user |
+| Context | Area |
+|---------|------|
+| Issue has `client` label | `client` |
+| Issue has `server` label | `server` |
+| User specifies | as given |
 
 Area dir: monorepo root (e.g., `/workspace`) for `workspace`, or `{monorepo}/{area}` for client/server.
 
-### 2. Fetch & Filter Issues
+### 2. Fetch & filter issues
+
+Always use `-R` to target the correct GitHub repo:
 
 ```bash
-cd {area_dir}
-gh issue list --assignee @me --state open --json number,title,body,labels \
+REPO=$(monorepo_area_repo "$AREA")
+gh issue list -R "$REPO" --assignee @me --state open \
+  --json number,title,body,labels \
   --jq '.[] | select(.labels[].name == "{area}")'
 ```
 
@@ -69,7 +71,7 @@ Exclude issues already in pipeline state (`.workspace/pipeline/{area}/issue-*.st
 
 Present list to user for confirmation before proceeding.
 
-### 3. Build Dependency DAG
+### 3. Build dependency DAG
 
 ```bash
 source scripts/orchestrate-helpers.sh
@@ -83,7 +85,7 @@ done
 
 Build DAG: `dag[N]="dep1 dep2"` (N depends on dep1, dep2).
 
-Cycle detection → abort with error if cycle found. See [dependency-resolution.md](references/dependency-resolution.md).
+Cycle detection -> abort with error if cycle found. See [dependency-resolution.md](references/dependency-resolution.md).
 
 Write initial state:
 
@@ -98,63 +100,59 @@ Write initial state:
     "3": "blocked", "4": "blocked", "5": "pending"
   },
   "dispatched": {},
-  "agent": "codex",
-  "orchestratorPane": "%1",
+  "agent": "claude:sonnet",
+  "maxConcurrent": 4,
   "createdAt": "2026-03-01T00:00:00Z",
   "updatedAt": "2026-03-01T00:00:00Z"
 }
 ```
 
-### 4. Initial Dispatch
+### 4. Initial dispatch
 
-Find idle panes in the same tmux session:
-
-```bash
-# Default: window-based discovery (one pane per work window)
-IDLE_PANES=$(orch_find_idle_panes)
-
-# Override: explicit pane IDs (for multiple panes in one window)
-ORCH_WORK_PANES="%4 %16" orch_find_idle_panes
-```
-
-For each idle pane + each `pending` issue (no unmet deps), dispatch:
+For each `pending` issue (no unmet deps), up to `maxConcurrent`:
 
 ```bash
-orch_dispatch "$ISSUE" "$PANE_ID" "$AREA_DIR" "$AGENT"
+PID=$(orch_dispatch "$ISSUE" "$AREA_DIR" "$AGENT")
+orch_record_dispatch "$AREA" "$ISSUE" "$PID"
 ```
+
+Each dispatch launches a background `claude -p` process running `/dev-pipeline`. The process runs autonomously - no stdin, no user interaction needed.
 
 Update status: `"dispatched"`. See [state-detection.md](references/state-detection.md).
 
-### 5. Poll Cycle
+### 5. Poll cycle
 
 Run continuously (30-second interval):
 
 ```bash
 while true; do
-  orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT" "$ORCH_PANE"
+  orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"
+  REMAINING=$(orch_state_read "$AREA" | jq \
+    '[.status | to_entries[] | select(.value == "pending" or .value == "dispatched" or .value == "blocked")] | length')
+  [ "$REMAINING" -eq 0 ] && break
   sleep 30
 done
 ```
 
 `orch_poll_cycle` does, for each dispatched issue:
 
-1. **Completion check** → `orch_check_completion "$ISSUE" "$AREA_DIR"`
-   - Signal file exists → mark `completed` or `failed`
-   - Pipeline state gone + PR merged → mark `completed`
-   - Pipeline state gone + PR not merged/absent → mark `failed`
+1. **Completion check** -> `orch_check_completion "$ISSUE" "$AREA_DIR"`
+   - Signal file exists -> mark `completed` or `failed`
+   - Process exited + pipeline state gone -> mark `completed`
+   - Process exited + no PR -> mark `failed`
 
-2. **Stall detection** → `orch_detect_stall "$ISSUE" "$AREA_DIR"`
-   - No new commits in 10 min → warn user, offer retry
+2. **Stall detection** -> `orch_detect_stall "$ISSUE" "$AREA_DIR"`
+   - No new commits in 10 min -> warn user, offer retry
 
-3. **Unblock** → on any `completed` or `failed`, call `orch_unblock "$AREA" "$ISSUE"`
+3. **Unblock** -> on any `completed` or `failed`, call `orch_unblock "$AREA" "$ISSUE"`
    - Find issues whose only remaining blocker was this issue
-   - For each newly-unblocked issue + idle pane → dispatch
+   - For each newly-unblocked issue -> dispatch
 
-4. **Idle pane dispatch** → for any `pending` issues with met deps + idle panes, dispatch
+4. **Dispatch pending** -> for any `pending` issues with met deps, launch new process
 
-5. **Report** → print status summary to orchestrator pane
+5. **Report** -> print status to orchestrator output
 
-### 6. Batch Completion
+### 6. Batch completion
 
 All issues `completed` or `failed`:
 
@@ -162,7 +160,7 @@ All issues `completed` or `failed`:
 orch_print_summary "$AREA" "$AREA_DIR"
 ```
 
-Show table: issue → status → PR URL. For failed issues, ask user to handle manually.
+Show table: issue -> status -> PR URL. For failed issues, ask user to handle manually.
 
 Clean up:
 
@@ -170,20 +168,21 @@ Clean up:
 rm -rf .workspace/orchestrate/{area}/
 ```
 
-### 7. Record Progress
+### 7. Record progress
 
 Run `/dev-log` to record batch completion.
 
 ## Constraints
 
-- **Never merge PRs** — merging is handled by each `/dev-pipeline` instance
-- **Never modify code** — code changes happen only inside dispatched panes
-- **Dispatch at most one issue per pane** — no overloading
-- **Max concurrency** = number of idle panes found at dispatch time
+- **Never merge PRs** - merging is handled by each `/dev-pipeline` instance
+- **Never modify code** - code changes happen only inside dispatched processes
+- **Max concurrency** controlled by `maxConcurrent` (default: 4)
+- Always use `-R <owner/repo>` or `cd {area_dir}` for `gh` commands - never run from the wrong repo
+- Avoid deprecated `gh` fields (`projectCards` etc.) - use `number,title,state,body,url`
 - On unrecoverable error: save state, report to user
 
 ## References
 
-- [Dependency resolution](references/dependency-resolution.md) — DAG construction, cycle detection, edge cases
-- [State detection](references/state-detection.md) — completion/stall detection, status state machine
-- [Recovery strategy](references/recovery.md) — crash recovery, auto-retry policy
+- [Dependency resolution](references/dependency-resolution.md) - DAG construction, cycle detection, edge cases
+- [State detection](references/state-detection.md) - completion/stall detection, status state machine
+- [Recovery strategy](references/recovery.md) - crash recovery, auto-retry policy

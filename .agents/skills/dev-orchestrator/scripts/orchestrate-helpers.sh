@@ -1,6 +1,9 @@
 #!/bin/bash
 # orchestrate-helpers.sh — Shell helpers for dev-orchestrator skill
 # Source this file at orchestrator start.
+#
+# Dispatch model: headless `claude -p` background processes (no tmux dependency).
+# Each issue gets its own background process running /dev-pipeline.
 
 # Source shared monorepo helpers for MONOREPO_ROOT and area resolution.
 # → .agents/references/monorepo-layout.md
@@ -25,14 +28,13 @@ orch_signal_path() {
 }
 
 orch_init() {
-  # Usage: orch_init <area> <agent> <orchestrator_pane> <issues_json> <dag_json> [max_concurrent]
+  # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent]
   # Creates initial batch state file.
   local area=$1
   local agent=$2
-  local orch_pane=$3
-  local issues_json=$4  # JSON array e.g. '[1,2,3]'
-  local dag_json=$5     # JSON object e.g. '{"3":[1,2]}'
-  local max_concurrent=${6:-99}  # default: no practical limit
+  local issues_json=$3  # JSON array e.g. '[1,2,3]'
+  local dag_json=$4     # JSON object e.g. '{"3":[1,2]}'
+  local max_concurrent=${5:-4}  # default: 4 concurrent processes
 
   mkdir -p "$ORCH_BASE/$area"
 
@@ -61,13 +63,11 @@ orch_init() {
     --argjson dag "$filtered_dag" \
     --argjson status "$status_json" \
     --arg agent "$agent" \
-    --arg orchPane "$orch_pane" \
     --argjson maxConcurrent "$max_concurrent" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
       status: $status, dispatched: {}, agent: $agent,
       maxConcurrent: $maxConcurrent,
-      orchestratorPane: $orchPane,
       createdAt: $now, updatedAt: $now}' \
     > "$(orch_state_path "$area")"
 }
@@ -106,55 +106,12 @@ orch_status_set() {
 }
 
 # ──────────────────────────────────────────────
-# Pane management
+# Process management (headless dispatch)
 # ──────────────────────────────────────────────
-
-ORCH_WORK_WINDOWS="${ORCH_WORK_WINDOWS:-server1 server2 client1 client2}"
-
-orch_find_idle_panes() {
-  # Usage: orch_find_idle_panes [exclude_pane]
-  # Returns space-separated list of idle pane IDs.
-  # Idle = shell (bash/zsh/sh/fish) with no foreground job.
-  #
-  # Two modes:
-  #   ORCH_WORK_PANES set   → use explicit pane IDs (user controls sub-pane safety)
-  #   ORCH_WORK_PANES unset → window-based discovery (head -1 per window, safe default)
-  local exclude=${1:-""}
-
-  local current_session
-  current_session=$(tmux display-message -p '#{session_id}' 2>/dev/null)
-
-  if [ -n "${ORCH_WORK_PANES:-}" ]; then
-    # Explicit pane IDs
-    for pane_id in $ORCH_WORK_PANES; do
-      tmux display-message -t "$pane_id" \
-        -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null
-    done
-  else
-    # Window-based: first pane (lowest index) per window to prevent
-    # dispatching to sub-panes. Uses head -1 to be independent of
-    # tmux pane-base-index setting.
-    for win in $ORCH_WORK_WINDOWS; do
-      tmux list-panes -t "$win" \
-        -F '#{session_id} #{pane_id} #{pane_current_command}' 2>/dev/null \
-        | head -1
-    done
-  fi \
-    | awk -v sess="$current_session" -v excl="$exclude" '
-        $1 == sess && ($3 == "bash" || $3 == "zsh" || $3 == "sh" || $3 == "fish") {
-          if ($2 != excl) print $2
-        }' \
-    | tr '\n' ' '
-}
-
-orch_pane_alive() {
-  local pane_id=$1
-  tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx "$pane_id"
-}
 
 _orch_parse_agent() {
   # Usage: read -r tool model <<< "$(_orch_parse_agent "$agent")"
-  # Parses structured agent string: "codex" | "claude" | "claude:sonnet" | "claude:opus"
+  # Parses structured agent string: "claude" | "claude:sonnet" | "claude:opus"
   # stdout: two words - tool model (model may be empty)
   local agent=$1
   local tool="${agent%%:*}"
@@ -163,80 +120,84 @@ _orch_parse_agent() {
   echo "$tool" "$model"
 }
 
-orch_dispatch() {
-  # Usage: orch_dispatch <issue> <pane_id> <area_dir> <agent>
-  # Sends /dev-pipeline #{issue} to the target pane.
-  # Agent format: "codex" | "claude" | "claude:<model>" (e.g. "claude:sonnet")
-  # Returns: 0 = sent, 1 = pane dead
-  local issue=$1
-  local pane_id=$2
-  local area_dir=$3
-  local agent=$4
+orch_process_alive() {
+  # Usage: orch_process_alive <pid>
+  # Returns: 0 = alive, 1 = dead
+  local pid=$1
+  [ -n "$pid" ] && [ "$pid" != "null" ] && kill -0 "$pid" 2>/dev/null
+}
 
-  if ! orch_pane_alive "$pane_id"; then
-    return 1
-  fi
+orch_dispatch() {
+  # Usage: orch_dispatch <issue> <area_dir> <agent>
+  # Launches a headless claude -p background process for /dev-pipeline.
+  # stdout: PID of the background process
+  # Returns: 0 = launched, 1 = launch failed
+  local issue=$1
+  local area_dir=$2
+  local agent=$3
 
   local area
   area=$(monorepo_area_from_dir "$area_dir")
+  local repo
+  repo=$(monorepo_area_repo "$area")
 
   local tool model
   read -r tool model <<< "$(_orch_parse_agent "$agent")"
 
-  # Always start from monorepo root so Claude/Codex can find root repo skills
-  # (dev-pipeline, dev-review, dev-resolve). The area param in the prompt
-  # tells /dev-pipeline which subdirectory to work in.
-  local prompt="/dev-pipeline ${area} #${issue}. Use ${tool} for review and resolve panes. After completing all steps, exit the session."
+  local log="$ORCH_BASE/${area}/issue-${issue}.log"
+  local err_log="$ORCH_BASE/${area}/issue-${issue}.err"
 
-  if [ "$tool" = "codex" ]; then
-    tmux send-keys -t "$pane_id" \
-      "cd '${MONOREPO_ROOT}' && codex exec --dangerously-bypass-approvals-and-sandbox '${prompt}'" Enter
-  else
-    local model_flag=""
-    [ -n "$model" ] && model_flag="--model ${model} "
-    tmux send-keys -t "$pane_id" \
-      "cd '${MONOREPO_ROOT}' && claude ${model_flag}--dangerously-skip-permissions '${prompt}'" Enter
+  # Pipeline prompt: auto-approve merge since this is batch orchestration.
+  # No stdin available in -p mode, so pipeline must make autonomous decisions.
+  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}. Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
+
+  local model_flag=""
+  [ -n "$model" ] && model_flag="--model ${model} "
+
+  cd "$MONOREPO_ROOT" && CLAUDECODE= timeout 3600 claude -p \
+    ${model_flag}--dangerously-skip-permissions \
+    --no-session-persistence \
+    --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \
+    --max-turns 80 \
+    "$prompt" > "$log" 2>"$err_log" &
+
+  local pid=$!
+
+  # Brief check that process started
+  sleep 1
+  if ! orch_process_alive "$pid"; then
+    >&2 echo "[orchestrator] Process failed to start for issue #${issue}"
+    return 1
   fi
 
+  echo "$pid"
   return 0
 }
 
-orch_release_pane() {
-  # Usage: orch_release_pane <pane_id>
-  # Terminates AI process in pane so it returns to shell prompt.
-  # Does NOT destroy the pane (unlike pipeline_kill_pane).
-  # Fallback for when the prompt "exit the session" instruction was not followed.
-  local pane_id=$1
-  if [ -z "$pane_id" ] || [ "$pane_id" = "null" ]; then return 0; fi
-  if ! orch_pane_alive "$pane_id"; then return 0; fi
+orch_stop_process() {
+  # Usage: orch_stop_process <pid>
+  # Gracefully stops a headless process. Sends SIGTERM, waits, then SIGKILL.
+  local pid=$1
+  if [ -z "$pid" ] || [ "$pid" = "null" ]; then return 0; fi
+  if ! orch_process_alive "$pid"; then return 0; fi
 
-  local cmd
-  cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
-  if [[ "$cmd" != "claude" && "$cmd" != "codex" && "$cmd" != "node" ]]; then
-    return 0  # Already at shell prompt
-  fi
-
-  tmux send-keys -t "$pane_id" C-c
-  sleep 2
-
-  # Verify exit
-  cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
-  if [[ "$cmd" == "claude" || "$cmd" == "codex" || "$cmd" == "node" ]]; then
-    tmux send-keys -t "$pane_id" C-c
-    sleep 2
+  kill "$pid" 2>/dev/null
+  sleep 3
+  if orch_process_alive "$pid"; then
+    kill -9 "$pid" 2>/dev/null
   fi
 }
 
 orch_record_dispatch() {
-  # Usage: orch_record_dispatch <area> <issue> <pane_id>
+  # Usage: orch_record_dispatch <area> <issue> <pid>
   local area=$1
   local issue=$2
-  local pane_id=$3
+  local pid=$3
   local now
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   orch_state_update "$area" \
-    ".dispatched[\"$issue\"] = {pane: \"$pane_id\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false}"
+    ".dispatched[\"$issue\"] = {pid: $pid, log: \"$ORCH_BASE/${area}/issue-${issue}.log\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false, retryCount: 0}"
   orch_status_set "$area" "$issue" "dispatched"
 }
 
@@ -246,9 +207,16 @@ orch_record_dispatch() {
 
 _orch_pr_list() {
   # Usage: _orch_pr_list <area_dir> <issue> <state> <json_fields> <jq_filter>
-  # Finds PRs that close the given issue, matching Closes/Fixes/Resolves #N.
+  # Finds PRs that close the given issue. Uses -R for explicit repo targeting.
+  # Avoid deprecated fields (projectCards etc.) - use number,title,state,body,url only.
   local area_dir=$1 issue=$2 state=$3 json_fields=$4 jq_filter=$5
-  cd "$area_dir" && gh pr list \
+  local area
+  area=$(monorepo_area_from_dir "$area_dir")
+  local repo
+  repo=$(monorepo_area_repo "$area")
+
+  gh pr list \
+    -R "$repo" \
     --search "\"Closes #${issue}\" OR \"Fixes #${issue}\" OR \"Resolves #${issue}\"" \
     --state "$state" --json "$json_fields" --jq "$jq_filter" 2>/dev/null
 }
@@ -265,7 +233,7 @@ orch_check_completion() {
   #
   # Detection priority:
   #   1. Signal file (explicit completion, if present)
-  #   2. Pane command (AI process still running?)
+  #   2. Process alive (PID still running?)
   #   3. Pipeline state file (absent + previously seen = completed)
   #   4. PR status (merged/open/absent)
   local issue=$1
@@ -286,37 +254,31 @@ orch_check_completion() {
     fi
   fi
 
-  # 2. Pane command check - if AI process is still running, it's running
+  # 2. Process alive check (replaces tmux pane command check)
   local state
   state=$(orch_state_read "$area")
-  local pane_id
-  pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane // empty")
+  local pid
+  pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
 
-  if [ -n "$pane_id" ] && orch_pane_alive "$pane_id"; then
-    local cmd
-    cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
-    if [[ "$cmd" == "claude" ]] || [[ "$cmd" == "codex" ]] || [[ "$cmd" == "node" ]]; then
-      # AI running - check if pipeline already completed (AI stays in session after finishing)
-      local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-      local seen
-      seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
-      if [ -f "$pipeline_state" ]; then
-        # State file exists - pipeline in progress, mark as seen
-        if [ "$seen" != "true" ]; then
-          orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true" || true
-        fi
-      else
-        # State file absent - completed only if it was previously seen
-        if [ "$seen" = "true" ]; then
-          echo "completed"; return 0
-        fi
+  if [ -n "$pid" ] && orch_process_alive "$pid"; then
+    # Process running - check if pipeline state file exists (to track pipelineStarted)
+    local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+    local seen
+    seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
+    if [ -f "$pipeline_state" ]; then
+      if [ "$seen" != "true" ]; then
+        orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true" || true
       fi
-      echo "running"; return 0
+    else
+      # State file absent while process running - completed only if previously seen
+      if [ "$seen" = "true" ]; then
+        echo "completed"; return 0
+      fi
     fi
-    # Pane alive but shell prompt (AI exited) - fall through to state file check
+    echo "running"; return 0
   fi
 
-  # 3. Pipeline state file check (AI exited or pane dead)
+  # 3. Pipeline state file check (process exited)
   local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
   if [ ! -f "$pipeline_state" ]; then
     local seen
@@ -327,7 +289,7 @@ orch_check_completion() {
     # Never seen (early crash) - fall through to PR check
   fi
 
-  # 4. PR status (AI exited, state file inconclusive)
+  # 4. PR status (process exited, state file inconclusive)
   local pr_merged
   pr_merged=$(_orch_pr_list "$area_dir" "$issue" merged number 'length')
   if [ "${pr_merged:-0}" -gt 0 ] 2>/dev/null; then
@@ -340,7 +302,7 @@ orch_check_completion() {
     echo "running"; return 0
   fi
 
-  # No signal, no AI process, no PR - failed
+  # No signal, no process, no PR - failed
   echo "failed"; return 0
 }
 
@@ -387,6 +349,11 @@ orch_detect_stall() {
     # Verify no new commits since last check
     local last_sha
     last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
+
+    local area_name
+    area_name=$(monorepo_area_from_dir "$area_dir")
+    local repo
+    repo=$(monorepo_area_repo "$area_name")
     local pr_number
     pr_number=$(_orch_pr_list "$area_dir" "$issue" open number '.[0].number')
 
@@ -399,8 +366,9 @@ orch_detect_stall() {
       echo "active"; return 0
     fi
 
+    # Use -R for explicit repo targeting instead of cd + {owner}/{repo} placeholder
     local latest_sha
-    latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr_number}/commits" \
+    latest_sha=$(gh api "repos/${repo}/pulls/${pr_number}/commits" \
       --jq '.[-1].sha' 2>/dev/null)
 
     if [ -n "$latest_sha" ] && [ "$latest_sha" != "$last_sha" ]; then
@@ -467,12 +435,11 @@ orch_unblock() {
 # ──────────────────────────────────────────────
 
 orch_poll_cycle() {
-  # Usage: orch_poll_cycle <area> <area_dir> <agent> <orchestrator_pane>
+  # Usage: orch_poll_cycle <area> <area_dir> <agent>
   # One polling iteration: check completion, detect stalls, unblock, dispatch.
   local area=$1
   local area_dir=$2
   local agent=$3
-  local orch_pane=$4
 
   local state
   state=$(orch_state_read "$area")
@@ -489,16 +456,9 @@ orch_poll_cycle() {
     local result
     result=$(orch_check_completion "$issue" "$area_dir")
     if [ "$result" = "completed" ] || [ "$result" = "failed" ]; then
-      # Extract pane_id before removing from dispatched (needed for release)
-      local pane_id
-      pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane // empty")
-
       orch_status_set "$area" "$issue" "$result"
       orch_state_update "$area" "del(.dispatched[\"$issue\"])"
       >&2 echo "[orchestrator] Issue #${issue}: ${result}"
-
-      # Release pane so it returns to shell prompt and becomes available
-      [ -n "$pane_id" ] && orch_release_pane "$pane_id"
 
       local newly_unblocked
       newly_unblocked=$(orch_unblock "$area" "$issue")
@@ -515,49 +475,45 @@ orch_poll_cycle() {
     [ "$cur_status" != "dispatched" ] && continue
 
     if [ "$(orch_detect_stall "$area" "$issue" "$area_dir")" = "stalled" ]; then
-      local pane_id
-      pane_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pane")
+      local pid
+      pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid")
       local retry_count
       retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
 
-      if ! orch_pane_alive "$pane_id" && [ "$retry_count" -lt 1 ]; then
-        # Pane died — attempt bounded retry (max 1)
-        >&2 echo "[orchestrator] STALL: Issue #${issue} pane dead — retrying (attempt $((retry_count + 1)))"
-        local idle_panes
-        idle_panes=$(orch_find_idle_panes "$orch_pane")
-        local retried=0
-        for p in $idle_panes; do
-          if orch_dispatch "$issue" "$p" "$area_dir" "$agent"; then
-            local retry_now
-            retry_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            orch_state_update "$area" \
-              ".dispatched[\"$issue\"].pane = \"$p\" | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].dispatchedAt = \"$retry_now\" | .dispatched[\"$issue\"].lastActivity = \"$retry_now\" | .dispatched[\"$issue\"].pipelineStarted = false"
-            >&2 echo "[orchestrator] Re-dispatched #${issue} → pane $p"
-            retried=1
-            break
-          fi
-        done
-        [ "$retried" -eq 0 ] && >&2 echo "[orchestrator] STALL: Issue #${issue} — no idle panes for retry"
+      if ! orch_process_alive "$pid" && [ "$retry_count" -lt 1 ]; then
+        # Process died - attempt bounded retry (max 1)
+        >&2 echo "[orchestrator] STALL: Issue #${issue} process dead - retrying (attempt $((retry_count + 1)))"
+        local new_pid
+        new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent")
+        if [ -n "$new_pid" ]; then
+          local retry_now
+          retry_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          orch_state_update "$area" \
+            ".dispatched[\"$issue\"].pid = $new_pid | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].dispatchedAt = \"$retry_now\" | .dispatched[\"$issue\"].lastActivity = \"$retry_now\" | .dispatched[\"$issue\"].pipelineStarted = false"
+          >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
+        else
+          >&2 echo "[orchestrator] STALL: Issue #${issue} - re-dispatch failed"
+        fi
       elif [ "$retry_count" -ge 1 ]; then
-        # Already retried once — mark as failed
-        >&2 echo "[orchestrator] STALL: Issue #${issue} — retry exhausted, marking failed"
+        # Already retried once - mark as failed
+        >&2 echo "[orchestrator] STALL: Issue #${issue} - retry exhausted, marking failed"
+        orch_stop_process "$pid"
         orch_status_set "$area" "$issue" "failed"
         orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-        [ -n "$pane_id" ] && orch_release_pane "$pane_id"
         local newly_unblocked
         newly_unblocked=$(orch_unblock "$area" "$issue")
         [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
       else
-        >&2 echo "[orchestrator] STALL detected: Issue #${issue} — no activity for 10+ minutes"
-        >&2 echo "[orchestrator] Consider: inspect pane, retry, or skip"
+        >&2 echo "[orchestrator] STALL detected: Issue #${issue} - no activity for 10+ minutes"
+        >&2 echo "[orchestrator] Process PID $pid still alive. Consider: stop, retry, or skip"
       fi
     fi
   done
 
-  # 3. Dispatch pending issues to idle panes (respecting maxConcurrent)
+  # 3. Dispatch pending issues as background processes (respecting maxConcurrent)
   state=$(orch_state_read "$area")
   local max_concurrent
-  max_concurrent=$(echo "$state" | jq -r '.maxConcurrent // 99')
+  max_concurrent=$(echo "$state" | jq -r '.maxConcurrent // 4')
   local active_count
   active_count=$(echo "$state" | jq '[.status | to_entries[] | select(.value == "dispatched")] | length')
 
@@ -566,31 +522,20 @@ orch_poll_cycle() {
 
   if [ -n "$pending_issues" ] && [ "$active_count" -lt "$max_concurrent" ]; then
     local slots_available=$(( max_concurrent - active_count ))
-    local idle_panes
-    idle_panes=$(orch_find_idle_panes "$orch_pane")
-    local pane_array=($idle_panes)
-    local pane_idx=0
     local dispatched_count=0
 
     for issue in $pending_issues; do
       [ "$dispatched_count" -ge "$slots_available" ] && break
-      [ $pane_idx -ge ${#pane_array[@]} ] && break
-      local pane="${pane_array[$pane_idx]}"
 
-      if orch_dispatch "$issue" "$pane" "$area_dir" "$agent"; then
-        orch_record_dispatch "$area" "$issue" "$pane"
-        if ! orch_verify_startup "$pane" 5; then
-          >&2 echo "[orchestrator] Startup failed for #${issue} on pane $pane — reverting to pending"
-          orch_status_set "$area" "$issue" "pending"
-          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-        else
-          >&2 echo "[orchestrator] Dispatched #${issue} → pane $pane"
-          dispatched_count=$((dispatched_count + 1))
-        fi
+      local pid
+      pid=$(orch_dispatch "$issue" "$area_dir" "$agent")
+      if [ -n "$pid" ]; then
+        orch_record_dispatch "$area" "$issue" "$pid"
+        >&2 echo "[orchestrator] Dispatched #${issue} - PID $pid"
+        dispatched_count=$((dispatched_count + 1))
       else
-        >&2 echo "[orchestrator] Pane $pane dead — skipping for issue #${issue}"
+        >&2 echo "[orchestrator] Failed to dispatch #${issue}"
       fi
-      pane_idx=$((pane_idx + 1))  # always advance to skip dead panes
     done
   fi
 }
@@ -624,17 +569,4 @@ orch_print_summary() {
     printf "%-8s %-12s %s\n" "#${issue}" "$status" "$pr_url"
   done
   echo "=================================="
-}
-
-# ──────────────────────────────────────────────
-# Verify startup
-# ──────────────────────────────────────────────
-
-orch_verify_startup() {
-  # Usage: orch_verify_startup <pane_id> [grace_seconds]
-  # Returns: 0 = alive after grace period, 1 = died
-  local pane_id=$1
-  local grace=${2:-5}
-  sleep "$grace"
-  orch_pane_alive "$pane_id"
 }
