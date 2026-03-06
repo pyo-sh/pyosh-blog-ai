@@ -31,15 +31,19 @@ mkdir -p "$SIDECAR_DIR"
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
+# Use pre-computed tokens from statusline-wrapper.sh when available (avoids duplicate jq).
+# Standalone invocation falls back to current_usage extraction from input JSON.
+_precomputed="${TRANSCRIPT_TOKENS:-0}"
+
 # Build jq expression for the merge.
-# Token calculation uses current_usage (accurate per-request context tokens).
-# Fallback: used_percentage * context_window_size (when current_usage is null, e.g. before first API call).
+# Token priority: pre-computed > current_usage > used_percentage reverse-calc > 0.
 jq_expr='
   ($input.model.display_name // $input.model.id // "Claude") as $model |
   ($input.context_window.context_window_size // 200000) as $max_tokens |
   (($input.context_window.used_percentage // 0) | floor) as $pct |
   (
-    if $input.context_window.current_usage != null then
+    if $precomputed > 0 then $precomputed
+    elif $input.context_window.current_usage != null then
       (($input.context_window.current_usage.input_tokens // 0) +
        ($input.context_window.current_usage.cache_creation_input_tokens // 0) +
        ($input.context_window.current_usage.cache_read_input_tokens // 0))
@@ -70,7 +74,7 @@ jq_expr='
   [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
 
   updated=$(jq -n --argjson existing "$existing" --argjson input "$input" --arg pane_id "$pane_id" \
-    "$jq_expr" 2>/dev/null)
+    --argjson precomputed "${_precomputed:-0}" "$jq_expr" 2>/dev/null)
 
   if [[ -n "$updated" ]]; then
     tmp="${sidecar_path}.tmp.$$"
