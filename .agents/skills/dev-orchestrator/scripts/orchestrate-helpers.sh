@@ -182,7 +182,7 @@ orch_record_dispatch() {
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   orch_state_update "$area" \
-    ".dispatched[\"$issue\"] = {pane: \"$pane_id\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null}"
+    ".dispatched[\"$issue\"] = {pane: \"$pane_id\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false}"
   orch_status_set "$area" "$issue" "dispatched"
 }
 
@@ -210,9 +210,10 @@ orch_check_completion() {
   # Always returns 0 (safe for set -e callers).
   #
   # Detection priority:
-  #   1. Signal file (written by pipeline AI at end)
+  #   1. Signal file (explicit completion, if present)
   #   2. Pane command (AI process still running?)
-  #   3. PR status (merged/open/absent)
+  #   3. Pipeline state file (absent + previously seen = completed)
+  #   4. PR status (merged/open/absent)
   local issue=$1
   local area_dir=$2
   local area
@@ -241,12 +242,44 @@ orch_check_completion() {
     local cmd
     cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
     if [[ "$cmd" == "claude" ]] || [[ "$cmd" == "codex" ]] || [[ "$cmd" == "node" ]]; then
+      # AI running - check if pipeline already completed (AI stays in session after finishing)
+      local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+      if [ -f "$pipeline_state" ]; then
+        # State file exists - pipeline in progress, mark as seen
+        local seen
+        seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
+        if [ "$seen" != "true" ]; then
+          orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true"
+        fi
+      else
+        # State file absent - completed only if it was previously seen
+        local seen
+        seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
+        if [ "$seen" = "true" ]; then
+          echo "completed"; return 0
+        fi
+      fi
       echo "running"; return 0
     fi
-    # Pane alive but shell prompt (AI exited) - fall through to PR check
+    # Pane alive but shell prompt (AI exited) - fall through to state file check
   fi
 
-  # 3. AI process exited or pane dead - check PR status
+  # 3. Pipeline state file check (AI exited or pane dead)
+  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+  if [ -f "$pipeline_state" ]; then
+    # State file exists but AI exited - fall through to PR check
+    :
+  else
+    # State file absent - completed only if it was previously seen
+    local seen
+    seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
+    if [ "$seen" = "true" ]; then
+      echo "completed"; return 0
+    fi
+    # Never seen (early crash) - fall through to PR check
+  fi
+
+  # 4. PR status (AI exited, state file inconclusive)
   local pr_merged
   pr_merged=$(_orch_pr_list "$area_dir" "$issue" merged number 'length')
   if [ "${pr_merged:-0}" -gt 0 ] 2>/dev/null; then
