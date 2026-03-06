@@ -1,28 +1,18 @@
 ---
 name: dev-pipeline
-description: Orchestrate the full dev cycle - code, review, resolve - with automated tmux pane management and pipeline state tracking. Runs /dev-build, then triggers /dev-review and /dev-resolve in a sandboxed side pane. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
+description: Orchestrate the full dev cycle - code, review, resolve - with headless subprocess execution and self-healing. Runs /dev-build, then triggers /dev-review and /dev-resolve as synchronous headless subprocesses. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
 ---
 
 # Dev-Pipeline
 
-Orchestrate: `/dev-build` -> `/dev-review` -> `/dev-resolve` -> merge. Review/resolve run in a **sandboxed side pane**. State tracked per-issue for crash recovery.
+Orchestrate: `/dev-build` -> `/dev-review` -> `/dev-resolve` -> merge. Review/resolve run as **headless `claude -p` subprocesses**. State tracked per-issue for crash recovery. Self-healing with auto-retry on known failures.
 
 > Area definitions, directory/repo mappings, worktree paths: [monorepo-layout.md](../../references/monorepo-layout.md)
-> Requires tmux session (`$TMUX`). Source helpers: `source scripts/pipeline-helpers.sh`
-
-## Agent selection
-
-If the prompt specifies an agent (e.g., "Use claude for review and resolve panes"), use that agent without asking. Otherwise, ask the user: **Claude** (`claude --dangerously-skip-permissions`) or **Codex** (`codex exec --dangerously-bypass-approvals-and-sandbox`). Store as `"agent": "claude"|"codex"` in state.
+> Source helpers: `source scripts/pipeline-helpers.sh`
 
 ## Workflow
 
 ### 0. Check existing state
-
-Verify tmux session first:
-
-```bash
-[ -z "$TMUX" ] && echo "ERROR: tmux session required. Start tmux and retry." && exit 1
-```
 
 Check for existing pipeline:
 
@@ -36,10 +26,12 @@ Not exists -> Step 1.
 
 ### 1. Run /dev-build
 
-**`cd {area}` first.** Capture orchestrator pane:
+**`cd {area}` first.** Sync with remote before starting:
 
 ```bash
-ORCHESTRATOR_PANE=$(pipeline_orchestrator_pane)
+cd {area}
+git fetch origin
+git rebase origin/main || git merge origin/main
 ```
 
 **Recovery entry**: If state says `step: "build"`, check PR status first:
@@ -67,72 +59,69 @@ fi
   "issue": 42, "area": "client", "pr": 99,
   "branch": "feat/issue-42-add-auth",
   "worktree": ".workspace/worktrees/issue-42",
-  "agent": "claude", "orchestratorPane": "%0",
+  "agent": "claude",
   "step": "review", "reviewRound": 1, "lastReviewId": 0,
   "lastCommitSha": "{LAST_COMMIT_SHA}",
   "skipReview": false,
-  "reviewPaneRetries": 0, "resolvePaneRetries": 0, "maxPaneRetries": 2,
+  "reviewLog": ".workspace/pipeline/logs/issue-42-review.log",
+  "resolveLog": ".workspace/pipeline/logs/issue-42-resolve.log",
+  "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
+  "maxStageRetries": 3,
+  "recoveryLog": [],
   "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
 }
 ```
 
-### 2. Open review pane
+### 2. Run review (headless)
 
-**Recovery entry**: Before opening a pane, check if a review already exists:
+**Recovery entry**: Check if a review already exists:
 
 ```bash
 REVIEW_ID=$(pipeline_check_review_exists "{area_dir}" {PR#} {lastReviewId})
 ```
 
-If found -> skip pane open, go directly to Step 3 (process review).
+If found -> skip to Step 3 (process review).
 
-If not found, check if a review pane from a previous session is still alive:
+If not found, run review as a synchronous headless subprocess:
 
 ```bash
-PREV_PANE=$(pipeline_state_read "$ISSUE" "$AREA" | jq -r '.reviewPane // empty')
-if [ -n "$PREV_PANE" ] && pipeline_pane_alive_verified "$PREV_PANE"; then
-  REVIEW_PANE="$PREV_PANE"
-  # Skip pane open, go directly to Step 3 (poll existing pane)
+LOG=$(pipeline_run_headless "$MONOREPO_ROOT" \
+  "/dev-review for PR #{PR#} in {area} repo ({owner}/{repo}). After review, exit." \
+  "$ISSUE" "$AREA" "review")
+RC=$?
+```
+
+- `RC=0` -> check API for review, continue to Step 3
+- `RC=124` (timeout) -> log, attempt self-healing (Step 2a)
+- `RC!=0` -> log, attempt self-healing (Step 2a)
+
+After subprocess exits (any exit code), always check API first:
+
+```bash
+REVIEW_ID=$(pipeline_check_review_exists "{area_dir}" {PR#} {lastReviewId})
+```
+
+If review found -> success regardless of exit code, continue to Step 3.
+If not found and `RC=0` -> unexpected, report to user.
+If not found and `RC!=0` -> Step 2a.
+
+### 2a. Review self-healing
+
+```bash
+if pipeline_stage_retry "$ISSUE" "$AREA" "review"; then
+  pipeline_recovery_log "$ISSUE" "$AREA" "review" "exit code $RC" "re-run headless" "retrying"
+  # -> retry Step 2
+else
+  pipeline_format_escalation "$ISSUE" "$AREA" "review"
+  # -> report to user, stop
 fi
 ```
 
-If neither review exists nor pane is alive, open using the 3-layer protocol ([pane-lifecycle.md](references/pane-lifecycle.md)):
+### 3. Process review
+
+Fetch and read review:
 
 ```bash
-# Layer 1: Pre-defense
-pipeline_kill_state_pane "$ISSUE" "$AREA" "reviewPane"
-pipeline_pane_snapshot > /tmp/panes_before_${ISSUE}.txt
-
-# Layer 2: Execution (file-based capture, single call)
-PANE_OUT="/tmp/pipeline-pane-${ISSUE}-${AREA}.txt"
-pipeline_open_pane_with_retry "$ISSUE" "$AREA" "reviewPane" \
-  "$MONOREPO_ROOT" \
-  "Run /dev-review for PR #{PR#} in {area} repo. After review, exit." \
-  "$AGENT" "$ORCHESTRATOR_PANE" \
-  > "$PANE_OUT" 2>/tmp/pipeline-pane-err.txt
-RC=$?
-REVIEW_PANE=$(cat "$PANE_OUT")
-```
-
-- `RC=0` -> save `"reviewPane": "{REVIEW_PANE}"` in state
-- `RC=5` (MAX_RETRIES) -> run Layer 3 cleanup, report to user, stop
-- `RC!=0` -> run Layer 3 cleanup, report to user, stop
-
-### 3. Wait for review
-
-```bash
-REVIEW_ID=$(pipeline_poll_review "{area_dir}" {PR#} {lastReviewId} 900 "$REVIEW_PANE")
-rc=$?
-```
-
-- `rc=0` -> success, continue below
-- `rc=1` (TIMEOUT) -> kill pane, report to user
-- `rc=2` (PANE_DEAD) -> go back to Step 2 (do NOT reset `reviewPaneRetries` - let retries accumulate)
-
-On success - kill pane, fetch and read review:
-
-```bash
-pipeline_kill_pane "$REVIEW_PANE"
 pipeline_fetch_review "{area_dir}" {PR#} "$REVIEW_ID"
 ```
 
@@ -140,83 +129,62 @@ Read `state` and severity counts (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`). Up
 
 ```bash
 pipeline_state_update "$ISSUE" "$AREA" \
-  '.lastReviewId = {REVIEW_ID} | .reviewPaneRetries = 0'
+  ".lastReviewId = ${REVIEW_ID} | .stageRetries.review = 0"
 ```
 
 Decision:
-- `CHANGES_REQUESTED` or `COMMENTED` + `CRITICAL > 0` -> Step 4a
+- `CHANGES_REQUESTED` or `COMMENTED` + `CRITICAL > 0` -> Step 4
 - `COMMENTED` + `CRITICAL = 0` -> Step 5
 - `APPROVED` -> Step 5 (treat as no critical)
 - `PENDING` or `DISMISSED` -> report unexpected state to user, stop
 
-### 4a. Trigger resolve
+### 4. Run resolve (headless)
 
-**Recovery entry**: Before opening a pane, check if new commits already exist:
+**Recovery entry**: Check if new commits already exist:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "{area_dir}" {PR#} "{lastCommitSha}")
 ```
 
-If found -> skip pane open, go directly to Step 4b (process commits).
+If found -> skip to Step 4b (process commits).
 
-If not found, check if a resolve pane from a previous session is still alive:
-
-```bash
-PREV_PANE=$(pipeline_state_read "$ISSUE" "$AREA" | jq -r '.resolvePane // empty')
-if [ -n "$PREV_PANE" ] && pipeline_pane_alive_verified "$PREV_PANE"; then
-  RESOLVE_PANE="$PREV_PANE"
-  # Skip pane open, go directly to Step 4b (poll existing pane)
-fi
-```
-
-If neither new commits exist nor pane is alive, continue below.
+If not found, run resolve as a synchronous headless subprocess:
 
 ```bash
-# Layer 1
-pipeline_kill_state_pane "$ISSUE" "$AREA" "resolvePane"
-pipeline_pane_snapshot > /tmp/panes_before_${ISSUE}.txt
-
-# Layer 2
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
-PANE_OUT="/tmp/pipeline-pane-${ISSUE}-${AREA}.txt"
-pipeline_open_pane_with_retry "$ISSUE" "$AREA" "resolvePane" \
-  "$MONOREPO_ROOT" \
-  "Run /dev-resolve for PR #{PR#} in worktree ${WORKTREE_PATH}. After done, exit." \
-  "$AGENT" "$ORCHESTRATOR_PANE" \
-  > "$PANE_OUT" 2>/tmp/pipeline-pane-err.txt
+LOG=$(pipeline_run_headless "$WORKTREE_PATH" \
+  "/dev-resolve for PR #{PR#} in {area} repo ({owner}/{repo}). Worktree: ${WORKTREE_PATH}. After done, exit." \
+  "$ISSUE" "$AREA" "resolve")
 RC=$?
-RESOLVE_PANE=$(cat "$PANE_OUT")
 ```
 
-`RC=0` -> save state with `"step": "resolve", "resolvePane": "{RESOLVE_PANE}"`. `RC!=0` -> Layer 3, report, stop.
-
-### 4b. Wait for resolve
+After subprocess exits, check API:
 
 ```bash
-NEW_SHA=$(pipeline_poll_commits "{area_dir}" {PR#} "{lastCommitSha}" 900 "$RESOLVE_PANE")
-rc=$?
+NEW_SHA=$(pipeline_check_new_commits "{area_dir}" {PR#} "{lastCommitSha}")
 ```
 
-- `rc=0` -> continue below
-- `rc=1` (TIMEOUT) -> kill pane, report to user
-- `rc=2` (PANE_DEAD) -> go back to Step 4a (do NOT reset `resolvePaneRetries` - let retries accumulate)
+If found -> Step 4b. If not found -> self-healing (same pattern as Step 2a but for "resolve" stage).
 
-When new commits found: kill pane, update state, show diff (`gh pr diff {PR#}`):
+### 4b. Process resolve result
+
+Update state:
 
 ```bash
-pipeline_kill_pane "$RESOLVE_PANE"
 pipeline_state_update "$ISSUE" "$AREA" \
-  ".lastCommitSha = \"${NEW_SHA}\" | .resolvePaneRetries = 0"
+  ".lastCommitSha = \"${NEW_SHA}\" | .stageRetries.resolve = 0"
 ```
+
+Show diff (`gh pr diff {PR#}`).
 
 - `skipReview: true` -> Step 6
-- `skipReview: false` -> ask user: "Re-review" (reset `reviewPaneRetries` to 0 -> Step 2) | "Merge as-is" (-> Step 6) | "Manual edit" (user edits, then Step 2)
+- `skipReview: false` -> ask user: **"Re-review"** (reset `stageRetries.review` to 0 -> Step 2) | **"Merge as-is"** (-> Step 6) | **"Manual edit"** (user edits, then Step 2)
 
 ### 5. No critical - user decision
 
 Show review summary.
 
-Ask user: **"Merge"** -> Step 6 | **"Fix & Re-review"** -> Step 4a | **"Fix & Merge"** -> Step 4a with `skipReview: true`.
+Ask user: **"Merge"** -> Step 6 | **"Fix & Re-review"** -> Step 4 | **"Fix & Merge"** -> Step 4 with `skipReview: true`.
 
 ### 6. Merge + cleanup
 
@@ -229,24 +197,32 @@ PR_STATE=$(cd {area} && gh pr view {PR#} --json state -q .state)
 - `MERGED` -> skip merge, proceed to cleanup
 - `OPEN` -> ask user for merge approval, then merge
 
-Kill side panes first:
-
-```bash
-pipeline_kill_state_pane "$ISSUE" "$AREA" "reviewPane"
-pipeline_kill_state_pane "$ISSUE" "$AREA" "resolvePane"
-```
-
-Merge and validate:
+Merge with self-healing:
 
 ```bash
 cd {area}
 gh pr merge {PR#} --squash --delete-branch
-if [ $? -ne 0 ]; then
-  echo "ERROR: gh pr merge failed."
-  pipeline_state_update "$ISSUE" "$AREA" '.step = "merge-failed"'
-  exit 1
-fi
+```
 
+If merge fails:
+
+```bash
+# Self-healing: sync and retry
+if pipeline_stage_retry "$ISSUE" "$AREA" "merge"; then
+  git fetch origin
+  git rebase origin/main || git merge origin/main
+  git push
+  pipeline_recovery_log "$ISSUE" "$AREA" "merge" "merge failed" "fetch+rebase+push" "retrying"
+  # retry gh pr merge
+else
+  pipeline_format_escalation "$ISSUE" "$AREA" "merge"
+  # -> report to user, stop
+fi
+```
+
+After successful merge, validate:
+
+```bash
 PR_STATE=$(gh pr view {PR#} --json state -q .state)
 if [ "$PR_STATE" != "MERGED" ]; then
   echo "ERROR: PR #{PR#} state is '$PR_STATE', expected 'MERGED'."
@@ -259,9 +235,7 @@ Cleanup (run inside `{area}` dir):
 
 ```bash
 git fetch --prune
-git worktree remove ../.workspace/worktrees/issue-{N} --force
-git worktree prune
-git branch -D {branch}
+pipeline_cleanup "$ISSUE" "$AREA" "{branch}"
 ```
 
 State -> `"step": "log"`.
@@ -273,12 +247,11 @@ Run `/dev-log`, then `rm .workspace/pipeline/{area}/issue-{N}.state.json`.
 ## Constraints
 
 - **Never merge without user approval**
-- **Never modify code in this session** - code changes happen only in /dev-build or /dev-resolve pane
-- **Never call `pipeline_open_pane_verified` or `pipeline_open_pane_with_retry` more than once per step attempt** - if it fails, run Layer 3 cleanup and report to user
-- On unrecoverable error: save state, kill panes, report to user
+- **Never modify code in this session** - code changes happen only in /dev-build or headless /dev-resolve
+- On unrecoverable error: save state, report to user with `pipeline_format_escalation`
 
 ## References
 
 - [Recovery strategy](references/recovery.md)
-- [Pane lifecycle](references/pane-lifecycle.md)
+- [Process lifecycle](references/process-lifecycle.md)
 - [Pipeline helpers](scripts/pipeline-helpers.sh)

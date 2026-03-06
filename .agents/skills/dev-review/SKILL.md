@@ -5,37 +5,39 @@ description: PR code review skill. Run in a separate session from the code autho
 
 # Dev-Review
 
-Review PRs in a **different session** from the code author. Comments only — never modify code.
+Review PRs in a **different session** from the code author. Comments only - never modify code.
 
 > Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
+> Always verify you are in the correct area directory before running `gh` commands.
+> Client PRs: `cd client && gh pr ...` or `gh pr ... -R pyo-sh/pyosh-blog-fe`
+> Server PRs: `cd server && gh pr ...` or `gh pr ... -R pyo-sh/pyosh-blog-be`
 
 ## Steps
 
 ### 1. Read PR
 
 ```bash
-gh pr view {PR#}
 gh pr diff {PR#}
-gh issue view {Issue#}
+gh pr view {PR#} --json number,title,state,body
 ```
 
 ### 2. Analyze code
 
-Read diff + surrounding context. Check `{area}/CLAUDE.md` compliance.
+Analyze the diff output directly. Do NOT explore the broader codebase. Only read specific files when the diff context is insufficient to understand the change. Check `{area}/CLAUDE.md` compliance.
 
 Focus: Security (OWASP Top 10), type safety, edge cases, error handling, performance (N+1), conventions.
 
 ### 3. Classify & submit
 
-Classify findings by severity and submit. → [review-template.md](references/review-template.md)
+Classify findings by severity and submit. -> [review-template.md](references/review-template.md)
 
 ### 4. Report
 
-Summarize counts. If Critical → advise `/dev-resolve`. If none → advise approve & merge.
+Summarize counts. If Critical -> advise `/dev-resolve`. If none -> advise approve & merge.
 
 ## Constraints
 
-- Comments only — never modify code
+- Comments only - never modify code
 - Cite `file:line` with problem and alternative
 - Don't flag trivial style differences as Critical/Warning
-- Review body **must start with `## Review Summary`** — the pipeline polls for this exact prefix to detect review completion
+- Review body **must start with `## Review Summary`** - the pipeline checks for this exact prefix to detect review completion

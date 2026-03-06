@@ -6,6 +6,7 @@
 _PIPELINE_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_PIPELINE_HELPERS_DIR/../../../../.agents/scripts/monorepo-helpers.sh"
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
+PIPELINE_LOG_DIR="$PIPELINE_DIR/logs"
 WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
 # ──────────────────────────────────────────────
@@ -20,7 +21,7 @@ pipeline_state_path() {
 
 pipeline_init() {
   local area=$1
-  mkdir -p "$PIPELINE_DIR/$area" "$WORKTREE_DIR"
+  mkdir -p "$PIPELINE_DIR/$area" "$PIPELINE_LOG_DIR" "$WORKTREE_DIR"
 }
 
 pipeline_state_exists() {
@@ -76,109 +77,46 @@ pipeline_state_delete() {
 }
 
 # ──────────────────────────────────────────────
-# tmux pane management
+# Headless execution (synchronous)
 # ──────────────────────────────────────────────
 
-pipeline_orchestrator_pane() {
-  # Prefer $TMUX_PANE (process's own pane, not the focused pane, which
-  # differs on --continue sessions). Fall back to tmux display-message
-  # for contexts where $TMUX_PANE is unset.
-  if [ -n "$TMUX_PANE" ]; then
-    echo "$TMUX_PANE"
-  else
-    tmux display-message -p '#{pane_id}' 2>/dev/null
-  fi
-}
-
-pipeline_open_pane() {
-  # Usage: pipeline_open_pane <working_dir> <prompt> [agent] [target_pane]
+pipeline_run_headless() {
+  # Run claude -p synchronously (blocking). Returns when subprocess exits.
+  # Usage: pipeline_run_headless <workdir> <prompt> <issue> <area> <stage>
+  # stage: "review" or "resolve" (determines tool allowlist and max-turns)
+  # stdout: log file path
+  # Returns: exit code from claude -p (0=success, 124=timeout, other=error)
   local workdir=$1
   local prompt=$2
-  local agent=${3:-claude}
-  local target_pane=$4
+  local issue=$3
+  local area=$4
+  local stage=$5
 
-  local cmd
-  if [ "$agent" = "codex" ]; then
-    cmd="codex exec --dangerously-bypass-approvals-and-sandbox '$prompt'"
-  else
-    cmd="claude --dangerously-skip-permissions '$prompt'"
-  fi
+  local log="$PIPELINE_LOG_DIR/issue-${issue}-${stage}.log"
 
-  if [ -n "$target_pane" ]; then
-    tmux split-window -h -d -t "$target_pane" -P -F '#{pane_id}' \
-      "cd '$workdir' && $cmd"
-  else
-    tmux split-window -h -d -P -F '#{pane_id}' \
-      "cd '$workdir' && $cmd"
-  fi
-}
-
-pipeline_kill_pane() {
-  local pane_id=$1
-  if [ -n "$pane_id" ]; then
-    tmux kill-pane -t "$pane_id" 2>/dev/null
-  fi
-}
-
-pipeline_pane_alive() {
-  # Returns 0 if pane exists (any window/session), 1 if dead.
-  local pane_id=$1
-  tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx "$pane_id"
-}
-
-pipeline_pane_alive_verified() {
-  # Returns 0 only if pane exists AND runs a known agent command.
-  # Prevents false positives after tmux server restart (pane ID reuse).
-  # Usage: pipeline_pane_alive_verified <pane_id>
-  local pane_id=$1
-  if ! pipeline_pane_alive "$pane_id"; then
-    return 1
-  fi
-  local actual_cmd
-  actual_cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}' 2>/dev/null)
-  case "$actual_cmd" in
-    claude|codex) return 0 ;;
-    *) return 1 ;;
+  local tools max_turns timeout_sec
+  case "$stage" in
+    review)
+      tools="Bash,Read,Skill"
+      max_turns=15
+      timeout_sec=900
+      ;;
+    resolve)
+      tools="Bash,Read,Edit,Write,Grep,Glob,Skill"
+      max_turns=25
+      timeout_sec=900
+      ;;
   esac
-}
 
-pipeline_pane_snapshot() {
-  # Outputs sorted list of all current tmux pane IDs.
-  # Use before/after pane creation to detect orphans.
-  tmux list-panes -a -F '#{pane_id}' 2>/dev/null | sort
-}
+  echo "$log"
 
-pipeline_pane_orphan_cleanup() {
-  # Kills panes that appeared between two snapshots (orphans from failed opens).
-  # Usage: pipeline_pane_orphan_cleanup <before_file> <after_file>
-  local before=$1
-  local after=$2
-  local orphans
-  orphans=$(comm -13 "$before" "$after")
-  local count=0
-  for p in $orphans; do
-    tmux kill-pane -t "$p" 2>/dev/null
-    count=$((count + 1))
-  done
-  if [ "$count" -gt 0 ]; then
-    >&2 echo "[pipeline] Cleaned up $count orphan pane(s): $orphans"
-  fi
-}
-
-pipeline_kill_state_pane() {
-  # Kills a pane recorded in state by field name.
-  # Usage: pipeline_kill_state_pane <issue> <area> <field>
-  local issue=$1
-  local area=$2
-  local field=$3
-  if ! pipeline_state_exists "$issue" "$area"; then
-    return
-  fi
-  local pane_id
-  pane_id=$(pipeline_state_read "$issue" "$area" | jq -r ".${field} // empty")
-  if [ -n "$pane_id" ]; then
-    pipeline_kill_pane "$pane_id"
-  fi
+  cd "$workdir" || return 3
+  CLAUDECODE= timeout "$timeout_sec" claude -p \
+    --dangerously-skip-permissions \
+    --no-session-persistence \
+    --allowedTools "$tools" \
+    --max-turns "$max_turns" \
+    "$prompt" > "$log" 2>"${log%.log}.err"
 }
 
 pipeline_resolve_worktree_path() {
@@ -206,219 +144,12 @@ pipeline_resolve_worktree_path() {
   return 3
 }
 
-pipeline_open_pane_verified() {
-  # Opens a side pane and verifies it survives startup (3-second grace period).
-  # Single attempt only - no internal retry. On failure, captures dead pane output
-  # for diagnosis via remain-on-exit, then cleans up.
-  # stdout: pane_id on success, diagnostic token on failure
-  # stderr: diagnosis info on failure (last 20 lines of dead pane output)
-  # Returns: 0 = success, 2 = PANE_DEAD, 3 = PATH_INVALID
-  local workdir=$1
-  local prompt=$2
-  local agent=${3:-claude}
-  local target_pane=$4
-  local issue=$5
-  local area=$6
-
-  # Phase 1: Validate path
-  if [ ! -d "$workdir" ]; then
-    if [ -n "$issue" ]; then
-      workdir=$(pipeline_resolve_worktree_path "$issue" "$area")
-      if [ $? -ne 0 ]; then
-        echo "PATH_INVALID"
-        return 3
-      fi
-    else
-      echo "PATH_INVALID"
-      return 3
-    fi
-  fi
-
-  # Phase 2: Open pane with remain-on-exit for failure diagnosis
-  local pane_id
-  pane_id=$(pipeline_open_pane "$workdir" "$prompt" "$agent" "$target_pane")
-
-  if [ -z "$pane_id" ]; then
-    echo "PANE_DEAD"
-    return 2
-  fi
-
-  # Enable remain-on-exit so dead panes stay visible for diagnosis
-  tmux set-option -t "$pane_id" remain-on-exit on 2>/dev/null
-
-  # Phase 3: Verify startup (3-second grace period)
-  # With remain-on-exit on, dead panes still appear in list-panes.
-  # Check #{pane_dead} flag instead of pane existence.
-  sleep 3
-  local is_dead
-  is_dead=$(tmux display-message -t "$pane_id" -p '#{pane_dead}' 2>/dev/null)
-  if [ "$is_dead" != "1" ]; then
-    # Pane survived - disable remain-on-exit for normal operation
-    tmux set-option -t "$pane_id" remain-on-exit off 2>/dev/null
-    echo "$pane_id"
-    return 0
-  fi
-
-  # Phase 4: Pane died - capture output for diagnosis, then clean up
-  >&2 echo "[pipeline] Pane $pane_id died within 3s of startup"
-  local diagnosis
-  diagnosis=$(tmux capture-pane -t "$pane_id" -p 2>/dev/null | tail -20)
-  tmux kill-pane -t "$pane_id" 2>/dev/null
-
-  if [ -n "$diagnosis" ]; then
-    >&2 echo "[pipeline] Last output from dead pane:"
-    >&2 echo "$diagnosis"
-  fi
-
-  echo "PANE_DEAD"
-  return 2
-}
-
-pipeline_open_pane_with_retry() {
-  # State-based retry wrapper around pipeline_open_pane_verified.
-  # Reads/increments retry count from state so retry limits survive across sessions.
-  # Usage: pipeline_open_pane_with_retry <issue> <area> <field> <workdir> <prompt> <agent> <target_pane>
-  # field: "reviewPane" or "resolvePane" (determines retry counter key)
-  # stdout: pane_id on success, diagnostic token on failure
-  # Returns: 0 = success, 2 = PANE_DEAD, 3 = PATH_INVALID, 5 = MAX_RETRIES
-  local issue=$1
-  local area=$2
-  local field=$3
-  local workdir=$4
-  local prompt=$5
-  local agent=$6
-  local target_pane=$7
-
-  # Read retry count and max from state (single read)
-  local retry_key="${field}Retries"
-  local state
-  state=$(pipeline_state_read "$issue" "$area")
-  local retries
-  retries=$(echo "$state" | jq -r ".${retry_key} // 0")
-  local max_retries
-  max_retries=$(echo "$state" | jq -r ".maxPaneRetries // 2")
-
-  if [ "$retries" -ge "$max_retries" ]; then
-    >&2 echo "[pipeline] Max retries ($max_retries) reached for $field"
-    echo "MAX_RETRIES"
-    return 5
-  fi
-
-  # Increment retry count BEFORE attempting (crash-safe)
-  pipeline_state_update "$issue" "$area" ".${retry_key} = $((retries + 1))"
-
-  # Kill previous pane for this field if still alive
-  pipeline_kill_state_pane "$issue" "$area" "$field"
-
-  # Single attempt
-  pipeline_open_pane_verified "$workdir" "$prompt" "$agent" "$target_pane" "$issue" "$area"
-}
-
 # ──────────────────────────────────────────────
-# Polling (review & commits)
-# ──────────────────────────────────────────────
-
-pipeline_poll_review() {
-  # Polls for a new /dev-review submission (body starts with "## Review Summary")
-  # that has an ID greater than last_review_id.
-  # Returns: 0 = found, 1 = timeout, 2 = pane died
-  local area_dir=$1
-  local pr=$2
-  local last_review_id=${3:-0}
-  local max_wait=${4:-900}
-  local review_pane_id=$5
-  local interval=30
-  local elapsed=0
-
-  while true; do
-    local review_id
-    review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
-      --jq "[.[] | select(.id > ${last_review_id})
-                 | select(.body | startswith(\"## Review Summary\"))]
-            | last // empty | .id")
-
-    if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
-      echo "$review_id"
-      return 0
-    fi
-
-    if [ -n "$review_pane_id" ] && ! pipeline_pane_alive "$review_pane_id"; then
-      review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
-        --jq "[.[] | select(.id > ${last_review_id})
-                   | select(.body | startswith(\"## Review Summary\"))]
-              | last // empty | .id")
-      if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
-        echo "$review_id"
-        return 0
-      fi
-      echo "PANE_DEAD"
-      return 2
-    fi
-
-    elapsed=$((elapsed + interval))
-    if [ "$elapsed" -gt "$max_wait" ]; then
-      echo "TIMEOUT"
-      return 1
-    fi
-    sleep "$interval"
-  done
-}
-
-pipeline_fetch_review() {
-  local area_dir=$1
-  local pr=$2
-  local review_id=$3
-  cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" \
-    --jq '{state: .state, body: .body}'
-}
-
-pipeline_poll_commits() {
-  # Polls for new commits on a PR after a known commit SHA.
-  # Returns: 0 = new commit, 1 = timeout, 2 = pane died
-  local area_dir=$1
-  local pr=$2
-  local last_commit_sha=$3
-  local max_wait=${4:-900}
-  local resolve_pane_id=$5
-  local interval=30
-  local elapsed=0
-
-  while true; do
-    local latest_sha
-    latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
-      --jq '.[-1].sha')
-
-    if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
-      echo "$latest_sha"
-      return 0
-    fi
-
-    if [ -n "$resolve_pane_id" ] && ! pipeline_pane_alive "$resolve_pane_id"; then
-      latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
-        --jq '.[-1].sha')
-      if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
-        echo "$latest_sha"
-        return 0
-      fi
-      echo "PANE_DEAD"
-      return 2
-    fi
-
-    elapsed=$((elapsed + interval))
-    if [ "$elapsed" -gt "$max_wait" ]; then
-      echo "TIMEOUT"
-      return 1
-    fi
-    sleep "$interval"
-  done
-}
-
-# ──────────────────────────────────────────────
-# Pre-checks (recovery: detect work completed by previous session)
+# API checks (single-shot, no polling)
 # ──────────────────────────────────────────────
 
 pipeline_check_review_exists() {
-  # Check if a review already exists (from a previous session's pane that completed).
+  # Check if a review exists with body starting "## Review Summary".
   # Returns: 0 = found (review_id on stdout), 1 = not found
   local area_dir=$1
   local pr=$2
@@ -437,8 +168,16 @@ pipeline_check_review_exists() {
   return 1
 }
 
+pipeline_fetch_review() {
+  local area_dir=$1
+  local pr=$2
+  local review_id=$3
+  cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" \
+    --jq '{state: .state, body: .body}'
+}
+
 pipeline_check_new_commits() {
-  # Check if new commits exist (from a previous session's resolve that completed).
+  # Check if new commits exist after a known SHA.
   # Returns: 0 = found (new_sha on stdout), 1 = not found
   local area_dir=$1
   local pr=$2
@@ -456,6 +195,65 @@ pipeline_check_new_commits() {
 }
 
 # ──────────────────────────────────────────────
+# Self-healing (stage retry + recovery log)
+# ──────────────────────────────────────────────
+
+pipeline_stage_retry() {
+  # Increment stage retry counter, check against max.
+  # Usage: pipeline_stage_retry <issue> <area> <stage>
+  # Returns: 0 = can retry, 1 = max reached
+  local issue=$1
+  local area=$2
+  local stage=$3
+  local retries
+  retries=$(pipeline_state_read "$issue" "$area" | jq -r ".stageRetries.${stage} // 0")
+  local max
+  max=$(pipeline_state_read "$issue" "$area" | jq -r ".maxStageRetries // 3")
+  if [ "$retries" -ge "$max" ]; then
+    return 1
+  fi
+  pipeline_state_update "$issue" "$area" ".stageRetries.${stage} = $((retries + 1))"
+}
+
+pipeline_recovery_log() {
+  # Append a recovery attempt to recoveryLog.
+  # Usage: pipeline_recovery_log <issue> <area> <stage> <error> <action> <result>
+  local issue=$1
+  local area=$2
+  local stage=$3
+  local error=$4
+  local action=$5
+  local result=$6
+  local entry
+  entry=$(jq -n --arg s "$stage" --arg e "$error" --arg a "$action" --arg r "$result" \
+    '{stage:$s, error:$e, action:$a, result:$r, timestamp:(now|todate)}')
+  pipeline_state_update "$issue" "$area" ".recoveryLog += [$entry]"
+}
+
+pipeline_format_escalation() {
+  # Format recovery log for user escalation.
+  # Usage: pipeline_format_escalation <issue> <area> <stage>
+  local issue=$1
+  local area=$2
+  local stage=$3
+  local state
+  state=$(pipeline_state_read "$issue" "$area")
+  local max
+  max=$(echo "$state" | jq -r ".maxStageRetries // 3")
+
+  echo "[pipeline] Stage \"$stage\" failed after $max recovery attempts."
+  echo ""
+  echo "Recovery log:"
+  echo "$state" | jq -r '.recoveryLog[] | select(.stage == "'"$stage"'") | "  #\(.timestamp) \(.error) -> \(.action) -> \(.result)"'
+  echo ""
+  echo "Worktree: $(echo "$state" | jq -r '.worktree')"
+  echo "Branch: $(echo "$state" | jq -r '.branch')"
+  echo "PR: #$(echo "$state" | jq -r '.pr')"
+  echo ""
+  echo "Action needed: fix manually, then resume with /dev-pipeline"
+}
+
+# ──────────────────────────────────────────────
 # Cleanup
 # ──────────────────────────────────────────────
 
@@ -463,11 +261,12 @@ pipeline_cleanup() {
   local issue=$1
   local area=$2
   local branch=$3
-  local review_pane=$4
-  local resolve_pane=$5
 
-  pipeline_kill_pane "$review_pane"
-  pipeline_kill_pane "$resolve_pane"
+  # Clean up log files
+  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-review.log"
+  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-review.err"
+  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-resolve.log"
+  rm -f "$PIPELINE_LOG_DIR/issue-${issue}-resolve.err"
 
   local wt="$WORKTREE_DIR/issue-${issue}"
   if [ -d "$wt" ]; then

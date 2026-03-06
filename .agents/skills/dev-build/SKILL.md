@@ -21,6 +21,8 @@ Run `gh issue list --assignee @me` in the target area. If none exists, get user 
 
 ```bash
 cd {area}
+git fetch origin
+git rebase origin/main || git merge origin/main
 git worktree add -b {type}/issue-{N}-{desc} ../.workspace/worktrees/issue-{N} main
 cd ../.workspace/worktrees/issue-{N}
 ```
