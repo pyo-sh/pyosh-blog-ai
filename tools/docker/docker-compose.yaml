@@ -1,6 +1,8 @@
 services:
   dev-lab:
-    build: .
+    build:
+      context: ../..
+      dockerfile: tools/docker/Dockerfile
     container_name: dev-lab
     stdin_open: true
     tty: true
