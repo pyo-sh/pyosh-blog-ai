@@ -9,7 +9,7 @@
 #   Stop             → idle (adds "(Done) " prefix to task if set, clears activity) (#32)
 #   PreToolUse       → activity: "{ToolName}: {key_arg}"
 #                      + needs-input (AskUserQuestion only)
-#   PostToolUse      → clears activity
+#   PostToolUse      → clears activity, restores needs-input → working (#47)
 #   SessionEnd       → deletes sidecar file for this pane (#32)
 #
 # Uses flock to prevent race conditions with on-statusline.sh.
@@ -19,7 +19,8 @@ set -euo pipefail
 SIDECAR_DIR="/tmp/agent-tracker"
 
 # Determine pane identifier
-pane_id="${TMUX_PANE:-pid-$$}"
+# PPID fallback: stable across hook invocations (same Claude Code parent). (#47)
+pane_id="${TMUX_PANE:-pid-$PPID}"
 pane_file="${pane_id#%}"
 
 # Read hook JSON from stdin
@@ -39,8 +40,9 @@ if [[ "$event" == "SessionEnd" ]]; then
   exit 0
 fi
 
-# Ensure sidecar directory exists
+# Ensure sidecar directory exists (owner-only access for prompt privacy) (#47)
 mkdir -p "$SIDECAR_DIR"
+chmod 700 "$SIDECAR_DIR" 2>/dev/null
 
 # ── Prepare update fields from input (outside lock to minimize lock time) ──
 
@@ -118,8 +120,12 @@ case "$event" in
     fi
     ;;
   PostToolUse)
+    # Reset needs-input → working when AskUserQuestion completes (#47)
     jq_args=(--arg pane_id "$pane_id")
-    jq_expr='. + {activity: null, pane_id: $pane_id, updated_at: now}'
+    jq_expr='
+      . + {activity: null, pane_id: $pane_id, updated_at: now} |
+      if .status == "needs-input" then .status = "working" else . end
+    '
     ;;
   *)
     exit 0

@@ -12,7 +12,10 @@ set -euo pipefail
 SIDECAR_DIR="/tmp/agent-tracker"
 
 # Determine pane identifier
-pane_id="${TMUX_PANE:-pid-$$}"
+# AGENT_TRACKER_PANE is exported by statusline-wrapper.sh with a stable value
+# (wrapper's PPID = Claude Code PID). Without it, $PPID here would point to the
+# wrapper process (different each ~300ms invocation). (#47)
+pane_id="${TMUX_PANE:-${AGENT_TRACKER_PANE:-pid-$PPID}}"
 
 # Sanitize pane_id for filename (remove % prefix)
 pane_file="${pane_id#%}"
@@ -21,8 +24,9 @@ pane_file="${pane_id#%}"
 input=$(cat)
 [[ -z "$input" ]] && exit 0
 
-# Ensure sidecar directory exists
+# Ensure sidecar directory exists (owner-only access for prompt privacy) (#47)
 mkdir -p "$SIDECAR_DIR"
+chmod 700 "$SIDECAR_DIR" 2>/dev/null
 
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"

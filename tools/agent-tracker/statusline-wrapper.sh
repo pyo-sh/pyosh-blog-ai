@@ -15,6 +15,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Read stdin once
 input=$(cat)
 
+# Stable pane identifier for on-statusline.sh (which runs as a child of this
+# wrapper, so its own $PPID points here — unstable). Export our PPID (= Claude
+# Code PID) so on-statusline.sh can use the same ID as on-status.sh. (#47)
+export AGENT_TRACKER_PANE="${TMUX_PANE:-pid-$PPID}"
+
 # Pre-compute tokens + last user message from transcript in a single pass.
 # Uses tail to avoid slurping the entire file (O(fixed) instead of O(file size)).
 # total_input_tokens excludes system prompt/tools/memory — transcript is accurate.

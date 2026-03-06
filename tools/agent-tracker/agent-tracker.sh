@@ -68,7 +68,7 @@ fi
 
 # make_line <char> <n> — repeat unicode char n times
 make_line() {
-  local char="$1" n="$2" s=""
+  local char="$1" n="$2" s="" i
   for ((i = 0; i < n; i++)); do s+="$char"; done
   printf '%s' "$s"
 }
@@ -114,7 +114,7 @@ pad_right() { printf '%-*s' "$2" "$1"; }
 
 # token_bar <pct> <color> — render ▰▰▰▱▱ (5 blocks)
 token_bar() {
-  local pct="$1" color="$2" bar=""
+  local pct="$1" color="$2" bar="" i
   for ((i = 0; i < 5; i++)); do
     (( i * 20 < pct )) && bar+="${color}▰${R}" || bar+="${DARK}▱${R}"
   done
@@ -154,11 +154,25 @@ parse_claude_pane() {
       (.tokens.pct // 0 | tostring),
       ((.tokens.used // 0) / 1000 | floor | tostring),
       .task // "—",
-      .activity // ""
+      .activity // "",
+      (.updated_at // 0 | tostring)
     ] | join("\u001e")' "$sidecar_path" 2>/dev/null)
 
     if [[ -n "$raw" ]]; then
-      IFS=$'\x1e' read -r model status pct tok_k task activity <<< "$raw"
+      local updated_at
+      IFS=$'\x1e' read -r model status pct tok_k task activity updated_at <<< "$raw"
+
+      # Stale sidecar detection: if not updated for 30s and status is non-idle,
+      # the agent likely crashed without sending SessionEnd. Reset to idle. (#47)
+      if [[ "$status" != "idle" && -n "$updated_at" && "$updated_at" != "0" ]]; then
+        local now_epoch age
+        now_epoch=$(date +%s)
+        age=$(( now_epoch - ${updated_at%.*} ))
+        if (( age > 30 )); then
+          status="idle"
+          activity=""
+        fi
+      fi
     fi
 
     # Only scrape pane when sidecar status is idle — prevents spinner false
@@ -350,20 +364,13 @@ _match_agent() {
   return 1
 }
 
-# agent type cache — keyed by pane_pid, avoids repeated process tree traversal (#30)
-declare -A AGENT_TYPE_CACHE
-
 # detect_agent_type <pane_pid>
+# No cache — re-detects each cycle so dynamic pane changes (agent start/stop)
+# are reflected immediately. Cost is negligible (~50 /proc reads/sec). (#47)
 detect_agent_type() {
   local root_pid="$1"
-
-  # Return cached result if available
-  if [[ -n "${AGENT_TYPE_CACHE[$root_pid]+x}" ]]; then
-    [[ -n "${AGENT_TYPE_CACHE[$root_pid]}" ]] && printf '%s' "${AGENT_TYPE_CACHE[$root_pid]}"
-    return 0
-  fi
-
   local pids=() queue=("$root_pid") pid child cmdline exename result
+
   while (( ${#queue[@]} > 0 )); do
     pid="${queue[0]}"; queue=("${queue[@]:1}")
     pids+=("$pid")
@@ -375,12 +382,10 @@ detect_agent_type() {
     cmdline=$(_get_cmdline "$pid") || continue
     exename=$(_get_exe_name "$pid") || true
     result=$(_match_agent "$cmdline" "$exename") && {
-      AGENT_TYPE_CACHE[$root_pid]="$result"
       printf '%s' "$result"
       return 0
     }
   done
-  AGENT_TYPE_CACHE[$root_pid]=""
   return 1
 }
 
@@ -616,6 +621,7 @@ tput civis 2>/dev/null
 # Clean up orphan sidecar files for panes not in the current session (#32)
 # Smarter than rm -rf: preserves files for active panes
 mkdir -p "$SIDECAR_DIR"
+chmod 700 "$SIDECAR_DIR" 2>/dev/null
 declare -A _active_panes=()
 while IFS= read -r _pid; do
   _active_panes["$_pid"]=1

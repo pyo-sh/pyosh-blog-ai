@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-06 | agent-tracker 동적 pane 감지 실패 수정 - AGENT_TYPE_CACHE 제거, pane ID 안정화, staleness 감지, chmod 700 (PR #50, #47) | done |
 | 2026-03-06 | Orchestrator pipeline 완료 감지 - state file 부재 기반, pipelineStarted 플래그, 3회 버그 검증 (#48, PR #49) | done |
 | 2026-03-06 | Pipeline tmux pane resilience 개선 - orphan pane 증식 방지, atomic state, state 기반 retry, remain-on-exit 검증, RAPHL self-fix (PR #46) | done |
 | 2026-03-05 | Orchestrator dispatch 버그 6종 수정 - set-e 안전, sub-pane 필터, maxConcurrent, DAG 외부 dep 필터, startup 검증, recovery jq (PR #44) | done |
