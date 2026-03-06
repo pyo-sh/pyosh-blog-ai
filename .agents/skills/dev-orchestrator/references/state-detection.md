@@ -15,13 +15,11 @@ failed, or stalled.
 
 Content `ok` → `completed`. Any other content → `failed`.
 
-The signal file is written by the pipeline AI at the end of `/dev-pipeline` (Step 7 log):
+The signal file is optional. If present, it takes highest priority.
+It is not written automatically - the pipeline AI or an external hook must produce it.
+In practice, the primary detection path is method 2 (state file absence).
 
-```bash
-echo "ok" > "$ORCH_BASE/$AREA/issue-${ISSUE}.exit"
-```
-
-If the pipeline AI does not write the signal file (older version), fall back to method 2.
+If no signal file exists, fall back to method 2.
 
 ### 2. Pane command + pipeline state file
 
