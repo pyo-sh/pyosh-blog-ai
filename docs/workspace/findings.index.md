@@ -19,6 +19,7 @@
 | 011 | Pipeline pane orphan 증식 원인과 해결                    | 2026-03-06 | #pipeline #tmux #pane #orphan #remain-on-exit #retry |
 | 012 | agent-tracker 동적 pane 감지 실패 원인 분석             | 2026-03-06 | #agent-tracker #sidecar #pane-id #cache #staleness |
 | 013 | Orchestrator pane release 누락 - interactive mode 잔류 | 2026-03-06 | #orchestrator #pane #release #tmux #claude-code |
+| 014 | Headless dispatch architecture - tmux pane에서 claude -p 백그라운드 프로세스로 | 2026-03-07 | #headless #claude-p #pid #dispatch #merge-queue |
 
 ## 상세 문서
 
@@ -35,6 +36,7 @@
 - [findings.011-pane-orphan-proliferation.md](./findings/findings.011-pane-orphan-proliferation.md) - pipeline pane orphan 증식: remain-on-exit 상호작용, alive vs verified 분리, jq 우선순위
 - [findings.012-agent-tracker-detection-failures.md](./findings/findings.012-agent-tracker-detection-failures.md) - agent-tracker 동적 pane 감지 실패: negative cache, PPID 불안정, TRANSCRIPT_LAST_MSG 회귀
 - [findings.013-orchestrator-pane-release.md](./findings/findings.013-orchestrator-pane-release.md) - Orchestrator pane release 누락: interactive mode 잔류, Ctrl+C fallback, `-p` 비호환
+- [findings.014-headless-dispatch-architecture.md](./findings/findings.014-headless-dispatch-architecture.md) - tmux pane → claude -p 헤드리스 전환: nested headless, CLAUDECODE= unset, $BASHPID, merge queue
 
 ## 주요 원칙
 
@@ -55,3 +57,6 @@
 - **캐시 제거가 캐시 무효화보다 낫다** → /proc 탐색 비용은 무시 가능. 캐시 무효화 버그 위험이 더 큼
 - **다단계 프로세스 체인에서 PPID는 불안정** → wrapper 경유 시 env var로 안정 식별자 전달
 - **env var export 삭제 전 소비처 확인 필수** → `grep -r VAR_NAME` 후 제거
+- **`CLAUDECODE=` unset 필수** → 자식 claude -p가 부모 환경변수 상속하면 충돌
+- **`$$` 대신 `$BASHPID`** → 서브셸/백그라운드에서 `$$`는 top-level shell PID. lock PID 기록 시 `${BASHPID:-$$}` 사용
+- **병렬 merge는 lock 직렬화 필수** → 같은 area 동시 merge 시 rebase 충돌. `mkdir` atomic lock + PID stale 감지

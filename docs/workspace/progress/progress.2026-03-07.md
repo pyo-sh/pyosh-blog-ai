@@ -16,3 +16,25 @@
   - `pane-lifecycle.md` 삭제, `process-lifecycle.md` 신규
 - **Review**: PR #56 comment review - WARNING 2 (decision doc 불일치, status), SUGGESTION 2 (vestigial agent field, step 5 annotation)
 - **Files**: `pipeline-helpers.sh`, `SKILL.md`, `process-lifecycle.md`, `recovery.md`, `dev-review/SKILL.md`, `dev-build/SKILL.md`, `dev-resolve/SKILL.md`
+
+## Orchestrator headless 전환 + merge queue (#57)
+
+- **Issue**: dev-orchestrator가 tmux pane 기반 dispatch 사용. pane release 실패, 과잉 dispatch, pane death 감지 등 반복적 버그 발생. dev-pipeline이 이미 headless 전환 완료 (#55).
+- **Changes**:
+  - tmux pane 함수 전체 제거: `orch_find_idle_panes`, `orch_pane_alive`, `orch_release_pane`, `orch_verify_startup`, `ORCH_WORK_WINDOWS`
+  - `orch_dispatch()`: tmux send-keys → 백그라운드 `claude -p &` + PID 반환
+  - `orch_process_alive()`, `orch_stop_process()` 추가 (PID 기반)
+  - `orch_check_completion()`: pane command 체크 → `kill -0 $pid` 체크
+  - `_orch_pr_list()`: `cd area_dir && gh pr list` → `gh pr list -R $repo` (explicit repo targeting)
+  - `orch_detect_stall()`: 3 params → 2 params (area_dir 제거)
+  - `orch_record_dispatch()`: 2회 state write → 단일 jq filter
+  - `orch_check_completion()`: 2회 `gh pr list` (merged + open) → 단일 `--state all` 호출
+  - `orch_init()`: `orchestratorPane` 파라미터/필드 제거
+  - `orch_poll_cycle()`, `orch_print_summary()`: 파라미터 축소
+  - Merge queue: `pipeline_acquire_merge_lock()` / `pipeline_release_merge_lock()` - `mkdir` 기반 atomic lock + PID stale 감지
+  - `$BASHPID` 수정: merge lock PID가 `$$`(top-level shell)이 아닌 현재 프로세스 PID 기록
+  - `pipeline_list()`: 3 jq → 1 jq 통합
+  - SKILL.md, references 최적화: 중복 JSON 예시 제거, stale 함수 시그니처 수정, Kahn's algorithm 설명 제거
+  - README.md: 다이어그램 tmux → headless, orchestrator 섹션 추가, merge queue 섹션 추가
+- **Review**: /simplify 3회 통과. `$$` → `$BASHPID` 버그 수정, 죽은 변수 제거, pipeline_list 효율화.
+- **Files**: `orchestrate-helpers.sh`, `pipeline-helpers.sh`, `SKILL.md` (orchestrator/pipeline), `state-detection.md`, `dependency-resolution.md`, `recovery.md`, `process-lifecycle.md`, `README.md`
