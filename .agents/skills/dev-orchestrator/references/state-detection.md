@@ -15,15 +15,13 @@ failed, or stalled.
 
 Content `ok` → `completed`. Any other content → `failed`.
 
-The signal file is written by the pipeline AI at the end of `/dev-pipeline` (Step 7 log):
+The signal file is optional. If present, it takes highest priority.
+It is not written automatically - the pipeline AI or an external hook must produce it.
+In practice, the primary detection path is method 2 (state file absence).
 
-```bash
-echo "ok" > "$ORCH_BASE/$AREA/issue-${ISSUE}.exit"
-```
+If no signal file exists, fall back to method 2.
 
-If the pipeline AI does not write the signal file (older version), fall back to method 2.
-
-### 2. Pane command (AI process running?)
+### 2. Pane command + pipeline state file
 
 Check the pane's current foreground command via tmux:
 
@@ -31,21 +29,35 @@ Check the pane's current foreground command via tmux:
 cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}')
 ```
 
-| Command | Meaning |
-|---------|---------|
-| `claude`, `codex`, `node` | AI process still running → `running` |
-| `bash`, `zsh`, `sh`, `fish` | AI exited, shell prompt → fall through to PR check |
-| pane dead | Process crashed → fall through to PR check |
+| Command | State file | pipelineStarted | Result |
+|---------|-----------|-----------------|--------|
+| `claude`/`codex`/`node` | exists | * | `running` (marks `pipelineStarted: true`) |
+| `claude`/`codex`/`node` | absent | true | `completed` (Step 7 deleted it) |
+| `claude`/`codex`/`node` | absent | false | `running` (not created yet) |
+| shell / pane dead | * | * | fall through to method 3 |
 
-This replaces the previous pipeline state file-based detection, which caused false `failed` judgments
-when the state file hadn't been created yet (grace period too short).
+The `pipelineStarted` flag in `batch.state.json` tracks whether the pipeline state file
+was ever observed. This prevents false `completed` judgments when the state file hasn't
+been created yet (dispatch just happened, pipeline still in Step 1).
 
-### 3. PR status (AI process finished)
+Pipeline AI typically stays in the session after completing work, so the state file check
+while AI is running is the primary completion detection path.
 
-After AI process exits or pane dies:
+### 3. Pipeline state file (AI exited)
+
+When AI has exited (shell prompt or pane dead):
+
+| State file | pipelineStarted | Result |
+|-----------|-----------------|--------|
+| absent | true | `completed` |
+| absent | false | fall through (early crash, never started) |
+| exists | * | fall through (pipeline didn't finish) |
+
+### 4. PR status (fallback)
+
+After methods 2-3 are inconclusive:
 
 ```bash
-# Check for merged PR
 gh pr list --search "Closes #${issue}" --state merged --json number --jq 'length'
 ```
 
