@@ -1,5 +1,17 @@
 # 2026-03-07 Workspace progress
 
+## agent-tracker sidecar 경로 이동 + pipeline 중복 제거 + 토큰 버그 수정 (#62)
+
+- **Issue**: agent-tracker에 3가지 문제. (1) sidecar 파일이 `/tmp/agent-tracker/`에 위치하여 시스템 재부팅 시 소실 + `chmod 700` 방어 필요, (2) footer pipeline state 요약이 orchestrator 섹션과 중복 표시, (3) TOKENS 컬럼이 대화 초반 값에서 갱신 안 됨 - transcript JSONL의 단일 턴 `input_tokens`가 누적값이 아닌 문제.
+- **Changes**:
+  - sidecar 경로: `/tmp/agent-tracker` -> `$REPO_ROOT/.workspace/agent-tracker` (agent-tracker.sh, on-statusline.sh, on-status.sh, setup.sh). `chmod 700` 방어 코드 제거.
+  - `get_pipeline_summary()` 함수 + footer `pipeline_str` 참조 제거. orchestrator 섹션이 동일 정보를 더 상세히 표시.
+  - 토큰 계산: transcript 파싱 -> statusLine JSON의 `current_usage` 필드 사용 (Claude Code v2.0.72+). `used_percentage` fallback. `TRANSCRIPT_TOKENS` export 유지 (context-bar.sh 호환).
+  - on-statusline.sh: wrapper의 pre-computed `TRANSCRIPT_TOKENS` 우선 사용, standalone 호출 시에만 `current_usage` fallback (중복 jq 제거).
+- **Research**: Claude Code statusLine JSON 공식 스키마 조사. `total_input_tokens`는 세션 누적값 (context 아님), `current_usage`가 정확한 per-request context 토큰. #13783 참조.
+- **Review**: /simplify - 토큰 jq 중복 계산 제거 (wrapper pre-computed 우선 사용)
+- **Files**: `agent-tracker.sh`, `on-statusline.sh`, `on-status.sh`, `statusline-wrapper.sh`, `setup.sh`, `README.md`
+
 ## Orchestrator 안정성 개선 (#59, #60, #61)
 
 - **Issue**: /dev-orchestrator 실행 시 3가지 문제 발생. (1) headless 프로세스 상태를 트래킹할 수 없음 (#59), (2) pipeline 내부 review/resolve 서브프로세스가 orchestrator가 지정한 모델이 아닌 CLI 기본 모델로 실행됨 (#60), (3) dispatch + state 기록이 분리되어 tool call 에러 시 orphan 프로세스 발생 (#61).
