@@ -35,6 +35,18 @@
 - **Bug review**: 3회 반복 검증 - retry 미리셋(HIGH), set-e 위반(MED), docs 불일치(MED) 발견 및 수정
 - **Files**: `orchestrate-helpers.sh`, `state-detection.md`
 
+## Orchestrator pane release 누락 + agent model/pane flexibility (#53, PR #54)
+
+- **Issue**: `claude --dangerously-skip-permissions`가 pipeline 완료 후 interactive 모드에 머물러 pane 점유 지속. `orch_find_idle_panes`가 shell(bash/zsh)만 idle로 판단하므로 후속 dispatch 불가.
+- **Root cause**: `orch_poll_cycle`이 완료 감지 후 AI 프로세스를 종료하지 않음. `-p`(print) 모드는 pipeline의 `AskUserQuestion` 호출과 비호환.
+- **Changes**:
+  - C-1: `orch_release_pane()` - 완료/실패 후 Ctrl+C로 AI 프로세스 종료 (pane 파괴 안 함). 2회 retry 포함.
+  - C-2: `_orch_parse_agent()` - `"claude:sonnet"` 형식 파싱, `orch_dispatch()`에 `--model` flag 조건부 추가
+  - C-3: `ORCH_WORK_PANES` env var - 명시적 pane ID 지정 모드. 기존 window-based discovery는 default 유지.
+  - `orch_poll_cycle` step 1/2에서 pane_id 추출 후 `orch_release_pane` 호출
+- **Side effect analysis**: completion detection 4단계 통과 필수이므로 false positive 리스크 극히 낮음. shell injection은 agent 값이 내부 입력이라 실질적 위험 없음.
+- **Files**: `orchestrate-helpers.sh` (+91 -24), `SKILL.md`, `state-detection.md`
+
 ## agent-tracker 동적 pane 감지 실패 수정 (#47, PR #50)
 
 - **Issue**: 다른 pane에서 Claude Code를 동적 시작 시 tokens=0, status=idle 고정

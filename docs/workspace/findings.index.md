@@ -18,6 +18,7 @@
 | 010 | Orchestrator dispatch 버그 3종 분석 및 수정              | 2026-03-05 | #orchestrator #dispatch #set-e #sub-pane #dag |
 | 011 | Pipeline pane orphan 증식 원인과 해결                    | 2026-03-06 | #pipeline #tmux #pane #orphan #remain-on-exit #retry |
 | 012 | agent-tracker 동적 pane 감지 실패 원인 분석             | 2026-03-06 | #agent-tracker #sidecar #pane-id #cache #staleness |
+| 013 | Orchestrator pane release 누락 - interactive mode 잔류 | 2026-03-06 | #orchestrator #pane #release #tmux #claude-code |
 
 ## 상세 문서
 
@@ -33,6 +34,7 @@
 - [findings.010-orchestrator-dispatch-bugs.md](./findings/findings.010-orchestrator-dispatch-bugs.md) - set-e 크래시, sub-pane 과잉 dispatch, 외부 dep 영구 차단 3종 분석
 - [findings.011-pane-orphan-proliferation.md](./findings/findings.011-pane-orphan-proliferation.md) - pipeline pane orphan 증식: remain-on-exit 상호작용, alive vs verified 분리, jq 우선순위
 - [findings.012-agent-tracker-detection-failures.md](./findings/findings.012-agent-tracker-detection-failures.md) - agent-tracker 동적 pane 감지 실패: negative cache, PPID 불안정, TRANSCRIPT_LAST_MSG 회귀
+- [findings.013-orchestrator-pane-release.md](./findings/findings.013-orchestrator-pane-release.md) - Orchestrator pane release 누락: interactive mode 잔류, Ctrl+C fallback, `-p` 비호환
 
 ## 주요 원칙
 
@@ -45,6 +47,8 @@
 - **Orchestrator helper 함수는 항상 return 0** → stdout으로만 상태 전달. `set -e` caller 안전.
 - **orch_find_idle_panes는 window당 1 pane** → sub-pane dispatch 방지. `head -1`로 `pane-base-index` 무관.
 - **orch_init DAG 자동 필터링** → batch에 없는 외부 dep을 자동 제거. AI 수동 필터 불필요.
+- **완료 후 pane release는 Ctrl+C 2회** → prompt exit 미이행 시 fallback. pane 파괴 아닌 shell 복귀.
+- **`-p`(print) 모드는 pipeline과 비호환** → AskUserQuestion 호출 시 stdin 불가. interactive 모드 필수.
 - **remain-on-exit on 상태에서 pane_alive는 dead pane도 true** → `#{pane_dead}` flag로 직접 확인 필요
 - **Polling은 pane_alive, recovery는 pane_alive_verified** → child process가 `#{pane_current_command}` 변경하므로 polling에서 verified 사용 금지
 - **State 기반 retry counter는 성공 시에만 reset** → PANE_DEAD에서 reset하면 무한 루프
