@@ -20,6 +20,11 @@
   - `pnpm add unified remark-parse remark-rehype rehype-stringify rehype-sanitize shiki @shikijs/rehype`
   - All checks passed: `compile:types`, `lint`, `build`
 
+- [x] #23 PaginatedResponse meta.total 필드 수정
+  - `src/shared/api/types.ts`의 `meta.totalCount` → `meta.total` 변경 (1줄 수정)
+  - 서버 `PaginationMetaSchema`의 `total` 필드와 일치
+  - All checks passed: `compile:types`, `lint`, `build`
+
 ## Issues & resolutions
 - **Issue**: `@/shared/api` import alias not defined in tsconfig - pre-existing bug from #38
 - **Resolution**: Fixed to `@shared/api` (matching tsconfig.alias.json paths) in both auth/api.ts and post/api.ts
