@@ -257,6 +257,59 @@ pipeline_format_escalation() {
 }
 
 # ──────────────────────────────────────────────
+# Merge queue (lock-based serialization)
+# ──────────────────────────────────────────────
+
+pipeline_acquire_merge_lock() {
+  # Acquire area-level merge lock. Only one pipeline can merge at a time.
+  # Uses mkdir for atomic creation + PID file for stale lock detection.
+  # Usage: pipeline_acquire_merge_lock <area> <issue>
+  # Returns: 0 = acquired, 1 = timeout
+  local area=$1
+  local issue=$2
+  local lock_dir="$PIPELINE_DIR/${area}/merge.lock"
+  local max_wait=300  # 5 minutes
+  local interval=10
+  local waited=0
+
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    # Check if holder is still alive (stale lock recovery)
+    local holder_pid
+    holder_pid=$(cat "$lock_dir/pid" 2>/dev/null)
+    if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
+      >&2 echo "[pipeline] Stale merge lock (PID $holder_pid dead) - reclaiming"
+      rm -rf "$lock_dir"
+      continue
+    fi
+
+    if [ "$waited" -ge "$max_wait" ]; then
+      local holder_issue
+      holder_issue=$(cat "$lock_dir/issue" 2>/dev/null)
+      >&2 echo "[pipeline] Merge lock timeout after ${max_wait}s (held by issue #${holder_issue:-unknown})"
+      return 1
+    fi
+
+    >&2 echo "[pipeline] Merge lock held - waiting (${waited}s/${max_wait}s)"
+    sleep "$interval"
+    waited=$((waited + interval))
+  done
+
+  # Write lock metadata
+  echo "$$" > "$lock_dir/pid"
+  echo "$issue" > "$lock_dir/issue"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lock_dir/acquired"
+  return 0
+}
+
+pipeline_release_merge_lock() {
+  # Release area-level merge lock.
+  # Usage: pipeline_release_merge_lock <area>
+  local area=$1
+  local lock_dir="$PIPELINE_DIR/${area}/merge.lock"
+  rm -rf "$lock_dir"
+}
+
+# ──────────────────────────────────────────────
 # Cleanup
 # ──────────────────────────────────────────────
 

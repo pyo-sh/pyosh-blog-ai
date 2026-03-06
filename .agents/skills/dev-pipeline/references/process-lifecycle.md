@@ -16,6 +16,24 @@ pipeline_run_headless(workdir, prompt, issue, area, stage)
 | review | `Bash,Read,Skill` | 15 | 900s |
 | resolve | `Bash,Read,Edit,Write,Grep,Glob,Skill` | 25 | 900s |
 
+## Merge queue
+
+When multiple pipelines run in parallel (via orchestrator), only one can merge at a time per area. Prevents rebase conflicts from simultaneous merges.
+
+```
+pipeline_acquire_merge_lock(area, issue)
+  -> mkdir .workspace/pipeline/{area}/merge.lock  (atomic)
+  -> writes pid, issue, timestamp to lock dir
+  -> if held: polls every 10s, max 300s
+  -> stale lock (holder PID dead): auto-reclaims
+  -> returns: 0=acquired, 1=timeout
+
+pipeline_release_merge_lock(area)
+  -> rm -rf .workspace/pipeline/{area}/merge.lock
+```
+
+**Always release the lock** - both on success and failure. If the process dies, the next acquirer detects the stale lock via PID check and reclaims it.
+
 ## Self-healing
 
 Per-stage retry via `pipeline_stage_retry()` (max 3). Log actions with `pipeline_recovery_log()`. On max retries -> `pipeline_format_escalation()` reports to user.
