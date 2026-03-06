@@ -79,7 +79,7 @@ done
 If the batch is already complete (all issues `completed` or `failed`) but state file remains:
 
 ```bash
-orch_print_summary "$AREA" "$AREA_DIR"
+orch_print_summary "$AREA"
 rm -rf ".workspace/orchestrate/$AREA/"
 echo "[recovery] Stale state cleaned up."
 ```

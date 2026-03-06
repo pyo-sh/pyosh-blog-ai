@@ -197,8 +197,7 @@ orch_record_dispatch() {
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   orch_state_update "$area" \
-    ".dispatched[\"$issue\"] = {pid: $pid, log: \"$ORCH_BASE/${area}/issue-${issue}.log\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false, retryCount: 0}"
-  orch_status_set "$area" "$issue" "dispatched"
+    ".dispatched[\"$issue\"] = {pid: $pid, log: \"$ORCH_BASE/${area}/issue-${issue}.log\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false, retryCount: 0} | .status[\"$issue\"] = \"dispatched\""
 }
 
 # ──────────────────────────────────────────────
@@ -206,12 +205,10 @@ orch_record_dispatch() {
 # ──────────────────────────────────────────────
 
 _orch_pr_list() {
-  # Usage: _orch_pr_list <area_dir> <issue> <state> <json_fields> <jq_filter>
+  # Usage: _orch_pr_list <area> <issue> <state> <json_fields> <jq_filter>
   # Finds PRs that close the given issue. Uses -R for explicit repo targeting.
   # Avoid deprecated fields (projectCards etc.) - use number,title,state,body,url only.
-  local area_dir=$1 issue=$2 state=$3 json_fields=$4 jq_filter=$5
-  local area
-  area=$(monorepo_area_from_dir "$area_dir")
+  local area=$1 issue=$2 state=$3 json_fields=$4 jq_filter=$5
   local repo
   repo=$(monorepo_area_repo "$area")
 
@@ -254,17 +251,18 @@ orch_check_completion() {
     fi
   fi
 
-  # 2. Process alive check (replaces tmux pane command check)
+  # Shared across checks 2-3
   local state
   state=$(orch_state_read "$area")
   local pid
   pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
+  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+  local seen
+  seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
 
+  # 2. Process alive check (replaces tmux pane command check)
   if [ -n "$pid" ] && orch_process_alive "$pid"; then
     # Process running - check if pipeline state file exists (to track pipelineStarted)
-    local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-    local seen
-    seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
     if [ -f "$pipeline_state" ]; then
       if [ "$seen" != "true" ]; then
         orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true" || true
@@ -279,26 +277,19 @@ orch_check_completion() {
   fi
 
   # 3. Pipeline state file check (process exited)
-  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-  if [ ! -f "$pipeline_state" ]; then
-    local seen
-    seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
-    if [ "$seen" = "true" ]; then
-      echo "completed"; return 0
-    fi
-    # Never seen (early crash) - fall through to PR check
+  # Uses $pipeline_state and $seen from above
+  if [ ! -f "$pipeline_state" ] && [ "$seen" = "true" ]; then
+    echo "completed"; return 0
   fi
 
   # 4. PR status (process exited, state file inconclusive)
   local pr_merged
-  pr_merged=$(_orch_pr_list "$area_dir" "$issue" merged number 'length')
-  if [ "${pr_merged:-0}" -gt 0 ] 2>/dev/null; then
+  local pr_states
+  pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]')
+  if echo "$pr_states" | grep -q '"MERGED"'; then
     echo "completed"; return 0
   fi
-
-  local pr_open
-  pr_open=$(_orch_pr_list "$area_dir" "$issue" open number 'length')
-  if [ "${pr_open:-0}" -gt 0 ] 2>/dev/null; then
+  if echo "$pr_states" | grep -q '"OPEN"'; then
     echo "running"; return 0
   fi
 
@@ -322,12 +313,11 @@ orch_update_last_activity() {
 # ──────────────────────────────────────────────
 
 orch_detect_stall() {
-  # Usage: orch_detect_stall <area> <issue> <area_dir>
+  # Usage: orch_detect_stall <area> <issue>
   # stdout: "stalled" or "active"
   # Always returns 0 (safe for set -e callers).
   local area=$1
   local issue=$2
-  local area_dir=$3
   local stall_seconds=600  # 10 minutes
 
   local state
@@ -350,12 +340,10 @@ orch_detect_stall() {
     local last_sha
     last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
 
-    local area_name
-    area_name=$(monorepo_area_from_dir "$area_dir")
     local repo
-    repo=$(monorepo_area_repo "$area_name")
+    repo=$(monorepo_area_repo "$area")
     local pr_number
-    pr_number=$(_orch_pr_list "$area_dir" "$issue" open number '.[0].number')
+    pr_number=$(_orch_pr_list "$area" "$issue" open number '.[0].number')
 
     # No open PR yet - apply extended stall threshold (2x normal) for pre-PR phase
     if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
@@ -474,7 +462,7 @@ orch_poll_cycle() {
     cur_status=$(echo "$state" | jq -r ".status[\"$issue\"]")
     [ "$cur_status" != "dispatched" ] && continue
 
-    if [ "$(orch_detect_stall "$area" "$issue" "$area_dir")" = "stalled" ]; then
+    if [ "$(orch_detect_stall "$area" "$issue")" = "stalled" ]; then
       local pid
       pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid")
       local retry_count
@@ -545,9 +533,8 @@ orch_poll_cycle() {
 # ──────────────────────────────────────────────
 
 orch_print_summary() {
-  # Usage: orch_print_summary <area> <area_dir>
+  # Usage: orch_print_summary <area>
   local area=$1
-  local area_dir=$2
 
   local state
   state=$(orch_state_read "$area")
@@ -564,7 +551,7 @@ orch_print_summary() {
     status=$(echo "$state" | jq -r ".status[\"$issue\"]")
     local pr_url=""
     if [ "$status" = "completed" ]; then
-      pr_url=$(_orch_pr_list "$area_dir" "$issue" merged url '.[0].url')
+      pr_url=$(_orch_pr_list "$area" "$issue" merged url '.[0].url')
     fi
     printf "%-8s %-12s %s\n" "#${issue}" "$status" "$pr_url"
   done
