@@ -283,7 +283,6 @@ orch_check_completion() {
   fi
 
   # 4. PR status (process exited, state file inconclusive)
-  local pr_merged
   local pr_states
   pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]')
   if echo "$pr_states" | grep -q '"MERGED"'; then

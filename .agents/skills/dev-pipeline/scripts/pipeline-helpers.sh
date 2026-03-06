@@ -294,8 +294,8 @@ pipeline_acquire_merge_lock() {
     waited=$((waited + interval))
   done
 
-  # Write lock metadata
-  echo "$$" > "$lock_dir/pid"
+  # Write lock metadata ($BASHPID = current process, not top-level shell $$)
+  echo "${BASHPID:-$$}" > "$lock_dir/pid"
   echo "$issue" > "$lock_dir/issue"
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lock_dir/acquired"
   return 0
@@ -341,11 +341,9 @@ pipeline_list() {
     for f in "$PIPELINE_DIR"/*/issue-*.state.json; do
       [ -f "$f" ] || continue
       found=1
-      local issue step area
-      issue=$(jq -r '.issue' "$f")
-      area=$(jq -r '.area' "$f")
-      step=$(jq -r '.step' "$f")
-      echo "Issue #${issue} (${area}): step=${step}"
+      local info
+      info=$(jq -r '"Issue #\(.issue) (\(.area)): step=\(.step)"' "$f")
+      echo "$info"
     done
     [ "$found" -eq 0 ] && echo "No active pipelines"
   else
