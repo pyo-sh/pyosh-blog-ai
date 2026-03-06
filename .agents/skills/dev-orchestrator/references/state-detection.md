@@ -5,7 +5,7 @@ failed, or stalled.
 
 ## Completion detection
 
-`orch_check_completion <issue> <area_dir>` checks in priority order:
+`orch_check_completion <issue> <area_dir>` checks in priority order (see `orchestrate-helpers.sh`):
 
 ### 1. Signal file (highest priority)
 
@@ -69,7 +69,7 @@ like `projectCards` - use `number,title,state,body,url` only.
 
 ## Stall detection
 
-`orch_detect_stall <area> <issue> <area_dir>` checks if the last activity timestamp
+`orch_detect_stall <area> <issue>` checks if the last activity timestamp
 for a dispatched issue exceeds 10 minutes with no new commits on the PR.
 
 ### Activity tracking

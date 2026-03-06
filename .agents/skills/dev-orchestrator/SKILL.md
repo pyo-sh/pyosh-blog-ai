@@ -73,39 +73,9 @@ Present list to user for confirmation before proceeding.
 
 ### 3. Build dependency DAG
 
-```bash
-source scripts/orchestrate-helpers.sh
-ISSUES="1 2 3 4 5"
+Parse `### Dependencies` section from each issue body via `parse-dependencies.sh`. Build DAG: `dag[N]="dep1 dep2"`. Run cycle detection - abort if cycle found. See [dependency-resolution.md](references/dependency-resolution.md).
 
-for N in $ISSUES; do
-  DEPS=$(bash scripts/parse-dependencies.sh "$N" "{area_dir}")
-  # stdout: space-separated dependency issue numbers, or empty
-done
-```
-
-Build DAG: `dag[N]="dep1 dep2"` (N depends on dep1, dep2).
-
-Cycle detection -> abort with error if cycle found. See [dependency-resolution.md](references/dependency-resolution.md).
-
-Write initial state:
-
-```json
-{
-  "area": "client",
-  "batchId": "batch-20260301-001",
-  "issues": [1, 2, 3, 4, 5],
-  "dag": {"3": [1, 2], "4": [3]},
-  "status": {
-    "1": "pending", "2": "pending",
-    "3": "blocked", "4": "blocked", "5": "pending"
-  },
-  "dispatched": {},
-  "agent": "claude:sonnet",
-  "maxConcurrent": 4,
-  "createdAt": "2026-03-01T00:00:00Z",
-  "updatedAt": "2026-03-01T00:00:00Z"
-}
-```
+Write initial state via `orch_init`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), timestamps.
 
 ### 4. Initial dispatch
 
@@ -122,35 +92,9 @@ Update status: `"dispatched"`. See [state-detection.md](references/state-detecti
 
 ### 5. Poll cycle
 
-Run continuously (30-second interval):
+Loop `orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"` every 30 seconds until no `pending`/`dispatched`/`blocked` issues remain.
 
-```bash
-while true; do
-  orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"
-  REMAINING=$(orch_state_read "$AREA" | jq \
-    '[.status | to_entries[] | select(.value == "pending" or .value == "dispatched" or .value == "blocked")] | length')
-  [ "$REMAINING" -eq 0 ] && break
-  sleep 30
-done
-```
-
-`orch_poll_cycle` does, for each dispatched issue:
-
-1. **Completion check** -> `orch_check_completion "$ISSUE" "$AREA_DIR"`
-   - Signal file exists -> mark `completed` or `failed`
-   - Process exited + pipeline state gone -> mark `completed`
-   - Process exited + no PR -> mark `failed`
-
-2. **Stall detection** -> `orch_detect_stall "$ISSUE" "$AREA_DIR"`
-   - No new commits in 10 min -> warn user, offer retry
-
-3. **Unblock** -> on any `completed` or `failed`, call `orch_unblock "$AREA" "$ISSUE"`
-   - Find issues whose only remaining blocker was this issue
-   - For each newly-unblocked issue -> dispatch
-
-4. **Dispatch pending** -> for any `pending` issues with met deps, launch new process
-
-5. **Report** -> print status to orchestrator output
+Each cycle, for every dispatched issue: check completion (`orch_check_completion`), detect stalls (`orch_detect_stall`), unblock dependents (`orch_unblock`), dispatch newly-pending issues, and print status. See [state-detection.md](references/state-detection.md) for detection logic.
 
 ### 6. Batch completion
 

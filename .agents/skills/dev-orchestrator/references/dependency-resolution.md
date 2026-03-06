@@ -75,13 +75,6 @@ if [ $rc -eq 1 ]; then
 fi
 ```
 
-**Kahn's algorithm** (topological sort):
-
-1. Compute in-degree for each node (number of unmet dependencies).
-2. Queue all nodes with in-degree 0 (no dependencies).
-3. While queue non-empty: dequeue node, reduce in-degree of its dependents; re-queue those reaching 0.
-4. If total processed < total nodes → cycle exists (nodes never reached 0 in-degree).
-
 ## Initial Status Assignment
 
 After DAG construction, assign initial status to each issue:
@@ -111,6 +104,6 @@ Both `completed` and `failed` are terminal states that unblock dependents.
 
 ## Edge Cases
 
-- **Issue not in batch**: If a dependency issue number is not in the current batch, log a warning but do not abort. Treat as an external dependency — the issue will remain `blocked` until manually resolved.
+- **Issue not in batch**: If a dependency references an issue not in the current batch, `orch_init` auto-filters it out (only in-batch dependencies are stored in the DAG). A warning is logged but the issue proceeds as if that dependency doesn't exist.
 - **Self-dependency**: `dag[N]` containing N itself → caught by cycle detection.
 - **Empty `### Dependencies` section**: Treated as no dependencies → `pending`.
