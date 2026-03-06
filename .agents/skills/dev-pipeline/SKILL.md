@@ -88,18 +88,39 @@ Show review summary. Ask user: **"Merge"** -> Step 6 | **"Fix & Re-review"** -> 
 
 **Recovery entry**: Check `gh pr view {PR#} --json state -q .state`. `MERGED` -> skip to cleanup. `OPEN` -> ask user for merge approval.
 
+**Acquire merge lock** before merging. Only one pipeline can merge per area at a time to prevent rebase conflicts when multiple pipelines complete simultaneously.
+
+```bash
+pipeline_acquire_merge_lock "$AREA" "$ISSUE"
+```
+
+If lock timeout (returns 1) -> self-heal with `pipeline_stage_retry`, retry or escalate.
+
+After lock acquired, sync and merge:
+
 ```bash
 cd {area}
+git fetch origin
+git rebase origin/main || git merge origin/main
+git push
 gh pr merge {PR#} --squash --delete-branch
 ```
 
 If merge fails -> self-heal: `git fetch origin && git rebase origin/main || git merge origin/main && git push`, retry. Max 3 retries, then escalate with `pipeline_format_escalation`.
 
-After merge, validate state is `MERGED`, then:
+After merge, validate state is `MERGED`, **release lock**, then cleanup:
 
 ```bash
+pipeline_release_merge_lock "$AREA"
 git fetch --prune
 pipeline_cleanup "$ISSUE" "$AREA" "{branch}"
+```
+
+If merge fails permanently, **always release the lock** before escalating:
+
+```bash
+pipeline_release_merge_lock "$AREA"
+pipeline_format_escalation "$ISSUE" "$AREA" "merge"
 ```
 
 State -> `"step": "log"`.

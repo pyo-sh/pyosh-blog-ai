@@ -1,11 +1,11 @@
-# State Detection
+# State detection
 
 How the orchestrator determines whether a dispatched issue's pipeline has completed,
 failed, or stalled.
 
-## Completion Detection
+## Completion detection
 
-`orch_check_completion <issue> <area_dir>` checks in priority order:
+`orch_check_completion <issue> <area_dir>` checks in priority order (see `orchestrate-helpers.sh`):
 
 ### 1. Signal file (highest priority)
 
@@ -13,39 +13,36 @@ failed, or stalled.
 .workspace/orchestrate/{area}/issue-{N}.exit
 ```
 
-Content `ok` → `completed`. Any other content → `failed`.
+Content `ok` -> `completed`. Any other content -> `failed`.
 
 The signal file is optional. If present, it takes highest priority.
 It is not written automatically - the pipeline AI or an external hook must produce it.
-In practice, the primary detection path is method 2 (state file absence).
+In practice, the primary detection path is method 2 (process exit + state file absence).
 
 If no signal file exists, fall back to method 2.
 
-### 2. Pane command + pipeline state file
+### 2. Process alive check (PID)
 
-Check the pane's current foreground command via tmux:
+Check whether the background `claude -p` process is still running:
 
 ```bash
-cmd=$(tmux display-message -t "$pane_id" -p '#{pane_current_command}')
+kill -0 "$pid" 2>/dev/null
 ```
 
-| Command | State file | pipelineStarted | Result |
+| Process | State file | pipelineStarted | Result |
 |---------|-----------|-----------------|--------|
-| `claude`/`codex`/`node` | exists | * | `running` (marks `pipelineStarted: true`) |
-| `claude`/`codex`/`node` | absent | true | `completed` (Step 7 deleted it) |
-| `claude`/`codex`/`node` | absent | false | `running` (not created yet) |
-| shell / pane dead | * | * | fall through to method 3 |
+| alive | exists | * | `running` (marks `pipelineStarted: true`) |
+| alive | absent | true | `completed` (Step 7 deleted it) |
+| alive | absent | false | `running` (not created yet) |
+| dead | * | * | fall through to method 3 |
 
 The `pipelineStarted` flag in `batch.state.json` tracks whether the pipeline state file
 was ever observed. This prevents false `completed` judgments when the state file hasn't
 been created yet (dispatch just happened, pipeline still in Step 1).
 
-Pipeline AI typically stays in the session after completing work, so the state file check
-while AI is running is the primary completion detection path.
+### 3. Pipeline state file (process exited)
 
-### 3. Pipeline state file (AI exited)
-
-When AI has exited (shell prompt or pane dead):
+When the headless process has exited:
 
 | State file | pipelineStarted | Result |
 |-----------|-----------------|--------|
@@ -58,16 +55,21 @@ When AI has exited (shell prompt or pane dead):
 After methods 2-3 are inconclusive:
 
 ```bash
-gh pr list --search "Closes #${issue}" --state merged --json number --jq 'length'
+gh pr list -R "$REPO" \
+  --search "Closes #${issue}" --state merged \
+  --json number --jq 'length'
 ```
 
-- Merged PR exists → `completed`
-- Open PR exists → `running` (pipeline may still be cleaning up)
-- No PR at all → `failed`
+- Merged PR exists -> `completed`
+- Open PR exists -> `running` (pipeline may still be cleaning up)
+- No PR at all -> `failed`
 
-## Stall Detection
+Always use `-R <owner/repo>` for explicit repo targeting. Avoid deprecated fields
+like `projectCards` - use `number,title,state,body,url` only.
 
-`orch_detect_stall <area> <issue> <area_dir>` checks if the last activity timestamp
+## Stall detection
+
+`orch_detect_stall <area> <issue>` checks if the last activity timestamp
 for a dispatched issue exceeds 10 minutes with no new commits on the PR.
 
 ### Activity tracking
@@ -83,50 +85,35 @@ stall_seconds = 600  # 10 minutes
 ```
 
 If `now - lastActivity > stall_seconds`:
-1. Fetch latest commit SHA on the PR
+1. Fetch latest commit SHA on the PR via `gh api repos/{repo}/pulls/{pr}/commits`
 2. Compare with `lastCommitSha` in state
-3. Different → update `lastActivity` + `lastCommitSha`, return "not stalled"
-4. Same → return "stalled"
+3. Different -> update `lastActivity` + `lastCommitSha`, return "active"
+4. Same -> return "stalled"
+
+Extended threshold (2x normal) for pre-PR phase when no open PR exists yet.
 
 ### On stall detected
 
 Orchestrator reports to user:
 
 ```
-[orchestrator] STALL: Issue #N — no activity for 10+ minutes
-  Pane: %3
-  Last commit: abc1234 (10:05:00 UTC)
-Options: [retry] [skip] [inspect]
+[orchestrator] STALL: Issue #N - no activity for 10+ minutes
+  Process PID 12345 still alive. Consider: stop, retry, or skip
 ```
 
-User chooses:
-- **retry** → kill pane, re-dispatch to same or different pane
-- **skip** → mark issue `failed`, unblock any dependents
-- **inspect** → user manually resolves, orchestrator resumes polling
+Automatic handling:
+- Process dead + retry available -> auto re-dispatch (max 1 retry per issue)
+- Process dead + retry exhausted -> mark `failed`, unblock dependents
+- Process alive + stalled -> report only, user decides
 
-## Pane Release
-
-After marking an issue `completed` or `failed`, the orchestrator releases the
-pane so it becomes available for the next dispatch.
-
-Two-layer approach:
-
-1. **Primary**: The dispatch prompt includes `"After completing all steps, exit the session."` -
-   AI exits naturally, pane returns to shell prompt.
-2. **Fallback**: `orch_release_pane` sends Ctrl+C if the AI process is still running.
-   Called automatically by `orch_poll_cycle` after completion detection.
-
-`orch_release_pane` does NOT destroy the pane (unlike `pipeline_kill_pane`).
-The pane stays alive at a shell prompt, ready for the next dispatch.
-
-## Status State Machine
+## Status state machine
 
 ```
 pending
   └─(dispatch)──► dispatched
-                    ├─(completion: ok)──► completed + release pane
-                    ├─(completion: fail)─► failed + release pane
-                    └─(stall + skip)──────► failed + release pane
+                    ├─(completion: ok)──► completed
+                    ├─(completion: fail)─► failed
+                    └─(stall + skip)──────► failed
 
 blocked
   └─(all deps completed OR failed)──► pending
@@ -135,7 +122,7 @@ completed ──(triggers orch_unblock)
 failed    ──(triggers orch_unblock - dependency was attempted, downstream unblocked)
 ```
 
-## Polling Interval
+## Polling interval
 
 Default: 30 seconds per cycle.
 
