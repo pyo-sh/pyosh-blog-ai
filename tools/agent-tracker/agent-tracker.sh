@@ -154,11 +154,25 @@ parse_claude_pane() {
       (.tokens.pct // 0 | tostring),
       ((.tokens.used // 0) / 1000 | floor | tostring),
       .task // "—",
-      .activity // ""
+      .activity // "",
+      (.updated_at // 0 | tostring)
     ] | join("\u001e")' "$sidecar_path" 2>/dev/null)
 
     if [[ -n "$raw" ]]; then
-      IFS=$'\x1e' read -r model status pct tok_k task activity <<< "$raw"
+      local updated_at
+      IFS=$'\x1e' read -r model status pct tok_k task activity updated_at <<< "$raw"
+
+      # Stale sidecar detection: if not updated for 30s and status is non-idle,
+      # the agent likely crashed without sending SessionEnd. Reset to idle. (#47)
+      if [[ "$status" != "idle" && -n "$updated_at" && "$updated_at" != "0" ]]; then
+        local now_epoch age
+        now_epoch=$(date +%s)
+        age=$(( now_epoch - ${updated_at%.*} ))
+        if (( age > 30 )); then
+          status="idle"
+          activity=""
+        fi
+      fi
     fi
 
     # Only scrape pane when sidecar status is idle — prevents spinner false
@@ -607,6 +621,7 @@ tput civis 2>/dev/null
 # Clean up orphan sidecar files for panes not in the current session (#32)
 # Smarter than rm -rf: preserves files for active panes
 mkdir -p "$SIDECAR_DIR"
+chmod 700 "$SIDECAR_DIR" 2>/dev/null
 declare -A _active_panes=()
 while IFS= read -r _pid; do
   _active_panes["$_pid"]=1

@@ -40,8 +40,9 @@ if [[ "$event" == "SessionEnd" ]]; then
   exit 0
 fi
 
-# Ensure sidecar directory exists
+# Ensure sidecar directory exists (owner-only access for prompt privacy) (#47)
 mkdir -p "$SIDECAR_DIR"
+chmod 700 "$SIDECAR_DIR" 2>/dev/null
 
 # ── Prepare update fields from input (outside lock to minimize lock time) ──
 
