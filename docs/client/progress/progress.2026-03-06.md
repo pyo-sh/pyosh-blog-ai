@@ -11,6 +11,10 @@
   - `fetchAdminPost`, `createPost`, `updatePost` functions
   - Used `clientMutate` for CSRF-protected mutations, `serverFetch` for SSR reads
   - 3 review rounds: type mismatches fixed (id/categoryId string->number, tags string[]->PostTag[], status added `archived`), `PostDetailResponse` wrapper unwrap, `cookieHeader` made required
+- [x] #42 Stat entity (대시보드) - PR pending
+  - `DashboardStats` 타입 (todayPageviews, weekPageviews, monthPageviews, totalPosts, totalComments)
+  - `fetchDashboardStats()` - clientFetch('/api/admin/stats/dashboard')
+  - tsconfig.alias.json에 `@/*` 경로 추가로 `@/shared/api` import resolve 근본 수정
 
 ## Issues & resolutions
 - **Issue**: `@/shared/api` import alias not defined in tsconfig - pre-existing bug from #38

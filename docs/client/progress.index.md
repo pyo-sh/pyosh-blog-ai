@@ -6,7 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
-| 2026-03-06 | #46 Admin 레이아웃 (사이드바), #50 Post CRUD API | ✅   |
+| 2026-03-06 | #46 Admin 레이아웃 (사이드바), #50 Post CRUD API, #42 Stat entity | ✅   |
 | 2026-03-04 | #34 CSRF 토큰 유틸리티 + mutation helper, #38 Auth entity types + API | ✅   |
 | 2026-02-23 | #4 API 클라이언트 설정 (fetch wrapper + TanStack Query) | ✅   |
 | 2026-02-06 | 기술 스택 분석 & Phase 0 (보안 패치) | ✅   |
@@ -16,7 +16,7 @@
 
 ## 🔗 상세 문서
 
-- [progress.2026-03-06.md](./progress/progress.2026-03-06.md) - #46 Admin 레이아웃 (사이드바), #50 Post CRUD API
+- [progress.2026-03-06.md](./progress/progress.2026-03-06.md) - #46 Admin 레이아웃 (사이드바), #50 Post CRUD API, #42 Stat entity
 - [progress.2026-03-04.md](./progress/progress.2026-03-04.md) - #34 CSRF 토큰 유틸리티 + mutation helper, #38 Auth entity types + API
 - [progress.2026-02-23.md](./progress/progress.2026-02-23.md) - #4 API 클라이언트 설정
 - [progress.2026-02-06.md](./progress/progress.2026-02-06.md) - 기술 스택 분석 & Phase 0
