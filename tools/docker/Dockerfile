@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
 RUN npm install -g @openai/codex
 
 # entrypoint 스크립트
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY tools/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # non-root 사용자 생성
