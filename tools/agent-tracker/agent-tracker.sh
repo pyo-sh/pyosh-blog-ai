@@ -14,6 +14,7 @@ INTERVAL=1
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PIPELINE_DIR="${PIPELINE_DIR:-"$REPO_ROOT/.workspace/pipeline"}"
+ORCH_DIR="${ORCH_DIR:-"$REPO_ROOT/.workspace/orchestrate"}"
 SIDECAR_DIR="/tmp/agent-tracker"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -329,6 +330,206 @@ get_pipeline_summary() {
   fi
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Orchestrator batch rendering (#59)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# _orch_elapsed <seconds> — compact elapsed time
+_orch_elapsed() {
+  local s=$1
+  (( s < 0 )) && s=0
+  if (( s >= 3600 )); then
+    printf '%dh%02dm' $(( s / 3600 )) $(( (s % 3600) / 60 ))
+  elif (( s >= 60 )); then
+    printf '%dm%02ds' $(( s / 60 )) $(( s % 60 ))
+  else
+    printf '%ds' "$s"
+  fi
+}
+
+# _orch_badge <type> — 6 visible chars, colored
+_orch_badge() {
+  case "$1" in
+    run)   printf "${GREEN}● run ${R}" ;;
+    stop)  printf "${ROSE}✖ stop${R}" ;;
+    *)     printf "${GRAY}○ --- ${R}" ;;
+  esac
+}
+
+# render_orchestrator <INNER> — render all orchestrator batch sections
+# Called from render_dashboard after the agent footer, before bottom border.
+# Auto-detects batches via .workspace/orchestrate/*/batch.state.json.
+render_orchestrator() {
+  local INNER=$1
+
+  local -a batch_files=()
+  for f in "$ORCH_DIR"/*/batch.state.json; do
+    [[ -f "$f" ]] || continue
+    batch_files+=("$f")
+  done
+  (( ${#batch_files[@]} == 0 )) && return
+
+  # Cache ps output once for subprocess detection
+  local ps_cache
+  ps_cache=$(ps aux 2>/dev/null | grep "claude -p" | grep -v grep || true)
+
+  # Column widths: ISSUE(7) STEP(13) STATUS(6) TIME(7) INFO(rest)
+  # overhead: 2(left pad) + 4(column separators) + 2(right pad) = 8
+  local W_ISS=7 W_STEP=13 W_STAT=6 W_TIME=7
+  local W_INFO=$(( INNER - W_ISS - W_STEP - W_STAT - W_TIME - 8 ))
+  (( W_INFO < 10 )) && W_INFO=10
+
+  local now_epoch
+  now_epoch=$(date +%s)
+
+  for batch_file in "${batch_files[@]}"; do
+    local state
+    state=$(cat "$batch_file" 2>/dev/null) || continue
+
+    # Extract metadata + dispatched list in a single jq pass
+    local combined
+    combined=$(printf '%s' "$state" | jq -r '
+      def cnt(v): [.status | to_entries[] | select(.value == v)] | length | tostring;
+      [
+        .area, .batchId,
+        cnt("completed"), cnt("dispatched"), cnt("pending"), cnt("blocked"), cnt("failed"),
+        (.issues | length | tostring),
+        (. as $root | [.dispatched | to_entries[]
+          | select($root.status[.key] == "dispatched")
+          | [.key, (.value.pid // 0 | tostring), (.value.dispatchedAt // "")]
+          | join("\u001e")] | sort | join("\n"))
+      ] | join("\u001f")' 2>/dev/null)
+
+    local meta dispatched_data
+    IFS=$'\x1f' read -r meta dispatched_data <<< "$combined"
+
+    local area batch_id n_done n_active n_pending n_blocked n_failed n_total
+    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total <<< "$meta"
+
+    # ── Section separator ──
+    printf "${GRAY}╠%s╣${R}" "$_CACHE_eqline"; tput el; echo
+
+    # ── Header ──
+    local h_left="⚙ Orchestrator: ${area}"
+    local h_right="${n_done}/${n_total} done  ${batch_id}"
+    local hgap=$(( INNER - 4 - ${#h_left} - ${#h_right} ))
+    (( hgap < 1 )) && hgap=1
+    printf "${GRAY}║${R}  ${BOLD}${GOLD}%s${R}%*s${GRAY}%s${R}  ${GRAY}║${R}" \
+      "$h_left" "$hgap" "" "$h_right"
+    tput el; echo
+
+    printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
+
+    # ── Dispatched issues (already extracted in combined jq above) ──
+    if [[ -n "$dispatched_data" ]]; then
+      # Column headers
+      printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s${R}  ${GRAY}║${R}" \
+        "$(pad_right "ISSUE" $W_ISS)" "$(pad_right "STEP" $W_STEP)" \
+        "$(pad_right "STATUS" $W_STAT)" "$(pad_right "TIME" $W_TIME)" \
+        "$(pad_right "INFO" $W_INFO)"
+      tput el; echo
+
+      printf "${GRAY}║${R}  ${DARK}%s %s %s %s %s${R}  ${GRAY}║${R}" \
+        "$(make_line '─' $W_ISS)" "$(make_line '─' $W_STEP)" \
+        "$(make_line '─' $W_STAT)" "$(make_line '─' $W_TIME)" \
+        "$(make_line '─' $W_INFO)"
+      tput el; echo
+
+      while IFS=$'\x1e' read -r issue pid dispatched_at; do
+        [[ -z "$issue" ]] && continue
+
+        # Pipeline state for step + PR
+        local step="—" pr_num="" pr_display="—"
+        local pf="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+        if [[ -f "$pf" ]]; then
+          local praw
+          praw=$(jq -r '[.step // "—", (.pr // 0 | tostring)] | join("\u001e")' "$pf" 2>/dev/null)
+          IFS=$'\x1e' read -r step pr_num <<< "$praw"
+          [[ -n "$pr_num" && "$pr_num" != "0" ]] && pr_display="PR #${pr_num}"
+        fi
+
+        # Process alive check
+        local alive=0
+        [[ -n "$pid" && "$pid" != "0" && "$pid" != "null" ]] && kill -0 "$pid" 2>/dev/null && alive=1
+
+        # Elapsed time
+        local etime="—"
+        if [[ -n "$dispatched_at" ]]; then
+          local ts
+          ts=$(date -d "$dispatched_at" +%s 2>/dev/null)
+          [[ -n "$ts" ]] && etime=$(_orch_elapsed $(( now_epoch - ts )))
+        fi
+
+        # Issue row
+        printf "${GRAY}║${R}  "
+        printf "%s " "$(pad_right "#${issue}" $W_ISS)"
+        printf "%s " "$(pad_right "$step" $W_STEP)"
+        printf "%b " "$( (( alive )) && _orch_badge run || _orch_badge stop)"
+        printf "%s " "$(pad_right "$etime" $W_TIME)"
+        printf "%s  " "$(trunc "$pr_display" $W_INFO)"
+        printf "${GRAY}║${R}"
+        tput el; echo
+
+        # Subprocess detection (review/resolve)
+        if [[ -n "$pr_num" && "$pr_num" != "0" && -n "$ps_cache" ]]; then
+          local sub_line
+          sub_line=$(printf '%s' "$ps_cache" \
+            | grep -E "dev-(review|resolve)" | grep "PR #${pr_num} " \
+            | grep -v timeout | head -1)
+
+          if [[ -n "$sub_line" ]]; then
+            local sub_pid sub_type
+            sub_pid=$(printf '%s' "$sub_line" | awk '{print $2}')
+            if printf '%s' "$sub_line" | grep -q "dev-review"; then
+              sub_type="review"
+            else
+              sub_type="resolve"
+            fi
+
+            local sub_alive=0
+            kill -0 "$sub_pid" 2>/dev/null && sub_alive=1
+
+            local sub_etime="—"
+            local sub_secs
+            sub_secs=$(ps -o etimes= -p "$sub_pid" 2>/dev/null | tr -d ' ')
+            [[ -n "$sub_secs" ]] && sub_etime=$(_orch_elapsed "$sub_secs")
+
+            printf "${GRAY}║${R}  "
+            printf "${DARK}%s${R} " "$(pad_right "  └─" $W_ISS)"
+            printf "%s " "$(pad_right "/dev-${sub_type}" $W_STEP)"
+            printf "%b " "$( (( sub_alive )) && _orch_badge run || _orch_badge stop)"
+            printf "%s " "$(pad_right "$sub_etime" $W_TIME)"
+            printf "%s  " "$(trunc "PID ${sub_pid}" $W_INFO)"
+            printf "${GRAY}║${R}"
+            tput el; echo
+          fi
+        fi
+      done <<< "$dispatched_data"
+    else
+      local no_msg="  No dispatched issues"
+      printf "${GRAY}║${R}%-*s${GRAY}║${R}" "$INNER" "$no_msg"
+      tput el; echo
+    fi
+
+    printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
+
+    # ── Orchestrator footer ──
+    local of="${GREEN}●${R} ${GRAY}${n_done} done${R}"
+    of+="  ${GREEN}●${R} ${GRAY}${n_active} active${R}"
+    of+="  ${GOLD}○${R} ${GRAY}${n_pending} pending${R}"
+    of+="  ${DARK}◆${R} ${GRAY}${n_blocked} blocked${R}"
+    (( n_failed > 0 )) && of+="  ${ROSE}✖${R} ${GRAY}${n_failed} failed${R}"
+
+    local of_plain="● ${n_done} done  ● ${n_active} active  ○ ${n_pending} pending  ◆ ${n_blocked} blocked"
+    (( n_failed > 0 )) && of_plain+="  ✖ ${n_failed} failed"
+
+    local fp=$(( INNER - 4 - ${#of_plain} ))
+    (( fp < 0 )) && fp=0
+    printf "${GRAY}║${R}  %b%*s  ${GRAY}║${R}" "$of" "$fp" ""
+    tput el; echo
+  done
+}
+
 # _get_cmdline <pid>
 _get_cmdline() {
   local pid=$1
@@ -604,6 +805,9 @@ render_dashboard() {
   printf "${GRAY}║${R}  %b%b%*s ${GRAY}║${R}" \
     "$left_colored" "$right_colored" "$fpad" ""
   tput el; echo
+
+  # Orchestrator batch sections (#59)
+  render_orchestrator "$INNER"
 
   printf "${GRAY}╚%s╝${R}" "$_CACHE_eqline"; tput el; echo
 

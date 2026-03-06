@@ -128,13 +128,15 @@ orch_process_alive() {
 }
 
 orch_dispatch() {
-  # Usage: orch_dispatch <issue> <area_dir> <agent>
-  # Launches a headless claude -p background process for /dev-pipeline.
+  # Usage: orch_dispatch <issue> <area_dir> <agent> [retryCount]
+  # Atomic: launches background process AND records in state.
+  # If state recording fails, kills the orphan process.
   # stdout: PID of the background process
-  # Returns: 0 = launched, 1 = launch failed
+  # Returns: 0 = launched + recorded, 1 = failed
   local issue=$1
   local area_dir=$2
   local agent=$3
+  local retry_count=${4:-0}
 
   local area
   area=$(monorepo_area_from_dir "$area_dir")
@@ -149,7 +151,7 @@ orch_dispatch() {
 
   # Pipeline prompt: auto-approve merge since this is batch orchestration.
   # No stdin available in -p mode, so pipeline must make autonomous decisions.
-  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}. Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
+  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for review/resolve subprocesses (pass to pipeline_run_headless).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
   cd "$MONOREPO_ROOT" && CLAUDECODE= timeout 3600 claude -p \
     ${model:+--model "$model"} --dangerously-skip-permissions \
@@ -164,6 +166,16 @@ orch_dispatch() {
   sleep 1
   if ! orch_process_alive "$pid"; then
     >&2 echo "[orchestrator] Process failed to start for issue #${issue}"
+    return 1
+  fi
+
+  # Atomic: record dispatch in state. Kill orphan if recording fails.
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  if ! orch_state_update "$area" \
+    ".dispatched[\"$issue\"] = {pid: $pid, log: \"$log\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false, retryCount: $retry_count} | .status[\"$issue\"] = \"dispatched\""; then
+    >&2 echo "[orchestrator] State recording failed for #${issue} - killing orphan PID $pid"
+    orch_stop_process "$pid"
     return 1
   fi
 
@@ -183,18 +195,6 @@ orch_stop_process() {
   if orch_process_alive "$pid"; then
     kill -9 "$pid" 2>/dev/null
   fi
-}
-
-orch_record_dispatch() {
-  # Usage: orch_record_dispatch <area> <issue> <pid>
-  local area=$1
-  local issue=$2
-  local pid=$3
-  local now
-  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-  orch_state_update "$area" \
-    ".dispatched[\"$issue\"] = {pid: $pid, log: \"$ORCH_BASE/${area}/issue-${issue}.log\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false, retryCount: 0} | .status[\"$issue\"] = \"dispatched\""
 }
 
 # ──────────────────────────────────────────────
@@ -467,12 +467,8 @@ orch_poll_cycle() {
         # Process died - attempt bounded retry (max 1)
         >&2 echo "[orchestrator] STALL: Issue #${issue} process dead - retrying (attempt $((retry_count + 1)))"
         local new_pid
-        new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent")
+        new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
         if [ -n "$new_pid" ]; then
-          local retry_now
-          retry_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          orch_state_update "$area" \
-            ".dispatched[\"$issue\"].pid = $new_pid | .dispatched[\"$issue\"].retryCount = $((retry_count + 1)) | .dispatched[\"$issue\"].dispatchedAt = \"$retry_now\" | .dispatched[\"$issue\"].lastActivity = \"$retry_now\" | .dispatched[\"$issue\"].pipelineStarted = false"
           >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
         else
           >&2 echo "[orchestrator] STALL: Issue #${issue} - re-dispatch failed"
@@ -513,7 +509,6 @@ orch_poll_cycle() {
       local pid
       pid=$(orch_dispatch "$issue" "$area_dir" "$agent")
       if [ -n "$pid" ]; then
-        orch_record_dispatch "$area" "$issue" "$pid"
         >&2 echo "[orchestrator] Dispatched #${issue} - PID $pid"
         dispatched_count=$((dispatched_count + 1))
       else
