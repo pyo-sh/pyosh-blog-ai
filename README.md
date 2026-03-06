@@ -71,27 +71,27 @@ cp .env.example .env
 
 모든 코딩 작업은 GitHub Issue에서 시작하여 PR Merge로 종료됩니다. 코드 작성과 리뷰는 **별도 AI 세션**에서 실행하여 컨텍스트 오염을 방지합니다.
 
-> **주의**: `/dev-pipeline`은 Claude Code의 `--dangerously-skip-permissions`, Codex의 `--dangerously-bypass-approvals-and-sandbox` 옵션을 사용합니다. 모든 도구 호출이 자동 승인되므로 **Docker 컨테이너 안에서 실행하는 것을 권장**합니다. 설정 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
+> **주의**: `/dev-pipeline`과 `/dev-orchestrator`는 `claude -p --dangerously-skip-permissions` 옵션으로 헤드리스 서브프로세스를 실행합니다. 모든 도구 호출이 자동 승인되므로 **Docker 컨테이너 안에서 실행하는 것을 권장**합니다. 설정 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
 
 ### 자동 파이프라인 (`/dev-pipeline`)
 
-`/dev-pipeline`은 코딩부터 Merge까지 전체 사이클을 오케스트레이션합니다. 리뷰/수정은 tmux 사이드 패인에서 별도 Claude 인스턴스가 처리하며, 사용자는 각 단계에서 의사결정만 합니다.
+`/dev-pipeline`은 코딩부터 Merge까지 전체 사이클을 오케스트레이션합니다. 리뷰/수정은 `claude -p` 헤드리스 서브프로세스로 실행되며, 사용자는 각 단계에서 의사결정만 합니다.
 
 ```
-┌─ 메인 세션 (오케스트레이터) ──────────────────────────────────┐
+┌─ 메인 세션 (파이프라인) ─────────────────────────────────────┐
 │                                                               │
 │  /dev-build (코딩 + PR 생성)                                  │
 │       │                                                       │
 │       ▼                                                       │
-│  ┌─ tmux 사이드 패인 ──────┐                                  │
-│  │  /dev-review (코드 리뷰) │                                  │
-│  └──────────┬──────────────┘                                  │
+│  ┌─ claude -p 서브프로세스 ──┐                                │
+│  │  /dev-review (코드 리뷰)   │                                │
+│  └──────────┬────────────────┘                                │
 │             │                                                 │
 │             ▼                                                 │
 │  ┌─ Critical 있음 ─────────────────────────────────────────┐  │
-│  │  ┌─ tmux 사이드 패인 ──────┐                            │  │
-│  │  │  /dev-resolve (코드 수정) │ ──→ 재리뷰 (자동 반복)    │  │
-│  │  └─────────────────────────┘                            │  │
+│  │  ┌─ claude -p 서브프로세스 ──┐                          │  │
+│  │  │  /dev-resolve (코드 수정)  │ ──→ 재리뷰 (자동 반복)   │  │
+│  │  └───────────────────────────┘                          │  │
 │  └─────────────────────────────────────────────────────────┘  │
 │             │                                                 │
 │             ▼                                                 │
@@ -103,12 +103,38 @@ cp .env.example .env
 │  └──────────────────────────────────────┘                     │
 │             │                                                 │
 │             ▼                                                 │
-│  Merge → Worktree 정리 → /dev-log                             │
+│  Merge (lock 기반 직렬화) → Worktree 정리 → /dev-log          │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-> **토큰 효율성**: 오케스트레이터는 `gh api` 폴링만 수행하고, 코드 분석은 하지 않습니다. Review/Resolve는 별도 Claude 인스턴스에서 실행되어 토큰이 분리됩니다.
+### 배치 오케스트레이터 (`/dev-orchestrator`)
+
+`/dev-orchestrator`는 여러 Issue를 의존성 DAG 기반으로 병렬 처리합니다. 각 Issue마다 `claude -p` 백그라운드 프로세스로 `/dev-pipeline`을 실행하고, PID 기반으로 완료/실패/정체를 감지합니다.
+
+```
+┌─ 오케스트레이터 세션 ────────────────────────────────────────┐
+│                                                               │
+│  Issue 목록 → 의존성 DAG 구성 → 사이클 검증                   │
+│       │                                                       │
+│       ▼                                                       │
+│  ┌─ 백그라운드 프로세스 (최대 maxConcurrent개) ────────────┐  │
+│  │  claude -p /dev-pipeline #1  (PID 12345)                │  │
+│  │  claude -p /dev-pipeline #2  (PID 12346)                │  │
+│  │  claude -p /dev-pipeline #5  (PID 12347)                │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│       │                                                       │
+│       ▼  (30초 폴링)                                          │
+│  완료 감지 → 의존 Issue unblock → 새 Issue dispatch            │
+│  정체 감지 → 프로세스 사망 시 자동 재시도 (최대 1회)           │
+│       │                                                       │
+│       ▼                                                       │
+│  전체 완료 → 결과 요약 → /dev-log                              │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+> **토큰 효율성**: 오케스트레이터는 PID 감시와 `gh api` 폴링만 수행하고, 코드 분석은 하지 않습니다. 각 파이프라인은 독립 프로세스에서 실행되어 토큰이 분리됩니다.
 
 ### 수동 실행
 
@@ -129,7 +155,8 @@ cp .env.example .env
 
 | 스킬 | 용도 |
 |------|------|
-| **dev-pipeline** | 전체 자동화 오케스트레이션 (build → review → resolve → merge) |
+| **dev-orchestrator** | 여러 Issue 병렬 처리 (의존성 DAG + 헤드리스 백그라운드 프로세스) |
+| **dev-pipeline** | 단일 Issue 자동화 (build → review → resolve → merge) |
 | **dev-build** | Issue → Worktree → 코딩 → Push → PR 생성 |
 | **dev-review** | PR 코드 리뷰 (심각도: Critical / Warning / Suggestion) |
 | **dev-resolve** | 리뷰 코멘트 대응 및 코드 수정 |
@@ -146,13 +173,13 @@ cp .env.example .env
 
 Critical이 모두 해결되면 사용자에게 Warning/Suggestion 처리 방법을 묻습니다. 사용자가 수용 가능하다고 판단하면 즉시 Merge할 수 있습니다.
 
+### Merge queue
+
+여러 파이프라인이 동시에 실행될 때 (오케스트레이터를 통해), 같은 area에서 동시 merge로 인한 rebase 충돌을 방지하기 위해 lock 기반 직렬화를 사용합니다. `pipeline_acquire_merge_lock` / `pipeline_release_merge_lock`으로 area당 하나의 파이프라인만 merge할 수 있습니다. Stale lock은 PID 검사로 자동 회수됩니다.
+
 ### Docker 환경 설정
 
 Docker 컨테이너 안에서 AI 에이전트를 실행하는 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
-
-### tmux 환경 설정
-
-tmux 및 tmuxinator 설치, 세션 구성에 대해서는 [tools/tmux/README.md](tools/tmux/README.md)를 참조하세요.
 
 ### 왜 세션을 분리하는가?
 
