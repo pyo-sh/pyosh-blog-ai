@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-07 | Headless pipeline - tmux pane을 synchronous `claude -p` subprocess로 전환 + self-healing 통합 (#55, PR #56) | done |
 | 2026-03-06 | Orchestrator pane release 누락 + agent model/pane flexibility 수정 - orch_release_pane, _orch_parse_agent, ORCH_WORK_PANES (#53, PR #54) | done |
 | 2026-03-06 | agent-tracker 동적 pane 감지 실패 수정 - AGENT_TYPE_CACHE 제거, pane ID 안정화, staleness 감지, chmod 700 (PR #50, #47) | done |
 | 2026-03-06 | Orchestrator pipeline 완료 감지 - state file 부재 기반, pipelineStarted 플래그, 3회 버그 검증 (#48, PR #49) | done |
