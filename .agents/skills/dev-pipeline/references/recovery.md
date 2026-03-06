@@ -1,37 +1,25 @@
 # Pipeline recovery
 
-Resume from state file when pipeline session crashes or disconnects.
+Resume from state file on crash/disconnect. Jump to the `step` field - each step self-validates on entry.
 
-Recovery is integrated into each workflow step's entry point (see SKILL.md). Each step validates its own state before proceeding, so the pipeline simply jumps to the current `step` field.
-
-## Entry
-
-```bash
-ls .workspace/pipeline/*/issue-*.state.json 2>/dev/null
-```
-
-If found, read state, then jump to the step indicated by the `step` field. Each step's self-validation handles the rest.
-
-## Step self-validation summary
+## Step self-validation
 
 | step | Entry validation |
 |------|-----------------|
-| `build` | Check if PR exists via `gh pr list --head {branch}`. PR open -> jump to `review`. PR merged -> jump to `log`. No PR -> re-run `/dev-build`. |
-| `review` | `pipeline_check_review_exists` first. Found -> process review (skip headless run). Not found -> run headless review. |
-| `resolve` | `pipeline_check_new_commits` first. Found -> process commits (skip headless run). Not found -> run headless resolve. |
-| `merge` | `gh pr view --json state`. MERGED -> jump to `log`. OPEN -> ask user. |
-| `merge-failed` | Same as `merge`. |
+| `build` | `gh pr list --head {branch}`. PR open -> `review`. Merged -> `log`. None -> re-run `/dev-build`. |
+| `review` | `pipeline_check_review_exists`. Found -> process review. Not found -> run headless. |
+| `resolve` | `pipeline_check_new_commits`. Found -> process commits. Not found -> run headless. |
+| `merge` / `merge-failed` | `gh pr view --json state`. MERGED -> `log`. OPEN -> ask user. |
 | `log` | Re-run `/dev-log` (idempotent). |
 
-## Self-healing recovery
+## Self-healing on failure
 
-When `pipeline_run_headless` returns a non-zero exit code and API check finds no result:
+Headless exit non-zero + API finds no result:
 
-1. Call `pipeline_stage_retry` to check/increment retry count
-2. If retries available: log recovery action, retry the step
-3. If max retries reached: call `pipeline_format_escalation`, report to user
-4. User decides: fix and retry (reset retries in state) or abort
+1. `pipeline_stage_retry` - increment, check max (3)
+2. Available -> `pipeline_recovery_log`, retry step
+3. Exhausted -> `pipeline_format_escalation`, report to user
 
 ## Stale state
 
-If PR already merged and logged, delete state file and report completed.
+PR already merged and logged -> delete state file, report completed.
