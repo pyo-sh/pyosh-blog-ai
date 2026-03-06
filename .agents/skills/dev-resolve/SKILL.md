@@ -5,9 +5,12 @@ description: Respond to PR review comments. Read review comments left by /dev-re
 
 # Dev-Resolve
 
-Fix PR review comments → record → push → request re-review.
+Fix PR review comments -> record -> push -> request re-review.
 
 > Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
+> Always verify you are in the correct area directory before running `gh` commands.
+> Client PRs: `cd client && gh pr ...` or `gh pr ... -R pyo-sh/pyosh-blog-fe`
+> Server PRs: `cd server && gh pr ...` or `gh pr ... -R pyo-sh/pyosh-blog-be`
 
 ## Workflow
 
@@ -15,7 +18,7 @@ Fix PR review comments → record → push → request re-review.
 
 ```bash
 cd {area}
-gh pr view {PR#} --comments
+gh pr view {PR#} --json number,title,state,body,reviews
 gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 ```
 
@@ -28,7 +31,7 @@ gh api repos/{owner}/{repo}/pulls/{PR#}/reviews
 
 ### 3. Fix code
 
-Work inside the worktree — not the main branch:
+Work inside the worktree - not the main branch:
 
 ```bash
 cd .workspace/worktrees/issue-{N}
@@ -46,7 +49,7 @@ Run `/dev-log`. Include which comments were addressed and any technical decision
 git push
 ```
 
-Post response comment. → [response-template.md](references/response-template.md)
+Post response comment. -> [response-template.md](references/response-template.md)
 
 ### 6. Notify user
 
