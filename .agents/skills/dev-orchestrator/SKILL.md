@@ -77,24 +77,28 @@ Parse `### Dependencies` section from each issue body via `parse-dependencies.sh
 
 Write initial state via `orch_init`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), timestamps.
 
-### 4. Initial dispatch
+### 4. Enter poll cycle (dispatch + monitor)
 
-For each `pending` issue (no unmet deps), up to `maxConcurrent`:
+**Do NOT dispatch issues manually.** Use `orch_poll_cycle` for both initial and subsequent dispatches. The poll cycle handles dispatch atomically (launch + state recording in one call), respects `maxConcurrent`, and prevents orphan processes.
+
+`orch_dispatch` is atomic: it launches the background process AND records it in state. If state recording fails, it kills the orphan process automatically.
 
 ```bash
-PID=$(orch_dispatch "$ISSUE" "$AREA_DIR" "$AGENT")
-orch_record_dispatch "$AREA" "$ISSUE" "$PID"
+# Run first poll cycle immediately (dispatches initial pending issues)
+orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"
+
+# Then loop every 30 seconds
+while true; do
+  sleep 30
+  orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"
+
+  REMAINING=$(orch_state_read "$AREA" | jq \
+    '[.status | to_entries[] | select(.value == "pending" or .value == "dispatched" or .value == "blocked")] | length')
+  [ "$REMAINING" -eq 0 ] && break
+done
 ```
 
-Each dispatch launches a background `claude -p` process running `/dev-pipeline`. The process runs autonomously - no stdin, no user interaction needed.
-
-Update status: `"dispatched"`. See [state-detection.md](references/state-detection.md).
-
-### 5. Poll cycle
-
-Loop `orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"` every 30 seconds until no `pending`/`dispatched`/`blocked` issues remain.
-
-Each cycle, for every dispatched issue: check completion (`orch_check_completion`), detect stalls (`orch_detect_stall`), unblock dependents (`orch_unblock`), dispatch newly-pending issues, and print status. See [state-detection.md](references/state-detection.md) for detection logic.
+Each cycle: check completion, detect stalls, unblock dependents, dispatch newly-pending issues (up to `maxConcurrent`), and print status. See [state-detection.md](references/state-detection.md) for detection logic.
 
 ### 6. Batch completion
 

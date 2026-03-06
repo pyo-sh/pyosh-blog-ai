@@ -5,10 +5,11 @@
 Review and resolve run as synchronous `claude -p` subprocesses via `pipeline_run_headless()`. The pipeline blocks until exit, then checks GitHub API for results.
 
 ```
-pipeline_run_headless(workdir, prompt, issue, area, stage)
-  -> timeout $SEC claude -p --dangerously-skip-permissions ... "$prompt" > $LOG
+pipeline_run_headless(workdir, prompt, issue, area, stage [, model])
+  -> timeout $SEC claude -p [--model $MODEL] --dangerously-skip-permissions ... "$prompt" > $LOG
   -> returns exit code: 0=success, 124=timeout, other=error
   -> ALWAYS check API after exit (result may exist even on non-zero exit)
+  -> model: optional. Pass to ensure review/resolve use the same model as the pipeline.
 ```
 
 | Stage | Tools | Max turns | Timeout |
@@ -45,7 +46,7 @@ Per-stage retry via `pipeline_stage_retry()` (max 3). Log actions with `pipeline
   "issue": 42, "area": "client", "pr": 99,
   "branch": "feat/issue-42-add-auth",
   "worktree": ".workspace/worktrees/issue-42",
-  "agent": "claude",
+  "agent": "claude", "model": "sonnet",
   "step": "review", "reviewRound": 1, "lastReviewId": 0,
   "lastCommitSha": "{SHA}", "skipReview": false,
   "reviewLog": ".workspace/pipeline/logs/issue-42-review.log",

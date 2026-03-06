@@ -24,7 +24,8 @@ Claude Code session
             └─ PostToolUse      → clear activity
 
 agent-tracker.sh (dashboard)
-  └─ reads /tmp/agent-tracker/*.json → renders table
+  ├─ reads /tmp/agent-tracker/*.json → renders agent table
+  └─ reads .workspace/orchestrate/*/batch.state.json → renders orchestrator section
 ```
 
 ### Pull model (Codex fallback)
@@ -130,6 +131,18 @@ bash tools/agent-tracker/agent-tracker.sh [-s SESSION] [-i INTERVAL]
 
 - `-s SESSION` - tmux session name (default: `lab`)
 - `-i INTERVAL` - refresh interval in seconds (default: `1`)
+
+## Orchestrator section
+
+When `/dev-orchestrator` is running, the dashboard auto-detects `batch.state.json` files in `.workspace/orchestrate/*/` and renders a section below the agent table.
+
+Each orchestrator batch section shows:
+- **Header**: area name, completion count, batch ID
+- **Dispatched issues**: issue number, pipeline step, process status (alive/dead), elapsed time, PR number
+- **Subprocesses**: review/resolve subprocesses detected via `ps aux` command-line matching, shown as `└─` child rows under their parent issue
+- **Footer**: done / active / pending / blocked / failed counts
+
+Multiple batches (e.g., client + server) render as separate sections. No configuration needed - the section appears when batch state files exist and disappears when they are cleaned up.
 
 ## Host vs Docker
 

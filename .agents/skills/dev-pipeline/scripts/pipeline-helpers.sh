@@ -82,8 +82,9 @@ pipeline_state_delete() {
 
 pipeline_run_headless() {
   # Run claude -p synchronously (blocking). Returns when subprocess exits.
-  # Usage: pipeline_run_headless <workdir> <prompt> <issue> <area> <stage>
+  # Usage: pipeline_run_headless <workdir> <prompt> <issue> <area> <stage> [model]
   # stage: "review" or "resolve" (determines tool allowlist and max-turns)
+  # model: optional model name (e.g. "sonnet", "opus"). Omit to use CLI default.
   # stdout: log file path
   # Returns: exit code from claude -p (0=success, 124=timeout, other=error)
   local workdir=$1
@@ -91,6 +92,7 @@ pipeline_run_headless() {
   local issue=$3
   local area=$4
   local stage=$5
+  local model=${6:-}
 
   local log="$PIPELINE_LOG_DIR/issue-${issue}-${stage}.log"
 
@@ -112,6 +114,7 @@ pipeline_run_headless() {
 
   cd "$workdir" || return 3
   CLAUDECODE= timeout "$timeout_sec" claude -p \
+    ${model:+--model "$model"} \
     --dangerously-skip-permissions \
     --no-session-persistence \
     --allowedTools "$tools" \

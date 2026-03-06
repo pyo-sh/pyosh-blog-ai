@@ -39,9 +39,10 @@ After PR creation, capture initial commit SHA and write state. -> [process-lifec
 Run headless review and check API after exit. -> [process-lifecycle.md#headless-pattern](references/process-lifecycle.md) for the run-then-check pattern.
 
 ```bash
+# MODEL comes from pipeline state .model field (set by orchestrator, may be empty)
 LOG=$(pipeline_run_headless "$MONOREPO_ROOT" \
   "/dev-review for PR #{PR#} in {area} repo ({owner}/{repo}). After review, exit." \
-  "$ISSUE" "$AREA" "review")
+  "$ISSUE" "$AREA" "review" "$MODEL")
 RC=$?
 REVIEW_ID=$(pipeline_check_review_exists "{area_dir}" {PR#} {lastReviewId})
 ```
@@ -68,7 +69,7 @@ Same headless pattern as Step 2 but with `"resolve"` stage and worktree path:
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
 LOG=$(pipeline_run_headless "$WORKTREE_PATH" \
   "/dev-resolve for PR #{PR#} in {area} repo ({owner}/{repo}). Worktree: ${WORKTREE_PATH}. After done, exit." \
-  "$ISSUE" "$AREA" "resolve")
+  "$ISSUE" "$AREA" "resolve" "$MODEL")
 ```
 
 After exit -> `pipeline_check_new_commits`. Found -> Step 4b. Not found -> self-heal.
