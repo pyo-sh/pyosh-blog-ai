@@ -16,6 +16,10 @@
   - `fetchDashboardStats()` - clientFetch('/api/admin/stats/dashboard')
   - tsconfig.alias.json에 `@/*` 경로 추가로 `@/shared/api` import resolve 근본 수정
 
+- [x] #31 마크다운 렌더링 의존성 설치
+  - `pnpm add unified remark-parse remark-rehype rehype-stringify rehype-sanitize shiki @shikijs/rehype`
+  - All checks passed: `compile:types`, `lint`, `build`
+
 ## Issues & resolutions
 - **Issue**: `@/shared/api` import alias not defined in tsconfig - pre-existing bug from #38
 - **Resolution**: Fixed to `@shared/api` (matching tsconfig.alias.json paths) in both auth/api.ts and post/api.ts
