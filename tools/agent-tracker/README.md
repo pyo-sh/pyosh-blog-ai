@@ -12,7 +12,7 @@ Claude Code pushes data via hooks and statusLine. No `/proc` scanning or JSONL p
 Claude Code session
   ├─ statusLine (every ~300ms)
   │    └─ statusline-wrapper.sh
-  │         ├─ hooks/on-statusline.sh  → writes /tmp/agent-tracker/{pane}.json
+  │         ├─ hooks/on-statusline.sh  → writes .workspace/agent-tracker/{pane}.json
   │         └─ scripts/context-bar.sh  → status bar display (unchanged)
   │
   └─ hooks (on events)
@@ -24,7 +24,7 @@ Claude Code session
             └─ PostToolUse      → clear activity
 
 agent-tracker.sh (dashboard)
-  ├─ reads /tmp/agent-tracker/*.json → renders agent table
+  ├─ reads .workspace/agent-tracker/*.json → renders agent table
   └─ reads .workspace/orchestrate/*/batch.state.json → renders orchestrator section
 ```
 
@@ -47,7 +47,7 @@ tools/agent-tracker/
 
 ## Sidecar format
 
-Location: `/tmp/agent-tracker/{pane_id}.json` (pane_id without `%` prefix)
+Location: `.workspace/agent-tracker/{pane_id}.json` (pane_id without `%` prefix)
 
 ```json
 {

@@ -152,7 +152,9 @@ printf 'Restart Claude Code sessions for hooks to take effect.\n'
 # ─────────────────────────────────────────────────────────────────────────────
 # Create sidecar directory
 # ─────────────────────────────────────────────────────────────────────────────
-mkdir -p /tmp/agent-tracker
-printf 'Sidecar directory: /tmp/agent-tracker/\n'
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SIDECAR_DIR="$REPO_ROOT/.workspace/agent-tracker"
+mkdir -p "$SIDECAR_DIR"
+printf 'Sidecar directory: %s\n' "$SIDECAR_DIR"
 
 printf '\nDone.\n'

@@ -16,7 +16,9 @@
 
 set -euo pipefail
 
-SIDECAR_DIR="/tmp/agent-tracker"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+SIDECAR_DIR="$REPO_ROOT/.workspace/agent-tracker"
 
 # Determine pane identifier
 # PPID fallback: stable across hook invocations (same Claude Code parent). (#47)
@@ -40,9 +42,7 @@ if [[ "$event" == "SessionEnd" ]]; then
   exit 0
 fi
 
-# Ensure sidecar directory exists (owner-only access for prompt privacy) (#47)
 mkdir -p "$SIDECAR_DIR"
-chmod 700 "$SIDECAR_DIR" 2>/dev/null
 
 # ── Prepare update fields from input (outside lock to minimize lock time) ──
 

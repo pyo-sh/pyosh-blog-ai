@@ -3,13 +3,15 @@
 # Reads StatusLine JSON from stdin, writes sidecar file for agent-tracker dashboard.
 # Called by statusline-wrapper.sh every ~300ms. Must be non-blocking.
 #
-# Sidecar location: /tmp/agent-tracker/{pane_id}.json
+# Sidecar location: .workspace/agent-tracker/{pane_id}.json
 # Falls back to PID-based filename when TMUX_PANE is not set.
 # Uses flock to prevent race conditions with on-status.sh.
 
 set -euo pipefail
 
-SIDECAR_DIR="/tmp/agent-tracker"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+SIDECAR_DIR="$REPO_ROOT/.workspace/agent-tracker"
 
 # Determine pane identifier
 # AGENT_TRACKER_PANE is exported by statusline-wrapper.sh with a stable value
@@ -24,19 +26,13 @@ pane_file="${pane_id#%}"
 input=$(cat)
 [[ -z "$input" ]] && exit 0
 
-# Ensure sidecar directory exists (owner-only access for prompt privacy) (#47)
 mkdir -p "$SIDECAR_DIR"
-chmod 700 "$SIDECAR_DIR" 2>/dev/null
 
 sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
-# Use pre-computed token count from statusline-wrapper.sh (avoids duplicate transcript read).
-# Falls back to total_input_tokens if env var is not set (standalone invocation).
-used_tokens="${TRANSCRIPT_TOKENS:-0}"
-if [[ "$used_tokens" -eq 0 ]]; then
-  used_tokens=$(printf '%s' "$input" | jq -r '.context_window.total_input_tokens // 0' 2>/dev/null)
-fi
+# Use total_input_tokens from statusLine JSON (accurate cumulative token count).
+used_tokens=$(printf '%s' "$input" | jq -r '.context_window.total_input_tokens // 0' 2>/dev/null)
 
 # Build jq expression for the merge
 jq_expr='
