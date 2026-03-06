@@ -114,7 +114,7 @@ pad_right() { printf '%-*s' "$2" "$1"; }
 
 # token_bar <pct> <color> — render ▰▰▰▱▱ (5 blocks)
 token_bar() {
-  local pct="$1" color="$2" bar=""
+  local pct="$1" color="$2" bar="" i
   for ((i = 0; i < 5; i++)); do
     (( i * 20 < pct )) && bar+="${color}▰${R}" || bar+="${DARK}▱${R}"
   done
