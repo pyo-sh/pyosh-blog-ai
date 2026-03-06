@@ -1,5 +1,19 @@
 # 2026-03-07 Workspace progress
 
+## Orchestrator 안정성 개선 (#59, #60, #61)
+
+- **Issue**: /dev-orchestrator 실행 시 3가지 문제 발생. (1) headless 프로세스 상태를 트래킹할 수 없음 (#59), (2) pipeline 내부 review/resolve 서브프로세스가 orchestrator가 지정한 모델이 아닌 CLI 기본 모델로 실행됨 (#60), (3) dispatch + state 기록이 분리되어 tool call 에러 시 orphan 프로세스 발생 (#61).
+- **Changes**:
+  - `agent-tracker.sh`: `render_orchestrator()` 추가 - `batch.state.json` 자동 감지, dispatched 이슈별 step/status/time/PR 표시, `ps aux` 기반 review/resolve 서브프로세스 `└─` 트리 표시, done/active/pending/blocked 카운트 footer, 다중 배치(client+server) 지원
+  - `pipeline-helpers.sh`: `pipeline_run_headless()` 에 optional model 파라미터 추가, `${model:+--model "$model"}` 전달
+  - `orchestrate-helpers.sh`: `orch_dispatch()` atomic화 - 프로세스 launch + state 기록을 단일 함수로 통합, state 기록 실패 시 orphan kill. `orch_record_dispatch()` 제거. dispatch prompt에 model 정보 포함. retryCount 파라미터 추가로 retry 시 double state write 제거.
+  - `SKILL.md` (orchestrator): Step 4+5를 "Enter poll cycle" 단일 단계로 통합, 수동 dispatch 금지 명시
+  - `SKILL.md` (pipeline): review/resolve 호출에 `$MODEL` 전달 예시 추가
+  - `process-lifecycle.md`: model 파라미터 시그니처 + state schema 업데이트
+  - `README.md` (agent-tracker): orchestrator section 문서 추가
+- **Review**: /simplify - jq 2회 호출을 1회로 통합, `date +%s` 루프 외 캐싱, PID null guard 추가, retryCount 파라미터로 double state write 제거
+- **Files**: `agent-tracker.sh`, `agent-tracker/README.md`, `orchestrate-helpers.sh`, `pipeline-helpers.sh`, `SKILL.md` (orchestrator/pipeline), `process-lifecycle.md`
+
 ## Headless pipeline - tmux pane을 synchronous subprocess로 전환 + self-healing (#55, PR #56)
 
 - **Issue**: dev-pipeline이 review/resolve AI를 tmux side pane으로 실행하여 잦은 오류 발생 (PANE_DEAD, orphan pane, pane ID 재사용). ~230줄의 방어 코드가 pipeline-helpers.sh의 46% 차지. Docker 환경에서 tmux 의존으로 실행 불가.

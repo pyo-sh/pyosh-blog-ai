@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-07 | Orchestrator 안정성 개선 - agent-tracker 배치 UI, pipeline model 전달, atomic dispatch (#59, #60, #61) | done |
 | 2026-03-07 | Orchestrator headless 전환 + merge queue - tmux pane dispatch를 `claude -p` 백그라운드 프로세스로 교체, lock 기반 merge 직렬화 (#57) | done |
 | 2026-03-07 | Headless pipeline - tmux pane을 synchronous `claude -p` subprocess로 전환 + self-healing 통합 (#55, PR #56) | done |
 | 2026-03-06 | Orchestrator pane release 누락 + agent model/pane flexibility 수정 - orch_release_pane, _orch_parse_agent, ORCH_WORK_PANES (#53, PR #54) | done |
