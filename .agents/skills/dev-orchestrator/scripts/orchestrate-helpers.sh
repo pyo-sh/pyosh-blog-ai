@@ -58,10 +58,10 @@ orch_init() {
 
   # Record orchestrator process identity for liveness detection.
   # $PPID = Claude Code (node) process that spawned this Bash tool call.
-  # lstart = process start time — guards against PID reuse after reboot.
+  # /proc/PID/stat field 22 = start time in clock ticks since boot (locale-invariant).
   local orch_pid=$PPID
   local orch_started_at
-  orch_started_at=$(ps -o lstart= -p "$orch_pid" 2>/dev/null | xargs)
+  orch_started_at=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
 
   jq -n \
     --arg area "$area" \

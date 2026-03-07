@@ -397,9 +397,9 @@ render_orchestrator() {
       batch_status="done"
     elif [[ -n "$orch_pid" && "$orch_pid" != "0" && "$orch_pid" != "null" ]]; then
       if kill -0 "$orch_pid" 2>/dev/null; then
-        local current_lstart
-        current_lstart=$(ps -o lstart= -p "$orch_pid" 2>/dev/null | xargs)
-        if [[ "$current_lstart" == "$orch_started_at" ]]; then
+        local current_starttime
+        current_starttime=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
+        if [[ "$current_starttime" == "$orch_started_at" ]]; then
           batch_status="active"
         fi
       fi
@@ -466,10 +466,10 @@ render_orchestrator() {
 
         # Issue row
         printf "${GRAY}║${R}  "
-        printf "%s " "$(trunc "#${issue}" $W_ISS)"
+        printf "%s " "$(pad_right "#${issue}" $W_ISS)"
         printf "%s " "$(trunc "$step" $W_STEP)"
         printf "%b " "$( (( alive )) && _orch_badge run || _orch_badge stop)"
-        printf "%s " "$(trunc "$etime" $W_TIME)"
+        printf "%s " "$(pad_right "$etime" $W_TIME)"
         printf "%s  " "$(trunc "$pr_display" $W_INFO)"
         printf "${GRAY}║${R}"
         tput el; echo
@@ -499,10 +499,10 @@ render_orchestrator() {
             [[ -n "$sub_secs" ]] && sub_etime=$(_orch_elapsed "$sub_secs")
 
             printf "${GRAY}║${R}  "
-            printf "${DARK}%s${R} " "$(trunc "  └─" $W_ISS)"
+            printf "${DARK}%s${R} " "$(pad_right "  └─" $W_ISS)"
             printf "%s " "$(trunc "/dev-${sub_type}" $W_STEP)"
             printf "%b " "$( (( sub_alive )) && _orch_badge run || _orch_badge stop)"
-            printf "%s " "$(trunc "$sub_etime" $W_TIME)"
+            printf "%s " "$(pad_right "$sub_etime" $W_TIME)"
             printf "%s  " "$(trunc "PID ${sub_pid}" $W_INFO)"
             printf "${GRAY}║${R}"
             tput el; echo
