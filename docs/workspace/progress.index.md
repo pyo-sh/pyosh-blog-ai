@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-07 | agent-tracker UI 버그 수정 - 칸 밀림, done/idle 구분, batch liveness PID 기반 감지 (#64) | done |
 | 2026-03-07 | agent-tracker sidecar 경로 이동 + pipeline 중복 제거 + 토큰 버그 수정 - current_usage 기반 전환 (#62) | done |
 | 2026-03-07 | Orchestrator 안정성 개선 - agent-tracker 배치 UI, pipeline model 전달, atomic dispatch (#59, #60, #61) | done |
 | 2026-03-07 | Orchestrator headless 전환 + merge queue - tmux pane dispatch를 `claude -p` 백그라운드 프로세스로 교체, lock 기반 merge 직렬화 (#57) | done |

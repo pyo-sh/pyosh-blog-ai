@@ -12,6 +12,17 @@
 - **Review**: /simplify - 토큰 jq 중복 계산 제거 (wrapper pre-computed 우선 사용)
 - **Files**: `agent-tracker.sh`, `on-statusline.sh`, `on-status.sh`, `statusline-wrapper.sh`, `setup.sh`, `README.md`
 
+## agent-tracker UI 버그 수정 (#64)
+
+- **Issue**: agent-tracker 대시보드 3가지 문제. (1) orchestrator 테이블에서 `pad_right`가 truncate하지 않아 가변 폭 컬럼 overflow 시 칸 밀림, (2) agent 작업 완료 후 done과 idle이 동일한 `○ idle` 뱃지로 표시, orchestrator footer에서도 done/active가 같은 `●` 아이콘, (3) `batch.state.json` 파일 존재만으로 orchestrator 실행 판별 - stop 후에도 파일이 남아 계속 실행 중으로 표시.
+- **Changes**:
+  - `agent-tracker.sh`: orchestrator 행 `pad_right` -> `trunc` 교체로 overflow 시 ellipsis 처리
+  - `agent-tracker.sh`: `status_badge`/`_orch_badge`에 `done` 케이스 추가 (`✓ done`, blue). `(Done)` prefix 감지로 idle에서 done 승격. orchestrator footer done `✓` vs active `●` 아이콘 분리
+  - `agent-tracker.sh`: orchestrator batch liveness - `orchestratorPid` + `orchestratorStartedAt`(lstart) 비교로 PID reuse 방지. batch_status: done/active/stopped 3단계 + header 색상 + footer `[DONE]`/`[STOPPED]` 라벨
+  - `orchestrate-helpers.sh`: `orch_init()`에 `$PPID`(Claude Code PID) + `ps -o lstart=` 시작 시각을 `batch.state.json`에 기록
+  - `session.docker.yml`: 현재 tmux 구성에 맞게 정리 - server2/client2 제거, 4 panes -> 2 panes (even-horizontal)
+- **Files**: `agent-tracker.sh`, `orchestrate-helpers.sh`, `session.docker.yml`
+
 ## Orchestrator 안정성 개선 (#59, #60, #61)
 
 - **Issue**: /dev-orchestrator 실행 시 3가지 문제 발생. (1) headless 프로세스 상태를 트래킹할 수 없음 (#59), (2) pipeline 내부 review/resolve 서브프로세스가 orchestrator가 지정한 모델이 아닌 CLI 기본 모델로 실행됨 (#60), (3) dispatch + state 기록이 분리되어 tool call 에러 시 orphan 프로세스 발생 (#61).
