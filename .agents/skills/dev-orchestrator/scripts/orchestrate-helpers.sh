@@ -56,6 +56,13 @@ orch_init() {
     --argjson dag "$filtered_dag" \
     'reduce $issues[] as $n ({}; . + {($n|tostring): (if ($dag[($n|tostring)] // []) | length > 0 then "blocked" else "pending" end)})')
 
+  # Record orchestrator process identity for liveness detection.
+  # $PPID = Claude Code (node) process that spawned this Bash tool call.
+  # lstart = process start time — guards against PID reuse after reboot.
+  local orch_pid=$PPID
+  local orch_started_at
+  orch_started_at=$(ps -o lstart= -p "$orch_pid" 2>/dev/null | xargs)
+
   jq -n \
     --arg area "$area" \
     --arg batchId "$batch_id" \
@@ -64,10 +71,14 @@ orch_init() {
     --argjson status "$status_json" \
     --arg agent "$agent" \
     --argjson maxConcurrent "$max_concurrent" \
+    --argjson orchestratorPid "$orch_pid" \
+    --arg orchestratorStartedAt "$orch_started_at" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
       status: $status, dispatched: {}, agent: $agent,
       maxConcurrent: $maxConcurrent,
+      orchestratorPid: $orchestratorPid,
+      orchestratorStartedAt: $orchestratorStartedAt,
       createdAt: $now, updatedAt: $now}' \
     > "$(orch_state_path "$area")"
 }

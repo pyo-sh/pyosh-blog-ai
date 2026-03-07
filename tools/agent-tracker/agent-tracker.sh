@@ -375,6 +375,8 @@ render_orchestrator() {
         .area, .batchId,
         cnt("completed"), cnt("dispatched"), cnt("pending"), cnt("blocked"), cnt("failed"),
         (.issues | length | tostring),
+        (.orchestratorPid // 0 | tostring),
+        (.orchestratorStartedAt // ""),
         (. as $root | [.dispatched | to_entries[]
           | select($root.status[.key] == "dispatched")
           | [.key, (.value.pid // 0 | tostring), (.value.dispatchedAt // "")]
@@ -384,29 +386,23 @@ render_orchestrator() {
     local meta dispatched_data
     IFS=$'\x1f' read -r meta dispatched_data <<< "$combined"
 
-    local area batch_id n_done n_active n_pending n_blocked n_failed n_total
-    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total <<< "$meta"
+    local area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pid orch_started_at
+    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pid orch_started_at <<< "$meta"
 
     # ── Batch liveness detection ──
-    # Check if any dispatched process is actually alive
-    local n_alive=0
-    if [[ -n "$dispatched_data" ]]; then
-      while IFS=$'\x1e' read -r _iss _pid _dat; do
-        [[ -z "$_iss" ]] && continue
-        [[ -n "$_pid" && "$_pid" != "0" && "$_pid" != "null" ]] && kill -0 "$_pid" 2>/dev/null && (( n_alive++ ))
-      done <<< "$dispatched_data"
-    fi
-
-    # Determine batch status:
-    #   done    = all issues completed or failed (terminal)
-    #   active  = at least one alive dispatched process
-    #   stopped = non-terminal issues exist but no alive processes
+    # Check orchestrator process: PID alive + start time match (guards PID reuse)
     local batch_status="stopped"
     local n_terminal=$(( n_done + n_failed ))
     if (( n_terminal >= n_total )); then
       batch_status="done"
-    elif (( n_alive > 0 )); then
-      batch_status="active"
+    elif [[ -n "$orch_pid" && "$orch_pid" != "0" && "$orch_pid" != "null" ]]; then
+      if kill -0 "$orch_pid" 2>/dev/null; then
+        local current_lstart
+        current_lstart=$(ps -o lstart= -p "$orch_pid" 2>/dev/null | xargs)
+        if [[ "$current_lstart" == "$orch_started_at" ]]; then
+          batch_status="active"
+        fi
+      fi
     fi
 
     # ── Section separator ──
