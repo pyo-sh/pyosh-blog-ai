@@ -129,6 +129,7 @@ status_badge() {
     plan)         printf "${GOLD}◑ plan${R}" ;;
     needs-input)  printf "${ROSE}◉ wait${R}" ;;
     error)        printf "${ROSE}✖ err ${R}" ;;
+    done)         printf "${BLUE}✓ done${R}" ;;
     *)            printf "${GRAY}○ idle${R}" ;;
   esac
 }
@@ -330,6 +331,7 @@ _orch_elapsed() {
 _orch_badge() {
   case "$1" in
     run)   printf "${GREEN}● run ${R}" ;;
+    done)  printf "${BLUE}✓ done${R}" ;;
     stop)  printf "${ROSE}✖ stop${R}" ;;
     *)     printf "${GRAY}○ --- ${R}" ;;
   esac
@@ -385,6 +387,28 @@ render_orchestrator() {
     local area batch_id n_done n_active n_pending n_blocked n_failed n_total
     IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total <<< "$meta"
 
+    # ── Batch liveness detection ──
+    # Check if any dispatched process is actually alive
+    local n_alive=0
+    if [[ -n "$dispatched_data" ]]; then
+      while IFS=$'\x1e' read -r _iss _pid _dat; do
+        [[ -z "$_iss" ]] && continue
+        [[ -n "$_pid" && "$_pid" != "0" && "$_pid" != "null" ]] && kill -0 "$_pid" 2>/dev/null && (( n_alive++ ))
+      done <<< "$dispatched_data"
+    fi
+
+    # Determine batch status:
+    #   done    = all issues completed or failed (terminal)
+    #   active  = at least one alive dispatched process
+    #   stopped = non-terminal issues exist but no alive processes
+    local batch_status="stopped"
+    local n_terminal=$(( n_done + n_failed ))
+    if (( n_terminal >= n_total )); then
+      batch_status="done"
+    elif (( n_alive > 0 )); then
+      batch_status="active"
+    fi
+
     # ── Section separator ──
     printf "${GRAY}╠%s╣${R}" "$_CACHE_eqline"; tput el; echo
 
@@ -393,7 +417,12 @@ render_orchestrator() {
     local h_right="${n_done}/${n_total} done  ${batch_id}"
     local hgap=$(( INNER - 4 - ${#h_left} - ${#h_right} ))
     (( hgap < 1 )) && hgap=1
-    printf "${GRAY}║${R}  ${BOLD}${GOLD}%s${R}%*s${GRAY}%s${R}  ${GRAY}║${R}" \
+
+    local h_color="$GOLD"
+    [[ "$batch_status" == "done" ]] && h_color="$BLUE"
+    [[ "$batch_status" == "stopped" ]] && h_color="$ROSE"
+
+    printf "${GRAY}║${R}  ${BOLD}${h_color}%s${R}%*s${GRAY}%s${R}  ${GRAY}║${R}" \
       "$h_left" "$hgap" "" "$h_right"
     tput el; echo
 
@@ -441,10 +470,10 @@ render_orchestrator() {
 
         # Issue row
         printf "${GRAY}║${R}  "
-        printf "%s " "$(pad_right "#${issue}" $W_ISS)"
-        printf "%s " "$(pad_right "$step" $W_STEP)"
+        printf "%s " "$(trunc "#${issue}" $W_ISS)"
+        printf "%s " "$(trunc "$step" $W_STEP)"
         printf "%b " "$( (( alive )) && _orch_badge run || _orch_badge stop)"
-        printf "%s " "$(pad_right "$etime" $W_TIME)"
+        printf "%s " "$(trunc "$etime" $W_TIME)"
         printf "%s  " "$(trunc "$pr_display" $W_INFO)"
         printf "${GRAY}║${R}"
         tput el; echo
@@ -474,10 +503,10 @@ render_orchestrator() {
             [[ -n "$sub_secs" ]] && sub_etime=$(_orch_elapsed "$sub_secs")
 
             printf "${GRAY}║${R}  "
-            printf "${DARK}%s${R} " "$(pad_right "  └─" $W_ISS)"
-            printf "%s " "$(pad_right "/dev-${sub_type}" $W_STEP)"
+            printf "${DARK}%s${R} " "$(trunc "  └─" $W_ISS)"
+            printf "%s " "$(trunc "/dev-${sub_type}" $W_STEP)"
             printf "%b " "$( (( sub_alive )) && _orch_badge run || _orch_badge stop)"
-            printf "%s " "$(pad_right "$sub_etime" $W_TIME)"
+            printf "%s " "$(trunc "$sub_etime" $W_TIME)"
             printf "%s  " "$(trunc "PID ${sub_pid}" $W_INFO)"
             printf "${GRAY}║${R}"
             tput el; echo
@@ -493,18 +522,35 @@ render_orchestrator() {
     printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
 
     # ── Orchestrator footer ──
-    local of="${GREEN}●${R} ${GRAY}${n_done} done${R}"
+    local of="${BLUE}✓${R} ${GRAY}${n_done} done${R}"
     of+="  ${GREEN}●${R} ${GRAY}${n_active} active${R}"
     of+="  ${GOLD}○${R} ${GRAY}${n_pending} pending${R}"
     of+="  ${DARK}◆${R} ${GRAY}${n_blocked} blocked${R}"
     (( n_failed > 0 )) && of+="  ${ROSE}✖${R} ${GRAY}${n_failed} failed${R}"
 
-    local of_plain="● ${n_done} done  ● ${n_active} active  ○ ${n_pending} pending  ◆ ${n_blocked} blocked"
+    local of_plain="✓ ${n_done} done  ● ${n_active} active  ○ ${n_pending} pending  ◆ ${n_blocked} blocked"
     (( n_failed > 0 )) && of_plain+="  ✖ ${n_failed} failed"
 
-    local fp=$(( INNER - 4 - ${#of_plain} ))
+    # Append batch status indicator
+    local batch_label=""
+    local batch_label_plain=""
+    if [[ "$batch_status" == "done" ]]; then
+      batch_label="${BLUE}[DONE]${R}"
+      batch_label_plain="[DONE]"
+    elif [[ "$batch_status" == "stopped" ]]; then
+      batch_label="${ROSE}[STOPPED]${R}"
+      batch_label_plain="[STOPPED]"
+    fi
+
+    local bl_extra=0
+    (( ${#batch_label_plain} > 0 )) && bl_extra=$(( ${#batch_label_plain} + 2 ))
+    local fp=$(( INNER - 4 - ${#of_plain} - bl_extra ))
     (( fp < 0 )) && fp=0
-    printf "${GRAY}║${R}  %b%*s  ${GRAY}║${R}" "$of" "$fp" ""
+    if [[ -n "$batch_label" ]]; then
+      printf "${GRAY}║${R}  %b%*s%b  ${GRAY}║${R}" "$of" "$fp" "" "$batch_label"
+    else
+      printf "${GRAY}║${R}  %b%*s  ${GRAY}║${R}" "$of" "$fp" ""
+    fi
     tput el; echo
   done
 }
@@ -617,10 +663,16 @@ render_dashboard() {
     local model status pct tok_k task activity
     IFS=$'\x1e' read -r model status pct tok_k task activity <<< "$data"
 
+    # Detect "(Done) " prefix in task and promote idle → done
+    if [[ "$status" == "idle" && "$task" == "(Done) "* ]]; then
+      status="done"
+    fi
+
     case "$status" in
       working)      (( n_working++ )) ;;
       plan)         (( n_plan++ ))    ;;
       needs-input)  (( n_working++ )) ;;
+      done)         (( n_idle++ ))    ;;
       *)            (( n_idle++ ))    ;;
     esac
 
