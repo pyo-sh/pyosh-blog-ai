@@ -16,44 +16,22 @@ root: <%= ENV.fetch('TMUX_ROOT', '.') %>
 
 windows:
   - lab:
-      layout: tiled
+      layout: even-horizontal
       panes:
-        - # top-left
-        - # top-right
-        - # bottom-left
-        - # bottom-right
+        - # left
+        - # right
 
   - server1:
-      layout: tiled
+      layout: even-horizontal
       panes:
-        - # pane 1
-        - # pane 2
-        - # pane 3
-        - # pane 4
-
-  - server2:
-      layout: tiled
-      panes:
-        - # pane 1
-        - # pane 2
-        - # pane 3
-        - # pane 4
+        - # left
+        - # right
 
   - client1:
-      layout: tiled
+      layout: even-horizontal
       panes:
-        - # pane 1
-        - # pane 2
-        - # pane 3
-        - # pane 4
-
-  - client2:
-      layout: tiled
-      panes:
-        - # pane 1
-        - # pane 2
-        - # pane 3
-        - # pane 4
+        - # left
+        - # right
 
   - tracker:
       layout: even-horizontal
