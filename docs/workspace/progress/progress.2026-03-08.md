@@ -41,6 +41,20 @@
   - 66개 fixture 테스트 추가 (orchestrator/claude-parse/codex-parse/exit-code/sidecar-cleanup/token-fallback)
 - **Files**: `agent-tracker.sh` (rewrite), `lib/util.sh`, `lib/collect.sh`, `lib/render.sh`, `tests/` (helpers.sh, run-tests.sh, test-*.sh 6개)
 
+## agent-tracker 토큰 표시 신뢰성 개선 - coherent snapshot + freshness 분리 (#74)
+
+- **Issue**: 토큰 값이 부정확하거나 stale 데이터를 fresh로 표시하는 3가지 근본 원인. (1) `updated_at`이 status hook과 token 업데이트에 공유되어 status 변경만으로 토큰이 fresh로 오판, (2) Codex에서 used/total을 독립 이벤트에서 추출 - 분자/분모 불일치, (3) jq 파싱 실패 시 값이 0으로 리셋.
+- **Changes**:
+  - `tokens_updated_at` 필드를 `updated_at`과 분리 - `on-statusline.sh`만 설정, `on-status.sh`는 토큰 필드 미변경
+  - Codex coherent snapshot: `$tok_pair` jq 변수로 동일 `.payload.info` 이벤트에서 used+total 추출
+  - 파싱 실패 시 last-good 캐시 폴백 + `tok_fresh=false` 설정 (0 리셋 대신)
+  - `format_tok_str()` 공유 헬퍼 추출 (render.sh 중복 제거)
+  - `_emit_agent_json()` 공유 헬퍼 추출 (Claude/Codex collector 중복 제거)
+  - `STALE_THRESHOLD_SECS=30` 상수 도입 (매직넘버 제거)
+  - 토큰 소스 enum: `sidecar`, `scraping`, `session`, `unknown`
+  - 30개 fixture 테스트 추가 (총 105개)
+- **Files**: `lib/collect.sh`, `lib/render.sh`, `lib/util.sh`, `hooks/on-statusline.sh`, `tests/test-token-snapshot.sh`, `tests/test-codex-parse.sh`, `tests/test-claude-parse.sh`
+
 ## Shell script cleanup - stale code 삭제 및 과도한 복잡성 제거 (#70)
 
 - **Issue**: #68 후속. 전체 sh 파일 검사에서 동일 패턴의 과도한 복잡성 잔존 확인.

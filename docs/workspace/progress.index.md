@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-08 | agent-tracker 토큰 표시 신뢰성 개선 - coherent snapshot, freshness 분리, 파싱 실패 폴백, 105 fixture 테스트 (#74) | done |
 | 2026-03-08 | agent-tracker 구조적 데이터 경계 및 신뢰성 전면 개편 - lib/ 3-layer 분리, JSON+@tsv 프로토콜, 66 fixture 테스트 (#72) | done |
 | 2026-03-08 | Shell script cleanup - stale code 삭제 및 과도한 복잡성 제거 (#70) | done |
 | 2026-03-08 | agent-tracker 프로세스 감지 단순화 + orchestrator liveness 수정 (#68) | done |
