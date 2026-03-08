@@ -54,13 +54,7 @@ render_dashboard() {
 
       # Track token column width — stale uses "?" suffix, unknown shows "   ?" (#74)
       local _tok_str _tok_w
-      if [[ "$tok_source" == "unknown" ]]; then
-        _tok_str="   ?"
-      elif [[ "$tok_fresh" == "false" ]]; then
-        if (( tok_k > 999 )); then _tok_str="999?"; else printf -v _tok_str "%3d?" "$tok_k"; fi
-      else
-        if (( tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$tok_k"; fi
-      fi
+      _tok_str=$(format_tok_str "$tok_source" "$tok_fresh" "$tok_k")
       _tok_w=$(( 5 + 1 + ${#_tok_str} ))
       (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
 
@@ -164,15 +158,13 @@ render_dashboard() {
 
       # Token display: stale uses dimmed bars + "?", unknown shows empty bars + "?" (#74)
       local tok_str
+      tok_str=$(format_tok_str "$tok_source" "$tok_fresh" "$tok_k")
       if [[ "$tok_source" == "unknown" ]]; then
         tok_bar_str=$(token_bar 0 "$DARK")
-        tok_str="   ?"
       elif [[ "$tok_fresh" == "false" ]]; then
         tok_bar_str=$(token_bar "$pct" "$DARK")
-        if (( tok_k > 999 )); then tok_str="999?"; else printf -v tok_str "%3d?" "$tok_k"; fi
       else
         tok_bar_str=$(token_bar "$pct" "$ecol")
-        if (( tok_k > 999 )); then tok_str="999+"; else printf -v tok_str "%3dk" "$tok_k"; fi
       fi
 
       printf "${GRAY}║${R}  "

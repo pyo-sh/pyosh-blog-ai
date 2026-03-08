@@ -133,13 +133,13 @@ _collect_claude_pane() {
       [[ "$tok_ts" == "0" || "$tok_ts" == "null" || -z "$tok_ts" ]] && tok_ts="${updated_at:-0}"
       if [[ -n "$tok_ts" && "$tok_ts" != "0" && "$tok_ts" != "null" ]]; then
         local tok_age=$(( now_epoch - ${tok_ts%.*} ))
-        (( tok_age > 30 )) && tok_fresh=false
+        (( tok_age > STALE_THRESHOLD_SECS )) && tok_fresh=false
       fi
 
-      # Status staleness: >30s without update + non-idle → reset (#47)
+      # Status staleness: non-idle without recent update → reset (#47)
       if [[ "$status" != "idle" && -n "$updated_at" && "$updated_at" != "0" ]]; then
         local age=$(( now_epoch - ${updated_at%.*} ))
-        if (( age > 30 )); then
+        if (( age > STALE_THRESHOLD_SECS )); then
           status="idle"
           activity=""
         fi
@@ -201,11 +201,22 @@ _collect_claude_pane() {
   task=$(printf '%s' "$task" | tr '\n\t\r' '   ' | sed 's/  */ /g')
   activity=$(printf '%s' "$activity" | tr '\n\t\r' '   ' | sed 's/  */ /g')
 
-  # Output JSON record with token sub-object (#74)
+  _emit_agent_json "$pane_addr" "$pane_id" "claude" "$model" "$status" \
+    "$tok_used" "$tok_total" "$tok_pct" "$tok_source" "$tok_fresh" "$task" "$activity"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared agent JSON output
+# ─────────────────────────────────────────────────────────────────────────────
+
+_emit_agent_json() {
+  local pane_addr=$1 pane_id=$2 engine=$3 model=$4 status=$5
+  local tok_used=$6 tok_total=$7 tok_pct=$8 tok_source=$9 tok_fresh=${10}
+  local task=${11} activity=${12}
   jq -nc \
     --arg pa "$pane_addr $pane_id" \
     --arg pi "$pane_id" \
-    --arg e "claude" \
+    --arg e "$engine" \
     --arg m "$model" \
     --arg s "$status" \
     --argjson tu "${tok_used:-0}" \
@@ -349,23 +360,8 @@ _collect_codex_pane() {
   # Final text normalization
   task=$(printf '%s' "$task" | tr '\n\t\r' '   ' | sed 's/  */ /g')
 
-  # Output JSON record with token sub-object (#74)
-  jq -nc \
-    --arg pa "$pane_addr $pane_id" \
-    --arg pi "$pane_id" \
-    --arg e "codex" \
-    --arg m "$model" \
-    --arg s "$status" \
-    --argjson tu "${tok_used:-0}" \
-    --argjson tt "${tok_total:-0}" \
-    --argjson tp "${tok_pct:-0}" \
-    --arg ts "$tok_source" \
-    --argjson tf "$tok_fresh" \
-    --arg ta "$task" \
-    --arg ac "$activity" \
-    '{pane_addr:$pa, pane_id:$pi, engine:$e, model:$m, status:$s,
-      tokens:{used:$tu, total:$tt, pct:$tp, source:$ts, fresh:$tf},
-      task:$ta, activity:$ac}'
+  _emit_agent_json "$pane_addr" "$pane_id" "codex" "$model" "$status" \
+    "$tok_used" "$tok_total" "$tok_pct" "$tok_source" "$tok_fresh" "$task" "$activity"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
