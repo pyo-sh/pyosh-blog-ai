@@ -21,8 +21,8 @@ input=$(cat)
 export AGENT_TRACKER_PANE="${TMUX_PANE:-pid-$PPID}"
 
 # Pre-compute tokens from current_usage for context-bar.sh compatibility.
-# current_usage: accurate per-request context tokens (added in Claude Code v2.0.72).
-# Fallback: used_percentage reverse calculation (when current_usage is null).
+# context-bar.sh has its own fallback when this env var is missing.
+# SYNC:token-calc-fallback — keep in sync with context-bar.sh fallback
 TRANSCRIPT_TOKENS=$(printf '%s' "$input" | jq -r '
   .context_window |
   if .current_usage != null then
@@ -36,7 +36,7 @@ TRANSCRIPT_TOKENS=$(printf '%s' "$input" | jq -r '
 export TRANSCRIPT_TOKENS="${TRANSCRIPT_TOKENS:-0}"
 
 # Pre-compute last user message from transcript.
-# Uses tail to avoid slurping the entire file (O(fixed) instead of O(file size)).
+# SYNC:last-user-msg — keep in sync with context-bar.sh fallback
 _tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
 export TRANSCRIPT_LAST_MSG=""
 if [[ -n "$_tp" && -f "$_tp" ]]; then

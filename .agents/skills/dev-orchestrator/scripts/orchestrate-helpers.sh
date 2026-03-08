@@ -352,7 +352,10 @@ orch_detect_stall() {
   fi
 
   local last_ts
-  last_ts=$(date -d "$last_activity" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$last_activity" +%s 2>/dev/null)
+  last_ts=$(date -d "$last_activity" +%s 2>/dev/null)
+  if [ -z "$last_ts" ]; then
+    echo "active"; return 0
+  fi
   local now_ts
   now_ts=$(date +%s)
   local elapsed=$(( now_ts - last_ts ))
