@@ -55,6 +55,26 @@
   - 30개 fixture 테스트 추가 (총 105개)
 - **Files**: `lib/collect.sh`, `lib/render.sh`, `lib/util.sh`, `hooks/on-statusline.sh`, `tests/test-token-snapshot.sh`, `tests/test-codex-parse.sh`, `tests/test-claude-parse.sh`
 
+## Orchestrator/pipeline 신뢰성 전면 개편 (#76)
+
+- **Issue**: orchestrator 운영 중 발견된 6개 critical 버그 + 5개 설계 모호성. exit file이 plain text "ok"/"fail"로 stale 충돌 위험, PID 기반 프로세스 관리로 자식 프로세스 누수, `2>/dev/null`로 gh 실패 무시, flock 미적용으로 동시 state 업데이트 시 손상, 의존성 실패 전파 미구현 (`blocked` 영구 대기).
+- **Changes**:
+  - `orch-dispatch-wrapper.sh` (신규) - setsid 프로세스 그룹 래퍼: heartbeat (60s), JSON exit file (attemptId 매칭), SIGTERM 트랩
+  - `orchestrate-helpers.sh` 전면 재작성 (+716/-289):
+    - `orch_dispatch`: setsid + PGID 기반 프로세스 격리, pre-dispatch stale 파일 cleanup, attemptId 생성
+    - `orch_stop_process`: PID kill -> PGID 기반 그룹 kill (area+issue 시그니처)
+    - `orch_check_completion`: exit file JSON + attemptId match -> PGID alive -> 60s grace period -> PR fallback (provider health aware)
+    - `orch_detect_stall`: heartbeat -> elapsed time -> composite signals (log mtime, CPU jiffies, commit SHA)
+    - `orch_unblock`: `skipped_dep_failed` 전파 (실패 의존성 -> 하위 이슈 자동 스킵)
+    - `orch_state_update`: flock -n 상호 배제 추가
+    - `orch_gh`: provider health circuit breaker (healthy/degraded/hard_fault), gh-errors.log 기록
+    - `_orch_mark_failed_and_unblock`: poll cycle 중복 코드 4곳 추출
+  - `parse-dependencies.sh`: "없음" 마커 regex 수정 (optional `- ` prefix)
+  - `CLAUDE.md`: `2>/dev/null` 정책 추가 (control-flow 금지, cleanup 허용)
+  - 참조 문서 3개 전면 갱신 (state-detection.md, recovery.md, dependency-resolution.md)
+  - `/simplify` 리뷰 반영: JSON escape 취약점 수정 (jq -Rs), batch jq 파싱, 상태 읽기 중복 제거, gh-errors.log 크기 제한
+- **Files**: `orchestrate-helpers.sh`, `orch-dispatch-wrapper.sh` (신규), `parse-dependencies.sh`, `CLAUDE.md`, `SKILL.md`, `state-detection.md`, `recovery.md`, `dependency-resolution.md`
+
 ## Shell script cleanup - stale code 삭제 및 과도한 복잡성 제거 (#70)
 
 - **Issue**: #68 후속. 전체 sh 파일 검사에서 동일 패턴의 과도한 복잡성 잔존 확인.
