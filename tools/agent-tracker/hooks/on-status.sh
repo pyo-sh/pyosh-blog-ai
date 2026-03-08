@@ -82,21 +82,21 @@ case "$event" in
     if [[ -n "$tool_name" ]]; then
       key_arg=$(printf '%s' "$input" | jq -r --arg tn "$tool_name" '
         (.tool_input // {}) | if type != "object" then {} else . end |
-        if   $tn == "Bash"         then .description // .command // ""
-        elif $tn == "Read"         then (.file_path // "" | split("/") | last)
-        elif $tn == "Edit"         then (.file_path // "" | split("/") | last)
-        elif $tn == "Write"        then (.file_path // "" | split("/") | last)
-        elif $tn == "Grep"         then .pattern // ""
-        elif $tn == "Glob"         then .pattern // ""
-        elif $tn == "Agent"        then .description // ""
-        elif $tn == "Skill"        then ((.skill // "") + (if .args == null then "" else " " + (.args | tostring) end))
-        elif $tn == "WebSearch"    then .query // ""
-        elif $tn == "WebFetch"     then .url // ""
-        elif $tn == "NotebookEdit" then (.notebook_path // "" | split("/") | last)
-        elif $tn == "TaskCreate"   then .subject // ""
-        elif $tn == "TaskUpdate"   then .taskId // ""
-        else ""
-        end |
+        {
+          Bash:         (.description // .command),
+          Read:         (.file_path // "" | split("/") | last),
+          Edit:         (.file_path // "" | split("/") | last),
+          Write:        (.file_path // "" | split("/") | last),
+          Grep:         .pattern,
+          Glob:         .pattern,
+          Agent:        .description,
+          Skill:        ((.skill // "") + (if .args then " " + (.args | tostring) else "" end)),
+          WebSearch:    .query,
+          WebFetch:     .url,
+          NotebookEdit: (.notebook_path // "" | split("/") | last),
+          TaskCreate:   .subject,
+          TaskUpdate:   .taskId
+        } | .[$tn] // "" |
         tostring |
         gsub("\n"; " ") | gsub("  +"; " ") |
         gsub("[[:cntrl:]]"; "") |

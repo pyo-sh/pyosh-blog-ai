@@ -56,15 +56,6 @@ orch_init() {
     --argjson dag "$filtered_dag" \
     'reduce $issues[] as $n ({}; . + {($n|tostring): (if ($dag[($n|tostring)] // []) | length > 0 then "blocked" else "pending" end)})')
 
-  # Record orchestrator identity for liveness detection by agent-tracker.
-  # $PPID = Claude Code (node) process that spawned this Bash tool call.
-  # $TMUX_PANE = tmux pane ID where orchestrator is running.
-  # /proc/PID/stat field 22 = start time in clock ticks since boot (locale-invariant).
-  local orch_pid=$PPID
-  local orch_pane="${TMUX_PANE:-}"
-  local orch_started_at
-  orch_started_at=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
-
   jq -n \
     --arg area "$area" \
     --arg batchId "$batch_id" \
@@ -73,16 +64,34 @@ orch_init() {
     --argjson status "$status_json" \
     --arg agent "$agent" \
     --argjson maxConcurrent "$max_concurrent" \
-    --arg orchestratorPane "$orch_pane" \
-    --arg orchestratorStartedAt "$orch_started_at" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
       status: $status, dispatched: {}, agent: $agent,
       maxConcurrent: $maxConcurrent,
-      orchestratorPane: $orchestratorPane,
-      orchestratorStartedAt: $orchestratorStartedAt,
+      orchestratorPid: 0, orchestratorPane: "", orchestratorStartedAt: "",
       createdAt: $now, updatedAt: $now}' \
     > "$(orch_state_path "$area")"
+
+  # Record orchestrator identity (pane + start time) for agent-tracker liveness.
+  orch_register_self "$area"
+}
+
+orch_register_self() {
+  # Usage: orch_register_self <area>
+  # Records current orchestrator identity (pane + start time) in batch state.
+  # Call at orch_init AND on every resume/recovery to keep liveness info fresh.
+  local area=$1
+  local orch_pane="${TMUX_PANE:-}"
+  local orch_pid=$PPID
+  local orch_started_at=""
+  if [ -f "/proc/$orch_pid/stat" ]; then
+    orch_started_at=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
+  fi
+  if [ -z "$orch_started_at" ]; then
+    >&2 echo "[orchestrator] WARNING: could not read start time from /proc/$orch_pid/stat"
+  fi
+  orch_state_update "$area" \
+    ".orchestratorPid = $orch_pid | .orchestratorPane = \"$orch_pane\" | .orchestratorStartedAt = \"${orch_started_at:-}\""
 }
 
 orch_state_read() {
@@ -166,7 +175,11 @@ orch_dispatch() {
   # No stdin available in -p mode, so pipeline must make autonomous decisions.
   local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for review/resolve subprocesses (pass to pipeline_run_headless).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
-  cd "$MONOREPO_ROOT" && CLAUDECODE= timeout 3600 claude -p \
+  # cd must be separate from the backgrounded command.
+  # `cd X && cmd &` backgrounds the whole compound list in a subshell that
+  # inherits the caller's stdout fd — blocking $() pipe EOF indefinitely.
+  cd "$MONOREPO_ROOT" || return 1
+  CLAUDECODE= timeout 3600 claude -p \
     ${model:+--model "$model"} --dangerously-skip-permissions \
     --no-session-persistence \
     --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \

@@ -11,3 +11,16 @@
   - orchestrator footer: done/active/pending/blocked 카운트 -> `⏱ elapsed` + failed 카운트 + [DONE] 라벨.
   - header/footer gap 계산: `${#string}` -> `display_width` 일관 적용 (`⚙`, `●` 등 non-ASCII 문자).
 - **Files**: `agent-tracker.sh`, `orchestrate-helpers.sh`
+
+## agent-tracker 프로세스 감지 단순화 + orchestrator liveness 수정 (#68)
+
+- **Issue**: orchestrator 배치 테이블이 agent-tracker에서 렌더링되지 않음. 원인은 `_find_claude_pid`의 BFS `/proc` 탐색이 Claude Code 바이너리 exe name `2.1.71`(버전 번호)을 인식 못함. `_match_agent`가 `exe == "claude"` 또는 `cmdline =~ claude-code/cli`만 체크 - 둘 다 불일치. tmux `#{pane_current_command}`는 정상적으로 `"claude"`를 반환하지만 orchestrator liveness는 이 fast path를 사용하지 않고 별도의 BFS 경로를 타서 실패.
+- **Changes**:
+  - `/proc` BFS 프로세스 감지 5개 함수 삭제 (`_get_cmdline`, `_get_exe_name`, `_match_agent`, `detect_agent_type`, `_find_claude_pid`) - 80줄 제거
+  - 에이전트 감지: tmux `#{pane_tty}` + `ps -t` 6줄로 대체
+  - orchestrator liveness: `orchestratorPid` 직접 저장 + `kill -0` 체크. pane 경유 BFS 탐색 제거
+  - 컬럼 폭 계산 3-pass -> 1-pass (데이터 수집 시 동시 계산)
+  - on-status.sh 도구 디스패치: 17-branch if-elif -> jq object lookup 테이블
+  - 순감소 -66줄 (899 -> 816)
+- **Findings**: [findings.015](../findings/findings.015-agent-tracker-overengineering.md)
+- **Files**: `agent-tracker.sh`, `on-status.sh`, `orchestrate-helpers.sh`

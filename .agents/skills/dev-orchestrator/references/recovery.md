@@ -12,12 +12,15 @@ If found -> read state, resume based on current issue statuses.
 
 ## Recovery steps
 
-### 1. Read state
+### 1. Read state + re-register identity
 
 ```bash
 source scripts/orchestrate-helpers.sh
 STATE=$(orch_state_read "$AREA")
 AGENT=$(echo "$STATE" | jq -r '.agent')
+
+# Update orchestrator pane/startedAt so agent-tracker can detect liveness.
+orch_register_self "$AREA"
 ```
 
 ### 2. Reconcile dispatched issues
