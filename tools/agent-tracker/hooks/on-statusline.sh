@@ -62,7 +62,8 @@ jq_expr='
     },
     cwd: ($input.cwd // $existing.cwd // null),
     transcript_path: ($input.transcript_path // $existing.transcript_path // null),
-    updated_at: now
+    updated_at: now,
+    tokens_updated_at: now
   }
 '
 

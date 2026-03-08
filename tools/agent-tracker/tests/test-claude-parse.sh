@@ -9,14 +9,17 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 # The jq expression used in _collect_claude_pane (lib/collect.sh)
+# Includes tokens_updated_at for independent token freshness tracking (#74)
 JQ_EXPR='[
   (.model // "Claude"),
   (.status // "idle"),
   (.tokens.pct // 0 | tostring),
-  ((.tokens.used // 0) / 1000 | floor | tostring),
+  (.tokens.used // 0 | tostring),
+  (.tokens.max // 0 | tostring),
   ((.task // "-") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " ")),
   ((.activity // "") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " ")),
-  (.updated_at // 0 | tostring)
+  (.updated_at // 0 | tostring),
+  (.tokens_updated_at // 0 | tostring)
 ] | @tsv'
 
 # ── Test 1: Normal sidecar ──
@@ -32,11 +35,12 @@ cat > "$TMPDIR/normal.json" << 'EOF'
 EOF
 
 raw=$(jq -r "$JQ_EXPR" "$TMPDIR/normal.json")
-IFS=$'\t' read -r model status pct tok_k task activity updated_at <<< "$raw"
+IFS=$'\t' read -r model status pct tok_used tok_total task activity updated_at tokens_updated_at <<< "$raw"
 assert_eq "normal: model" "Sonnet 4.6" "$model"
 assert_eq "normal: status" "working" "$status"
 assert_eq "normal: pct" "45" "$pct"
-assert_eq "normal: tok_k" "90" "$tok_k"
+assert_eq "normal: tok_used" "90000" "$tok_used"
+assert_eq "normal: tok_total" "0" "$tok_total"
 assert_eq "normal: task" "Fix the parser bug" "$task"
 assert_eq "normal: activity" "Edit: file.ts" "$activity"
 
@@ -53,7 +57,7 @@ cat > "$TMPDIR/multiline.json" << 'EOF'
 EOF
 
 raw=$(jq -r "$JQ_EXPR" "$TMPDIR/multiline.json")
-IFS=$'\t' read -r model status pct tok_k task activity updated_at <<< "$raw"
+IFS=$'\t' read -r model status pct tok_used tok_total task activity updated_at tokens_updated_at <<< "$raw"
 assert_eq "multiline: task normalized to single line" "Line one Line two Line three" "$task"
 assert_eq "multiline: activity normalized" 'Bash: echo "hello world"' "$activity"
 assert_eq "multiline: model preserved" "Claude" "$model"
@@ -72,7 +76,7 @@ cat > "$TMPDIR/tabs.json" << 'EOF'
 EOF
 
 raw=$(jq -r "$JQ_EXPR" "$TMPDIR/tabs.json")
-IFS=$'\t' read -r model status pct tok_k task activity updated_at <<< "$raw"
+IFS=$'\t' read -r model status pct tok_used tok_total task activity updated_at tokens_updated_at <<< "$raw"
 assert_eq "tabs: task tabs replaced with spaces" "col1 col2 col3" "$task"
 
 # ── Test 4: Stale sidecar detection ──
@@ -88,7 +92,7 @@ cat > "$TMPDIR/stale.json" << 'EOF'
 EOF
 
 raw=$(jq -r "$JQ_EXPR" "$TMPDIR/stale.json")
-IFS=$'\t' read -r model status pct tok_k task activity updated_at <<< "$raw"
+IFS=$'\t' read -r model status pct tok_used tok_total task activity updated_at tokens_updated_at <<< "$raw"
 # jq returns raw status; stale detection is done in bash
 assert_eq "stale: jq returns raw status" "working" "$status"
 # Simulate stale check
@@ -107,11 +111,12 @@ cat > "$TMPDIR/minimal.json" << 'EOF'
 EOF
 
 raw=$(jq -r "$JQ_EXPR" "$TMPDIR/minimal.json")
-IFS=$'\t' read -r model status pct tok_k task activity updated_at <<< "$raw"
+IFS=$'\t' read -r model status pct tok_used tok_total task activity updated_at tokens_updated_at <<< "$raw"
 assert_eq "minimal: model defaults to Claude" "Claude" "$model"
 assert_eq "minimal: status defaults to idle" "idle" "$status"
 assert_eq "minimal: pct defaults to 0" "0" "$pct"
-assert_eq "minimal: tok_k defaults to 0" "0" "$tok_k"
+assert_eq "minimal: tok_used defaults to 0" "0" "$tok_used"
+assert_eq "minimal: tok_total defaults to 0" "0" "$tok_total"
 assert_eq "minimal: task defaults to dash" "-" "$task"
 
 # ── Test 6: jq failure on invalid JSON produces unknown status ──

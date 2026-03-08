@@ -7,12 +7,16 @@
 #
 # Output schema:
 # {
-#   "agents": [{ pane_addr, pane_id, engine, model, status, pct, tok_k, task, activity }],
+#   "agents": [{ pane_addr, pane_id, engine, model, status,
+#                tokens: { used, total, pct, source, fresh },
+#                task, activity }],
 #   "orchestrator": [{ area, batch_id, batch_alive, batch_status, n_done, n_failed, n_total,
 #                      created_at, elapsed, dispatched: [...] }]
 # }
 #
 # Status enum: idle, working, plan, needs-input, done, error, unknown
+# Token source enum: sidecar, scraping, session, unknown
+# Token fresh: true = current, false = stale (>30s since last token update)
 
 # Codex session file mtime cache for incremental reparse detection (#72)
 declare -A _CODEX_CACHE_MTIME=()
@@ -95,31 +99,46 @@ _collect_claude_pane() {
   local pane_file="${pane_id#%}"
   local sidecar_path="${sidecar_dir}/${pane_file}.json"
 
-  local model="Claude" status="idle" pct=0 tok_k=0 task="-" activity=""
+  local model="Claude" status="idle" task="-" activity=""
+  local tok_used=0 tok_total=0 tok_pct=0 tok_source="unknown" tok_fresh=true
 
   if [[ -f "$sidecar_path" ]]; then
     # Read sidecar: single jq call, normalize text to single-line, output @tsv.
-    # jq @tsv properly escapes \t and \n in values, making read safe.
+    # Includes tokens_updated_at for independent token freshness tracking (#74).
     local raw
     raw=$(jq -r '[
       (.model // "Claude"),
       (.status // "idle"),
       (.tokens.pct // 0 | tostring),
-      ((.tokens.used // 0) / 1000 | floor | tostring),
+      (.tokens.used // 0 | tostring),
+      (.tokens.max // 0 | tostring),
       ((.task // "-") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " ")),
       ((.activity // "") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " ")),
-      (.updated_at // 0 | tostring)
+      (.updated_at // 0 | tostring),
+      (.tokens_updated_at // 0 | tostring)
     ] | @tsv' "$sidecar_path" 2>/dev/null)
 
     if [[ -n "$raw" ]]; then
-      local updated_at
-      IFS=$'\t' read -r model status pct tok_k task activity updated_at <<< "$raw"
+      local updated_at tokens_updated_at
+      IFS=$'\t' read -r model status tok_pct tok_used tok_total \
+        task activity updated_at tokens_updated_at <<< "$raw"
 
-      # Stale sidecar detection: >30s without update + non-idle → reset (#47)
+      tok_source="sidecar"
+
+      local now_epoch
+      now_epoch=$(date +%s)
+
+      # Token freshness: use tokens_updated_at if available, else fall back to updated_at (#74)
+      local tok_ts="${tokens_updated_at:-0}"
+      [[ "$tok_ts" == "0" || "$tok_ts" == "null" || -z "$tok_ts" ]] && tok_ts="${updated_at:-0}"
+      if [[ -n "$tok_ts" && "$tok_ts" != "0" && "$tok_ts" != "null" ]]; then
+        local tok_age=$(( now_epoch - ${tok_ts%.*} ))
+        (( tok_age > 30 )) && tok_fresh=false
+      fi
+
+      # Status staleness: >30s without update + non-idle → reset (#47)
       if [[ "$status" != "idle" && -n "$updated_at" && "$updated_at" != "0" ]]; then
-        local now_epoch age
-        now_epoch=$(date +%s)
-        age=$(( now_epoch - ${updated_at%.*} ))
+        local age=$(( now_epoch - ${updated_at%.*} ))
         if (( age > 30 )); then
           status="idle"
           activity=""
@@ -142,20 +161,23 @@ _collect_claude_pane() {
     pane_status=$(_infer_status_from_pane "$pane_id" 8)
     [[ -n "$pane_status" ]] && status="$pane_status"
 
-    # Token % from scraping — extract actual window size, not hardcoded 200k (#72)
+    # Token % from scraping — extract actual window size (#72)
     local captured
     captured=$(tmux capture-pane -p -t "$pane_id" -S -50 2>/dev/null)
     if [[ -n "$captured" ]]; then
-      local tok tok_total
+      local tok tok_total_k
       tok=$(printf '%s' "$captured" \
         | grep -oE '[0-9]+% of [0-9]+k tokens' | tail -1)
       if [[ -n "$tok" ]]; then
-        pct=$(printf '%s' "$tok" | grep -oE '^[0-9]+')
-        tok_total=$(printf '%s' "$tok" | grep -oE 'of [0-9]+k' | grep -oE '[0-9]+')
-        if [[ -n "$tok_total" && -n "$pct" ]]; then
-          tok_k=$(( pct * tok_total / 100 ))
+        tok_pct=$(printf '%s' "$tok" | grep -oE '^[0-9]+')
+        tok_total_k=$(printf '%s' "$tok" | grep -oE 'of [0-9]+k' | grep -oE '[0-9]+')
+        if [[ -n "$tok_total_k" && -n "$tok_pct" ]]; then
+          tok_total=$(( tok_total_k * 1000 ))
+          tok_used=$(( tok_pct * tok_total / 100 ))
+          tok_source="scraping"
         fi
       fi
+      # If no match: tok_source stays "unknown", values stay 0
 
       # Task from scraping
       local ptask
@@ -179,18 +201,23 @@ _collect_claude_pane() {
   task=$(printf '%s' "$task" | tr '\n\t\r' '   ' | sed 's/  */ /g')
   activity=$(printf '%s' "$activity" | tr '\n\t\r' '   ' | sed 's/  */ /g')
 
-  # Output JSON record
+  # Output JSON record with token sub-object (#74)
   jq -nc \
     --arg pa "$pane_addr $pane_id" \
     --arg pi "$pane_id" \
     --arg e "claude" \
     --arg m "$model" \
     --arg s "$status" \
-    --argjson p "${pct:-0}" \
-    --argjson tk "${tok_k:-0}" \
+    --argjson tu "${tok_used:-0}" \
+    --argjson tt "${tok_total:-0}" \
+    --argjson tp "${tok_pct:-0}" \
+    --arg ts "$tok_source" \
+    --argjson tf "$tok_fresh" \
     --arg ta "$task" \
     --arg ac "$activity" \
-    '{pane_addr:$pa, pane_id:$pi, engine:$e, model:$m, status:$s, pct:$p, tok_k:$tk, task:$ta, activity:$ac}'
+    '{pane_addr:$pa, pane_id:$pi, engine:$e, model:$m, status:$s,
+      tokens:{used:$tu, total:$tt, pct:$tp, source:$ts, fresh:$tf},
+      task:$ta, activity:$ac}'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -235,7 +262,8 @@ _find_codex_session_file() {
 _collect_codex_pane() {
   local pane_id=$1 pane_tty=${2:-} pane_addr=$3
 
-  local model="Codex" status="idle" pct=0 tok_k=0 task="-" activity=""
+  local model="Codex" status="idle" task="-" activity=""
+  local tok_used=0 tok_total=0 tok_pct=0 tok_source="unknown" tok_fresh=true
 
   local session_file
   session_file=$(_find_codex_session_file "$pane_id" "$pane_tty")
@@ -249,45 +277,63 @@ _collect_codex_pane() {
     local cached_stat="${_CODEX_CACHE_MTIME[$cache_key]:-}"
     if [[ "$file_stat" == "$cached_stat" && -n "${_CODEX_CACHE_DATA[$cache_key]:-}" ]]; then
       # Cache hit
-      IFS=$'\t' read -r model tok_k pct task <<< "${_CODEX_CACHE_DATA[$cache_key]}"
+      IFS=$'\t' read -r model tok_used tok_total task <<< "${_CODEX_CACHE_DATA[$cache_key]}"
     else
       # Cache miss: full parse with single jq call.
+      # Coherent snapshot: used+total extracted from same .payload.info event (#74).
       # Text fields normalized to single-line via gsub.
       local raw_jq
       raw_jq=$(jq -rs '
         def last_ne(f): [.[] | f | select(. != null and . != "")] | if length == 0 then null else last end;
+        (
+          [.[] | select(.payload.info | type == "object") |
+            { used: .payload.info.total_token_usage.total_tokens,
+              total: .payload.info.model_context_window } |
+            select(.used != null and .total != null)
+          ] | if length == 0 then null else last end
+        ) as $tok_pair |
         {
-          model:     last_ne(select(.type == "turn_context") | .payload.model),
-          total_tok: last_ne(select(.payload.info | type == "object") | .payload.info.total_token_usage.total_tokens),
-          ctx_win:   last_ne(select(.payload.info | type == "object") | .payload.info.model_context_window),
-          msg:       (last_ne(select(.payload.type == "user_message") | .payload.message)
-                     // last_ne(select(.type == "response_item" and .payload.role == "user") | .payload.content // .payload.message))
+          model: last_ne(select(.type == "turn_context") | .payload.model),
+          tok_used:  ($tok_pair.used // 0),
+          tok_total: ($tok_pair.total // 0),
+          msg:   (last_ne(select(.payload.type == "user_message") | .payload.message)
+                 // last_ne(select(.type == "response_item" and .payload.role == "user") | .payload.content // .payload.message))
         } | [
           (.model // ""),
-          (.total_tok // 0 | tostring),
-          (.ctx_win // 0 | tostring),
+          (.tok_used | tostring),
+          (.tok_total | tostring),
           ((.msg // "") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " "))
         ] | @tsv
       ' "$session_file" 2>/dev/null)
 
       if [[ -n "$raw_jq" ]]; then
-        local raw_model raw_total_tok raw_ctx_win raw_msg
-        IFS=$'\t' read -r raw_model raw_total_tok raw_ctx_win raw_msg <<< "$raw_jq"
+        local raw_model raw_tok_used raw_tok_total raw_msg
+        IFS=$'\t' read -r raw_model raw_tok_used raw_tok_total raw_msg <<< "$raw_jq"
         [[ -n "$raw_model" ]] && model="$raw_model"
-
-        local ctx_window="${raw_ctx_win:-200000}"
-        [[ -z "$ctx_window" || "$ctx_window" -le 0 ]] 2>/dev/null && ctx_window=200000
-        if [[ -n "$raw_total_tok" && "$raw_total_tok" -gt 0 ]] 2>/dev/null; then
-          pct=$(( raw_total_tok * 100 / ctx_window ))
-          (( pct > 100 )) && pct=100
-          tok_k=$(( raw_total_tok / 1000 ))
-        fi
+        [[ -n "$raw_tok_used" ]] && tok_used="$raw_tok_used"
+        [[ -n "$raw_tok_total" ]] && tok_total="$raw_tok_total"
         [[ -n "$raw_msg" ]] && task="$raw_msg"
-      fi
 
-      # Update cache
-      _CODEX_CACHE_MTIME[$cache_key]="$file_stat"
-      _CODEX_CACHE_DATA[$cache_key]=$(printf '%s\t%s\t%s\t%s' "$model" "$tok_k" "$pct" "$task")
+        # Update cache with new data
+        _CODEX_CACHE_MTIME[$cache_key]="$file_stat"
+        _CODEX_CACHE_DATA[$cache_key]=$(printf '%s\t%s\t%s\t%s' "$model" "$tok_used" "$tok_total" "$task")
+      else
+        # Parse failed (partial JSONL write): use last-good cache if available (#74)
+        if [[ -n "${_CODEX_CACHE_DATA[$cache_key]:-}" ]]; then
+          IFS=$'\t' read -r model tok_used tok_total task <<< "${_CODEX_CACHE_DATA[$cache_key]}"
+          tok_fresh=false  # Stale since we couldn't read current data
+        fi
+        # Don't update cache - keep last-good state
+      fi
+    fi
+
+    # Compute pct from coherent used/total pair (#74)
+    if [[ -n "$tok_total" && "$tok_total" -gt 0 ]] 2>/dev/null; then
+      if [[ -n "$tok_used" && "$tok_used" -gt 0 ]] 2>/dev/null; then
+        tok_pct=$(( tok_used * 100 / tok_total ))
+        (( tok_pct > 100 )) && tok_pct=100
+      fi
+      tok_source="session"
     fi
   fi
 
@@ -303,18 +349,23 @@ _collect_codex_pane() {
   # Final text normalization
   task=$(printf '%s' "$task" | tr '\n\t\r' '   ' | sed 's/  */ /g')
 
-  # Output JSON record
+  # Output JSON record with token sub-object (#74)
   jq -nc \
     --arg pa "$pane_addr $pane_id" \
     --arg pi "$pane_id" \
     --arg e "codex" \
     --arg m "$model" \
     --arg s "$status" \
-    --argjson p "${pct:-0}" \
-    --argjson tk "${tok_k:-0}" \
+    --argjson tu "${tok_used:-0}" \
+    --argjson tt "${tok_total:-0}" \
+    --argjson tp "${tok_pct:-0}" \
+    --arg ts "$tok_source" \
+    --argjson tf "$tok_fresh" \
     --arg ta "$task" \
     --arg ac "$activity" \
-    '{pane_addr:$pa, pane_id:$pi, engine:$e, model:$m, status:$s, pct:$p, tok_k:$tk, task:$ta, activity:$ac}'
+    '{pane_addr:$pa, pane_id:$pi, engine:$e, model:$m, status:$s,
+      tokens:{used:$tu, total:$tt, pct:$tp, source:$ts, fresh:$tf},
+      task:$ta, activity:$ac}'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
