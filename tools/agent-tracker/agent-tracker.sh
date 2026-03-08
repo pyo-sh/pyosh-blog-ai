@@ -384,7 +384,7 @@ render_orchestrator() {
         .area, .batchId,
         cnt("completed"), cnt("dispatched"), cnt("pending"), cnt("blocked"), cnt("failed"),
         (.issues | length | tostring),
-        (.orchestratorPane // ""),
+        (.orchestratorPid // 0 | tostring),
         (.orchestratorStartedAt // ""),
         (.createdAt // ""),
         (. as $root | [.dispatched | to_entries[]
@@ -396,21 +396,20 @@ render_orchestrator() {
     local meta dispatched_data
     IFS=$'\x1f' read -r meta dispatched_data <<< "$combined"
 
-    local area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pane orch_started_at created_at
-    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pane orch_started_at created_at <<< "$meta"
+    local area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pid orch_started_at created_at
+    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pid orch_started_at created_at <<< "$meta"
 
-    # ── Batch liveness: pane's Claude Code start time must match ──
-    # Skip rendering if orchestrator session is no longer alive in the pane.
-    if [[ -n "$orch_pane" && -n "$orch_started_at" && "$orch_started_at" != "null" ]]; then
-      local _pane_root
-      _pane_root=$(tmux display-message -t "$orch_pane" -p '#{pane_pid}' 2>/dev/null) || continue
-      local _claude_pid
-      _claude_pid=$(_find_claude_pid "$_pane_root") || continue
-      local _cur_start
-      _cur_start=$(awk '{print $22}' /proc/"$_claude_pid"/stat 2>/dev/null)
-      [[ "$_cur_start" != "$orch_started_at" ]] && continue
-    else
+    # ── Batch liveness: check stored PID directly ──
+    # Skip rendering if orchestrator process is no longer alive.
+    if [[ -z "$orch_pid" || "$orch_pid" == "0" || "$orch_pid" == "null" ]]; then
       continue
+    fi
+    kill -0 "$orch_pid" 2>/dev/null || continue
+    # PID reuse protection: verify start time matches
+    if [[ -n "$orch_started_at" && "$orch_started_at" != "null" ]]; then
+      local _cur_start
+      _cur_start=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
+      [[ "$_cur_start" != "$orch_started_at" ]] && continue
     fi
 
     local batch_status="active"
@@ -567,87 +566,6 @@ render_orchestrator() {
   done
 }
 
-# _get_cmdline <pid>
-_get_cmdline() {
-  local pid=$1
-  if [[ -f /proc/"$pid"/cmdline ]]; then
-    tr '\0' ' ' < /proc/"$pid"/cmdline 2>/dev/null
-    return
-  fi
-  ps -o command= -p "$pid" 2>/dev/null
-}
-
-# _get_exe_name <pid>
-_get_exe_name() {
-  local pid=$1
-  if [[ -L /proc/"$pid"/exe ]]; then
-    local p
-    p=$(readlink /proc/"$pid"/exe 2>/dev/null) && printf '%s' "${p##*/}"
-    return
-  fi
-  ps -o comm= -p "$pid" 2>/dev/null | xargs basename 2>/dev/null
-}
-
-# _match_agent <cmdline> <exe_name>
-_match_agent() {
-  local cmdline="$1" exe="$2"
-  if [[ "$exe" == "claude" ]] || \
-     [[ "$cmdline" =~ @anthropic-ai/claude-code|claude-code/cli ]]; then
-    printf 'claude'; return 0
-  fi
-  if [[ "$exe" == "codex" ]] || \
-     [[ "$cmdline" =~ @openai/codex|codex\.js ]]; then
-    printf 'codex'; return 0
-  fi
-  return 1
-}
-
-# detect_agent_type <pane_pid>
-# No cache — re-detects each cycle so dynamic pane changes (agent start/stop)
-# are reflected immediately. Cost is negligible (~50 /proc reads/sec). (#47)
-detect_agent_type() {
-  local root_pid="$1"
-  local pids=() queue=("$root_pid") pid child cmdline exename result
-
-  while (( ${#queue[@]} > 0 )); do
-    pid="${queue[0]}"; queue=("${queue[@]:1}")
-    pids+=("$pid")
-    while IFS= read -r child; do
-      [[ -n "$child" ]] && queue+=("$child")
-    done < <(pgrep -P "$pid" 2>/dev/null)
-  done
-  for pid in "${pids[@]}"; do
-    cmdline=$(_get_cmdline "$pid") || continue
-    exename=$(_get_exe_name "$pid") || true
-    result=$(_match_agent "$cmdline" "$exename") && {
-      printf '%s' "$result"
-      return 0
-    }
-  done
-  return 1
-}
-
-# _find_claude_pid <root_pid> — find Claude Code PID in process tree
-_find_claude_pid() {
-  local root_pid="$1"
-  local pids=() queue=("$root_pid") pid child cmdline exename
-  while (( ${#queue[@]} > 0 )); do
-    pid="${queue[0]}"; queue=("${queue[@]:1}")
-    pids+=("$pid")
-    while IFS= read -r child; do
-      [[ -n "$child" ]] && queue+=("$child")
-    done < <(pgrep -P "$pid" 2>/dev/null)
-  done
-  for pid in "${pids[@]}"; do
-    cmdline=$(_get_cmdline "$pid") || continue
-    exename=$(_get_exe_name "$pid") || true
-    if [[ "$(_match_agent "$cmdline" "$exename")" == "claude" ]]; then
-      printf '%s' "$pid"
-      return 0
-    fi
-  done
-  return 1
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard renderer
@@ -671,9 +589,10 @@ render_dashboard() {
   local now
   now=$(date '+%Y-%m-%d %H:%M:%S')
 
-  # ── Collect agent pane data ────────────────────────────────────────────────
+  # ── Collect agent pane data + compute column widths in single pass ────────
   local -a rows=()
   local n_working=0 n_plan=0 n_idle=0
+  local W_TOKENS=$W_TOKENS_MIN W_ACTIVITY=$W_ACTIVITY_MIN
 
   while IFS=' ' read -r pane_addr pane_id pane_cmd; do
     local etype
@@ -681,10 +600,17 @@ render_dashboard() {
       claude) etype="claude" ;;
       codex)  etype="codex"  ;;
       *)
-        local _pane_pid _detected
-        _pane_pid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
-        _detected=$(detect_agent_type "$_pane_pid" 2>/dev/null) || continue
-        etype="$_detected" ;;
+        # Check if claude/codex runs in this pane via tty process list
+        local _pane_tty _tty_procs
+        _pane_tty=$(tmux display-message -t "$pane_id" -p '#{pane_tty}' 2>/dev/null) || continue
+        _tty_procs=$(ps -t "${_pane_tty#/dev/}" -o comm= 2>/dev/null) || continue
+        if printf '%s\n' "$_tty_procs" | grep -qx 'claude'; then
+          etype="claude"
+        elif printf '%s\n' "$_tty_procs" | grep -qx 'codex'; then
+          etype="codex"
+        else
+          continue
+        fi ;;
     esac
 
     local data
@@ -710,6 +636,21 @@ render_dashboard() {
       *)            (( n_idle++ ))    ;;
     esac
 
+    # Track column widths during collection
+    local _tok_str _tok_w
+    if (( tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$tok_k"; fi
+    _tok_w=$(( 5 + 1 + ${#_tok_str} ))
+    (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
+
+    local _act_disp _act_dw
+    if [[ -z "$activity" || "$activity" == "null" ]]; then
+      [[ "$status" == "idle" ]] && _act_disp="— (idle)" || _act_disp="—"
+    else
+      _act_disp="$activity"
+    fi
+    _act_dw=$(display_width "$_act_disp")
+    (( _act_dw > W_ACTIVITY )) && W_ACTIVITY=$_act_dw
+
     rows+=("$(printf '%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s\x1e%s' \
       "$pane_addr" "$pane_id" "$etype" "$model" "$status" "$pct" "$tok_k" "$task" "$activity")")
   done < <(tmux list-panes -s -t "$SESSION" \
@@ -717,29 +658,6 @@ render_dashboard() {
 
   local n_total=${#rows[@]}
 
-  # ── TOKENS column width ────────────────────────────────────────────────────
-  local W_TOKENS=$W_TOKENS_MIN
-  local _tok_str _tok_w _row_tok_k _row_pct
-  for _row in "${rows[@]}"; do
-    IFS=$'\x1e' read -r _ _ _ _ _ _row_pct _row_tok_k _ _ <<< "$_row"
-    if (( _row_tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$_row_tok_k"; fi
-    _tok_w=$(( 5 + 1 + ${#_tok_str} ))
-    (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
-  done
-
-  # ── ACTIVITY column width — dynamic based on actual content (#32) ──────────
-  local W_ACTIVITY=$W_ACTIVITY_MIN
-  for _row in "${rows[@]}"; do
-    local _r_status _r_activity _act_disp _act_dw
-    IFS=$'\x1e' read -r _ _ _ _ _r_status _ _ _ _r_activity <<< "$_row"
-    if [[ -z "$_r_activity" || "$_r_activity" == "null" ]]; then
-      [[ "$_r_status" == "idle" ]] && _act_disp="— (idle)" || _act_disp="—"
-    else
-      _act_disp="$_r_activity"
-    fi
-    _act_dw=$(display_width "$_act_disp")
-    (( _act_dw > W_ACTIVITY )) && W_ACTIVITY=$_act_dw
-  done
   # Cap W_ACTIVITY so W_TASK always has room for at least 15 chars (#33)
   local W_ACTIVITY_MAX=$(( INNER - W_PANE - W_ENGINE - W_STATUS - W_TOKENS - 9 - 15 ))
   (( W_ACTIVITY_MAX < W_ACTIVITY_MIN )) && W_ACTIVITY_MAX=$W_ACTIVITY_MIN
