@@ -22,7 +22,7 @@ export AGENT_TRACKER_PANE="${TMUX_PANE:-pid-$PPID}"
 
 # Pre-compute tokens from current_usage for context-bar.sh compatibility.
 # context-bar.sh has its own fallback when this env var is missing.
-# NOTE: Keep token calculation logic in sync with context-bar.sh:108-121.
+# SYNC:token-calc-fallback — keep in sync with context-bar.sh fallback
 TRANSCRIPT_TOKENS=$(printf '%s' "$input" | jq -r '
   .context_window |
   if .current_usage != null then
@@ -36,7 +36,7 @@ TRANSCRIPT_TOKENS=$(printf '%s' "$input" | jq -r '
 export TRANSCRIPT_TOKENS="${TRANSCRIPT_TOKENS:-0}"
 
 # Pre-compute last user message from transcript.
-# NOTE: Keep jq logic in sync with context-bar.sh:167-183.
+# SYNC:last-user-msg — keep in sync with context-bar.sh fallback
 _tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
 export TRANSCRIPT_LAST_MSG=""
 if [[ -n "$_tp" && -f "$_tp" ]]; then

@@ -241,13 +241,15 @@ parse_claude_pane() {
 # Data extraction: Codex (pane scraping — no hooks support)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# find_codex_session_file <pane_id>
+# find_codex_session_file <pane_id> [pane_tty]
 # Finds codex session JSONL via tty → PID → /proc/fd scan (single process, no BFS).
+# Optional pane_tty avoids redundant tmux call when caller already resolved it.
 find_codex_session_file() {
   local pane_id="$1"
-  local pane_tty codex_pid session_file
+  local pane_tty="${2:-}"
+  local codex_pid session_file
 
-  pane_tty=$(tmux display-message -t "$pane_id" -p '#{pane_tty}' 2>/dev/null)
+  [[ -z "$pane_tty" ]] && pane_tty=$(tmux display-message -t "$pane_id" -p '#{pane_tty}' 2>/dev/null)
   [[ -z "$pane_tty" ]] && return
 
   codex_pid=$(ps -t "${pane_tty#/dev/}" -o pid=,comm= 2>/dev/null \
@@ -263,13 +265,14 @@ find_codex_session_file() {
 
 parse_codex_pane() {
   local pane_id="$1"
+  local pane_tty="${2:-}"
   local captured
   captured=$(tmux capture-pane -p -t "$pane_id" -S -50 2>/dev/null)
 
   local model="Codex" status="idle" pct=0 tok_k=0 task="—" activity=""
 
   local session_file
-  session_file=$(find_codex_session_file "$pane_id")
+  session_file=$(find_codex_session_file "$pane_id" "$pane_tty")
 
   if [[ -n "$session_file" && -f "$session_file" ]]; then
     # Merge all jq queries into a single pass over the session file (#30)
@@ -586,13 +589,13 @@ render_dashboard() {
   local W_TOKENS=$W_TOKENS_MIN W_ACTIVITY=$W_ACTIVITY_MIN
 
   while IFS=' ' read -r pane_addr pane_id pane_cmd; do
-    local etype
+    local etype _pane_tty=""
     case "$pane_cmd" in
       claude) etype="claude" ;;
       codex)  etype="codex"  ;;
       *)
         # Check if claude/codex runs in this pane via tty process list
-        local _pane_tty _tty_procs
+        local _tty_procs
         _pane_tty=$(tmux display-message -t "$pane_id" -p '#{pane_tty}' 2>/dev/null) || continue
         _tty_procs=$(ps -t "${_pane_tty#/dev/}" -o comm= 2>/dev/null) || continue
         if printf '%s\n' "$_tty_procs" | grep -qx 'claude'; then
@@ -608,7 +611,7 @@ render_dashboard() {
     if [[ "$etype" == "claude" ]]; then
       data=$(parse_claude_pane "$pane_id")
     else
-      data=$(parse_codex_pane "$pane_id")
+      data=$(parse_codex_pane "$pane_id" "$_pane_tty")
     fi
 
     local model status pct tok_k task activity

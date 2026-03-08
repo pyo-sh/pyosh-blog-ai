@@ -105,7 +105,7 @@ max_k=$((max_context / 1000))
 
 # Calculate context bar — use pre-computed value from statusline-wrapper.sh if available,
 # otherwise fall back to reading transcript directly.
-# NOTE: Fallback jq logic must stay in sync with statusline-wrapper.sh:26-35.
+# NOTE: Fallback logic must stay in sync — search SYNC:token-calc-fallback
 context_length=0
 if [[ -n "${TRANSCRIPT_TOKENS:-}" && "${TRANSCRIPT_TOKENS:-0}" -gt 0 ]] 2>/dev/null; then
     context_length="$TRANSCRIPT_TOKENS"
@@ -161,7 +161,7 @@ printf '%b\n' "$output"
 
 # Get user's last message — use pre-computed value from wrapper if available,
 # otherwise fall back to reading transcript directly.
-# NOTE: Fallback jq logic must stay in sync with statusline-wrapper.sh:43-58.
+# NOTE: Fallback logic must stay in sync — search SYNC:last-user-msg
 last_user_msg=""
 if [[ -n "${TRANSCRIPT_LAST_MSG:-}" ]]; then
     last_user_msg="$TRANSCRIPT_LAST_MSG"
