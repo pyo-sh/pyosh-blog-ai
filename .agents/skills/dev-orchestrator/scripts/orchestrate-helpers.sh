@@ -1,12 +1,20 @@
 #!/bin/bash
-# orchestrate-helpers.sh — Shell helpers for dev-orchestrator skill
+# orchestrate-helpers.sh - Shell helpers for dev-orchestrator skill
 # Source this file at orchestrator start.
 #
 # Dispatch model: headless `claude -p` background processes (no tmux dependency).
 # Each issue gets its own background process running /dev-pipeline.
+#
+# Key design decisions:
+#   - attemptId: unique per dispatch attempt, prevents stale file collision
+#   - setsid + PGID: process group based lifecycle management
+#   - flock: state file locking for correctness
+#   - provider health: circuit breaker for GitHub API failures
+#   - exit file JSON: explicit completion signal with attemptId matching
+#   - heartbeat: explicit activity signal from dispatch wrapper
+#   - skipped_dep_failed: failed dependency propagation without dispatching
 
 # Source shared monorepo helpers for MONOREPO_ROOT and area resolution.
-# → .agents/references/monorepo-layout.md
 _ORCH_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_ORCH_HELPERS_DIR/../../../../.agents/scripts/monorepo-helpers.sh"
 ORCH_BASE="$MONOREPO_ROOT/.workspace/orchestrate"
@@ -27,6 +35,15 @@ orch_signal_path() {
   echo "$ORCH_BASE/${area}/issue-${issue}.exit"
 }
 
+orch_attempt_id() {
+  # Generate a unique attempt identifier.
+  # Format: {batchId}-issue{N}-attempt{M}
+  local batch_id=$1
+  local issue=$2
+  local retry_count=$3
+  echo "${batch_id}-issue${issue}-attempt${retry_count}"
+}
+
 orch_init() {
   # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent]
   # Creates initial batch state file.
@@ -34,7 +51,7 @@ orch_init() {
   local agent=$2
   local issues_json=$3  # JSON array e.g. '[1,2,3]'
   local dag_json=$4     # JSON object e.g. '{"3":[1,2]}'
-  local max_concurrent=${5:-4}  # default: 4 concurrent processes
+  local max_concurrent=${5:-4}
 
   mkdir -p "$ORCH_BASE/$area"
 
@@ -47,14 +64,19 @@ orch_init() {
   filtered_dag=$(jq -n \
     --argjson issues "$issues_json" \
     --argjson dag "$dag_json" \
-    '$dag | to_entries | map(.value |= map(select(. as $d | $issues | any(. == $d)))) | from_entries')
+    '$dag | to_entries
+     | map(.value |= map(select(. as $d | $issues | any(. == $d))))
+     | from_entries')
 
   # Build initial status: pending for issues with no deps, blocked otherwise
   local status_json
   status_json=$(jq -n \
     --argjson issues "$issues_json" \
     --argjson dag "$filtered_dag" \
-    'reduce $issues[] as $n ({}; . + {($n|tostring): (if ($dag[($n|tostring)] // []) | length > 0 then "blocked" else "pending" end)})')
+    'reduce $issues[] as $n ({};
+       . + {($n|tostring):
+         (if ($dag[($n|tostring)] // []) | length > 0
+          then "blocked" else "pending" end)})')
 
   jq -n \
     --arg area "$area" \
@@ -68,24 +90,25 @@ orch_init() {
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
       status: $status, dispatched: {}, agent: $agent,
       maxConcurrent: $maxConcurrent,
+      providers: {github: {status: "healthy", consecutiveFailures: 0,
+                           lastError: null, lastCheckedAt: null}},
       orchestratorPid: 0, orchestratorPane: "", orchestratorStartedAt: "",
       createdAt: $now, updatedAt: $now}' \
     > "$(orch_state_path "$area")"
 
-  # Record orchestrator identity (pane + start time) for agent-tracker liveness.
   orch_register_self "$area"
 }
 
 orch_register_self() {
   # Usage: orch_register_self <area>
-  # Records current orchestrator identity (pane + start time) in batch state.
+  # Records current orchestrator identity in batch state.
   # Call at orch_init AND on every resume/recovery to keep liveness info fresh.
   local area=$1
   local orch_pane="${TMUX_PANE:-}"
-  local orch_pid=$PPID
+  local orch_pid=${BASHPID:-$$}
   local orch_started_at=""
   if [ -f "/proc/$orch_pid/stat" ]; then
-    orch_started_at=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
+    orch_started_at=$(awk '{print $22}' "/proc/$orch_pid/stat") || true
   fi
   if [ -z "$orch_started_at" ]; then
     >&2 echo "[orchestrator] WARNING: could not read start time from /proc/$orch_pid/stat"
@@ -102,25 +125,28 @@ orch_state_read() {
 orch_state_update() {
   # Usage: orch_state_update <area> <jq_filter>
   # Applies a jq filter to update the state file in place.
-  # Writes atomically via temp file + mv to prevent state corruption on jq failure.
+  # Uses flock for mutual exclusion + temp file + mv for atomicity.
   local area=$1
   local filter=$2
   local path
   path=$(orch_state_path "$area")
-  local tmp_file
-  tmp_file=$(mktemp "$(dirname "$path")/.tmp.state.XXXXXX")
-  if jq "($filter) | .updatedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$path" > "$tmp_file"; then
-    mv "$tmp_file" "$path"
-  else
-    rm -f "$tmp_file"
-    >&2 echo "[orchestrator] orch_state_update: jq failed for area=$area, filter=$filter"
-    return 1
-  fi
+  (
+    flock -n 9 || { >&2 echo "[orchestrator] state lock held by another process"; exit 1; }
+    local tmp_file
+    tmp_file=$(mktemp "$(dirname "$path")/.tmp.state.XXXXXX")
+    if jq "($filter) | .updatedAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" "$path" > "$tmp_file"; then
+      mv "$tmp_file" "$path"
+    else
+      rm -f "$tmp_file"
+      >&2 echo "[orchestrator] orch_state_update: jq failed for area=$area, filter=$filter"
+      exit 1
+    fi
+  ) 9>"${path}.lock"
 }
 
 orch_status_set() {
   # Usage: orch_status_set <area> <issue> <status>
-  # status: pending | blocked | dispatched | completed | failed
+  # Valid statuses: pending | blocked | dispatched | completed | failed | skipped_dep_failed
   local area=$1
   local issue=$2
   local status=$3
@@ -128,13 +154,102 @@ orch_status_set() {
 }
 
 # ──────────────────────────────────────────────
-# Process management (headless dispatch)
+# Provider health (GitHub circuit breaker)
+# ──────────────────────────────────────────────
+
+orch_provider_health_get() {
+  # Returns: "healthy" | "degraded" | "hard_fault"
+  local area=$1
+  orch_state_read "$area" | jq -r '.providers.github.status // "healthy"'
+}
+
+_orch_provider_health_record() {
+  # Internal: update provider health in state.
+  # result: "healthy" | "hard_fault" | "failure"
+  local area=$1 result=$2 error=${3:-}
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # Safely encode error string for JSON embedding (handles quotes, newlines, etc.)
+  local safe_error
+  safe_error=$(printf '%s' "$error" | jq -Rs '.'  | sed 's/^"//;s/"$//')
+
+  case "$result" in
+    healthy)
+      orch_state_update "$area" \
+        ".providers.github.status = \"healthy\"
+         | .providers.github.consecutiveFailures = 0
+         | .providers.github.lastCheckedAt = \"$now\""
+      ;;
+    hard_fault)
+      orch_state_update "$area" \
+        ".providers.github.status = \"hard_fault\"
+         | .providers.github.lastError = \"$safe_error\"
+         | .providers.github.lastCheckedAt = \"$now\""
+      ;;
+    failure)
+      orch_state_update "$area" \
+        ".providers.github.consecutiveFailures = ((.providers.github.consecutiveFailures // 0) + 1)
+         | .providers.github.status = (if .providers.github.consecutiveFailures >= 3 then \"degraded\" else .providers.github.status end)
+         | .providers.github.lastError = \"$safe_error\"
+         | .providers.github.lastCheckedAt = \"$now\""
+      ;;
+  esac
+}
+
+orch_gh() {
+  # Wrapper for gh commands with provider health tracking.
+  # Usage: orch_gh <area> <gh_subcommand> [args...]
+  # Returns: gh exit code. stdout: gh output on success.
+  # On auth failure (rc=4): sets hard_fault, blocks further calls.
+  # On other failure: increments consecutiveFailures, logs to gh-errors.log.
+  local area="$1"; shift
+
+  local health
+  health=$(orch_provider_health_get "$area")
+  if [ "$health" = "hard_fault" ]; then
+    >&2 echo "[orchestrator] GitHub provider hard fault - gh call blocked"
+    return 5
+  fi
+
+  local err_file out rc
+  err_file=$(mktemp)
+  out=$(gh "$@" 2>"$err_file") && rc=0 || rc=$?
+  local err_content
+  err_content=$(cat "$err_file")
+  rm -f "$err_file"
+
+  if [ $rc -eq 0 ]; then
+    # Only update state if transitioning from non-healthy
+    if [ "$health" != "healthy" ]; then
+      _orch_provider_health_record "$area" "healthy"
+    fi
+    echo "$out"
+    return 0
+  elif [ $rc -eq 4 ]; then
+    _orch_provider_health_record "$area" "hard_fault" "$err_content"
+    >&2 echo "[orchestrator] GitHub auth failure: $err_content"
+    return 4
+  else
+    _orch_provider_health_record "$area" "failure" "$err_content"
+    if [ -n "$err_content" ]; then
+      local err_log="$ORCH_BASE/${area}/gh-errors.log"
+      # Truncate if over 1MB to prevent unbounded growth
+      if [ -f "$err_log" ] && [ "$(stat -c %s "$err_log")" -gt 1048576 ]; then
+        tail -100 "$err_log" > "${err_log}.tmp" && mv "${err_log}.tmp" "$err_log"
+      fi
+      echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] gh rc=$rc: $err_content" >> "$err_log"
+    fi
+    return "$rc"
+  fi
+}
+
+# ──────────────────────────────────────────────
+# Process management (headless dispatch via setsid + PGID)
 # ──────────────────────────────────────────────
 
 _orch_parse_agent() {
   # Usage: read -r tool model <<< "$(_orch_parse_agent "$agent")"
-  # Parses structured agent string: "claude" | "claude:sonnet" | "claude:opus"
-  # stdout: two words - tool model (model may be empty)
+  # Parses agent string: "claude" | "claude:sonnet" | "claude:opus"
   local agent=$1
   local tool="${agent%%:*}"
   local model="${agent#*:}"
@@ -149,11 +264,18 @@ orch_process_alive() {
   [ -n "$pid" ] && [ "$pid" != "null" ] && kill -0 "$pid" 2>/dev/null
 }
 
+orch_pgid_alive() {
+  # Usage: orch_pgid_alive <pgid>
+  # Returns: 0 = at least one process in group alive, 1 = all dead
+  local pgid=$1
+  [ -n "$pgid" ] && [ "$pgid" != "null" ] && kill -0 -"$pgid" 2>/dev/null
+}
+
 orch_dispatch() {
   # Usage: orch_dispatch <issue> <area_dir> <agent> [retryCount]
   # Atomic: launches background process AND records in state.
-  # If state recording fails, kills the orphan process.
-  # stdout: PID of the background process
+  # If state recording fails, kills the orphan process group.
+  # stdout: wrapper PID (= PGID) of the background process
   # Returns: 0 = launched + recorded, 1 = failed
   local issue=$1
   local area_dir=$2
@@ -164,34 +286,60 @@ orch_dispatch() {
   area=$(monorepo_area_from_dir "$area_dir")
   local repo
   repo=$(monorepo_area_repo "$area")
+  local batch_id
+  batch_id=$(orch_state_read "$area" | jq -r '.batchId')
 
   local tool model
   read -r tool model <<< "$(_orch_parse_agent "$agent")"
 
   local log="$ORCH_BASE/${area}/issue-${issue}.log"
   local err_log="$ORCH_BASE/${area}/issue-${issue}.err"
+  local exit_file
+  exit_file=$(orch_signal_path "$area" "$issue")
+  local heartbeat_file="$ORCH_BASE/${area}/issue-${issue}.heartbeat"
+  local pid_file="$ORCH_BASE/${area}/issue-${issue}.pid"
+  local attempt_id
+  attempt_id=$(orch_attempt_id "$batch_id" "$issue" "$retry_count")
 
-  # Pipeline prompt: auto-approve merge since this is batch orchestration.
-  # No stdin available in -p mode, so pipeline must make autonomous decisions.
+  # Pre-dispatch cleanup: remove stale files from previous attempts.
+  # attemptId matching provides safety, but cleanup prevents confusion.
+  rm -f "$exit_file" "$heartbeat_file" "$pid_file" "$log" "$err_log"
+
   local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for review/resolve subprocesses (pass to pipeline_run_headless).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
-  # cd must be separate from the backgrounded command.
-  # `cd X && cmd &` backgrounds the whole compound list in a subshell that
-  # inherits the caller's stdout fd — blocking $() pipe EOF indefinitely.
+  local wrapper_script="$_ORCH_HELPERS_DIR/orch-dispatch-wrapper.sh"
+
+  # Launch in a new session (setsid) for process group isolation.
+  # The wrapper writes its PID (= PGID) to pid_file.
+  # timeout -k sends SIGKILL 30s after initial signal as runtime upper bound.
   cd "$MONOREPO_ROOT" || return 1
-  CLAUDECODE= timeout 3600 claude -p \
+  setsid bash "$wrapper_script" \
+    "$attempt_id" "$exit_file" "$heartbeat_file" "$pid_file" -- \
+    timeout -k 30 3600 claude -p \
     ${model:+--model "$model"} --dangerously-skip-permissions \
     --no-session-persistence \
     --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \
     --max-turns 80 \
     "$prompt" > "$log" 2>"$err_log" &
 
-  local pid=$!
+  # Wait for wrapper to write its PID
+  local wait_count=0
+  while [ ! -f "$pid_file" ] && [ "$wait_count" -lt 5 ]; do
+    sleep 1
+    wait_count=$((wait_count + 1))
+  done
 
-  # Brief check that process started
-  sleep 1
+  if [ ! -f "$pid_file" ]; then
+    >&2 echo "[orchestrator] Process failed to start for issue #${issue} (no pid file after 5s)"
+    return 1
+  fi
+
+  local pid
+  pid=$(cat "$pid_file")
+  local pgid=$pid  # setsid session leader: PGID = PID
+
   if ! orch_process_alive "$pid"; then
-    >&2 echo "[orchestrator] Process failed to start for issue #${issue}"
+    >&2 echo "[orchestrator] Process died immediately for issue #${issue}"
     return 1
   fi
 
@@ -199,9 +347,15 @@ orch_dispatch() {
   local now
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   if ! orch_state_update "$area" \
-    ".dispatched[\"$issue\"] = {pid: $pid, log: \"$log\", dispatchedAt: \"$now\", lastActivity: \"$now\", lastCommitSha: null, pipelineStarted: false, retryCount: $retry_count} | .status[\"$issue\"] = \"dispatched\""; then
-    >&2 echo "[orchestrator] State recording failed for #${issue} - killing orphan PID $pid"
-    orch_stop_process "$pid"
+    ".dispatched[\"$issue\"] = {
+       pid: $pid, pgid: $pgid, attemptId: \"$attempt_id\",
+       log: \"$log\", dispatchedAt: \"$now\", lastActivity: \"$now\",
+       lastCommitSha: null, lastCpuJiffies: \"0\",
+       pipelineStarted: false, retryCount: $retry_count
+     }
+     | .status[\"$issue\"] = \"dispatched\""; then
+    >&2 echo "[orchestrator] State recording failed for #${issue} - killing orphan PGID $pgid"
+    orch_stop_process "$area" "$issue"
     return 1
   fi
 
@@ -210,16 +364,34 @@ orch_dispatch() {
 }
 
 orch_stop_process() {
-  # Usage: orch_stop_process <pid>
-  # Gracefully stops a headless process. Sends SIGTERM, waits, then SIGKILL.
-  local pid=$1
-  if [ -z "$pid" ] || [ "$pid" = "null" ]; then return 0; fi
-  if ! orch_process_alive "$pid"; then return 0; fi
+  # Usage: orch_stop_process <area> <issue>
+  # Stops the entire process group for a dispatched issue.
+  # Sends SIGTERM to group, waits, then SIGKILL if needed.
+  local area=$1
+  local issue=$2
+  local state
+  state=$(orch_state_read "$area")
+  local pgid
+  pgid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pgid // empty")
 
-  kill "$pid" 2>/dev/null
+  if [ -z "$pgid" ] || [ "$pgid" = "null" ]; then
+    # Fallback: try PID-based kill (legacy state without pgid)
+    local pid
+    pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
+    if [ -n "$pid" ] && [ "$pid" != "null" ] && orch_process_alive "$pid"; then
+      kill "$pid" 2>/dev/null
+      sleep 3
+      orch_process_alive "$pid" && kill -9 "$pid" 2>/dev/null
+    fi
+    return 0
+  fi
+
+  if ! orch_pgid_alive "$pgid"; then return 0; fi
+
+  kill -- -"$pgid" 2>/dev/null
   sleep 3
-  if orch_process_alive "$pid"; then
-    kill -9 "$pid" 2>/dev/null
+  if orch_pgid_alive "$pgid"; then
+    kill -9 -- -"$pgid" 2>/dev/null
   fi
 }
 
@@ -229,16 +401,15 @@ orch_stop_process() {
 
 _orch_pr_list() {
   # Usage: _orch_pr_list <area> <issue> <state> <json_fields> <jq_filter>
-  # Finds PRs that close the given issue. Uses -R for explicit repo targeting.
-  # Avoid deprecated fields (projectCards etc.) - use number,title,state,body,url only.
+  # Finds PRs that close the given issue via orch_gh (provider health aware).
   local area=$1 issue=$2 state=$3 json_fields=$4 jq_filter=$5
   local repo
   repo=$(monorepo_area_repo "$area")
 
-  gh pr list \
+  orch_gh "$area" pr list \
     -R "$repo" \
     --search "\"Closes #${issue}\" OR \"Fixes #${issue}\" OR \"Resolves #${issue}\"" \
-    --state "$state" --json "$json_fields" --jq "$jq_filter" 2>/dev/null
+    --state "$state" --json "$json_fields" --jq "$jq_filter"
 }
 
 # ──────────────────────────────────────────────
@@ -248,157 +419,248 @@ _orch_pr_list() {
 orch_check_completion() {
   # Usage: orch_check_completion <issue> <area_dir>
   # Checks if a dispatched issue's pipeline has finished.
-  # stdout: "completed", "failed", or "running"
+  # stdout: "completed", "failed", "abnormal_exit", or "running"
   # Always returns 0 (safe for set -e callers).
   #
   # Detection priority:
-  #   1. Signal file (explicit completion, if present)
-  #   2. Process alive (PID still running?)
-  #   3. Pipeline state file (absent + previously seen = completed)
-  #   4. PR status (merged/open/absent)
+  #   1. Exit file JSON (explicit, with attemptId match)
+  #   2. Process group alive (PGID check)
+  #   3. Grace period for missing exit file (abnormal exit)
+  #   4. PR status (fallback, provider health aware)
   local issue=$1
   local area_dir=$2
   local area
   area=$(monorepo_area_from_dir "$area_dir")
 
-  # 1. Signal file (highest priority - explicit completion signal)
+  local state
+  state=$(orch_state_read "$area")
+  local current_attempt
+  current_attempt=$(echo "$state" | jq -r ".dispatched[\"$issue\"].attemptId // empty")
+  local pgid
+  pgid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pgid // empty")
+  local pid
+  pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
+
+  # 1. Exit file (highest priority - explicit completion signal)
   local signal
   signal=$(orch_signal_path "$area" "$issue")
   if [ -f "$signal" ]; then
-    local content
-    content=$(cat "$signal")
-    if [ "$content" = "ok" ]; then
-      echo "completed"; return 0
-    else
-      echo "failed"; return 0
-    fi
-  fi
+    local exit_json
+    exit_json=$(cat "$signal")
+    local file_attempt
+    file_attempt=$(echo "$exit_json" | jq -r '.attemptId // empty')
 
-  # Shared across checks 2-3
-  local state
-  state=$(orch_state_read "$area")
-  local pid
-  pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
-  local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-  local seen
-  seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
-
-  # 2. Process alive check (replaces tmux pane command check)
-  if [ -n "$pid" ] && orch_process_alive "$pid"; then
-    # Process running - check if pipeline state file exists (to track pipelineStarted)
-    if [ -f "$pipeline_state" ]; then
-      if [ "$seen" != "true" ]; then
-        orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true" || true
-      fi
+    if [ -n "$current_attempt" ] && [ "$file_attempt" != "$current_attempt" ]; then
+      # Stale exit file from a different attempt - ignore
+      >&2 echo "[orchestrator] Ignoring stale exit file for #${issue} (attempt mismatch: file=$file_attempt, current=$current_attempt)"
     else
-      # State file absent while process running - completed only if previously seen
-      if [ "$seen" = "true" ]; then
+      local exit_status
+      exit_status=$(echo "$exit_json" | jq -r '.status // "failed"')
+      if [ "$exit_status" = "completed" ]; then
         echo "completed"; return 0
+      else
+        echo "failed"; return 0
       fi
+    fi
+  fi
+
+  # 2. Process group alive check
+  local group_alive=false
+  if [ -n "$pgid" ] && orch_pgid_alive "$pgid"; then
+    group_alive=true
+  elif [ -n "$pid" ] && orch_process_alive "$pid"; then
+    # Fallback for legacy state without pgid
+    group_alive=true
+  fi
+
+  if [ "$group_alive" = "true" ]; then
+    # Track pipelineStarted for state file heuristic
+    local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+    local seen
+    seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
+    if [ -f "$pipeline_state" ] && [ "$seen" != "true" ]; then
+      orch_state_update "$area" ".dispatched[\"$issue\"].pipelineStarted = true" || true
     fi
     echo "running"; return 0
   fi
 
-  # 3. Pipeline state file check (process exited)
-  # Uses $pipeline_state and $seen from above
-  if [ ! -f "$pipeline_state" ] && [ "$seen" = "true" ]; then
-    echo "completed"; return 0
+  # 3. Process dead, no exit file - abnormal exit
+  # Allow 60s grace period for exit file to be written (race between
+  # process exit and trap handler writing the file).
+  local dispatched_at
+  dispatched_at=$(echo "$state" | jq -r ".dispatched[\"$issue\"].dispatchedAt // empty")
+  if [ -n "$dispatched_at" ]; then
+    local dispatch_ts now_ts
+    dispatch_ts=$(date -d "$dispatched_at" +%s) || dispatch_ts=0
+    now_ts=$(date +%s)
+    local alive_duration=$((now_ts - dispatch_ts))
+    # If process just died (< 60s since we last checked), wait for exit file
+    if [ "$alive_duration" -lt 60 ]; then
+      echo "running"; return 0
+    fi
   fi
 
-  # 4. PR status (process exited, state file inconclusive)
-  local pr_states
-  pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]')
-  if echo "$pr_states" | grep -q '"MERGED"'; then
-    echo "completed"; return 0
-  fi
-  if echo "$pr_states" | grep -q '"OPEN"'; then
+  # 4. PR status (fallback, provider health aware)
+  local gh_health
+  gh_health=$(orch_provider_health_get "$area")
+  if [ "$gh_health" = "degraded" ]; then
+    # Don't make PR-based judgments during degraded state
     echo "running"; return 0
   fi
 
-  # No signal, no process, no PR - failed
+  local pr_states
+  if pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]'); then
+    if echo "$pr_states" | grep -q '"MERGED"'; then
+      echo "completed"; return 0
+    fi
+    if echo "$pr_states" | grep -q '"OPEN"'; then
+      # PR exists but process dead and no exit file - abnormal exit
+      echo "abnormal_exit"; return 0
+    fi
+  fi
+
+  # No exit file, no process, no PR (or gh failed)
   echo "failed"; return 0
 }
 
 orch_update_last_activity() {
-  # Usage: orch_update_last_activity <area> <issue> <commit_sha>
+  # Usage: orch_update_last_activity <area> <issue> [commit_sha]
   local area=$1
   local issue=$2
-  local sha=$3
+  local sha=${3:-}
   local now
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  orch_state_update "$area" \
-    ".dispatched[\"$issue\"].lastActivity = \"$now\" | .dispatched[\"$issue\"].lastCommitSha = \"$sha\""
+  local filter=".dispatched[\"$issue\"].lastActivity = \"$now\""
+  if [ -n "$sha" ]; then
+    filter="$filter | .dispatched[\"$issue\"].lastCommitSha = \"$sha\""
+  fi
+  orch_state_update "$area" "$filter"
 }
 
 # ──────────────────────────────────────────────
-# Stall detection
+# Stall detection (heartbeat + composite signals)
 # ──────────────────────────────────────────────
 
 orch_detect_stall() {
   # Usage: orch_detect_stall <area> <issue>
   # stdout: "stalled" or "active"
   # Always returns 0 (safe for set -e callers).
+  #
+  # Detection priority:
+  #   1. Heartbeat file (strongest - explicit signal from dispatch wrapper)
+  #   2. Elapsed time check against threshold
+  #   3. Composite signals: log mtime | CPU jiffies | commit SHA change
+  #   4. Threshold exceeded with no positive signals = stalled
   local area=$1
   local issue=$2
-  local stall_seconds=600  # 10 minutes
+  local stall_seconds=600       # 10 minutes (post-PR)
+  local pre_pr_stall=1200       # 20 minutes (pre-PR)
 
   local state
   state=$(orch_state_read "$area")
 
-  local last_activity
-  last_activity=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastActivity // empty")
+  # Batch-extract all needed fields from state in one jq call
+  local fields
+  fields=$(echo "$state" | jq -r --arg i "$issue" '
+    .dispatched[$i] // {} |
+    [.pgid // "", .pid // "", .lastActivity // "",
+     .lastCpuJiffies // "0", .lastCommitSha // ""] | @tsv')
+  local pgid wrapper_pid last_activity last_cpu last_sha
+  IFS=$'\t' read -r pgid wrapper_pid last_activity last_cpu last_sha <<< "$fields"
+
+  # 1. Heartbeat check (strongest signal)
+  local hb_file="$ORCH_BASE/${area}/issue-${issue}.heartbeat"
+  if [ -f "$hb_file" ]; then
+    local hb_ts now_ts
+    hb_ts=$(cat "$hb_file")
+    now_ts=$(date +%s)
+    # 2 min tolerance (heartbeat fires every 60s)
+    if [ $((now_ts - hb_ts)) -lt 120 ]; then
+      echo "active"; return 0
+    fi
+  fi
+
+  # 2. Check elapsed time since lastActivity
   if [ -z "$last_activity" ]; then
     echo "active"; return 0
   fi
 
-  local last_ts
-  last_ts=$(date -d "$last_activity" +%s 2>/dev/null)
-  if [ -z "$last_ts" ]; then
+  local last_ts now_ts elapsed
+  last_ts=$(date -d "$last_activity" +%s) || { echo "active"; return 0; }
+  now_ts=$(date +%s)
+  elapsed=$((now_ts - last_ts))
+
+  # Determine threshold: pre-PR vs post-PR (single PR lookup, reused for commit check)
+  local threshold=$stall_seconds
+  local pr_number=""
+  pr_number=$(_orch_pr_list "$area" "$issue" open number '.[0].number') || true
+  if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+    threshold=$pre_pr_stall
+  fi
+
+  if [ "$elapsed" -lt "$threshold" ]; then
     echo "active"; return 0
   fi
-  local now_ts
-  now_ts=$(date +%s)
-  local elapsed=$(( now_ts - last_ts ))
 
-  if [ "$elapsed" -gt "$stall_seconds" ]; then
-    # Verify no new commits since last check
-    local last_sha
-    last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
+  # 3. Composite check: any positive signal = active
+  local stall_reason="no heartbeat"
 
-    local pr_number
-    pr_number=$(_orch_pr_list "$area" "$issue" open number '.[0].number')
-
-    # No open PR yet - apply extended stall threshold (2x normal) for pre-PR phase
-    if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
-      local extended_stall=$(( stall_seconds * 2 ))
-      if [ "$elapsed" -gt "$extended_stall" ]; then
-        echo "stalled"; return 0
-      fi
+  # 3a. Log file mtime
+  local log_file="$ORCH_BASE/${area}/issue-${issue}.log"
+  if [ -f "$log_file" ]; then
+    local log_mtime
+    log_mtime=$(stat -c %Y "$log_file")
+    if [ $((now_ts - log_mtime)) -lt "$threshold" ]; then
+      orch_update_last_activity "$area" "$issue"
       echo "active"; return 0
     fi
+  fi
 
+  # 3b. CPU jiffies change
+  if [ -n "$wrapper_pid" ] && [ -f "/proc/$wrapper_pid/stat" ]; then
+    local cpu_now
+    cpu_now=$(awk '{print $14+$15}' "/proc/$wrapper_pid/stat") || cpu_now="0"
+    if [ "$cpu_now" != "$last_cpu" ] && [ "$cpu_now" != "0" ]; then
+      orch_state_update "$area" ".dispatched[\"$issue\"].lastCpuJiffies = \"$cpu_now\""
+      orch_update_last_activity "$area" "$issue"
+      echo "active"; return 0
+    fi
+  fi
+
+  # 3c. Commit SHA change (reuses pr_number from threshold check above)
+  if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
     local repo
     repo=$(monorepo_area_repo "$area")
     local latest_sha
-    latest_sha=$(gh api "repos/${repo}/pulls/${pr_number}/commits" \
-      --jq '.[-1].sha' 2>/dev/null)
-
+    latest_sha=$(orch_gh "$area" api "repos/${repo}/pulls/${pr_number}/commits" \
+      --jq '.[-1].sha') || true
     if [ -n "$latest_sha" ] && [ "$latest_sha" != "$last_sha" ]; then
       orch_update_last_activity "$area" "$issue" "$latest_sha"
       echo "active"; return 0
     fi
-    echo "stalled"; return 0
   fi
-  echo "active"; return 0
+
+  # 4. No positive signals - stalled
+  if [ -n "$pgid" ] && orch_pgid_alive "$pgid"; then
+    stall_reason="$stall_reason, process group alive but no log/cpu/commit activity for ${elapsed}s"
+  else
+    stall_reason="$stall_reason, process group dead"
+  fi
+  orch_state_update "$area" \
+    ".dispatched[\"$issue\"].stallReason = \"$stall_reason\"" || true
+
+  echo "stalled"; return 0
 }
 
 # ──────────────────────────────────────────────
-# Unblocking
+# Unblocking (with skipped_dep_failed propagation)
 # ──────────────────────────────────────────────
 
 orch_unblock() {
   # Usage: orch_unblock <area> <completed_issue>
-  # Finds issues that were blocked only by completed_issue and marks them pending.
+  # Finds issues that were blocked only by completed_issue and updates status:
+  #   - All deps completed -> pending (ready to dispatch)
+  #   - All deps resolved but >= 1 failed -> skipped_dep_failed (not dispatched)
   # stdout: space-separated list of newly-unblocked issue numbers
   local area=$1
   local done_issue=$2
@@ -417,29 +679,43 @@ orch_unblock() {
     status=$(echo "$state" | jq -r ".status[\"$n\"]")
     [ "$status" != "blocked" ] && continue
 
-    # Get this issue's deps
     local deps
     deps=$(echo "$dag" | jq -r ".[\"$n\"] // [] | .[]")
 
-    # Remove completed_issue from deps; check if remaining deps are all completed
     local still_blocked=0
+    local has_failed_dep=0
     for dep in $deps; do
-      [ "$dep" = "$done_issue" ] && continue
       local dep_status
       dep_status=$(echo "$state" | jq -r ".status[\"$dep\"]")
-      if [ "$dep_status" != "completed" ] && [ "$dep_status" != "failed" ]; then
+      if [ "$dep_status" = "failed" ] || [ "$dep_status" = "skipped_dep_failed" ]; then
+        has_failed_dep=1
+      elif [ "$dep_status" != "completed" ]; then
         still_blocked=1
         break
       fi
     done
 
     if [ "$still_blocked" -eq 0 ]; then
-      orch_status_set "$area" "$n" "pending"
+      if [ "$has_failed_dep" -eq 1 ]; then
+        orch_status_set "$area" "$n" "skipped_dep_failed"
+      else
+        orch_status_set "$area" "$n" "pending"
+      fi
       unblocked="$unblocked $n"
     fi
   done
 
   echo "$unblocked"
+}
+
+_orch_mark_failed_and_unblock() {
+  # Internal helper: mark issue failed, remove from dispatched, unblock dependents.
+  local area=$1 issue=$2
+  orch_status_set "$area" "$issue" "failed"
+  orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+  local newly_unblocked
+  newly_unblocked=$(orch_unblock "$area" "$issue")
+  [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
 }
 
 # ──────────────────────────────────────────────
@@ -453,29 +729,59 @@ orch_poll_cycle() {
   local area_dir=$2
   local agent=$3
 
+  # Check provider health - halt cycle on hard fault
+  local gh_health
+  gh_health=$(orch_provider_health_get "$area")
+  if [ "$gh_health" = "hard_fault" ]; then
+    >&2 echo "[orchestrator] HARD FAULT: GitHub auth failure - poll cycle halted"
+    >&2 echo "[orchestrator] Fix auth and restart orchestrator"
+    return 1
+  fi
+
   local state
   state=$(orch_state_read "$area")
   local dispatched_issues
   dispatched_issues=$(echo "$state" | jq -r '.dispatched | keys[]')
 
-  # 1. Check completion for dispatched (non-terminal) issues only
+  # 1. Check completion for dispatched (non-terminal) issues
   for issue in $dispatched_issues; do
     local cur_status
     cur_status=$(echo "$state" | jq -r ".status[\"$issue\"]")
-    # Skip already-terminal issues
     [ "$cur_status" = "completed" ] || [ "$cur_status" = "failed" ] && continue
 
     local result
     result=$(orch_check_completion "$issue" "$area_dir")
-    if [ "$result" = "completed" ] || [ "$result" = "failed" ]; then
-      orch_status_set "$area" "$issue" "$result"
-      orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-      >&2 echo "[orchestrator] Issue #${issue}: ${result}"
 
-      local newly_unblocked
-      newly_unblocked=$(orch_unblock "$area" "$issue")
-      [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
-    fi
+    case "$result" in
+      completed|failed)
+        orch_status_set "$area" "$issue" "$result"
+        orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+        >&2 echo "[orchestrator] Issue #${issue}: ${result}"
+        local newly_unblocked
+        newly_unblocked=$(orch_unblock "$area" "$issue")
+        [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+        ;;
+      abnormal_exit)
+        local retry_count
+        retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
+        if [ "$retry_count" -lt 1 ]; then
+          >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
+          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+          local new_pid
+          new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
+          if [ -n "$new_pid" ]; then
+            >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
+          else
+            >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
+            _orch_mark_failed_and_unblock "$area" "$issue"
+          fi
+        else
+          >&2 echo "[orchestrator] Issue #${issue}: abnormal_exit (retry exhausted)"
+          _orch_mark_failed_and_unblock "$area" "$issue"
+        fi
+        ;;
+      # "running" - no action
+    esac
   done
 
   # 2. Stall detection + bounded auto-retry for still-dispatched issues
@@ -487,38 +793,35 @@ orch_poll_cycle() {
     [ "$cur_status" != "dispatched" ] && continue
 
     if [ "$(orch_detect_stall "$area" "$issue")" = "stalled" ]; then
-      local pid
-      pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid")
+      local pgid
+      pgid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pgid // empty")
       local retry_count
       retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
+      local group_alive=false
+      [ -n "$pgid" ] && orch_pgid_alive "$pgid" && group_alive=true
 
-      if ! orch_process_alive "$pid" && [ "$retry_count" -lt 1 ]; then
-        # Process died - attempt bounded retry (max 1)
+      if [ "$group_alive" = "false" ] && [ "$retry_count" -lt 1 ]; then
         >&2 echo "[orchestrator] STALL: Issue #${issue} process dead - retrying (attempt $((retry_count + 1)))"
+        orch_state_update "$area" "del(.dispatched[\"$issue\"])"
         local new_pid
         new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
         if [ -n "$new_pid" ]; then
           >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
         else
-          >&2 echo "[orchestrator] STALL: Issue #${issue} - re-dispatch failed"
+          >&2 echo "[orchestrator] Re-dispatch failed for #${issue}"
         fi
       elif [ "$retry_count" -ge 1 ]; then
-        # Already retried once - mark as failed
         >&2 echo "[orchestrator] STALL: Issue #${issue} - retry exhausted, marking failed"
-        orch_stop_process "$pid"
-        orch_status_set "$area" "$issue" "failed"
-        orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-        local newly_unblocked
-        newly_unblocked=$(orch_unblock "$area" "$issue")
-        [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+        orch_stop_process "$area" "$issue"
+        _orch_mark_failed_and_unblock "$area" "$issue"
       else
-        >&2 echo "[orchestrator] STALL detected: Issue #${issue} - no activity for 10+ minutes"
-        >&2 echo "[orchestrator] Process PID $pid still alive. Consider: stop, retry, or skip"
+        >&2 echo "[orchestrator] STALL detected: Issue #${issue} - no activity for threshold period"
+        >&2 echo "[orchestrator] Process group alive. Consider: stop, retry, or skip"
       fi
     fi
   done
 
-  # 3. Dispatch pending issues as background processes (respecting maxConcurrent)
+  # 3. Dispatch pending issues (respecting maxConcurrent)
   state=$(orch_state_read "$area")
   local max_concurrent
   max_concurrent=$(echo "$state" | jq -r '.maxConcurrent // 4')
@@ -560,8 +863,8 @@ orch_print_summary() {
 
   echo ""
   echo "=== Orchestrator Batch Summary ==="
-  printf "%-8s %-12s %s\n" "Issue" "Status" "PR"
-  echo "----------------------------------------"
+  printf "%-8s %-20s %s\n" "Issue" "Status" "PR"
+  echo "--------------------------------------------"
 
   local issues
   issues=$(echo "$state" | jq -r '.issues[]')
@@ -570,9 +873,9 @@ orch_print_summary() {
     status=$(echo "$state" | jq -r ".status[\"$issue\"]")
     local pr_url=""
     if [ "$status" = "completed" ]; then
-      pr_url=$(_orch_pr_list "$area" "$issue" merged url '.[0].url')
+      pr_url=$(_orch_pr_list "$area" "$issue" merged url '.[0].url') || true
     fi
-    printf "%-8s %-12s %s\n" "#${issue}" "$status" "$pr_url"
+    printf "%-8s %-20s %s\n" "#${issue}" "$status" "$pr_url"
   done
-  echo "=================================="
+  echo "============================================"
 }
