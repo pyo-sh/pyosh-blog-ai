@@ -242,32 +242,23 @@ parse_claude_pane() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 # find_codex_session_file <pane_id>
+# Finds codex session JSONL via tty → PID → /proc/fd scan (single process, no BFS).
 find_codex_session_file() {
   local pane_id="$1"
-  local pane_pid session_file
+  local pane_tty codex_pid session_file
 
-  pane_pid=$(tmux display-message -t "$pane_id" -p '#{pane_pid}' 2>/dev/null)
+  pane_tty=$(tmux display-message -t "$pane_id" -p '#{pane_tty}' 2>/dev/null)
+  [[ -z "$pane_tty" ]] && return
 
-  if [[ -n "$pane_pid" ]]; then
-    local all_pids=("$pane_pid") child grandchild
-    while IFS= read -r child; do
-      all_pids+=("$child")
-      while IFS= read -r grandchild; do
-        all_pids+=("$grandchild")
-      done < <(pgrep -P "$child" 2>/dev/null)
-    done < <(pgrep -P "$pane_pid" 2>/dev/null)
+  codex_pid=$(ps -t "${pane_tty#/dev/}" -o pid=,comm= 2>/dev/null \
+    | awk '$2=="codex" {print $1; exit}')
+  [[ -z "$codex_pid" ]] && return
 
-    if [[ -d /proc ]]; then
-      local pid
-      for pid in "${all_pids[@]}"; do
-        session_file=$(readlink -f /proc/"$pid"/fd/* 2>/dev/null \
-          | grep -E '\.codex/sessions.*\.jsonl$' | head -1)
-        [[ -n "$session_file" ]] && { printf '%s' "$session_file"; return; }
-      done
-    fi
+  if [[ -d "/proc/$codex_pid/fd" ]]; then
+    session_file=$(readlink -f /proc/"$codex_pid"/fd/* 2>/dev/null \
+      | grep -E '\.codex/sessions.*\.jsonl$' | head -1)
+    [[ -n "$session_file" ]] && printf '%s' "$session_file"
   fi
-
-  # No global fallback — avoids cross-contamination in multi-pane setups
 }
 
 parse_codex_pane() {
