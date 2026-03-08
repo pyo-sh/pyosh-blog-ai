@@ -1,137 +1,213 @@
 ---
 name: dev-pipeline
-description: Orchestrate the full dev cycle - code, review, resolve - with headless subprocess execution and self-healing. Runs /dev-build, then triggers /dev-review and /dev-resolve as synchronous headless subprocesses. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
+description: Orchestrate /dev-build -> /dev-review -> /dev-resolve -> merge for a monorepo with area-scoped worktrees. Headless Claude sessions always start from monorepo root so skills resolve correctly; code edits always happen in the issue worktree. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
 ---
 
 # Dev-Pipeline
 
-Orchestrate: `/dev-build` -> `/dev-review` -> `/dev-resolve` -> merge. Review/resolve run as **headless `claude -p` subprocesses**. Self-healing with auto-retry on known failures.
+## Non-negotiable invariants
 
-> Area definitions, directory/repo mappings, worktree paths: [monorepo-layout.md](../../references/monorepo-layout.md)
+1. **Claude headless cwd is always monorepo root** (`$MONOREPO_ROOT`). Never start `claude -p` from a worktree.
+2. **Feature-branch file edits and feature-branch git sync happen only in the issue worktree**.
+3. **gh commands use explicit repo selection** (`-R owner/name`) or an explicit repo dir.
+4. **Merge lock is held inside one helper call** (`pipeline_merge_pr`), not across multiple Bash tool calls.
+5. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees`).
+
 > Source helpers: `source scripts/pipeline-helpers.sh`
-> State schema and headless execution details: [process-lifecycle.md](references/process-lifecycle.md)
-> Recovery strategy: [recovery.md](references/recovery.md)
+> Canonical worktree path: `.workspace/worktrees/{area}/issue-{N}`
+> Canonical state path: `.workspace/pipeline/{area}/issue-{N}.state.json`
+
+## Required runtime shape
+
+For any long-running `pipeline_run_review` or `pipeline_run_resolve` Bash call, the Bash tool invocation itself must use **background mode**. The helper remains synchronous, but the outer tool call must not be foreground-blocked because the Bash-tool timeout can be shorter than Claude's internal timeout.
 
 ## Workflow
 
-### 0. Check existing state (`pipeline_init` first)
+### 0. Initialize / resume
 
-Run `pipeline_init {area}` to create directories. Check `.workspace/pipeline/{area}/issue-{N}.state.json`. If exists -> show `step` and `pr`, ask **"Resume?"** or **"Start fresh?"**. If resume -> jump to current `step`. Each step self-validates on entry.
-
-### 1. Run /dev-build (step: `build`)
-
-**`cd {area}` first.** Sync before starting:
+Run:
 
 ```bash
-cd {area}
-git fetch origin
-git rebase origin/main || git merge origin/main
+source scripts/pipeline-helpers.sh
+pipeline_init "$AREA"
+STATE_FILE=$(pipeline_state_path "$ISSUE" "$AREA")
 ```
 
-**Recovery entry**: If `step: "build"`, check PR via `gh pr list --head {branch} --json number,state --jq '.[0]'`. PR open -> Step 2. PR merged -> Step 7. No PR -> re-run `/dev-build`.
+If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions.
 
-After PR creation, capture initial commit SHA and write state. -> [process-lifecycle.md](references/process-lifecycle.md) for state schema.
+### 1. Build (`step: build`)
 
-### 2. Run review (step: `review`)
-
-**Recovery entry**: `pipeline_check_review_exists` first. Found -> skip to Step 3.
-
-Run headless review and check API after exit. -> [process-lifecycle.md#headless-pattern](references/process-lifecycle.md) for the run-then-check pattern.
+Use the canonical repo dir:
 
 ```bash
-# MODEL comes from pipeline state .model field (set by orchestrator, may be empty)
-LOG=$(pipeline_run_headless "$MONOREPO_ROOT" \
-  "/dev-review for PR #{PR#} in {area} repo ({owner}/{repo}). After review, exit." \
-  "$ISSUE" "$AREA" "review" "$MODEL")
+REPO_DIR=$(pipeline_repo_dir "$AREA")
+REPO=$(pipeline_repo_name "$AREA")
+
+git -C "$REPO_DIR" fetch origin
+git -C "$REPO_DIR" rebase origin/main || git -C "$REPO_DIR" merge origin/main
+```
+
+Then run `/dev-build` as usual. After PR creation, write state with at least:
+
+```json
+{
+  "version": 2,
+  "issue": 42,
+  "area": "client",
+  "pr": 129,
+  "branch": "feat/issue-42-add-auth",
+  "paths": {
+    "skillCwd": "/workspace",
+    "repoDir": "/workspace/client",
+    "worktreeDir": "/workspace/.workspace/worktrees/client/issue-42"
+  },
+  "step": "review",
+  "lastReviewId": 0,
+  "lastCommitSha": "<sha>",
+  "skipReview": false,
+  "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
+  "maxStageRetries": 3
+}
+```
+
+### 2. Review (`step: review`)
+
+Recovery entry:
+
+```bash
+REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
+```
+
+If found, skip to Step 3.
+
+Otherwise start headless review **from monorepo root** using the stage-specific wrapper:
+
+```bash
+LOG=$(pipeline_run_review "$ISSUE" "$AREA" "$PR" "$MODEL")
 RC=$?
-REVIEW_ID=$(pipeline_check_review_exists "{area_dir}" {PR#} {lastReviewId})
+REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
 ```
 
-- Review found -> Step 3 (success regardless of exit code)
-- Not found + `RC!=0` -> self-heal with `pipeline_stage_retry` / `pipeline_recovery_log`, retry or escalate
-- Not found + `RC=0` -> unexpected, report to user
+Rules:
+- This Bash call itself must run in background mode.
+- Never pass the worktree path as Claude's process cwd.
+- Always treat GitHub API as source of truth after exit.
 
-### 3. Process review (step: `review`)
+Outcome:
+- Review found -> Step 3
+- No review + non-zero exit -> retry / recovery
+- No review + zero exit -> unexpected failure; escalate
 
-Fetch review with `pipeline_fetch_review`. Count severities (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`). Update `lastReviewId`, reset `stageRetries.review`.
+### 3. Process review (`step: review`)
 
-- `CHANGES_REQUESTED` or `CRITICAL > 0` -> Step 4
-- `CRITICAL = 0` or `APPROVED` -> Step 5
-- `PENDING` / `DISMISSED` -> report to user, stop
+Fetch review:
 
-### 4. Run resolve (step: `resolve`)
+```bash
+REVIEW_JSON=$(pipeline_fetch_review "$AREA" "$PR" "$REVIEW_ID")
+```
 
-**Recovery entry**: `pipeline_check_new_commits` first. Found -> skip to Step 4b.
+Update:
+- `.lastReviewId = REVIEW_ID`
+- `.stageRetries.review = 0`
 
-Same headless pattern as Step 2 but with `"resolve"` stage and worktree path:
+Then decide:
+- `CHANGES_REQUESTED` or 1+ Critical -> Step 4
+- Approved / zero Critical -> Step 5
+- Pending / dismissed -> stop and report
+
+### 4. Resolve (`step: resolve`)
+
+Recovery entry:
+
+```bash
+NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
+```
+
+If found, skip to Step 4b.
+
+Otherwise run the resolve wrapper:
 
 ```bash
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
-LOG=$(pipeline_run_headless "$WORKTREE_PATH" \
-  "/dev-resolve for PR #{PR#} in {area} repo ({owner}/{repo}). Worktree: ${WORKTREE_PATH}. After done, exit." \
-  "$ISSUE" "$AREA" "resolve" "$MODEL")
+LOG=$(pipeline_run_resolve "$ISSUE" "$AREA" "$PR" "$MODEL")
+RC=$?
+NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
 ```
 
-After exit -> `pipeline_check_new_commits`. Found -> Step 4b. Not found -> self-heal.
+Rules:
+- The Claude process still starts from `$MONOREPO_ROOT`.
+- The prompt and exported env vars tell `/dev-resolve` which repo dir and worktree dir to use.
+- All file edits must happen in `WORKTREE_PATH`.
+- This Bash call itself must run in background mode.
 
-### 4b. Process resolve result (step: `resolve`)
+### 4b. Process resolve result (`step: resolve`)
 
-Update `lastCommitSha`, reset `stageRetries.resolve`. Show diff (`gh pr diff {PR#}`).
+Update:
+- `.lastCommitSha = NEW_SHA`
+- `.stageRetries.resolve = 0`
 
+Show PR diff:
+
+```bash
+gh pr diff "$PR" -R "$(pipeline_repo_name "$AREA")"
+```
+
+Then:
 - `skipReview: true` -> Step 6
-- `skipReview: false` -> ask user: **"Re-review"** (-> Step 2) | **"Merge as-is"** (-> Step 6) | **"Manual edit"** (user edits, then Step 2)
+- otherwise ask the user: Re-review / Merge as-is / Manual edit
 
-### 5. No critical - user decision
+### 5. No critical issues
 
-Show review summary. Ask user: **"Merge"** -> Step 6 | **"Fix & Re-review"** -> Step 4 | **"Fix & Merge"** -> Step 4 with `skipReview: true`.
+Show review summary and ask:
+- Merge -> Step 6
+- Fix & Re-review -> Step 4
+- Fix & Merge -> set `skipReview=true`, then Step 4
 
-### 6. Merge + cleanup (step: `merge`)
+### 6. Merge (`step: merge`)
 
-**Recovery entry**: Check `gh pr view {PR#} --json state -q .state`. `MERGED` -> skip to cleanup. `OPEN` -> ask user for merge approval.
+Never merge without user approval.
 
-**Acquire merge lock** before merging. Only one pipeline can merge per area at a time to prevent rebase conflicts when multiple pipelines complete simultaneously.
-
-```bash
-pipeline_acquire_merge_lock "$AREA" "$ISSUE"
-```
-
-If lock timeout (returns 1) -> self-heal with `pipeline_stage_retry`, retry or escalate.
-
-After lock acquired, sync and merge:
+Recovery entry:
 
 ```bash
-cd {area}
-git fetch origin
-git rebase origin/main || git merge origin/main
-git push
-gh pr merge {PR#} --squash --delete-branch
+gh pr view "$PR" -R "$(pipeline_repo_name "$AREA")" --json state --jq '.state'
 ```
 
-If merge fails -> self-heal: `git fetch origin && git rebase origin/main || git merge origin/main && git push`, retry. Max 3 retries, then escalate with `pipeline_format_escalation`.
+If already `MERGED`, go to Step 7.
 
-After merge, validate state is `MERGED`, **release lock**, then cleanup:
+Otherwise merge with the **single helper**:
 
 ```bash
-pipeline_release_merge_lock "$AREA"
-git fetch --prune
-pipeline_cleanup "$ISSUE" "$AREA" "{branch}"
+pipeline_merge_pr "$ISSUE" "$AREA" "$PR" "$BRANCH"
 ```
 
-If merge fails permanently, **always release the lock** before escalating:
+Important:
+- Do **not** acquire the merge lock in one Bash call and release it in another.
+- Do **not** run `gh pr merge` from the issue worktree.
+- Feature-branch sync/rebase/push happens in the worktree.
+- `gh pr merge` runs from the canonical repo dir.
+- The helper will use `git push --force-with-lease` automatically only when history diverged.
+
+On success:
 
 ```bash
-pipeline_release_merge_lock "$AREA"
-pipeline_format_escalation "$ISSUE" "$AREA" "merge"
+git -C "$(pipeline_repo_dir "$AREA")" fetch --prune
+pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH"
 ```
 
-State -> `"step": "log"`.
+On failure:
+- `pipeline_stage_retry`
+- `pipeline_recovery_log`
+- retry up to max
+- then `pipeline_format_escalation`
 
-### 7. Record + clean up (step: `log`)
+### 7. Log + cleanup (`step: log`)
 
-Run `/dev-log`, then delete state file.
+Run `/dev-log`, then delete the state file only after `/dev-log` succeeds.
 
 ## Constraints
 
-- **Never merge without user approval**
-- **Never modify code in this session** - code changes happen only in /dev-build or headless /dev-resolve
-- On unrecoverable error: save state, report to user with `pipeline_format_escalation`
+- Never merge without user approval
+- Never edit source files in the pipeline session itself; source edits happen only in `/dev-build` or headless `/dev-resolve`
+- Git metadata operations required for merge are allowed
+- On unrecoverable error: save state, then report with `pipeline_format_escalation`

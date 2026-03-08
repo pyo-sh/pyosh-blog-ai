@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-09 | Pipeline cwd 3-way 분리 - skill cwd / repo dir / worktree dir 혼용 수정, area-scoped 경로, TTL merge lock, 숨은 버그 8건 수정 (#106) | done |
 | 2026-03-08 | Orchestrator/pipeline 신뢰성 전면 개편 - attemptId, setsid+PGID, provider health circuit breaker, heartbeat, skipped_dep_failed, flock (#76) | done |
 | 2026-03-08 | agent-tracker 토큰 표시 신뢰성 개선 - coherent snapshot, freshness 분리, 파싱 실패 폴백, 105 fixture 테스트 (#74) | done |
 | 2026-03-08 | agent-tracker 구조적 데이터 경계 및 신뢰성 전면 개편 - lib/ 3-layer 분리, JSON+@tsv 프로토콜, 66 fixture 테스트 (#72) | done |

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-09 | #24 PR #127 리뷰 코멘트 대응 (processor 모듈화, sanitizeSchema 코멘트), #29 Category entity PR #129 머지 | ✅   |
 | 2026-03-08 | #24 마크다운 렌더링 유틸리티 (shiki), #29 Category entity 타입 + API, #30 PostContent + PostNavigation 컴포넌트 | ✅   |
 | 2026-03-07 | #25 Post entity - PostNavigation 타입 추가 | ✅   |
 | 2026-03-06 | #46 Admin 레이아웃 (사이드바), #50 Post CRUD API, #42 Stat entity, #31 마크다운 렌더링 의존성 설치, #23 PaginatedResponse meta.total 수정 | ✅   |
@@ -18,6 +19,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-09.md](./progress/progress.2026-03-09.md) - #24 PR #127 리뷰 코멘트 대응, #29 Category entity PR #129 머지
 - [progress.2026-03-08.md](./progress/progress.2026-03-08.md) - #24 마크다운 렌더링 유틸리티 (shiki), #29 Category entity 타입 + API, #30 PostContent + PostNavigation 컴포넌트
 - [progress.2026-03-07.md](./progress/progress.2026-03-07.md) - #25 Post entity - PostNavigation 타입 추가
 - [progress.2026-03-06.md](./progress/progress.2026-03-06.md) - #46 Admin 레이아웃 (사이드바), #50 Post CRUD API, #42 Stat entity, #31 마크다운 렌더링 의존성 설치, #23 PaginatedResponse meta.total 수정
