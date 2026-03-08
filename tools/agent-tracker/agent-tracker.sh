@@ -110,8 +110,17 @@ trunc() {
   fi
 }
 
-# pad_right <string> <width>
-pad_right() { printf '%-*s' "$2" "$1"; }
+# pad_right <string> <width> — display-width-aware right-padding
+# printf '%-*s' counts bytes, not display columns in this env. Use display_width.
+pad_right() {
+  local s="$1" w="$2" dw
+  dw=$(display_width "$s")
+  if (( dw < w )); then
+    printf '%s%*s' "$s" "$(( w - dw ))" ""
+  else
+    printf '%s' "$s"
+  fi
+}
 
 # token_bar <pct> <color> — render ▰▰▰▱▱ (5 blocks)
 token_bar() {
@@ -375,8 +384,9 @@ render_orchestrator() {
         .area, .batchId,
         cnt("completed"), cnt("dispatched"), cnt("pending"), cnt("blocked"), cnt("failed"),
         (.issues | length | tostring),
-        (.orchestratorPid // 0 | tostring),
+        (.orchestratorPane // ""),
         (.orchestratorStartedAt // ""),
+        (.createdAt // ""),
         (. as $root | [.dispatched | to_entries[]
           | select($root.status[.key] == "dispatched")
           | [.key, (.value.pid // 0 | tostring), (.value.dispatchedAt // "")]
@@ -386,24 +396,26 @@ render_orchestrator() {
     local meta dispatched_data
     IFS=$'\x1f' read -r meta dispatched_data <<< "$combined"
 
-    local area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pid orch_started_at
-    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pid orch_started_at <<< "$meta"
+    local area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pane orch_started_at created_at
+    IFS=$'\x1e' read -r area batch_id n_done n_active n_pending n_blocked n_failed n_total orch_pane orch_started_at created_at <<< "$meta"
 
-    # ── Batch liveness detection ──
-    # Check orchestrator process: PID alive + start time match (guards PID reuse)
-    local batch_status="stopped"
-    local n_terminal=$(( n_done + n_failed ))
-    if (( n_terminal >= n_total )); then
-      batch_status="done"
-    elif [[ -n "$orch_pid" && "$orch_pid" != "0" && "$orch_pid" != "null" ]]; then
-      if kill -0 "$orch_pid" 2>/dev/null; then
-        local current_starttime
-        current_starttime=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
-        if [[ "$current_starttime" == "$orch_started_at" ]]; then
-          batch_status="active"
-        fi
-      fi
+    # ── Batch liveness: pane's Claude Code start time must match ──
+    # Skip rendering if orchestrator session is no longer alive in the pane.
+    if [[ -n "$orch_pane" && -n "$orch_started_at" && "$orch_started_at" != "null" ]]; then
+      local _pane_root
+      _pane_root=$(tmux display-message -t "$orch_pane" -p '#{pane_pid}' 2>/dev/null) || continue
+      local _claude_pid
+      _claude_pid=$(_find_claude_pid "$_pane_root") || continue
+      local _cur_start
+      _cur_start=$(awk '{print $22}' /proc/"$_claude_pid"/stat 2>/dev/null)
+      [[ "$_cur_start" != "$orch_started_at" ]] && continue
+    else
+      continue
     fi
+
+    local batch_status="active"
+    local n_terminal=$(( n_done + n_failed ))
+    (( n_terminal >= n_total )) && batch_status="done"
 
     # ── Section separator ──
     printf "${GRAY}╠%s╣${R}" "$_CACHE_eqline"; tput el; echo
@@ -411,12 +423,11 @@ render_orchestrator() {
     # ── Header ──
     local h_left="⚙ Orchestrator: ${area}"
     local h_right="${n_done}/${n_total} done  ${batch_id}"
-    local hgap=$(( INNER - 4 - ${#h_left} - ${#h_right} ))
+    local hgap=$(( INNER - 4 - $(display_width "$h_left") - ${#h_right} ))
     (( hgap < 1 )) && hgap=1
 
     local h_color="$GOLD"
     [[ "$batch_status" == "done" ]] && h_color="$BLUE"
-    [[ "$batch_status" == "stopped" ]] && h_color="$ROSE"
 
     printf "${GRAY}║${R}  ${BOLD}${h_color}%s${R}%*s${GRAY}%s${R}  ${GRAY}║${R}" \
       "$h_left" "$hgap" "" "$h_right"
@@ -517,30 +528,35 @@ render_orchestrator() {
 
     printf "${GRAY}║${R}%*s${GRAY}║${R}" "$INNER" ""; tput el; echo
 
-    # ── Orchestrator footer ──
-    local of="${BLUE}✓${R} ${GRAY}${n_done} done${R}"
-    of+="  ${GREEN}●${R} ${GRAY}${n_active} active${R}"
-    of+="  ${GOLD}○${R} ${GRAY}${n_pending} pending${R}"
-    of+="  ${DARK}◆${R} ${GRAY}${n_blocked} blocked${R}"
-    (( n_failed > 0 )) && of+="  ${ROSE}✖${R} ${GRAY}${n_failed} failed${R}"
+    # ── Orchestrator footer: elapsed + failed + [DONE] ──
+    local of="" of_plain=""
+    if [[ -n "$created_at" && "$created_at" != "null" ]]; then
+      local created_ts
+      created_ts=$(date -d "$created_at" +%s 2>/dev/null)
+      if [[ -n "$created_ts" ]]; then
+        local elapsed_str
+        elapsed_str=$(_orch_elapsed $(( now_epoch - created_ts )))
+        of="${GRAY}⏱ ${elapsed_str} elapsed${R}"
+        of_plain="⏱ ${elapsed_str} elapsed"
+      fi
+    fi
+    if (( n_failed > 0 )); then
+      [[ -n "$of_plain" ]] && { of+="  "; of_plain+="  "; }
+      of+="${ROSE}${n_failed} failed${R}"
+      of_plain+="${n_failed} failed"
+    fi
 
-    local of_plain="✓ ${n_done} done  ● ${n_active} active  ○ ${n_pending} pending  ◆ ${n_blocked} blocked"
-    (( n_failed > 0 )) && of_plain+="  ✖ ${n_failed} failed"
-
-    # Append batch status indicator
-    local batch_label=""
-    local batch_label_plain=""
+    local batch_label="" batch_label_plain=""
     if [[ "$batch_status" == "done" ]]; then
       batch_label="${BLUE}[DONE]${R}"
       batch_label_plain="[DONE]"
-    elif [[ "$batch_status" == "stopped" ]]; then
-      batch_label="${ROSE}[STOPPED]${R}"
-      batch_label_plain="[STOPPED]"
     fi
 
-    local bl_extra=0
-    (( ${#batch_label_plain} > 0 )) && bl_extra=$(( ${#batch_label_plain} + 2 ))
-    local fp=$(( INNER - 4 - ${#of_plain} - bl_extra ))
+    local of_dw bl_dw bl_extra fp
+    of_dw=$(display_width "$of_plain")
+    bl_dw=$(display_width "$batch_label_plain")
+    (( bl_dw > 0 )) && bl_extra=$(( bl_dw + 2 )) || bl_extra=0
+    fp=$(( INNER - 4 - of_dw - bl_extra ))
     (( fp < 0 )) && fp=0
     if [[ -n "$batch_label" ]]; then
       printf "${GRAY}║${R}  %b%*s%b  ${GRAY}║${R}" "$of" "$fp" "" "$batch_label"
@@ -607,6 +623,28 @@ detect_agent_type() {
       printf '%s' "$result"
       return 0
     }
+  done
+  return 1
+}
+
+# _find_claude_pid <root_pid> — find Claude Code PID in process tree
+_find_claude_pid() {
+  local root_pid="$1"
+  local pids=() queue=("$root_pid") pid child cmdline exename
+  while (( ${#queue[@]} > 0 )); do
+    pid="${queue[0]}"; queue=("${queue[@]:1}")
+    pids+=("$pid")
+    while IFS= read -r child; do
+      [[ -n "$child" ]] && queue+=("$child")
+    done < <(pgrep -P "$pid" 2>/dev/null)
+  done
+  for pid in "${pids[@]}"; do
+    cmdline=$(_get_cmdline "$pid") || continue
+    exename=$(_get_exe_name "$pid") || true
+    if [[ "$(_match_agent "$cmdline" "$exename")" == "claude" ]]; then
+      printf '%s' "$pid"
+      return 0
+    fi
   done
   return 1
 }
@@ -815,7 +853,7 @@ render_dashboard() {
   local left_colored="${GREEN}●${R} ${GRAY}Active: ${n_total} agents ${n_stat}${R}"
   local left_plain="● Active: ${n_total} agents ${n_stat}"
 
-  local footer_len=$(( 2 + ${#left_plain} ))
+  local footer_len=$(( 2 + $(display_width "$left_plain") ))
   local fpad=$(( INNER - footer_len - 1 ))
   (( fpad < 0 )) && fpad=0
 

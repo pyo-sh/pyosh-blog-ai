@@ -56,10 +56,12 @@ orch_init() {
     --argjson dag "$filtered_dag" \
     'reduce $issues[] as $n ({}; . + {($n|tostring): (if ($dag[($n|tostring)] // []) | length > 0 then "blocked" else "pending" end)})')
 
-  # Record orchestrator process identity for liveness detection.
+  # Record orchestrator identity for liveness detection by agent-tracker.
   # $PPID = Claude Code (node) process that spawned this Bash tool call.
+  # $TMUX_PANE = tmux pane ID where orchestrator is running.
   # /proc/PID/stat field 22 = start time in clock ticks since boot (locale-invariant).
   local orch_pid=$PPID
+  local orch_pane="${TMUX_PANE:-}"
   local orch_started_at
   orch_started_at=$(awk '{print $22}' /proc/"$orch_pid"/stat 2>/dev/null)
 
@@ -71,13 +73,13 @@ orch_init() {
     --argjson status "$status_json" \
     --arg agent "$agent" \
     --argjson maxConcurrent "$max_concurrent" \
-    --argjson orchestratorPid "$orch_pid" \
+    --arg orchestratorPane "$orch_pane" \
     --arg orchestratorStartedAt "$orch_started_at" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
       status: $status, dispatched: {}, agent: $agent,
       maxConcurrent: $maxConcurrent,
-      orchestratorPid: $orchestratorPid,
+      orchestratorPane: $orchestratorPane,
       orchestratorStartedAt: $orchestratorStartedAt,
       createdAt: $now, updatedAt: $now}' \
     > "$(orch_state_path "$area")"
