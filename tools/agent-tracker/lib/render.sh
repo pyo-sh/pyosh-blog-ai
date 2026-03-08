@@ -36,12 +36,13 @@ render_dashboard() {
   agents_tsv=$(printf '%s' "$snapshot" | jq -r '
     .agents[] |
     [.pane_addr, .pane_id, .engine, .model, .status,
-     (.pct | tostring), (.tok_k | tostring),
+     (.tokens.pct | tostring), ((.tokens.used / 1000 | floor) | tostring),
+     (.tokens.fresh | tostring), (.tokens.source // "unknown"),
      .task, (.activity // "")] | @tsv
   ' 2>/dev/null)
 
   if [[ -n "$agents_tsv" ]]; then
-    while IFS=$'\t' read -r pane_addr pane_id engine model status pct tok_k task activity; do
+    while IFS=$'\t' read -r pane_addr pane_id engine model status pct tok_k tok_fresh tok_source task activity; do
       [[ -z "$pane_addr" ]] && continue
       (( n_total++ ))
 
@@ -51,9 +52,9 @@ render_dashboard() {
         *)                   (( n_idle++ ))    ;;
       esac
 
-      # Track token column width
+      # Track token column width — stale uses "?" suffix, unknown shows "   ?" (#74)
       local _tok_str _tok_w
-      if (( tok_k > 999 )); then _tok_str="999+"; else printf -v _tok_str "%3dk" "$tok_k"; fi
+      _tok_str=$(format_tok_str "$tok_source" "$tok_fresh" "$tok_k")
       _tok_w=$(( 5 + 1 + ${#_tok_str} ))
       (( _tok_w > W_TOKENS )) && W_TOKENS=$_tok_w
 
@@ -68,8 +69,9 @@ render_dashboard() {
       (( _act_dw > W_ACTIVITY )) && W_ACTIVITY=$_act_dw
 
       # Store raw row for rendering (tab-separated, values already single-line)
-      agent_rows+=("$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
-        "$pane_addr" "$pane_id" "$engine" "$model" "$status" "$pct" "$tok_k" "$task" "$activity")")
+      agent_rows+=("$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+        "$pane_addr" "$pane_id" "$engine" "$model" "$status" "$pct" "$tok_k" \
+        "$tok_fresh" "$tok_source" "$task" "$activity")")
     done <<< "$agents_tsv"
   fi
 
@@ -134,7 +136,8 @@ render_dashboard() {
     printf "${GRAY}║${R}%-*s${GRAY}║${R}" "$INNER" "$no_msg"; tput el; echo
   else
     for row in "${agent_rows[@]}"; do
-      IFS=$'\t' read -r pane_addr pane_id engine model status pct tok_k task activity <<< "$row"
+      IFS=$'\t' read -r pane_addr pane_id engine model status pct tok_k \
+        tok_fresh tok_source task activity <<< "$row"
 
       local ecol
       [[ "$engine" == "claude" ]] && ecol="$BLUE" || ecol="$CYAN"
@@ -151,8 +154,18 @@ render_dashboard() {
       col_task=$(trunc "$task" $W_TASK)
       col_activity=$(trunc "$act_display" $W_ACTIVITY)
       col_engine=$(printf "${ecol}%s${R}" "$(trunc "$model" $W_ENGINE)")
-      tok_bar_str=$(token_bar "$pct" "$ecol")
       badge=$(status_badge "$status")
+
+      # Token display: stale uses dimmed bars + "?", unknown shows empty bars + "?" (#74)
+      local tok_str
+      tok_str=$(format_tok_str "$tok_source" "$tok_fresh" "$tok_k")
+      if [[ "$tok_source" == "unknown" ]]; then
+        tok_bar_str=$(token_bar 0 "$DARK")
+      elif [[ "$tok_fresh" == "false" ]]; then
+        tok_bar_str=$(token_bar "$pct" "$DARK")
+      else
+        tok_bar_str=$(token_bar "$pct" "$ecol")
+      fi
 
       printf "${GRAY}║${R}  "
       printf "${GRAY}%s${R} " "$col_pane"
@@ -160,8 +173,6 @@ render_dashboard() {
       printf "%s "            "$col_activity"
       printf "%b "            "$col_engine"
       printf "%b "            "$badge"
-      local tok_str
-      if (( tok_k > 999 )); then tok_str="999+"; else printf -v tok_str "%3dk" "$tok_k"; fi
       printf "%b %s  "       "$tok_bar_str" "$tok_str"
       printf "${GRAY}║${R}"
       tput el; echo

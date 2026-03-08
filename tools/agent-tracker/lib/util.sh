@@ -2,6 +2,9 @@
 # tools/agent-tracker/lib/util.sh
 # Pure rendering helpers — no I/O, no side effects.
 
+# ── Constants ──
+STALE_THRESHOLD_SECS=30
+
 # ── Colors (blue accent theme) ──
 R='\033[0m'
 BOLD='\033[1m'
@@ -86,6 +89,19 @@ status_badge() {
     unknown)      printf "${ROSE}? unkn${R}" ;;
     *)            printf "${GRAY}○ idle${R}" ;;
   esac
+}
+
+# format_tok_str <tok_source> <tok_fresh> <tok_k> — 4-char token display
+# Returns: "   ?" (unknown), "NNN?" (stale), "NNNk" (fresh)
+format_tok_str() {
+  local src=$1 fresh=$2 tk=$3
+  if [[ "$src" == "unknown" ]]; then
+    printf '   ?'
+  elif [[ "$fresh" == "false" ]]; then
+    if (( tk > 999 )); then printf '999?'; else printf '%3d?' "$tk"; fi
+  else
+    if (( tk > 999 )); then printf '999+'; else printf '%3dk' "$tk"; fi
+  fi
 }
 
 # _orch_elapsed <seconds> — compact elapsed time
