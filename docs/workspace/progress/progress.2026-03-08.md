@@ -24,3 +24,15 @@
   - 순감소 -66줄 (899 -> 816)
 - **Findings**: [findings.015](../findings/findings.015-agent-tracker-overengineering.md)
 - **Files**: `agent-tracker.sh`, `on-status.sh`, `orchestrate-helpers.sh`
+
+## Shell script cleanup - stale code 삭제 및 과도한 복잡성 제거 (#70)
+
+- **Issue**: #68 후속. 전체 sh 파일 검사에서 동일 패턴의 과도한 복잡성 잔존 확인.
+- **Changes**:
+  - `scripts/agent-tracker.sh` (648줄) 삭제 - `tools/agent-tracker/agent-tracker.sh`로 대체된 구버전
+  - Codex `find_codex_session_file` BFS 프로세스 트리 탐색을 tty 기반 PID lookup으로 교체
+  - `orchestrate-helpers.sh` macOS `date -j` dead code 제거 + 빈 `last_ts` 가드 추가 (false stall 방지)
+  - `statusline-wrapper.sh` ↔ `context-bar.sh` 중복 jq 로직에 grep 가능한 SYNC 마커 추가
+  - Codex pane tty 중복 호출 제거 (optional 파라미터 전달)
+  - 순감소 -649줄
+- **Files**: `scripts/agent-tracker.sh` (삭제), `agent-tracker.sh`, `statusline-wrapper.sh`, `context-bar.sh`, `orchestrate-helpers.sh`
