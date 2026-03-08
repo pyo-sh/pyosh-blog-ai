@@ -11,7 +11,14 @@
   - `src/entities/category/api.ts`: `fetchCategories(cookieHeader?)` - serverFetch 사용
   - `src/entities/category/index.ts`: barrel export
   - `pnpm compile:types && pnpm lint && pnpm build` 통과
+- [x] #30 PostContent + PostNavigation 컴포넌트 구현 (`src/features/post-detail/`)
+  - `post-content.tsx`: async Server Component, `renderMarkdown` 호출, `prose` 클래스 적용, `dangerouslySetInnerHTML`
+  - `post-navigation.tsx`: prevPost/nextPost 링크 카드 (없으면 빈 공간)
+  - `index.ts`: barrel export
+  - worktree는 `feat/issue-24-markdown-renderer` 기반 (renderMarkdown 의존성 미머지 상태)
+  - `pnpm compile:types && pnpm lint && pnpm build` 통과
 
 ## Next Steps
 - [ ] #24 PR 리뷰 및 머지
 - [ ] #29 PR 리뷰 및 머지
+- [ ] #30 PR 리뷰 및 머지
