@@ -20,6 +20,7 @@
 | 012 | agent-tracker 동적 pane 감지 실패 원인 분석             | 2026-03-06 | #agent-tracker #sidecar #pane-id #cache #staleness |
 | 013 | Orchestrator pane release 누락 - interactive mode 잔류 | 2026-03-06 | #orchestrator #pane #release #tmux #claude-code |
 | 014 | Headless dispatch architecture - tmux pane에서 claude -p 백그라운드 프로세스로 | 2026-03-07 | #headless #claude-p #pid #dispatch #merge-queue |
+| 015 | agent-tracker 과도 설계 - `/proc` BFS가 tmux API보다 나쁜 이유 | 2026-03-08 | #agent-tracker #proc #tmux #overengineering #process-detection |
 
 ## 상세 문서
 
@@ -37,6 +38,7 @@
 - [findings.012-agent-tracker-detection-failures.md](./findings/findings.012-agent-tracker-detection-failures.md) - agent-tracker 동적 pane 감지 실패: negative cache, PPID 불안정, TRANSCRIPT_LAST_MSG 회귀
 - [findings.013-orchestrator-pane-release.md](./findings/findings.013-orchestrator-pane-release.md) - Orchestrator pane release 누락: interactive mode 잔류, Ctrl+C fallback, `-p` 비호환
 - [findings.014-headless-dispatch-architecture.md](./findings/findings.014-headless-dispatch-architecture.md) - tmux pane → claude -p 헤드리스 전환: nested headless, CLAUDECODE= unset, $BASHPID, merge queue
+- [findings.015-agent-tracker-overengineering.md](./findings/findings.015-agent-tracker-overengineering.md) - agent-tracker 과도 설계: /proc BFS vs tmux API, AI 행동 패턴 분석, 단순화 원칙
 
 ## 주요 원칙
 
@@ -60,3 +62,6 @@
 - **`CLAUDECODE=` unset 필수** → 자식 claude -p가 부모 환경변수 상속하면 충돌
 - **`$$` 대신 `$BASHPID`** → 서브셸/백그라운드에서 `$$`는 top-level shell PID. lock PID 기록 시 `${BASHPID:-$$}` 사용
 - **병렬 merge는 lock 직렬화 필수** → 같은 area 동시 merge 시 rebase 충돌. `mkdir` atomic lock + PID stale 감지
+- **가장 높은 수준의 API를 사용할 것** → tmux `#{pane_current_command}`, `ps -t`로 충분하면 `/proc` BFS 탐색 불필요. 저수준 재구현은 환경별 깨짐 위험이 더 큼
+- **2단계 이상 fallback 체인 금지** → 3번째 fallback부터는 문제를 가리는 것. 실패를 명시적으로 드러내는 게 디버깅에 유리
+- **버그 수정 시 삭제를 먼저 고려** → workaround 추가보다 원인 코드 제거가 우선. 기존 코드를 "정답"으로 전제하지 말 것
