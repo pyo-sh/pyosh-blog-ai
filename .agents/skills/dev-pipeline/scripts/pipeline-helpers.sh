@@ -1,27 +1,129 @@
-#!/bin/bash
-# pipeline-helpers.sh - Shell helpers for dev-pipeline skill
-# Source this file or use functions individually via the AI's Bash tool.
+#!/usr/bin/env bash
+# pipeline-helpers.fixed.sh
+# Shell helpers for dev-pipeline.
+#
+# Design invariants:
+# 1) Claude headless sessions always start from MONOREPO_ROOT so .claude/skills resolve.
+# 2) gh commands always use explicit repo (-R owner/name), never implicit cwd.
+# 3) Feature-branch git operations always run in the issue worktree.
+# 4) Merge runs through a single helper that acquires and releases the lock in one shell process.
+# 5) All transient artifacts are area-scoped to avoid client/server collisions.
 
-# Source shared monorepo helpers for MONOREPO_ROOT and area resolution.
-_PIPELINE_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$_PIPELINE_HELPERS_DIR/../../../../.agents/scripts/monorepo-helpers.sh"
+_PIPELINE_HELPERS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+_PIPELINE_SEARCH_DIR="$_PIPELINE_HELPERS_DIR"
+while [ "$_PIPELINE_SEARCH_DIR" != "/" ] && [ ! -f "$_PIPELINE_SEARCH_DIR/.agents/scripts/monorepo-helpers.sh" ]; do
+  _PIPELINE_SEARCH_DIR="$(dirname -- "$_PIPELINE_SEARCH_DIR")"
+done
+if [ ! -f "$_PIPELINE_SEARCH_DIR/.agents/scripts/monorepo-helpers.sh" ]; then
+  printf '%s\n' '[pipeline] failed to locate .agents/scripts/monorepo-helpers.sh' >&2
+  return 1 2>/dev/null || exit 1
+fi
+# shellcheck disable=SC1090
+source "$_PIPELINE_SEARCH_DIR/.agents/scripts/monorepo-helpers.sh"
+
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 PIPELINE_LOG_DIR="$PIPELINE_DIR/logs"
+PIPELINE_MESSAGE_DIR="$MONOREPO_ROOT/.workspace/messages"
 WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
-# ──────────────────────────────────────────────
-# State management
-# ──────────────────────────────────────────────
+pipeline_skill_cwd() {
+  printf '%s\n' "$MONOREPO_ROOT"
+}
+
+pipeline_repo_dir() {
+  monorepo_area_dir "$1"
+}
+
+pipeline_repo_name() {
+  monorepo_area_repo "$1"
+}
+
+pipeline_state_dir() {
+  local area=$1
+  printf '%s\n' "$PIPELINE_DIR/$area"
+}
+
+pipeline_log_dir() {
+  local area=$1
+  printf '%s\n' "$PIPELINE_LOG_DIR/$area"
+}
 
 pipeline_state_path() {
   local issue=$1
   local area=$2
-  echo "$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+  printf '%s\n' "$(pipeline_state_dir "$area")/issue-${issue}.state.json"
+}
+
+pipeline_log_path() {
+  local issue=$1
+  local area=$2
+  local stage=$3
+  printf '%s\n' "$(pipeline_log_dir "$area")/issue-${issue}-${stage}.log"
+}
+
+pipeline_err_path() {
+  local issue=$1
+  local area=$2
+  local stage=$3
+  printf '%s\n' "$(pipeline_log_dir "$area")/issue-${issue}-${stage}.err"
+}
+
+pipeline_headless_meta_path() {
+  local issue=$1
+  local area=$2
+  local stage=$3
+  printf '%s\n' "$(pipeline_state_dir "$area")/issue-${issue}-${stage}.job.json"
+}
+
+pipeline_message_path() {
+  local area=$1
+  local pr=$2
+  local kind=$3
+  printf '%s\n' "$PIPELINE_MESSAGE_DIR/${area}-pr-${pr}-${kind}.md"
+}
+
+pipeline_worktree_path() {
+  local issue=$1
+  local area=$2
+  printf '%s\n' "$WORKTREE_DIR/$area/issue-${issue}"
+}
+
+pipeline_resolve_worktree_path() {
+  # Canonical path:   .workspace/worktrees/<area>/issue-<N>
+  # Legacy path #1:   .workspace/worktrees/issue-<N>
+  # Legacy path #2:   <area>/.workspace/worktrees/issue-<N>
+  local issue=$1
+  local area=$2
+  local canonical legacy_root legacy_area
+
+  canonical="$(pipeline_worktree_path "$issue" "$area")"
+  legacy_root="$WORKTREE_DIR/issue-${issue}"
+  legacy_area="$MONOREPO_ROOT/$area/.workspace/worktrees/issue-${issue}"
+
+  if [ -d "$canonical" ]; then
+    printf '%s\n' "$canonical"
+    return 0
+  fi
+  if [ -d "$legacy_root" ]; then
+    printf '%s\n' "$legacy_root"
+    return 0
+  fi
+  if [ -d "$legacy_area" ]; then
+    printf '%s\n' "$legacy_area"
+    return 0
+  fi
+
+  printf '%s\n' 'PATH_INVALID'
+  return 3
 }
 
 pipeline_init() {
   local area=$1
-  mkdir -p "$PIPELINE_DIR/$area" "$PIPELINE_LOG_DIR" "$WORKTREE_DIR"
+  mkdir -p \
+    "$(pipeline_state_dir "$area")" \
+    "$(pipeline_log_dir "$area")" \
+    "$PIPELINE_MESSAGE_DIR" \
+    "$WORKTREE_DIR/$area"
 }
 
 pipeline_state_exists() {
@@ -37,36 +139,45 @@ pipeline_state_read() {
 }
 
 pipeline_state_write() {
-  # Atomic write: write to .tmp then mv (POSIX atomic rename).
-  # Prevents half-written JSON on crash.
+  # Atomic write to prevent half-written JSON on crash.
   local issue=$1
   local area=$2
   local json=$3
-  local path
-  path=$(pipeline_state_path "$issue" "$area")
-  local tmp
-  tmp=$(mktemp "${path}.XXXXXX")
-  echo "$json" > "$tmp" && mv "$tmp" "$path" || { rm -f "$tmp"; return 1; }
+  local path tmp
+
+  path="$(pipeline_state_path "$issue" "$area")"
+  mkdir -p "$(dirname -- "$path")" || return 1
+  tmp="$(mktemp "${path}.tmp.XXXXXX")" || return 1
+  printf '%s\n' "$json" > "$tmp" && mv "$tmp" "$path" || {
+    rm -f "$tmp"
+    return 1
+  }
 }
 
 pipeline_state_update() {
-  # Update specific fields in state via jq expression.
-  # Usage: pipeline_state_update <issue> <area> <jq_expr>
-  # Example: pipeline_state_update 42 client '.step = "review" | .reviewRound += 1'
+  # Usage:
+  #   pipeline_state_update <issue> <area> <jq_expr> [jq args...]
+  # Example:
+  #   pipeline_state_update 42 client '.step = "review"'
+  #   pipeline_state_update 42 client '.recoveryLog = ((.recoveryLog // []) + [$entry])' --argjson entry "$json"
   local issue=$1
   local area=$2
   local jq_expr=$3
-  local current
-  current=$(pipeline_state_read "$issue" "$area")
-  local updated
-  if ! updated=$(echo "$current" | jq "$jq_expr | .updatedAt = (now | todate)"); then
-    >&2 echo "[pipeline] jq failed for expression: $jq_expr"
+  shift 3
+
+  local current updated
+  current="$(pipeline_state_read "$issue" "$area")" || return 1
+
+  if ! updated="$(printf '%s' "$current" | jq "$@" "$jq_expr | .updatedAt = (now | todate)")"; then
+    printf '[pipeline] jq failed for expression: %s\n' "$jq_expr" >&2
     return 1
   fi
-  if [ -z "$updated" ] || [ "$updated" = "null" ]; then
-    >&2 echo "[pipeline] jq produced empty/null output for: $jq_expr"
+
+  if [ -z "$updated" ] || [ "$updated" = 'null' ]; then
+    printf '[pipeline] jq produced empty/null output for: %s\n' "$jq_expr" >&2
     return 1
   fi
+
   pipeline_state_write "$issue" "$area" "$updated"
 }
 
@@ -76,153 +187,307 @@ pipeline_state_delete() {
   rm -f "$(pipeline_state_path "$issue" "$area")"
 }
 
-# ──────────────────────────────────────────────
-# Headless execution (synchronous)
-# ──────────────────────────────────────────────
+pipeline_review_prompt() {
+  local issue=$1
+  local area=$2
+  local pr=$3
+  local repo repo_dir
 
-pipeline_run_headless() {
-  # Run claude -p synchronously (blocking). Returns when subprocess exits.
-  # Usage: pipeline_run_headless <workdir> <prompt> <issue> <area> <stage> [model]
-  # stage: "review" or "resolve" (determines tool allowlist and max-turns)
-  # model: optional model name (e.g. "sonnet", "opus"). Omit to use CLI default.
-  # stdout: log file path
-  # Returns: exit code from claude -p (0=success, 124=timeout, other=error)
-  local workdir=$1
+  repo="$(pipeline_repo_name "$area")" || return 1
+  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+
+  cat <<PROMPT_REVIEW
+/dev-review
+Target issue: #$issue
+Target PR: #$pr
+Target area: $area
+GitHub repo: $repo
+Repo dir on disk: $repo_dir
+Session skill root: $MONOREPO_ROOT
+
+Rules:
+- Skills must resolve from $MONOREPO_ROOT. Do not change that assumption.
+- For GitHub commands, use either "gh ... -R $repo" or work from "$repo_dir" explicitly.
+- Do not assume the process cwd is the repo checkout.
+- Review only the PR diff and directly necessary context.
+- After posting the review, exit immediately.
+PROMPT_REVIEW
+}
+
+pipeline_resolve_prompt() {
+  local issue=$1
+  local area=$2
+  local pr=$3
+  local repo repo_dir worktree_dir
+
+  repo="$(pipeline_repo_name "$area")" || return 1
+  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area")" || return 1
+
+  cat <<PROMPT_RESOLVE
+/dev-resolve
+Target issue: #$issue
+Target PR: #$pr
+Target area: $area
+GitHub repo: $repo
+Repo dir on disk: $repo_dir
+Worktree dir for all source edits: $worktree_dir
+Session skill root: $MONOREPO_ROOT
+
+Rules:
+- Skills must resolve from $MONOREPO_ROOT. Do not launch or resolve skills from the worktree.
+- All source-file edits and feature-branch git commands must run in "$worktree_dir".
+- All repo-level gh commands must use either "gh ... -R $repo" or "$repo_dir" explicitly.
+- Fix only the reviewed items, then push and post the response comment.
+- After posting the response, exit immediately.
+PROMPT_RESOLVE
+}
+
+pipeline_run_headless_core() {
+  # Synchronous low-level runner.
+  # IMPORTANT: In Claude Code skills, the outer Bash tool call for this function
+  # should use run_in_background: true for long-running review/resolve steps.
+  #
+  # Usage:
+  #   pipeline_run_headless_core <skill_cwd> <prompt> <issue> <area> <stage> <repo_dir> <worktree_dir> <pr> [model]
+  local skill_cwd=$1
   local prompt=$2
   local issue=$3
   local area=$4
   local stage=$5
-  local model=${6:-}
+  local repo_dir=$6
+  local worktree_dir=$7
+  local pr=$8
+  local model=${9:-}
 
-  local log="$PIPELINE_LOG_DIR/issue-${issue}-${stage}.log"
+  local log err meta repo tools max_turns timeout_sec cmd rc status meta_tmp
 
-  local tools max_turns timeout_sec
+  pipeline_init "$area" || return 1
+
+  log="$(pipeline_log_path "$issue" "$area" "$stage")"
+  err="$(pipeline_err_path "$issue" "$area" "$stage")"
+  meta="$(pipeline_headless_meta_path "$issue" "$area" "$stage")"
+  repo="$(pipeline_repo_name "$area")" || return 1
+
   case "$stage" in
     review)
-      tools="Bash,Read,Skill"
+      tools='Bash,Read,Skill'
       max_turns=15
       timeout_sec=900
       ;;
     resolve)
-      tools="Bash,Read,Edit,Write,Grep,Glob,Skill"
+      tools='Bash,Read,Edit,Write,Grep,Glob,Skill'
       max_turns=25
       timeout_sec=900
       ;;
+    *)
+      printf "[pipeline] unknown headless stage: %s\n" "$stage" >&2
+      return 2
+      ;;
   esac
 
-  echo "$log"
+  meta_tmp="${meta}.tmp"
+  jq -n \
+    --arg status 'running' \
+    --arg issue "$issue" \
+    --arg area "$area" \
+    --arg stage "$stage" \
+    --arg pr "$pr" \
+    --arg repo "$repo" \
+    --arg repoDir "$repo_dir" \
+    --arg worktreeDir "$worktree_dir" \
+    --arg skillCwd "$skill_cwd" \
+    --arg log "$log" \
+    --arg err "$err" \
+    --arg model "$model" \
+    '{
+      status: $status,
+      issue: ($issue | tonumber),
+      area: $area,
+      stage: $stage,
+      pr: ($pr | tonumber),
+      repo: $repo,
+      repoDir: $repoDir,
+      worktreeDir: $worktreeDir,
+      skillCwd: $skillCwd,
+      log: $log,
+      err: $err,
+      model: $model,
+      startedAt: (now | todate),
+      finishedAt: null,
+      exitCode: null
+    }' > "$meta_tmp" && mv "$meta_tmp" "$meta"
 
-  cd "$workdir" || return 3
-  CLAUDECODE= timeout "$timeout_sec" claude -p \
-    ${model:+--model "$model"} \
-    --dangerously-skip-permissions \
-    --no-session-persistence \
-    --allowedTools "$tools" \
-    --max-turns "$max_turns" \
-    "$prompt" > "$log" 2>"${log%.log}.err"
+  cmd=(timeout "$timeout_sec" claude -p)
+  if [ -n "$model" ]; then
+    cmd+=(--model "$model")
+  fi
+  cmd+=(
+    --dangerously-skip-permissions
+    --no-session-persistence
+    --allowedTools "$tools"
+    --max-turns "$max_turns"
+    "$prompt"
+  )
+
+  (
+    cd -- "$skill_cwd" || exit 3
+    PIPELINE_MONOREPO_ROOT="$MONOREPO_ROOT" \
+    PIPELINE_AREA="$area" \
+    PIPELINE_REPO="$repo" \
+    PIPELINE_REPO_DIR="$repo_dir" \
+    PIPELINE_WORKTREE_DIR="$worktree_dir" \
+    PIPELINE_STAGE="$stage" \
+    PIPELINE_ISSUE="$issue" \
+    PIPELINE_PR="$pr" \
+    "${cmd[@]}" > "$log" 2> "$err"
+  )
+  rc=$?
+
+  case "$rc" in
+    0) status='success' ;;
+    124) status='timeout' ;;
+    *) status='error' ;;
+  esac
+
+  jq -n \
+    --arg status "$status" \
+    --arg issue "$issue" \
+    --arg area "$area" \
+    --arg stage "$stage" \
+    --arg pr "$pr" \
+    --arg repo "$repo" \
+    --arg repoDir "$repo_dir" \
+    --arg worktreeDir "$worktree_dir" \
+    --arg skillCwd "$skill_cwd" \
+    --arg log "$log" \
+    --arg err "$err" \
+    --arg model "$model" \
+    --argjson exitCode "$rc" \
+    '{
+      status: $status,
+      issue: ($issue | tonumber),
+      area: $area,
+      stage: $stage,
+      pr: ($pr | tonumber),
+      repo: $repo,
+      repoDir: $repoDir,
+      worktreeDir: $worktreeDir,
+      skillCwd: $skillCwd,
+      log: $log,
+      err: $err,
+      model: $model,
+      finishedAt: (now | todate),
+      exitCode: $exitCode
+    }' > "$meta_tmp" && mv "$meta_tmp" "$meta"
+
+  printf '%s\n' "$log"
+  return "$rc"
 }
 
-pipeline_resolve_worktree_path() {
-  # Resolves actual worktree directory, checking current path first, then legacy.
-  # stdout: absolute path on success, "PATH_INVALID" on failure
-  # Returns: 0 = found, 3 = not found
+pipeline_run_review() {
   local issue=$1
   local area=$2
+  local pr=$3
+  local model=${4:-}
+  local repo_dir prompt
 
-  local current_path="$WORKTREE_DIR/issue-${issue}"
-  if [ -d "$current_path" ]; then
-    echo "$current_path"
-    return 0
-  fi
-
-  if [ -n "$area" ]; then
-    local legacy_path="$MONOREPO_ROOT/$area/.workspace/worktrees/issue-${issue}"
-    if [ -d "$legacy_path" ]; then
-      echo "$legacy_path"
-      return 0
-    fi
-  fi
-
-  echo "PATH_INVALID"
-  return 3
+  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || return 1
+  pipeline_run_headless_core \
+    "$(pipeline_skill_cwd)" \
+    "$prompt" \
+    "$issue" "$area" review \
+    "$repo_dir" '' "$pr" "$model"
 }
 
-# ──────────────────────────────────────────────
-# API checks (single-shot, no polling)
-# ──────────────────────────────────────────────
+pipeline_run_resolve() {
+  local issue=$1
+  local area=$2
+  local pr=$3
+  local model=${4:-}
+  local repo_dir worktree_dir prompt
+
+  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area")" || return 1
+  prompt="$(pipeline_resolve_prompt "$issue" "$area" "$pr")" || return 1
+  pipeline_run_headless_core \
+    "$(pipeline_skill_cwd)" \
+    "$prompt" \
+    "$issue" "$area" resolve \
+    "$repo_dir" "$worktree_dir" "$pr" "$model"
+}
 
 pipeline_check_review_exists() {
-  # Check if a review exists with body starting "## Review Summary".
   # Returns: 0 = found (review_id on stdout), 1 = not found
-  local area_dir=$1
+  local area=$1
   local pr=$2
   local last_review_id=${3:-0}
+  local repo review_id
 
-  local review_id
-  review_id=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews" \
-    --jq "[.[] | select(.id > ${last_review_id})
-               | select(.body | startswith(\"## Review Summary\"))]
-          | last // empty | .id")
+  repo="$(pipeline_repo_name "$area")" || return 1
+  review_id="$({ gh api "repos/${repo}/pulls/${pr}/reviews" \
+    --jq "[.[]
+      | select(.id > ${last_review_id})
+      | select(.body | startswith(\"## Review Summary\"))
+    ] | last | .id // empty"; } 2>/dev/null)"
 
-  if [ -n "$review_id" ] && [ "$review_id" != "null" ]; then
-    echo "$review_id"
+  if [ -n "$review_id" ] && [ "$review_id" != 'null' ]; then
+    printf '%s\n' "$review_id"
     return 0
   fi
   return 1
 }
 
 pipeline_fetch_review() {
-  local area_dir=$1
+  local area=$1
   local pr=$2
   local review_id=$3
-  cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/reviews/${review_id}" \
+  local repo
+
+  repo="$(pipeline_repo_name "$area")" || return 1
+  gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}" \
     --jq '{state: .state, body: .body}'
 }
 
 pipeline_check_new_commits() {
-  # Check if new commits exist after a known SHA.
   # Returns: 0 = found (new_sha on stdout), 1 = not found
-  local area_dir=$1
+  local area=$1
   local pr=$2
   local last_commit_sha=$3
+  local repo latest_sha
 
-  local latest_sha
-  latest_sha=$(cd "$area_dir" && gh api "repos/{owner}/{repo}/pulls/${pr}/commits" \
-    --jq '.[-1].sha')
+  repo="$(pipeline_repo_name "$area")" || return 1
+  latest_sha="$({ gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha'; } 2>/dev/null)"
 
-  if [ -n "$latest_sha" ] && [ "$latest_sha" != "null" ] && [ "$latest_sha" != "$last_commit_sha" ]; then
-    echo "$latest_sha"
+  if [ -n "$latest_sha" ] && [ "$latest_sha" != 'null' ] && [ "$latest_sha" != "$last_commit_sha" ]; then
+    printf '%s\n' "$latest_sha"
     return 0
   fi
   return 1
 }
 
-# ──────────────────────────────────────────────
-# Self-healing (stage retry + recovery log)
-# ──────────────────────────────────────────────
-
 pipeline_stage_retry() {
   # Increment stage retry counter, check against max.
-  # Usage: pipeline_stage_retry <issue> <area> <stage>
   # Returns: 0 = can retry, 1 = max reached
   local issue=$1
   local area=$2
   local stage=$3
-  local state
-  state=$(pipeline_state_read "$issue" "$area")
-  local retries
-  retries=$(echo "$state" | jq -r ".stageRetries.${stage} // 0")
-  local max
-  max=$(echo "$state" | jq -r ".maxStageRetries // 3")
+  local state retries max
+
+  state="$(pipeline_state_read "$issue" "$area")" || return 1
+  retries="$(printf '%s' "$state" | jq -r ".stageRetries.${stage} // 0")"
+  max="$(printf '%s' "$state" | jq -r '.maxStageRetries // 3')"
+
   if [ "$retries" -ge "$max" ]; then
     return 1
   fi
+
   pipeline_state_update "$issue" "$area" ".stageRetries.${stage} = $((retries + 1))"
 }
 
 pipeline_recovery_log() {
   # Append a recovery attempt to recoveryLog.
-  # Usage: pipeline_recovery_log <issue> <area> <stage> <error> <action> <result>
   local issue=$1
   local area=$2
   local stage=$3
@@ -230,126 +495,208 @@ pipeline_recovery_log() {
   local action=$5
   local result=$6
   local entry
-  entry=$(jq -n --arg s "$stage" --arg e "$error" --arg a "$action" --arg r "$result" \
-    '{stage:$s, error:$e, action:$a, result:$r, timestamp:(now|todate)}')
-  pipeline_state_update "$issue" "$area" ".recoveryLog += [$entry]"
+
+  entry="$(jq -n \
+    --arg s "$stage" \
+    --arg e "$error" \
+    --arg a "$action" \
+    --arg r "$result" \
+    '{stage:$s, error:$e, action:$a, result:$r, timestamp:(now|todate)}')" || return 1
+
+  pipeline_state_update \
+    "$issue" "$area" \
+    '.recoveryLog = ((.recoveryLog // []) + [$entry])' \
+    --argjson entry "$entry"
 }
 
 pipeline_format_escalation() {
-  # Format recovery log for user escalation.
-  # Usage: pipeline_format_escalation <issue> <area> <stage>
   local issue=$1
   local area=$2
   local stage=$3
   local state
-  state=$(pipeline_state_read "$issue" "$area")
 
-  local info
-  info=$(echo "$state" | jq -r --arg stage "$stage" '
-    "[pipeline] Stage \"\($stage)\" failed after \(.maxStageRetries // 3) recovery attempts.\n",
-    "Recovery log:",
-    (.recoveryLog // [] | map(select(.stage == $stage))
-      | .[] | "  #\(.timestamp) \(.error) -> \(.action) -> \(.result)"),
-    "",
-    "Worktree: \(.worktree)",
-    "Branch: \(.branch)",
-    "PR: #\(.pr)",
-    "",
-    "Action needed: fix manually, then resume with /dev-pipeline"')
-  echo "$info"
+  state="$(pipeline_state_read "$issue" "$area")" || return 1
+  printf '%s\n' "$state" | jq -r --arg stage "$stage" '
+    [
+      "[pipeline] Stage \($stage) failed after \(.maxStageRetries // 3) recovery attempts.",
+      "Recovery log:",
+      ((.recoveryLog // [])
+        | map(select(.stage == $stage) | "  [\(.timestamp)] \(.error) -> \(.action) -> \(.result)")
+        | .[]?),
+      "",
+      "Worktree: \(.worktree // .paths.worktreeDir // "")",
+      "Branch: \(.branch // "")",
+      "PR: #\(.pr // 0)",
+      "",
+      "Action needed: fix manually, then resume with /dev-pipeline"
+    ] | .[]'
 }
 
-# ──────────────────────────────────────────────
-# Merge queue (lock-based serialization)
-# ──────────────────────────────────────────────
-
 pipeline_acquire_merge_lock() {
-  # Acquire area-level merge lock. Only one pipeline can merge at a time.
-  # Uses mkdir for atomic creation + PID file for stale lock detection.
-  # Usage: pipeline_acquire_merge_lock <area> <issue>
-  # Returns: 0 = acquired, 1 = timeout
+  # Area-level merge lock safe across separate shell invocations.
+  # Stale lock policy is TTL-based, not PID-based.
+  # Usage: pipeline_acquire_merge_lock <area> <issue> [max_wait_seconds] [stale_after_seconds]
   local area=$1
   local issue=$2
-  local lock_dir="$PIPELINE_DIR/${area}/merge.lock"
-  local max_wait=300  # 5 minutes
+  local max_wait=${3:-300}
+  local stale_after=${4:-1800}
   local interval=10
   local waited=0
+  local lock_dir holder_issue acquired_ts acquired_epoch now_epoch
+
+  lock_dir="$(pipeline_state_dir "$area")/merge.lock"
+  mkdir -p "$(pipeline_state_dir "$area")" || return 1
 
   while ! mkdir "$lock_dir" 2>/dev/null; do
-    # Check if holder is still alive (stale lock recovery)
-    local holder_pid
-    holder_pid=$(cat "$lock_dir/pid" 2>/dev/null)
-    if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
-      >&2 echo "[pipeline] Stale merge lock (PID $holder_pid dead) - reclaiming"
+    holder_issue="$(cat "$lock_dir/issue" 2>/dev/null || true)"
+    acquired_ts="$(cat "$lock_dir/acquired" 2>/dev/null || true)"
+    acquired_epoch="$(date -u -d "$acquired_ts" +%s 2>/dev/null || printf '0')"
+    now_epoch="$(date -u +%s)"
+
+    if [ "$acquired_epoch" -gt 0 ] && [ $((now_epoch - acquired_epoch)) -ge "$stale_after" ]; then
+      printf '[pipeline] stale merge lock detected for area=%s issue=%s; reclaiming\n' "$area" "${holder_issue:-unknown}" >&2
       rm -rf "$lock_dir"
       continue
     fi
 
     if [ "$waited" -ge "$max_wait" ]; then
-      local holder_issue
-      holder_issue=$(cat "$lock_dir/issue" 2>/dev/null)
-      >&2 echo "[pipeline] Merge lock timeout after ${max_wait}s (held by issue #${holder_issue:-unknown})"
+      printf '[pipeline] merge lock timeout after %ss (held by issue #%s)\n' "$max_wait" "${holder_issue:-unknown}" >&2
       return 1
     fi
 
-    >&2 echo "[pipeline] Merge lock held - waiting (${waited}s/${max_wait}s)"
+    printf '[pipeline] merge lock held for area=%s by issue #%s; waiting (%ss/%ss)\n' "$area" "${holder_issue:-unknown}" "$waited" "$max_wait" >&2
     sleep "$interval"
     waited=$((waited + interval))
   done
 
-  # Write lock metadata ($BASHPID = current process, not top-level shell $$)
-  echo "${BASHPID:-$$}" > "$lock_dir/pid"
-  echo "$issue" > "$lock_dir/issue"
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lock_dir/acquired"
+  printf '%s\n' "$issue" > "$lock_dir/issue"
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$lock_dir/acquired"
   return 0
 }
 
 pipeline_release_merge_lock() {
-  # Release area-level merge lock.
-  # Usage: pipeline_release_merge_lock <area>
+  # Usage: pipeline_release_merge_lock <area> [expected_issue]
   local area=$1
-  local lock_dir="$PIPELINE_DIR/${area}/merge.lock"
+  local expected_issue=${2:-}
+  local lock_dir holder_issue
+
+  lock_dir="$(pipeline_state_dir "$area")/merge.lock"
+  [ -d "$lock_dir" ] || return 0
+
+  if [ -n "$expected_issue" ]; then
+    holder_issue="$(cat "$lock_dir/issue" 2>/dev/null || true)"
+    if [ -n "$holder_issue" ] && [ "$holder_issue" != "$expected_issue" ]; then
+      printf '[pipeline] refusing to release merge lock for area=%s; expected issue #%s but lock belongs to #%s\n' "$area" "$expected_issue" "$holder_issue" >&2
+      return 1
+    fi
+  fi
+
   rm -rf "$lock_dir"
 }
 
-# ──────────────────────────────────────────────
-# Cleanup
-# ──────────────────────────────────────────────
+pipeline_push_branch_safely() {
+  # Push normally when fast-forward; otherwise use --force-with-lease.
+  local worktree_dir=$1
+
+  if ! git -C "$worktree_dir" rev-parse --verify '@{upstream}' >/dev/null 2>&1; then
+    git -C "$worktree_dir" push -u origin HEAD
+    return $?
+  fi
+
+  if git -C "$worktree_dir" merge-base --is-ancestor '@{upstream}' HEAD >/dev/null 2>&1; then
+    git -C "$worktree_dir" push
+  else
+    git -C "$worktree_dir" push --force-with-lease
+  fi
+}
+
+pipeline_merge_pr() {
+  # Acquire lock, sync feature branch from the issue worktree, then merge via gh.
+  # Runs lock acquire + merge + release in one shell process.
+  # Usage: pipeline_merge_pr <issue> <area> <pr> <branch>
+  local issue=$1
+  local area=$2
+  local pr=$3
+  local branch=$4
+  local repo repo_dir worktree_dir pr_state
+
+  repo="$(pipeline_repo_name "$area")" || return 1
+  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
+
+  pipeline_acquire_merge_lock "$area" "$issue" || return 1
+  trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' EXIT INT TERM
+
+  if [ -n "$worktree_dir" ] && [ "$worktree_dir" != 'PATH_INVALID' ] && [ -d "$worktree_dir" ]; then
+    git -C "$worktree_dir" fetch origin || return 1
+
+    if git -C "$worktree_dir" rebase origin/main; then
+      pipeline_push_branch_safely "$worktree_dir" || return 1
+    else
+      git -C "$worktree_dir" rebase --abort >/dev/null 2>&1 || true
+      git -C "$worktree_dir" merge --no-edit origin/main || return 1
+      pipeline_push_branch_safely "$worktree_dir" || return 1
+    fi
+  else
+    printf '[pipeline] worktree missing for issue #%s area=%s; skipping branch sync and attempting merge directly\n' "$issue" "$area" >&2
+  fi
+
+  (
+    cd -- "$repo_dir" || exit 1
+    gh pr merge "$pr" -R "$repo" --squash --delete-branch
+  ) || return 1
+
+  pr_state="$(gh pr view "$pr" -R "$repo" --json state --jq '.state')" || return 1
+  [ "$pr_state" = 'MERGED' ] || {
+    printf '[pipeline] gh pr merge returned without MERGED state for PR #%s in %s\n' "$pr" "$repo" >&2
+    return 1
+  }
+
+  trap - EXIT INT TERM
+  pipeline_release_merge_lock "$area" "$issue"
+}
 
 pipeline_cleanup() {
   local issue=$1
   local area=$2
   local branch=$3
+  local repo_dir wt
 
-  # Clean up log files
-  rm -f "$PIPELINE_LOG_DIR"/issue-"${issue}"-*.log "$PIPELINE_LOG_DIR"/issue-"${issue}"-*.err
+  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  wt="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
 
-  local wt="$WORKTREE_DIR/issue-${issue}"
-  if [ -d "$wt" ]; then
-    cd "$MONOREPO_ROOT/$area" && git worktree remove "$wt" --force
-    git worktree prune
+  rm -f \
+    "$(pipeline_log_path "$issue" "$area" review)" \
+    "$(pipeline_err_path "$issue" "$area" review)" \
+    "$(pipeline_log_path "$issue" "$area" resolve)" \
+    "$(pipeline_err_path "$issue" "$area" resolve)" \
+    "$(pipeline_headless_meta_path "$issue" "$area" review)" \
+    "$(pipeline_headless_meta_path "$issue" "$area" resolve)"
+
+  if [ -n "$wt" ] && [ "$wt" != 'PATH_INVALID' ] && [ -d "$wt" ]; then
+    git -C "$repo_dir" worktree remove "$wt" --force || true
+    git -C "$repo_dir" worktree prune || true
   fi
 
-  cd "$MONOREPO_ROOT/$area" && git branch -D "$branch" 2>/dev/null
+  git -C "$repo_dir" branch -D "$branch" 2>/dev/null || true
   pipeline_state_delete "$issue" "$area"
 }
 
-# ──────────────────────────────────────────────
-# Listing active pipelines
-# ──────────────────────────────────────────────
-
 pipeline_list() {
-  if [ -d "$PIPELINE_DIR" ]; then
-    local found=0
-    for f in "$PIPELINE_DIR"/*/issue-*.state.json; do
-      [ -f "$f" ] || continue
-      found=1
-      local info
-      info=$(jq -r '"Issue #\(.issue) (\(.area)): step=\(.step)"' "$f")
-      echo "$info"
-    done
-    [ "$found" -eq 0 ] && echo "No active pipelines"
-  else
-    echo "No active pipelines"
+  local found=0
+  local f info
+
+  if [ ! -d "$PIPELINE_DIR" ]; then
+    printf '%s\n' 'No active pipelines'
+    return 0
   fi
+
+  for f in "$PIPELINE_DIR"/*/issue-*.state.json; do
+    [ -f "$f" ] || continue
+    found=1
+    info="$(jq -r '"Issue #\(.issue) (\(.area)): step=\(.step) pr=#\(.pr // 0)"' "$f")"
+    printf '%s\n' "$info"
+  done
+
+  [ "$found" -eq 0 ] && printf '%s\n' 'No active pipelines'
 }

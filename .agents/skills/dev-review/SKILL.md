@@ -1,43 +1,66 @@
 ---
 name: dev-review
-description: PR code review skill. Run in a separate session from the code author to provide unbiased review. Outputs GitHub PR Review (inline comments + summary). Activates on "review PR", "code review", "/dev-review", etc.
+description: PR code review skill. Runs in a separate session from the code author. Posts a GitHub PR Review that begins with `## Review Summary`. Works correctly when the Claude session starts from monorepo root and the target repo is provided via environment variables.
 ---
 
 # Dev-Review
 
-Review PRs in a **different session** from the code author. Comments only - never modify code.
+Comments only. Never modify code.
 
-> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
-> Always verify you are in the correct area directory before running `gh` commands.
-> Client PRs: `cd client && gh pr ...` or `gh pr ... -R pyo-sh/pyosh-blog-fe`
-> Server PRs: `cd server && gh pr ...` or `gh pr ... -R pyo-sh/pyosh-blog-be`
+## Runtime contract when invoked by dev-pipeline
+
+The parent pipeline may launch this skill from monorepo root. In that case use these environment variables if present:
+
+- `PIPELINE_AREA`
+- `PIPELINE_REPO`
+- `PIPELINE_REPO_DIR`
+- `PIPELINE_PR`
+- `PIPELINE_MONOREPO_ROOT`
+
+Do not assume the current cwd is the repo checkout.
+
+Recommended command style:
+
+```bash
+REPO="${PIPELINE_REPO:-pyo-sh/pyosh-blog-fe}"
+REPO_DIR="${PIPELINE_REPO_DIR:-/workspace/client}"
+PR="${PIPELINE_PR:?PIPELINE_PR is required}"
+
+gh pr diff "$PR" -R "$REPO"
+gh pr view "$PR" -R "$REPO" --json number,title,state,body
+```
 
 ## Steps
 
 ### 1. Read PR
 
-```bash
-gh pr diff {PR#}
-gh pr view {PR#} --json number,title,state,body
-```
+Use `gh pr diff` and `gh pr view` with explicit `-R`.
 
 ### 2. Analyze code
 
-Analyze the diff output directly. Do NOT explore the broader codebase. Only read specific files when the diff context is insufficient to understand the change. Check `{area}/CLAUDE.md` compliance.
+Review the diff first. Read specific files under `REPO_DIR` only when diff context is insufficient.
 
-Focus: Security (OWASP Top 10), type safety, edge cases, error handling, performance (N+1), conventions.
+### 3. Classify and submit
 
-### 3. Classify & submit
+The review body **must start with `## Review Summary`**.
 
-Classify findings by severity and submit. -> [review-template.md](references/review-template.md)
+Write the temporary message file with an area-scoped name to avoid cross-repo collisions:
 
-### 4. Report
+```bash
+MSG_FILE="${PIPELINE_MONOREPO_ROOT:-/workspace}/.workspace/messages/${PIPELINE_AREA:-manual}-pr-${PR}-review.md"
+mkdir -p "$(dirname "$MSG_FILE")"
+cat > "$MSG_FILE" <<'EOF_REVIEW'
+{body}
+EOF_REVIEW
 
-Summarize counts. If Critical -> advise `/dev-resolve`. If none -> advise approve & merge.
+gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" --comment
+rm -f "$MSG_FILE"
+```
+
+Use `--request-changes` when 1+ Critical exists.
 
 ## Constraints
 
-- Comments only - never modify code
-- Cite `file:line` with problem and alternative
-- Don't flag trivial style differences as Critical/Warning
-- Review body **must start with `## Review Summary`** - the pipeline checks for this exact prefix to detect review completion
+- Comments only
+- Never modify code
+- Do not inspect unrelated code outside the diff unless absolutely necessary
