@@ -169,8 +169,9 @@ _orch_provider_health_record() {
   local area=$1 result=$2 error=${3:-}
   local now
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  # Escape double quotes in error for JSON embedding
-  local safe_error="${error//\"/\\\"}"
+  # Safely encode error string for JSON embedding (handles quotes, newlines, etc.)
+  local safe_error
+  safe_error=$(printf '%s' "$error" | jq -Rs '.'  | sed 's/^"//;s/"$//')
 
   case "$result" in
     healthy)
@@ -186,14 +187,9 @@ _orch_provider_health_record() {
          | .providers.github.lastCheckedAt = \"$now\""
       ;;
     failure)
-      local failures
-      failures=$(orch_state_read "$area" | jq '.providers.github.consecutiveFailures // 0')
-      failures=$((failures + 1))
-      local new_status="healthy"
-      [ "$failures" -ge 3 ] && new_status="degraded"
       orch_state_update "$area" \
-        ".providers.github.status = \"$new_status\"
-         | .providers.github.consecutiveFailures = $failures
+        ".providers.github.consecutiveFailures = ((.providers.github.consecutiveFailures // 0) + 1)
+         | .providers.github.status = (if .providers.github.consecutiveFailures >= 3 then \"degraded\" else .providers.github.status end)
          | .providers.github.lastError = \"$safe_error\"
          | .providers.github.lastCheckedAt = \"$now\""
       ;;
@@ -236,8 +232,12 @@ orch_gh() {
   else
     _orch_provider_health_record "$area" "failure" "$err_content"
     if [ -n "$err_content" ]; then
-      echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] gh rc=$rc: $err_content" \
-        >> "$ORCH_BASE/${area}/gh-errors.log"
+      local err_log="$ORCH_BASE/${area}/gh-errors.log"
+      # Truncate if over 1MB to prevent unbounded growth
+      if [ -f "$err_log" ] && [ "$(stat -c %s "$err_log")" -gt 1048576 ]; then
+        tail -100 "$err_log" > "${err_log}.tmp" && mv "${err_log}.tmp" "$err_log"
+      fi
+      echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] gh rc=$rc: $err_content" >> "$err_log"
     fi
     return "$rc"
   fi
@@ -369,13 +369,15 @@ orch_stop_process() {
   # Sends SIGTERM to group, waits, then SIGKILL if needed.
   local area=$1
   local issue=$2
+  local state
+  state=$(orch_state_read "$area")
   local pgid
-  pgid=$(orch_state_read "$area" | jq -r ".dispatched[\"$issue\"].pgid // empty")
+  pgid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pgid // empty")
 
   if [ -z "$pgid" ] || [ "$pgid" = "null" ]; then
     # Fallback: try PID-based kill (legacy state without pgid)
     local pid
-    pid=$(orch_state_read "$area" | jq -r ".dispatched[\"$issue\"].pid // empty")
+    pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
     if [ -n "$pid" ] && [ "$pid" != "null" ] && orch_process_alive "$pid"; then
       kill "$pid" 2>/dev/null
       sleep 3
@@ -556,8 +558,15 @@ orch_detect_stall() {
 
   local state
   state=$(orch_state_read "$area")
-  local pgid
-  pgid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pgid // empty")
+
+  # Batch-extract all needed fields from state in one jq call
+  local fields
+  fields=$(echo "$state" | jq -r --arg i "$issue" '
+    .dispatched[$i] // {} |
+    [.pgid // "", .pid // "", .lastActivity // "",
+     .lastCpuJiffies // "0", .lastCommitSha // ""] | @tsv')
+  local pgid wrapper_pid last_activity last_cpu last_sha
+  IFS=$'\t' read -r pgid wrapper_pid last_activity last_cpu last_sha <<< "$fields"
 
   # 1. Heartbeat check (strongest signal)
   local hb_file="$ORCH_BASE/${area}/issue-${issue}.heartbeat"
@@ -572,8 +581,6 @@ orch_detect_stall() {
   fi
 
   # 2. Check elapsed time since lastActivity
-  local last_activity
-  last_activity=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastActivity // empty")
   if [ -z "$last_activity" ]; then
     echo "active"; return 0
   fi
@@ -583,7 +590,7 @@ orch_detect_stall() {
   now_ts=$(date +%s)
   elapsed=$((now_ts - last_ts))
 
-  # Determine threshold: pre-PR vs post-PR
+  # Determine threshold: pre-PR vs post-PR (single PR lookup, reused for commit check)
   local threshold=$stall_seconds
   local pr_number=""
   pr_number=$(_orch_pr_list "$area" "$issue" open number '.[0].number') || true
@@ -610,13 +617,9 @@ orch_detect_stall() {
   fi
 
   # 3b. CPU jiffies change
-  local wrapper_pid
-  wrapper_pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
   if [ -n "$wrapper_pid" ] && [ -f "/proc/$wrapper_pid/stat" ]; then
     local cpu_now
     cpu_now=$(awk '{print $14+$15}' "/proc/$wrapper_pid/stat") || cpu_now="0"
-    local last_cpu
-    last_cpu=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCpuJiffies // \"0\"")
     if [ "$cpu_now" != "$last_cpu" ] && [ "$cpu_now" != "0" ]; then
       orch_state_update "$area" ".dispatched[\"$issue\"].lastCpuJiffies = \"$cpu_now\""
       orch_update_last_activity "$area" "$issue"
@@ -624,10 +627,8 @@ orch_detect_stall() {
     fi
   fi
 
-  # 3c. Commit SHA change (only if PR exists)
+  # 3c. Commit SHA change (reuses pr_number from threshold check above)
   if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
-    local last_sha
-    last_sha=$(echo "$state" | jq -r ".dispatched[\"$issue\"].lastCommitSha // empty")
     local repo
     repo=$(monorepo_area_repo "$area")
     local latest_sha
@@ -707,6 +708,16 @@ orch_unblock() {
   echo "$unblocked"
 }
 
+_orch_mark_failed_and_unblock() {
+  # Internal helper: mark issue failed, remove from dispatched, unblock dependents.
+  local area=$1 issue=$2
+  orch_status_set "$area" "$issue" "failed"
+  orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+  local newly_unblocked
+  newly_unblocked=$(orch_unblock "$area" "$issue")
+  [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+}
+
 # ──────────────────────────────────────────────
 # Poll cycle
 # ──────────────────────────────────────────────
@@ -746,13 +757,11 @@ orch_poll_cycle() {
         orch_status_set "$area" "$issue" "$result"
         orch_state_update "$area" "del(.dispatched[\"$issue\"])"
         >&2 echo "[orchestrator] Issue #${issue}: ${result}"
-
         local newly_unblocked
         newly_unblocked=$(orch_unblock "$area" "$issue")
         [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
         ;;
       abnormal_exit)
-        # Process dead, PR exists but no exit file - treat as retriable failure
         local retry_count
         retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
         if [ "$retry_count" -lt 1 ]; then
@@ -764,18 +773,11 @@ orch_poll_cycle() {
             >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
           else
             >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
-            orch_status_set "$area" "$issue" "failed"
-            local newly_unblocked
-            newly_unblocked=$(orch_unblock "$area" "$issue")
-            [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+            _orch_mark_failed_and_unblock "$area" "$issue"
           fi
         else
-          orch_status_set "$area" "$issue" "failed"
-          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
           >&2 echo "[orchestrator] Issue #${issue}: abnormal_exit (retry exhausted)"
-          local newly_unblocked
-          newly_unblocked=$(orch_unblock "$area" "$issue")
-          [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+          _orch_mark_failed_and_unblock "$area" "$issue"
         fi
         ;;
       # "running" - no action
@@ -811,11 +813,7 @@ orch_poll_cycle() {
       elif [ "$retry_count" -ge 1 ]; then
         >&2 echo "[orchestrator] STALL: Issue #${issue} - retry exhausted, marking failed"
         orch_stop_process "$area" "$issue"
-        orch_status_set "$area" "$issue" "failed"
-        orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-        local newly_unblocked
-        newly_unblocked=$(orch_unblock "$area" "$issue")
-        [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
+        _orch_mark_failed_and_unblock "$area" "$issue"
       else
         >&2 echo "[orchestrator] STALL detected: Issue #${issue} - no activity for threshold period"
         >&2 echo "[orchestrator] Process group alive. Consider: stop, retry, or skip"
