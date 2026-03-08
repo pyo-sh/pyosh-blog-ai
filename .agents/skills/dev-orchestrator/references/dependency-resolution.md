@@ -86,21 +86,19 @@ After DAG construction, assign initial status to each issue:
 
 Issues already in `.workspace/pipeline/{area}/issue-N.state.json` → skip (already running).
 
-## Dependency Satisfaction Check
+## Dependency satisfaction and failed dependency propagation
 
-An issue transitions from `blocked` → `pending` when all its dependencies are `completed` or `failed`:
+An issue transitions from `blocked` when all its dependencies reach a terminal state:
 
-```bash
-for dep in ${dag[$N]}; do
-  if [ "${status[$dep]}" != "completed" ] && [ "${status[$dep]}" != "failed" ]; then
-    still_blocked=1; break
-  fi
-done
-[ "$still_blocked" -eq 0 ] && status[$N]="pending"
-```
+| All deps | Transition |
+|----------|------------|
+| All `completed` | `blocked` -> `pending` (ready to dispatch) |
+| All resolved, >= 1 `failed` or `skipped_dep_failed` | `blocked` -> `skipped_dep_failed` |
+
+`skipped_dep_failed` is a terminal state. The issue is NOT dispatched, but it still
+triggers `orch_unblock` for downstream issues (propagating the skip).
 
 `orch_unblock()` in `orchestrate-helpers.sh` automates this check on each completion event.
-Both `completed` and `failed` are terminal states that unblock dependents.
 
 ## Edge Cases
 

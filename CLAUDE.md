@@ -82,6 +82,17 @@ For git operations in other directories, use `cd <path> && git ...` instead of `
 
 Never use `2>&1` in bash commands. Keep stderr and stdout separate.
 
+### `2>/dev/null` policy
+
+- **Forbidden** in control-flow commands whose result drives state transitions
+  - Example: `gh pr list`, `gh api`, `gh issue view` when the output determines status (completed/failed/stalled)
+  - Instead: capture stderr and log it, check exit code explicitly
+- **Allowed** in best-effort cleanup and existence probes
+  - Example: `kill "$pid" 2>/dev/null`, `rm -f ...`, `mkdir "$dir" 2>/dev/null`
+  - These are fire-and-forget operations where stderr is noise
+- **Recommended**: capture stderr with a temp file or variable, then log it
+  - Example: `err=$(gh ... 2>&1 >/tmp/out); rc=$?`
+
 ## Common dev principles
 
 - TypeScript Strict Mode

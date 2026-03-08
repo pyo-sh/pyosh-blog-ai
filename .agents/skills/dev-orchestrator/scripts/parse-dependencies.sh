@@ -18,7 +18,7 @@ set -euo pipefail
 # ──────────────────────────────────────────────
 # Cycle detection helper (Kahn's algorithm)
 # Called separately: bash parse-dependencies.sh --check-cycles <issues_json> <dag_json>
-# Returns: 0 = no cycles, 1 = cycle detected (prints cycle path to stderr)
+# Returns: 0 = no cycles, 1 = cycle detected (prints CYCLE_DETECTED to stderr)
 # ──────────────────────────────────────────────
 
 if [ "${1:-}" = "--check-cycles" ]; then
@@ -103,8 +103,8 @@ if [ -z "$DEPS_SECTION" ]; then
   exit 0
 fi
 
-# Check for "no dependencies" markers
-if echo "$DEPS_SECTION" | grep -qiE '^\s*(없음|none|n\/a|no dependencies|-\s*없음|-\s*none)\s*$'; then
+# Check for "no dependencies" markers (with optional leading "- ")
+if echo "$DEPS_SECTION" | grep -qiE '^\s*(-\s*)?(없음|none|n\/a|no dependencies)\s*$'; then
   exit 0
 fi
 
