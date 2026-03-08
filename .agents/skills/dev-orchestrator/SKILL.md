@@ -26,13 +26,18 @@ Store in state as `"agent": "claude:sonnet"` etc. Model aliases (`sonnet`, `opus
 ## State files
 
 ```
-.workspace/orchestrate/{area}/batch.state.json   # batch-level DAG + status
-.workspace/orchestrate/{area}/issue-{N}.exit     # signal: pipeline completed (content: "ok" or "fail")
+.workspace/orchestrate/{area}/batch.state.json   # batch-level DAG + status + provider health
+.workspace/orchestrate/{area}/issue-{N}.exit     # exit file JSON (attemptId, status, rc, endedAt)
 .workspace/orchestrate/{area}/issue-{N}.log      # stdout from headless process
 .workspace/orchestrate/{area}/issue-{N}.err      # stderr from headless process
+.workspace/orchestrate/{area}/issue-{N}.heartbeat  # epoch timestamp, updated every 60s
+.workspace/orchestrate/{area}/issue-{N}.pid      # wrapper PID (= PGID), transient
+.workspace/orchestrate/{area}/gh-errors.log      # captured stderr from failed gh calls
 ```
 
 Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
+
+State file updates use `flock` for mutual exclusion. Exit files use JSON with `attemptId` matching to prevent stale file collision across batches and retries.
 
 ## Workflow
 
@@ -75,7 +80,7 @@ Present list to user for confirmation before proceeding.
 
 Parse `### Dependencies` section from each issue body via `parse-dependencies.sh`. Build DAG: `dag[N]="dep1 dep2"`. Run cycle detection - abort if cycle found. See [dependency-resolution.md](references/dependency-resolution.md).
 
-Write initial state via `orch_init`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), timestamps.
+Write initial state via `orch_init`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), `providers` (GitHub circuit breaker), timestamps.
 
 ### 4. Enter poll cycle (dispatch + monitor)
 
@@ -102,7 +107,7 @@ Each cycle: check completion, detect stalls, unblock dependents, dispatch newly-
 
 ### 6. Batch completion
 
-All issues `completed` or `failed`:
+All issues `completed`, `failed`, or `skipped_dep_failed`:
 
 ```bash
 orch_print_summary "$AREA"
