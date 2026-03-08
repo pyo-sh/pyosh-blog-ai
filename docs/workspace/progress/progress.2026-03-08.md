@@ -25,6 +25,22 @@
 - **Findings**: [findings.015](../findings/findings.015-agent-tracker-overengineering.md)
 - **Files**: `agent-tracker.sh`, `on-status.sh`, `orchestrate-helpers.sh`
 
+## agent-tracker 구조적 데이터 경계 및 신뢰성 전면 개편 (#72)
+
+- **Issue**: orchestrator 배치 테이블이 렌더링되지 않는 문제가 #64, #66, #68에서 3회 이상 수정 시도되었으나 근본 원인 미해결. 원인은 jq가 12개 필드를 `\x1f`로 join한 뒤 `read -r meta dispatched_data` (2개 변수)로 분리 - `meta`에 area만 들어가고 `orch_pid` 포함 나머지 필드는 항상 빈 값.
+- **Changes**:
+  - 모놀리식 `agent-tracker.sh` (810줄)를 `lib/` 3-layer로 분리: `util.sh` (렌더링 헬퍼), `collect.sh` (데이터 수집), `render.sh` (대시보드 렌더링)
+  - `\x1f`/`\x1e`/newline 구분자 프로토콜을 JSON snapshot + `@tsv` 기반으로 전면 교체
+  - orchestrator 메타데이터: 단일 `IFS=\t read -r` 로 11개 필드 직접 추출 (중간 `meta` 변수 제거)
+  - dispatched 이슈: 별도 jq 호출로 분리 - status가 `dispatched`인 항목만 필터
+  - exit code 보존: `cleanup()` 에서 `exit 0` -> `local ec=$?; exit "$ec"`
+  - sidecar cleanup 안전성: `tmux has-session` 가드 추가 (비존재 세션에서 orphan 삭제 방지)
+  - 토큰 계산: 200k 하드코딩 -> 실제 window size 추출 (`[0-9]+% of [0-9]+k tokens`)
+  - Codex JSONL 파싱: mtime 캐시로 변경 없는 파일 재파싱 스킵 + 멀티라인 메시지 `gsub` 정규화
+  - `unknown` status badge 추가
+  - 66개 fixture 테스트 추가 (orchestrator/claude-parse/codex-parse/exit-code/sidecar-cleanup/token-fallback)
+- **Files**: `agent-tracker.sh` (rewrite), `lib/util.sh`, `lib/collect.sh`, `lib/render.sh`, `tests/` (helpers.sh, run-tests.sh, test-*.sh 6개)
+
 ## Shell script cleanup - stale code 삭제 및 과도한 복잡성 제거 (#70)
 
 - **Issue**: #68 후속. 전체 sh 파일 검사에서 동일 패턴의 과도한 복잡성 잔존 확인.
