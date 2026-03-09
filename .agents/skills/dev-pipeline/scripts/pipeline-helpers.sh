@@ -232,7 +232,7 @@ pipeline_fetch_review_comments() {
     gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" --paginate 2>"$_gh_err" \
       | jq -s '[add // [] | .[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]'
   ) || {
-    printf '[pipeline] gh api error fetching review comments for PR #%s review %s in %s: %s\n' \
+    printf '[pipeline] error fetching review comments for PR #%s review %s in %s: %s\n' \
       "$pr" "$review_id" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
     return 1

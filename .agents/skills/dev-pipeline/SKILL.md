@@ -98,10 +98,17 @@ Rules:
 - Never pass the worktree path as Claude's process cwd.
 - Always treat GitHub API as source of truth after exit.
 
-Outcome:
-- Review found -> Step 3
-- No review + non-zero exit -> retry / recovery
-- No review + zero exit -> unexpected failure; escalate
+Outcome (combine `RC` from headless run and `REVIEW_RC` from API check):
+
+```bash
+if [ -n "$REVIEW_ID" ]; then
+  # Review found -> Step 3
+elif [ $RC -ne 0 ]; then
+  # Headless failed + no review -> pipeline_stage_retry, then retry Step 2
+else
+  # Headless succeeded but no review posted -> unexpected; escalate
+fi
+```
 
 ### 3. Process review (`step: review`)
 
@@ -136,13 +143,17 @@ Recovery entry - check local worktree first, then GitHub API:
 LOCAL_HEAD=$(git -C "$WORKTREE_PATH" rev-parse HEAD 2>/dev/null || true)
 ```
 
-If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA`, a local commit exists (possibly unpushed). Push it and skip to 4d:
+If `LOCAL_HEAD` is empty, the worktree is corrupt - escalate and abort.
+
+If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA` and the working tree is clean (`git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet`), a local commit exists (possibly unpushed). Push it and skip to 4d:
 
 ```bash
 pipeline_push_branch_safely "$WORKTREE_PATH"
 ```
 
-Otherwise check the remote:
+If `LOCAL_HEAD` differs but the working tree is dirty, report to the user for manual resolution (uncommitted changes from a previous session may exist).
+
+Otherwise (LOCAL_HEAD matches LAST_COMMIT_SHA) check the remote:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
