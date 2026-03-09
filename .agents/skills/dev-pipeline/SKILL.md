@@ -34,7 +34,7 @@ pipeline_init "$AREA"
 STATE_FILE=$(pipeline_state_path "$ISSUE" "$AREA")
 ```
 
-If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions. If the state has no `.version` field or `.version < 2`, discard it and start fresh (v1 schema is incompatible).
+If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions. If the state has no `.version` field or `.version < 2`, check for an existing open PR first (`gh pr list --head {branch}`). If an open PR exists, migrate the state to v2 (populate `.paths` from current helpers, set `.version = 2`, preserve `.branch`, `.pr`, `.issue`, `.step`). If no open PR exists, discard the v1 state and start fresh.
 
 ### 1. Build (`step: build`)
 
@@ -140,12 +140,13 @@ if Critical > 0 or Warning > 0:
     go to Step 4 (auto)
 
 if Suggestion > 0 (but Critical = 0 and Warning = 0):
-  update .reviewResolveRound += 1
-  AI decides:
-    a) suggestions are trivial or debatable -> auto-merge (Step 6)
-    b) suggestions are valid and worth fixing -> resolve then re-review (Step 4, set skipReview = false)
-    c) suggestions are valid but no re-review needed -> resolve then merge (Step 4, set skipReview = true)
-  (round limit applies equally - if reviewResolveRound >= max, ask user instead)
+  if reviewResolveRound >= maxReviewResolveRounds (5):
+    ask user: merge as-is / fix suggestions / abort
+  else:
+    AI decides:
+      a) suggestions are trivial or debatable -> auto-merge (Step 6)
+      b) suggestions are valid and worth fixing -> update .reviewResolveRound += 1, resolve then re-review (Step 4, set skipReview = false)
+      c) suggestions are valid but no re-review needed -> update .reviewResolveRound += 1, resolve then merge (Step 4, set skipReview = true)
 
 if all counts = 0 (clean review):
   auto-merge -> update .step = "merge", go to Step 6
@@ -283,8 +284,9 @@ On success:
 
 ```bash
 git -C "$(pipeline_repo_dir "$AREA")" fetch --prune
-pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH" "$PR"
 ```
+
+Update `.step = "log"` immediately after successful merge (before cleanup). This ensures recovery can resume from Step 7 if a crash occurs.
 
 On failure:
 - `pipeline_stage_retry`
@@ -294,7 +296,13 @@ On failure:
 
 ### 7. Log + cleanup (`step: log`)
 
-Run `/dev-log`, then delete the state file only after `/dev-log` succeeds.
+Run `/dev-log` first, then clean up:
+
+```bash
+pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH" "$PR"
+```
+
+`pipeline_cleanup` deletes the state file as its last action. Only call it after `/dev-log` succeeds.
 
 ## Constraints
 
