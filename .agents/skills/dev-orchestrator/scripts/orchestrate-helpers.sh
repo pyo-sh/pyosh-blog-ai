@@ -29,10 +29,17 @@ orch_state_path() {
   echo "$ORCH_BASE/${area}/batch.state.json"
 }
 
-orch_signal_path() {
+orch_terminal_path() {
+  # Returns the terminal.json path for a dispatched issue.
+  # The terminal file is the sole completion contract between the pipeline and orchestrator.
   local area=$1
   local issue=$2
-  echo "$ORCH_BASE/${area}/issue-${issue}.exit"
+  echo "$ORCH_BASE/${area}/issue-${issue}.terminal.json"
+}
+
+# Alias kept for call sites that used the old name; prefer orch_terminal_path.
+orch_signal_path() {
+  orch_terminal_path "$@"
 }
 
 orch_attempt_id() {
@@ -294,16 +301,17 @@ orch_dispatch() {
 
   local log="$ORCH_BASE/${area}/issue-${issue}.log"
   local err_log="$ORCH_BASE/${area}/issue-${issue}.err"
-  local exit_file
-  exit_file=$(orch_signal_path "$area" "$issue")
+  local terminal_file
+  terminal_file=$(orch_terminal_path "$area" "$issue")
   local heartbeat_file="$ORCH_BASE/${area}/issue-${issue}.heartbeat"
   local pid_file="$ORCH_BASE/${area}/issue-${issue}.pid"
+  local pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
   local attempt_id
   attempt_id=$(orch_attempt_id "$batch_id" "$issue" "$retry_count")
 
   # Pre-dispatch cleanup: remove stale files from previous attempts.
   # attemptId matching provides safety, but cleanup prevents confusion.
-  rm -f "$exit_file" "$heartbeat_file" "$pid_file" "$log" "$err_log"
+  rm -f "$terminal_file" "$heartbeat_file" "$pid_file" "$log" "$err_log"
 
   local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for review/resolve subprocesses (pass to pipeline_run_headless).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
@@ -314,7 +322,8 @@ orch_dispatch() {
   # timeout -k sends SIGKILL 30s after initial signal as runtime upper bound.
   cd "$MONOREPO_ROOT" || return 1
   setsid bash "$wrapper_script" \
-    "$attempt_id" "$exit_file" "$heartbeat_file" "$pid_file" -- \
+    "$attempt_id" "$terminal_file" "$heartbeat_file" "$pid_file" \
+    "$issue" "$pipeline_state_file" -- \
     timeout -k 30 3600 claude -p \
     ${model:+--model "$model"} --dangerously-skip-permissions \
     --no-session-persistence \
@@ -422,11 +431,17 @@ orch_check_completion() {
   # stdout: "completed", "failed", "abnormal_exit", or "running"
   # Always returns 0 (safe for set -e callers).
   #
+  # Contract: terminal.json is the sole basis for a "completed" or "failed" result.
+  # PR status is supplementary - used only to distinguish "abnormal_exit" from
+  # "failed" when the process dies without writing terminal.json.
+  #
   # Detection priority:
-  #   1. Exit file JSON (explicit, with attemptId match)
-  #   2. Process group alive (PGID check)
-  #   3. Grace period for missing exit file (abnormal exit)
-  #   4. PR status (fallback, provider health aware)
+  #   1. terminal.json (explicit, with attemptId match) - only source of "completed"
+  #   2. Process group alive (PGID check) -> "running"
+  #   3. Grace period (60s) after process death -> "running"
+  #   4. PR status (supplementary only, provider health aware)
+  #      - merged or open PR -> "abnormal_exit" (process died without terminal.json)
+  #      - no PR or gh failed -> "failed"
   local issue=$1
   local area_dir=$2
   local area
@@ -441,22 +456,22 @@ orch_check_completion() {
   local pid
   pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
 
-  # 1. Exit file (highest priority - explicit completion signal)
-  local signal
-  signal=$(orch_signal_path "$area" "$issue")
-  if [ -f "$signal" ]; then
-    local exit_json
-    exit_json=$(cat "$signal")
+  # 1. terminal.json (sole source of "completed" / "failed" results)
+  local terminal_file
+  terminal_file=$(orch_terminal_path "$area" "$issue")
+  if [ -f "$terminal_file" ]; then
+    local terminal_json
+    terminal_json=$(cat "$terminal_file")
     local file_attempt
-    file_attempt=$(echo "$exit_json" | jq -r '.attemptId // empty')
+    file_attempt=$(echo "$terminal_json" | jq -r '.attemptId // empty')
 
     if [ -n "$current_attempt" ] && [ "$file_attempt" != "$current_attempt" ]; then
-      # Stale exit file from a different attempt - ignore
-      >&2 echo "[orchestrator] Ignoring stale exit file for #${issue} (attempt mismatch: file=$file_attempt, current=$current_attempt)"
+      # Stale terminal file from a different attempt - ignore
+      >&2 echo "[orchestrator] Ignoring stale terminal file for #${issue} (attempt mismatch: file=$file_attempt, current=$current_attempt)"
     else
-      local exit_status
-      exit_status=$(echo "$exit_json" | jq -r '.status // "failed"')
-      if [ "$exit_status" = "completed" ]; then
+      local terminal_status
+      terminal_status=$(echo "$terminal_json" | jq -r '.status // "failed"')
+      if [ "$terminal_status" = "completed" ]; then
         echo "completed"; return 0
       else
         echo "failed"; return 0
@@ -474,7 +489,7 @@ orch_check_completion() {
   fi
 
   if [ "$group_alive" = "true" ]; then
-    # Track pipelineStarted for state file heuristic
+    # Track pipelineStarted for observability
     local pipeline_state="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
     local seen
     seen=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pipelineStarted // false")
@@ -484,23 +499,24 @@ orch_check_completion() {
     echo "running"; return 0
   fi
 
-  # 3. Process dead, no exit file - abnormal exit
-  # Allow 60s grace period for exit file to be written (race between
-  # process exit and trap handler writing the file).
+  # 3. Process dead, no terminal file.
+  # Allow 60s grace period for the exit trap to finish writing terminal.json
+  # (race between process exit and trap handler / filesystem flush).
   local dispatched_at
   dispatched_at=$(echo "$state" | jq -r ".dispatched[\"$issue\"].dispatchedAt // empty")
   if [ -n "$dispatched_at" ]; then
     local dispatch_ts now_ts
     dispatch_ts=$(date -d "$dispatched_at" +%s) || dispatch_ts=0
     now_ts=$(date +%s)
-    local alive_duration=$((now_ts - dispatch_ts))
-    # If process just died (< 60s since we last checked), wait for exit file
-    if [ "$alive_duration" -lt 60 ]; then
+    if [ $((now_ts - dispatch_ts)) -lt 60 ]; then
       echo "running"; return 0
     fi
   fi
 
-  # 4. PR status (fallback, provider health aware)
+  # 4. PR status (supplementary only - never produces "completed").
+  # Process is dead and terminal.json was not written (SIGKILL or trap failure).
+  # PR evidence helps distinguish "abnormal_exit" (work may be done) from "failed"
+  # (no sign of progress), but cannot confirm completion without terminal.json.
   local gh_health
   gh_health=$(orch_provider_health_get "$area")
   if [ "$gh_health" = "degraded" ]; then
@@ -511,15 +527,18 @@ orch_check_completion() {
   local pr_states
   if pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]'); then
     if echo "$pr_states" | grep -q '"MERGED"'; then
-      echo "completed"; return 0
+      # PR merged but no terminal.json: process was killed before trap could write it.
+      # Treat as abnormal_exit so the orchestrator can inspect and decide.
+      >&2 echo "[orchestrator] #${issue}: merged PR found but no terminal.json - abnormal_exit"
+      echo "abnormal_exit"; return 0
     fi
     if echo "$pr_states" | grep -q '"OPEN"'; then
-      # PR exists but process dead and no exit file - abnormal exit
+      # PR open but process dead and no terminal.json - abnormal exit mid-pipeline
       echo "abnormal_exit"; return 0
     fi
   fi
 
-  # No exit file, no process, no PR (or gh failed)
+  # No terminal file, no process, no PR (or gh failed)
   echo "failed"; return 0
 }
 
@@ -765,15 +784,32 @@ orch_poll_cycle() {
         local retry_count
         retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
         if [ "$retry_count" -lt 1 ]; then
-          >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
-          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-          local new_pid
-          new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
-          if [ -n "$new_pid" ]; then
-            >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
-          else
-            >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
+          # Before re-dispatching, check if the PR is already merged.
+          # A merged PR with no terminal.json means the process was SIGKILL-ed after
+          # merge but before the exit trap could write the file. Re-dispatching would
+          # create a duplicate pipeline run against a branch that no longer exists.
+          local merged_pr
+          merged_pr=$(_orch_pr_list "$area" "$issue" merged "number" '.[0].number') || true
+          if [ -n "$merged_pr" ] && [ "$merged_pr" != "null" ]; then
+            >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking failed - manual review recommended."
+            # Record a durable signal in batch state so operators can detect this edge case
+            # without digging through logs. Visible in orch_print_summary output.
+            local _now
+            _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            orch_state_update "$area" \
+              ".mergedWithoutTerminal = ((.mergedWithoutTerminal // []) + [{issue: ($issue | tonumber), pr: ($merged_pr | tonumber), detectedAt: \"$_now\"}])" || true
             _orch_mark_failed_and_unblock "$area" "$issue"
+          else
+            >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
+            orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+            local new_pid
+            new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
+            if [ -n "$new_pid" ]; then
+              >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
+            else
+              >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
+              _orch_mark_failed_and_unblock "$area" "$issue"
+            fi
           fi
         else
           >&2 echo "[orchestrator] Issue #${issue}: abnormal_exit (retry exhausted)"
@@ -878,4 +914,14 @@ orch_print_summary() {
     printf "%-8s %-20s %s\n" "#${issue}" "$status" "$pr_url"
   done
   echo "============================================"
+
+  # Warn about merged-without-terminal cases (SIGKILL edge case, manual review needed)
+  local mwt_count
+  mwt_count=$(echo "$state" | jq '(.mergedWithoutTerminal // []) | length')
+  if [ "$mwt_count" -gt 0 ]; then
+    echo ""
+    echo "WARNING: ${mwt_count} issue(s) had PR merged but no terminal.json written (SIGKILL edge case)."
+    echo "These are marked 'failed' but the PR was actually merged. Manual review recommended:"
+    echo "$state" | jq -r '(.mergedWithoutTerminal // [])[] | "  Issue #\(.issue) - PR #\(.pr) - detected \(.detectedAt)"'
+  fi
 }
