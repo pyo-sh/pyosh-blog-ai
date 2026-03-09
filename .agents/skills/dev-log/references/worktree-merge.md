@@ -4,10 +4,11 @@
 
 Worktree isolation + lock-based merge to prevent conflicts when parallel agents modify `docs/` simultaneously.
 
+Two modes based on context:
+
 ```
-Agent A: [create worktree] [write docs] [commit] [LOCK] [rebase+merge] [UNLOCK] [cleanup]
-Agent B: [create worktree] [write docs] [commit] ......[LOCK] [rebase+merge] [UNLOCK] [cleanup]
-                                                        ↑ wait
+Standalone:  [detect] [create worktree] [write docs] [commit] [LOCK] [rebase+merge] [UNLOCK] [cleanup]
+In worktree: [detect] ................ [write docs] [commit] ......................................
 ```
 
 ## Constants
@@ -23,7 +24,27 @@ LOCK_INTERVAL=5   # seconds
 
 > **Note**: The AI must resolve `$ROOT_REPO` before sourcing. Use the monorepo root directory where `.agents/` lives. Do not use `git rev-parse` - this monorepo has multiple independent git repos.
 
-## Phase 1: Create Worktree
+## Phase 0: Detect context
+
+Check if the current working directory is already inside a worktree under `.workspace/worktrees/`.
+
+```bash
+CWD="$(pwd)"
+if [[ "$CWD" == "$ROOT_REPO/.workspace/worktrees/"* ]]; then
+  IN_WORKTREE=true
+  WORKTREE_PATH="$CWD"
+  echo "In existing worktree: $WORKTREE_PATH"
+  echo "Skipping Phase 1, 5, 6 - records will be committed in this worktree"
+else
+  IN_WORKTREE=false
+  echo "Not in worktree - using full standalone flow"
+fi
+```
+
+- **`IN_WORKTREE=true`**: Use current path as `$WORKTREE_PATH`. Skip Phase 1 (create), Phase 5 (lock merge), Phase 6 (cleanup). The parent task owns the worktree lifecycle.
+- **`IN_WORKTREE=false`**: Follow the full flow below.
+
+## Phase 1: Create worktree (skip if `IN_WORKTREE=true`)
 
 ```bash
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -48,7 +69,7 @@ git commit -m "docs: {type} - {summary}"
 - `{type}`: progress, findings, or decision
 - Multiple types at once: `docs: progress + findings - {summary}`
 
-## Phase 5: Lock → Merge → Unlock
+## Phase 5: Lock → Merge → Unlock (skip if `IN_WORKTREE=true`)
 
 ### Acquire Lock
 
@@ -104,7 +125,7 @@ echo "Lock released. Merge successful."
 
 **Important**: Always execute `rmdir "$LOCK_FILE"` when exiting Phase 5 regardless of path.
 
-## Phase 6: Cleanup
+## Phase 6: Cleanup (skip if `IN_WORKTREE=true`)
 
 ### On Success
 
