@@ -34,7 +34,21 @@
 
 ---
 
-## Scenario 4: Parallel Agents (worktree isolation)
+## Scenario 4: In-worktree recording (existing worktree)
+
+**Situation**: Agent completes a root-repo task in worktree `refactor/skill-update` and calls `/dev-log`
+
+1. Phase 0: Detect `CWD` is under `.workspace/worktrees/` → `IN_WORKTREE=true`
+2. Read `docs/workspace/progress.index.md` inside the worktree
+3. Write `docs/workspace/progress/progress.2026-03-09.md` inside the worktree
+4. `git add docs/ && git commit -m "docs: progress - skill update"`
+5. **Done** - no lock merge, no cleanup. The parent task handles merge/PR.
+
+**Key**: Records stay on the task branch alongside the code changes. The parent workflow (merge or PR) includes them.
+
+---
+
+## Scenario 5: Parallel Agents (worktree isolation)
 
 **Situation**: Agent A (server progress) + Agent B (client findings) running concurrently
 

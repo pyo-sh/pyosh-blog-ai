@@ -9,7 +9,7 @@ Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md
 
 > Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
 
-**Core strategy**: worktree isolation → scan indices → write records → lock merge → cleanup
+**Core strategy**: detect context → (worktree isolation if needed) → scan indices → write records → commit → (lock merge if needed) → cleanup
 
 ## Directory Structure
 
@@ -47,16 +47,24 @@ docs/{client|server|workspace}/
 > Use **worktree isolation** to prevent file conflicts when running parallel agents.
 > Detailed git commands: [worktree-merge.md](references/worktree-merge.md)
 
-### Phase 1: Create Worktree
+### Phase 0: Detect context
+
+Determine if already running inside a worktree.
+→ Commands: [worktree-merge.md § Phase 0](references/worktree-merge.md)
+
+- **In worktree** (`IN_WORKTREE=true`): use current worktree path. Skip Phase 1, 5, 6.
+- **Not in worktree**: follow the full flow (Phase 1 through 6).
+
+### Phase 1: Create worktree (skip if `IN_WORKTREE=true`)
 
 Timestamp-based worktree + branch. All file operations happen inside the worktree.
 → Commands: [worktree-merge.md § Phase 1](references/worktree-merge.md)
 
-### Phase 2: Check Context Before Recording
+### Phase 2: Check context before recording
 - Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside the worktree
 - Selectively read relevant sub-files only (do not read all)
 
-### Phase 3: Write Records (inside worktree)
+### Phase 3: Write records (inside worktree)
 - **Technical research**: Create `findings/findings.NNN-topic.md` + update `findings.index.md`
 - **Architecture decision**: Create `decisions/decision-NNN-topic.md` (draft) + update `decisions.index.md`
 - **Task completion**: Create/update `progress/progress.YYYY-MM-DD.md` + update `progress.index.md`
@@ -68,13 +76,13 @@ Timestamp-based worktree + branch. All file operations happen inside the worktre
 `git add docs/` → `git commit -m "docs: {type} - {summary}"`
 → Commands: [worktree-merge.md § Phase 4](references/worktree-merge.md)
 
-### Phase 5: Lock → Merge → Unlock
+### Phase 5: Lock → Merge → Unlock (skip if `IN_WORKTREE=true`)
 
 Acquire lock → rebase → fast-forward merge → release lock. Wait up to 60s if another agent holds the lock.
 On conflict/failure: always release lock, keep worktree intact.
 → Commands: [worktree-merge.md § Phase 5](references/worktree-merge.md)
 
-### Phase 6: Cleanup
+### Phase 6: Cleanup (skip if `IN_WORKTREE=true`)
 
 On success: remove worktree + delete branch. On failure: keep worktree for manual retry.
 → Commands: [worktree-merge.md § Phase 6](references/worktree-merge.md)
