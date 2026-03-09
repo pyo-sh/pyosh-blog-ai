@@ -140,10 +140,12 @@ if Critical > 0 or Warning > 0:
     go to Step 4 (auto)
 
 if Suggestion > 0 (but Critical = 0 and Warning = 0):
+  update .reviewResolveRound += 1
   AI decides:
     a) suggestions are trivial or debatable -> auto-merge (Step 6)
     b) suggestions are valid and worth fixing -> resolve then re-review (Step 4, set skipReview = false)
     c) suggestions are valid but no re-review needed -> resolve then merge (Step 4, set skipReview = true)
+  (round limit applies equally - if reviewResolveRound >= max, ask user instead)
 
 if all counts = 0 (clean review):
   auto-merge -> update .step = "merge", go to Step 6
@@ -173,9 +175,11 @@ If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA` and the working tree is clean (`
 pipeline_push_branch_safely "$WORKTREE_PATH"
 ```
 
-If `LOCAL_HEAD` differs but the working tree is dirty, report to the user for manual resolution (uncommitted changes from a previous session may exist).
+If `LOCAL_HEAD` differs but the working tree is dirty, report to the user for manual resolution and **stop** (uncommitted changes from a previous session may exist). Do not proceed to remote check or resolve.
 
-Otherwise (LOCAL_HEAD matches LAST_COMMIT_SHA), check for dirty/staged state first. If `git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet` fails, report to the user (partial resolve from a previous session may exist). Then check the remote:
+Otherwise (LOCAL_HEAD matches LAST_COMMIT_SHA), check for dirty/staged state first. If `git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet` fails, report to the user and **stop** (partial resolve from a previous session may exist). Do not proceed to remote check or resolve.
+
+Check the remote:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
@@ -248,7 +252,7 @@ Then:
 This step is entered from Step 3 when the review-resolve loop has exhausted its rounds but Critical/Warning items remain.
 
 Show the latest review summary and the round count, then ask the user:
-- Continue -> reset `.reviewResolveRound = 0`, update `.step = "resolve"`, go to Step 4
+- Continue -> reset `.reviewResolveRound = 0`, `.stageRetries.review = 0`, `.stageRetries.resolve = 0`, update `.step = "resolve"`, go to Step 4
 - Merge as-is -> update `.step = "merge"`, go to Step 6
 - Abort -> stop and report
 

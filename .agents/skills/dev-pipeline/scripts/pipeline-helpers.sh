@@ -620,6 +620,10 @@ pipeline_merge_pr() {
     trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' EXIT INT TERM
 
     if [ -n "$worktree_dir" ] && [ "$worktree_dir" != 'PATH_INVALID' ] && [ -d "$worktree_dir" ]; then
+      # Clean up stale merge/rebase state from a previous failed attempt.
+      git -C "$worktree_dir" merge --abort >/dev/null 2>&1 || true
+      git -C "$worktree_dir" rebase --abort >/dev/null 2>&1 || true
+
       git -C "$worktree_dir" fetch origin || exit 1
 
       if git -C "$worktree_dir" rebase origin/main; then
