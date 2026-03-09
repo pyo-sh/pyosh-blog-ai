@@ -792,6 +792,12 @@ orch_poll_cycle() {
           merged_pr=$(_orch_pr_list "$area" "$issue" merged "number" '.[0].number') || true
           if [ -n "$merged_pr" ] && [ "$merged_pr" != "null" ]; then
             >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking failed - manual review recommended."
+            # Record a durable signal in batch state so operators can detect this edge case
+            # without digging through logs. Visible in orch_print_summary output.
+            local _now
+            _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            orch_state_update "$area" \
+              ".mergedWithoutTerminal = ((.mergedWithoutTerminal // []) + [{issue: ($issue | tonumber), pr: ($merged_pr | tonumber), detectedAt: \"$_now\"}])" || true
             _orch_mark_failed_and_unblock "$area" "$issue"
           else
             >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
@@ -908,4 +914,14 @@ orch_print_summary() {
     printf "%-8s %-20s %s\n" "#${issue}" "$status" "$pr_url"
   done
   echo "============================================"
+
+  # Warn about merged-without-terminal cases (SIGKILL edge case, manual review needed)
+  local mwt_count
+  mwt_count=$(echo "$state" | jq '(.mergedWithoutTerminal // []) | length')
+  if [ "$mwt_count" -gt 0 ]; then
+    echo ""
+    echo "WARNING: ${mwt_count} issue(s) had PR merged but no terminal.json written (SIGKILL edge case)."
+    echo "These are marked 'failed' but the PR was actually merged. Manual review recommended:"
+    echo "$state" | jq -r '(.mergedWithoutTerminal // [])[] | "  Issue #\(.issue) - PR #\(.pr) - detected \(.detectedAt)"'
+  fi
 }

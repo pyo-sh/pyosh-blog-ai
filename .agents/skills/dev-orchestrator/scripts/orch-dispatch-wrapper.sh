@@ -64,13 +64,15 @@ trap '
     _step=$(jq -r ".step // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || _step=""
     _sha=$(jq -r ".lastCommitSha // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || true
     [ -n "$_sha" ] && _head_sha="$_sha"
-    [ "$_step" = "log" ] || [ "$_step" = "done" ] && _merged="true"
+    { [ "$_step" = "log" ] || [ "$_step" = "done" ]; } && _merged="true"
     [ $_rc -eq 0 ] && _reason="pipeline completed at step=${_step:-unknown}"
   fi
 
   _finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  # Write terminal.json; fall back to minimal printf if jq unavailable
+  # Write terminal.json; fall back to minimal printf if jq unavailable.
+  # The fallback omits prNumber/merged/headSha/reason intentionally: it only runs when jq
+  # is absent (extremely rare) and orch_check_completion only reads attemptId + status.
   if command -v jq >/dev/null 2>&1; then
     jq -n \
       --arg attemptId "$ATTEMPT_ID" \
