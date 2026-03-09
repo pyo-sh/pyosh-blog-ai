@@ -784,15 +784,26 @@ orch_poll_cycle() {
         local retry_count
         retry_count=$(echo "$state" | jq -r ".dispatched[\"$issue\"].retryCount // 0")
         if [ "$retry_count" -lt 1 ]; then
-          >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
-          orch_state_update "$area" "del(.dispatched[\"$issue\"])"
-          local new_pid
-          new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
-          if [ -n "$new_pid" ]; then
-            >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
-          else
-            >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
+          # Before re-dispatching, check if the PR is already merged.
+          # A merged PR with no terminal.json means the process was SIGKILL-ed after
+          # merge but before the exit trap could write the file. Re-dispatching would
+          # create a duplicate pipeline run against a branch that no longer exists.
+          local merged_pr
+          merged_pr=$(_orch_pr_list "$area" "$issue" merged "number" '.[0].number') || true
+          if [ -n "$merged_pr" ] && [ "$merged_pr" != "null" ]; then
+            >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking failed - manual review recommended."
             _orch_mark_failed_and_unblock "$area" "$issue"
+          else
+            >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
+            orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+            local new_pid
+            new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
+            if [ -n "$new_pid" ]; then
+              >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
+            else
+              >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
+              _orch_mark_failed_and_unblock "$area" "$issue"
+            fi
           fi
         else
           >&2 echo "[orchestrator] Issue #${issue}: abnormal_exit (retry exhausted)"

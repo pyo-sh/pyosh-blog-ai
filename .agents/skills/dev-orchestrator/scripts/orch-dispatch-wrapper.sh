@@ -56,7 +56,7 @@ trap '
   # Enrich terminal.json from pipeline state if available
   _pr_number="null"
   _merged="false"
-  _head_sha="null"
+  _head_sha=""
   _reason="pipeline exited with rc=$_rc"
   if [ -f "$PIPELINE_STATE_FILE" ]; then
     _pr_raw=$(jq -r ".pr // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || true
