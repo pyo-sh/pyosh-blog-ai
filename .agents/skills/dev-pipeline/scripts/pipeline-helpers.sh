@@ -218,15 +218,23 @@ PROMPT_REVIEW
 pipeline_fetch_review_comments() {
   # Fetch inline review comments for a specific review.
   # Returns JSON array of {path, line, side, body} objects.
+  # Returns: 0 = success (JSON on stdout), 1 = error
   # Usage: pipeline_fetch_review_comments <area> <pr> <review_id>
   local area=$1
   local pr=$2
   local review_id=$3
-  local repo
+  local repo _gh_err
 
   repo="$(pipeline_repo_name "$area")" || return 1
+  _gh_err="$(mktemp)"
   gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" \
-    --jq '[.[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]'
+    --jq '[.[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]' 2>"$_gh_err" || {
+    printf '[pipeline] gh api error fetching review comments for PR #%s review %s in %s: %s\n' \
+      "$pr" "$review_id" "$repo" "$(cat "$_gh_err")" >&2
+    rm -f "$_gh_err"
+    return 1
+  }
+  rm -f "$_gh_err"
 }
 
 pipeline_run_headless_core() {
@@ -382,11 +390,9 @@ pipeline_check_review_exists() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  review_id="$(gh api "repos/${repo}/pulls/${pr}/reviews" \
-    --jq "[.[]
-      | select(.id > ${last_review_id})
-      | select(.body | startswith(\"## Review Summary\"))
-    ] | last | .id // empty" 2>"$_gh_err")" || {
+  review_id="$(gh api "repos/${repo}/pulls/${pr}/reviews" 2>"$_gh_err" \
+    | jq -r --argjson lastId "${last_review_id:-0}" \
+      '[.[] | select(.id > $lastId) | select(.body | startswith("## Review Summary"))] | last | .id // empty')" || {
     printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
     return 2
@@ -401,14 +407,22 @@ pipeline_check_review_exists() {
 }
 
 pipeline_fetch_review() {
+  # Returns: 0 = success (JSON on stdout), 1 = error
   local area=$1
   local pr=$2
   local review_id=$3
-  local repo
+  local repo _gh_err
 
   repo="$(pipeline_repo_name "$area")" || return 1
+  _gh_err="$(mktemp)"
   gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}" \
-    --jq '{state: .state, body: .body}'
+    --jq '{state: .state, body: .body}' 2>"$_gh_err" || {
+    printf '[pipeline] gh api error fetching review %s for PR #%s in %s: %s\n' \
+      "$review_id" "$pr" "$repo" "$(cat "$_gh_err")" >&2
+    rm -f "$_gh_err"
+    return 1
+  }
+  rm -f "$_gh_err"
 }
 
 pipeline_check_new_commits() {
@@ -443,14 +457,14 @@ pipeline_stage_retry() {
   local state retries max
 
   state="$(pipeline_state_read "$issue" "$area")" || return 1
-  retries="$(printf '%s' "$state" | jq -r ".stageRetries.${stage} // 0")"
+  retries="$(printf '%s' "$state" | jq -r --arg s "$stage" '.stageRetries[$s] // 0')"
   max="$(printf '%s' "$state" | jq -r '.maxStageRetries // 3')"
 
   if [ "$retries" -ge "$max" ]; then
     return 1
   fi
 
-  pipeline_state_update "$issue" "$area" ".stageRetries.${stage} = $((retries + 1))"
+  pipeline_state_update "$issue" "$area" '.stageRetries[$s] = $n' --arg s "$stage" --argjson n "$((retries + 1))"
 }
 
 pipeline_recovery_log() {

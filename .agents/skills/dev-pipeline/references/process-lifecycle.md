@@ -46,13 +46,16 @@ Per-stage retry via `pipeline_stage_retry()` (max 3). Log actions with `pipeline
 
 ```json
 {
+  "version": 2,
   "issue": 42, "area": "client", "pr": 99,
   "branch": "feat/issue-42-add-auth",
-  "worktree": ".workspace/worktrees/issue-42",
-  "agent": "claude", "model": "sonnet",
-  "step": "review", "reviewRound": 1, "lastReviewId": 0,
+  "paths": {
+    "skillCwd": "/workspace",
+    "repoDir": "/workspace/client",
+    "worktreeDir": "/workspace/.workspace/worktrees/client/issue-42"
+  },
+  "step": "review", "lastReviewId": 0,
   "lastCommitSha": "{SHA}", "skipReview": false,
-  "reviewLog": ".workspace/pipeline/logs/issue-42-review.log",
   "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
   "maxStageRetries": 3,
   "recoveryLog": [],

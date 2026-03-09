@@ -128,7 +128,7 @@ RC=$?
 [ $RC -eq 2 ] && { echo "[pipeline] gh API error checking commits - abort"; return 1; }
 ```
 
-If found (`RC=0`), skip to Step 4c.
+If found (`RC=0`), skip to Step 4d (state update only - no response comment since context is lost).
 
 Otherwise resolve directly in this pipeline session:
 
@@ -161,7 +161,7 @@ git -C "$WORKTREE_PATH" commit -m "fix: address review comments (#${ISSUE})"
 pipeline_push_branch_safely "$WORKTREE_PATH"
 ```
 
-#### 4c. Post response and update state
+#### 4c. Post response comment
 
 Write and post a response comment summarizing fixed and skipped items:
 
@@ -172,10 +172,12 @@ gh pr comment "$PR" -R "$(pipeline_repo_name "$AREA")" --body-file "$MSG_FILE"
 rm -f "$MSG_FILE"
 ```
 
-Check the new commit SHA and update state:
+#### 4d. Update state and decide next step
+
+Get the new commit SHA. Use local git as the primary source (avoids GitHub API propagation delay after push):
 
 ```bash
-NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
+NEW_SHA=$(git -C "$WORKTREE_PATH" rev-parse HEAD)
 ```
 
 Update:
