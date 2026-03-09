@@ -494,7 +494,7 @@ orch_check_completion() {
     dispatch_ts=$(date -d "$dispatched_at" +%s) || dispatch_ts=0
     now_ts=$(date +%s)
     local alive_duration=$((now_ts - dispatch_ts))
-    # If process just died (< 60s since we last checked), wait for exit file
+    # If process just died (< 60s since dispatch), wait for exit file
     if [ "$alive_duration" -lt 60 ]; then
       echo "running"; return 0
     fi

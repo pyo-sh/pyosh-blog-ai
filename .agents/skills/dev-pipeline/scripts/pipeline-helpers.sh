@@ -356,7 +356,8 @@ pipeline_run_headless_core() {
       --arg status "$status" \
       --argjson exitCode "$rc" \
       '.status = $status | .exitCode = $exitCode | .finishedAt = (now | todate)' \
-      "$meta" > "$meta_tmp" && mv "$meta_tmp" "$meta"
+      "$meta" > "$meta_tmp" && mv "$meta_tmp" "$meta" || \
+      printf '[pipeline] meta update failed for issue=%s area=%s stage=%s\n' "$issue" "$area" "$stage" >&2
   else
     jq -n \
       --arg status "$status" \
@@ -409,21 +410,24 @@ pipeline_run_resolve() {
 }
 
 pipeline_check_review_exists() {
-  # Returns: 0 = found (review_id on stdout), 1 = not found
+  # Returns: 0 = found (review_id on stdout), 1 = not found, 2 = gh error
   local area=$1
   local pr=$2
   local last_review_id=${3:-0}
-  local repo review_id
+  local repo review_id _gh_err
 
   repo="$(pipeline_repo_name "$area")" || return 1
+  _gh_err="$(mktemp)"
   review_id="$(gh api "repos/${repo}/pulls/${pr}/reviews" \
     --jq "[.[]
       | select(.id > ${last_review_id})
       | select(.body | startswith(\"## Review Summary\"))
-    ] | last | .id // empty" 2>&1)" || {
-    printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$review_id" >&2
+    ] | last | .id // empty" 2>"$_gh_err")" || {
+    printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
+    rm -f "$_gh_err"
     return 2
   }
+  rm -f "$_gh_err"
 
   if [ -n "$review_id" ] && [ "$review_id" != 'null' ]; then
     printf '%s\n' "$review_id"
@@ -444,17 +448,20 @@ pipeline_fetch_review() {
 }
 
 pipeline_check_new_commits() {
-  # Returns: 0 = found (new_sha on stdout), 1 = not found
+  # Returns: 0 = found (new_sha on stdout), 1 = not found, 2 = gh error
   local area=$1
   local pr=$2
   local last_commit_sha=$3
-  local repo latest_sha
+  local repo latest_sha _gh_err
 
   repo="$(pipeline_repo_name "$area")" || return 1
-  latest_sha="$(gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha' 2>&1)" || {
-    printf '[pipeline] gh api error checking commits for PR #%s in %s: %s\n' "$pr" "$repo" "$latest_sha" >&2
+  _gh_err="$(mktemp)"
+  latest_sha="$(gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha' 2>"$_gh_err")" || {
+    printf '[pipeline] gh api error checking commits for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
+    rm -f "$_gh_err"
     return 2
   }
+  rm -f "$_gh_err"
 
   if [ -n "$latest_sha" ] && [ "$latest_sha" != 'null' ] && [ "$latest_sha" != "$last_commit_sha" ]; then
     printf '%s\n' "$latest_sha"
