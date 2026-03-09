@@ -332,6 +332,7 @@ pipeline_run_headless_core() {
 
   (
     cd -- "$skill_cwd" || exit 3
+    unset CLAUDECODE
     PIPELINE_MONOREPO_ROOT="$MONOREPO_ROOT" \
     PIPELINE_AREA="$area" \
     PIPELINE_REPO="$repo" \
