@@ -227,7 +227,7 @@ pipeline_fetch_review_comments() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" \
+  gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" --paginate \
     --jq '[.[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]' 2>"$_gh_err" || {
     printf '[pipeline] gh api error fetching review comments for PR #%s review %s in %s: %s\n' \
       "$pr" "$review_id" "$repo" "$(cat "$_gh_err")" >&2
@@ -390,9 +390,12 @@ pipeline_check_review_exists() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  review_id="$(gh api "repos/${repo}/pulls/${pr}/reviews" 2>"$_gh_err" \
-    | jq -r --argjson lastId "${last_review_id:-0}" \
-      '[.[] | select(.id > $lastId) | select(.body | startswith("## Review Summary"))] | last | .id // empty')" || {
+  review_id="$(
+    set -o pipefail
+    gh api "repos/${repo}/pulls/${pr}/reviews" --paginate 2>"$_gh_err" \
+      | jq -s -r --argjson lastId "${last_review_id:-0}" \
+        '[add // [] | .[] | select(.id > $lastId) | select(.body | startswith("## Review Summary"))] | last | .id // empty'
+  )" || {
     printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
     return 2
@@ -638,8 +641,8 @@ pipeline_merge_pr() {
       exit 1
     }
 
-    trap - EXIT INT TERM
     pipeline_release_merge_lock "$area" "$issue"
+    trap - EXIT INT TERM
   )
   merge_rc=$?
   trap - INT TERM
@@ -650,6 +653,7 @@ pipeline_cleanup() {
   local issue=$1
   local area=$2
   local branch=$3
+  local pr=${4:-}
   local repo_dir wt
 
   repo_dir="$(pipeline_repo_dir "$area")" || return 1
@@ -659,6 +663,11 @@ pipeline_cleanup() {
     "$(pipeline_log_path "$issue" "$area" review)" \
     "$(pipeline_err_path "$issue" "$area" review)" \
     "$(pipeline_headless_meta_path "$issue" "$area" review)"
+
+  # Clean up stale message files from resolve step.
+  if [ -n "$pr" ]; then
+    rm -f "$(pipeline_message_path "$area" "$pr" response)"
+  fi
 
   if [ -n "$wt" ] && [ "$wt" != 'PATH_INVALID' ] && [ -d "$wt" ]; then
     git -C "$repo_dir" worktree remove "$wt" --force || true

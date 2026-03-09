@@ -34,7 +34,7 @@ pipeline_init "$AREA"
 STATE_FILE=$(pipeline_state_path "$ISSUE" "$AREA")
 ```
 
-If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions.
+If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions. If the state has no `.version` field or `.version < 2`, discard it and start fresh (v1 schema is incompatible).
 
 ### 1. Build (`step: build`)
 
@@ -120,6 +120,12 @@ Then decide:
 
 ### 4. Resolve (`step: resolve`) - direct
 
+Resolve worktree path first (needed by all sub-steps including recovery):
+
+```bash
+WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
+```
+
 Recovery entry:
 
 ```bash
@@ -128,7 +134,7 @@ RC=$?
 [ $RC -eq 2 ] && { echo "[pipeline] gh API error checking commits - abort"; return 1; }
 ```
 
-If found (`RC=0`), skip to Step 4d (state update only - no response comment since context is lost).
+If found (`RC=0`), use `NEW_SHA` from stdout directly, update `.lastCommitSha`, show diff, and ask user (skip 4a-4c since context is lost).
 
 Otherwise resolve directly in this pipeline session:
 
@@ -142,10 +148,6 @@ COMMENTS_JSON=$(pipeline_fetch_review_comments "$AREA" "$PR" "$REVIEW_ID")
 Parse the review body for severity labels (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`) and inline comments for file-level feedback.
 
 #### 4b. Fix code in the worktree
-
-```bash
-WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
-```
 
 Rules:
 - All source-file edits must happen in `WORKTREE_PATH`. Use Read/Edit/Write tools with absolute worktree paths.
@@ -230,7 +232,7 @@ On success:
 
 ```bash
 git -C "$(pipeline_repo_dir "$AREA")" fetch --prune
-pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH"
+pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH" "$PR"
 ```
 
 On failure:
