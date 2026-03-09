@@ -2,10 +2,10 @@
 
 ## Headless pattern
 
-Review and resolve run as synchronous `claude -p` subprocesses via `pipeline_run_headless()`. The pipeline blocks until exit, then checks GitHub API for results.
+Review and resolve run as synchronous `claude -p` subprocesses via `pipeline_run_headless_core()`. The pipeline blocks until exit, then checks GitHub API for results.
 
 ```
-pipeline_run_headless(workdir, prompt, issue, area, stage [, model])
+pipeline_run_headless_core(skill_cwd, prompt, issue, area, stage, repo_dir, worktree_dir, pr [, model])
   -> timeout $SEC claude -p [--model $MODEL] --dangerously-skip-permissions ... "$prompt" > $LOG
   -> returns exit code: 0=success, 124=timeout, other=error
   -> ALWAYS check API after exit (result may exist even on non-zero exit)
@@ -24,16 +24,16 @@ When multiple pipelines run in parallel (via orchestrator), only one can merge a
 ```
 pipeline_acquire_merge_lock(area, issue)
   -> mkdir .workspace/pipeline/{area}/merge.lock  (atomic)
-  -> writes pid, issue, timestamp to lock dir
+  -> writes issue, timestamp to lock dir
   -> if held: polls every 10s, max 300s
-  -> stale lock (holder PID dead): auto-reclaims
+  -> stale lock (TTL 1800s elapsed): auto-reclaims
   -> returns: 0=acquired, 1=timeout
 
 pipeline_release_merge_lock(area)
   -> rm -rf .workspace/pipeline/{area}/merge.lock
 ```
 
-**Always release the lock** - both on success and failure. If the process dies, the next acquirer detects the stale lock via PID check and reclaims it.
+**Always release the lock** - both on success and failure. If a process holds the lock and does not release it within the TTL (1800s), the next acquirer auto-reclaims it.
 
 ## Self-healing
 

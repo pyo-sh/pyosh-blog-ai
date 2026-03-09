@@ -13,7 +13,7 @@ description: Orchestrate /dev-build -> /dev-review -> /dev-resolve -> merge for 
 4. **Merge lock is held inside one helper call** (`pipeline_merge_pr`), not across multiple Bash tool calls.
 5. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees`).
 
-> Source helpers: `source scripts/pipeline-helpers.sh`
+> Source helpers: `source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`
 > Canonical worktree path: `.workspace/worktrees/{area}/issue-{N}`
 > Canonical state path: `.workspace/pipeline/{area}/issue-{N}.state.json`
 

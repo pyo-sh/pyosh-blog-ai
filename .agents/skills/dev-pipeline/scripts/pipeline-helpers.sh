@@ -351,36 +351,11 @@ pipeline_run_headless_core() {
     *) status='error' ;;
   esac
 
-  jq -n \
+  jq \
     --arg status "$status" \
-    --arg issue "$issue" \
-    --arg area "$area" \
-    --arg stage "$stage" \
-    --arg pr "$pr" \
-    --arg repo "$repo" \
-    --arg repoDir "$repo_dir" \
-    --arg worktreeDir "$worktree_dir" \
-    --arg skillCwd "$skill_cwd" \
-    --arg log "$log" \
-    --arg err "$err" \
-    --arg model "$model" \
     --argjson exitCode "$rc" \
-    '{
-      status: $status,
-      issue: ($issue | tonumber),
-      area: $area,
-      stage: $stage,
-      pr: ($pr | tonumber),
-      repo: $repo,
-      repoDir: $repoDir,
-      worktreeDir: $worktreeDir,
-      skillCwd: $skillCwd,
-      log: $log,
-      err: $err,
-      model: $model,
-      finishedAt: (now | todate),
-      exitCode: $exitCode
-    }' > "$meta_tmp" && mv "$meta_tmp" "$meta"
+    '.status = $status | .exitCode = $exitCode | .finishedAt = (now | todate)' \
+    "$meta" > "$meta_tmp" && mv "$meta_tmp" "$meta"
 
   printf '%s\n' "$log"
   return "$rc"
@@ -427,11 +402,14 @@ pipeline_check_review_exists() {
   local repo review_id
 
   repo="$(pipeline_repo_name "$area")" || return 1
-  review_id="$({ gh api "repos/${repo}/pulls/${pr}/reviews" \
+  review_id="$(gh api "repos/${repo}/pulls/${pr}/reviews" \
     --jq "[.[]
       | select(.id > ${last_review_id})
       | select(.body | startswith(\"## Review Summary\"))
-    ] | last | .id // empty"; } 2>/dev/null)"
+    ] | last | .id // empty" 2>&1)" || {
+    printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$review_id" >&2
+    return 2
+  }
 
   if [ -n "$review_id" ] && [ "$review_id" != 'null' ]; then
     printf '%s\n' "$review_id"
@@ -459,7 +437,10 @@ pipeline_check_new_commits() {
   local repo latest_sha
 
   repo="$(pipeline_repo_name "$area")" || return 1
-  latest_sha="$({ gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha'; } 2>/dev/null)"
+  latest_sha="$(gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha' 2>&1)" || {
+    printf '[pipeline] gh api error checking commits for PR #%s in %s: %s\n' "$pr" "$repo" "$latest_sha" >&2
+    return 2
+  }
 
   if [ -n "$latest_sha" ] && [ "$latest_sha" != 'null' ] && [ "$latest_sha" != "$last_commit_sha" ]; then
     printf '%s\n' "$latest_sha"
@@ -626,35 +607,38 @@ pipeline_merge_pr() {
   worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
 
   pipeline_acquire_merge_lock "$area" "$issue" || return 1
-  trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' EXIT INT TERM
-
-  if [ -n "$worktree_dir" ] && [ "$worktree_dir" != 'PATH_INVALID' ] && [ -d "$worktree_dir" ]; then
-    git -C "$worktree_dir" fetch origin || return 1
-
-    if git -C "$worktree_dir" rebase origin/main; then
-      pipeline_push_branch_safely "$worktree_dir" || return 1
-    else
-      git -C "$worktree_dir" rebase --abort >/dev/null 2>&1 || true
-      git -C "$worktree_dir" merge --no-edit origin/main || return 1
-      pipeline_push_branch_safely "$worktree_dir" || return 1
-    fi
-  else
-    printf '[pipeline] worktree missing for issue #%s area=%s; skipping branch sync and attempting merge directly\n' "$issue" "$area" >&2
-  fi
 
   (
-    cd -- "$repo_dir" || exit 1
-    gh pr merge "$pr" -R "$repo" --squash --delete-branch
-  ) || return 1
+    trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' EXIT INT TERM
 
-  pr_state="$(gh pr view "$pr" -R "$repo" --json state --jq '.state')" || return 1
-  [ "$pr_state" = 'MERGED' ] || {
-    printf '[pipeline] gh pr merge returned without MERGED state for PR #%s in %s\n' "$pr" "$repo" >&2
-    return 1
-  }
+    if [ -n "$worktree_dir" ] && [ "$worktree_dir" != 'PATH_INVALID' ] && [ -d "$worktree_dir" ]; then
+      git -C "$worktree_dir" fetch origin || exit 1
 
-  trap - EXIT INT TERM
-  pipeline_release_merge_lock "$area" "$issue"
+      if git -C "$worktree_dir" rebase origin/main; then
+        pipeline_push_branch_safely "$worktree_dir" || exit 1
+      else
+        git -C "$worktree_dir" rebase --abort >/dev/null 2>&1 || true
+        git -C "$worktree_dir" merge --no-edit origin/main || exit 1
+        pipeline_push_branch_safely "$worktree_dir" || exit 1
+      fi
+    else
+      printf '[pipeline] worktree missing for issue #%s area=%s; skipping branch sync and attempting merge directly\n' "$issue" "$area" >&2
+    fi
+
+    (
+      cd -- "$repo_dir" || exit 1
+      gh pr merge "$pr" -R "$repo" --squash --delete-branch
+    ) || exit 1
+
+    pr_state="$(gh pr view "$pr" -R "$repo" --json state --jq '.state')" || exit 1
+    [ "$pr_state" = 'MERGED' ] || {
+      printf '[pipeline] gh pr merge returned without MERGED state for PR #%s in %s\n' "$pr" "$repo" >&2
+      exit 1
+    }
+
+    trap - EXIT INT TERM
+    pipeline_release_merge_lock "$area" "$issue"
+  )
 }
 
 pipeline_cleanup() {
