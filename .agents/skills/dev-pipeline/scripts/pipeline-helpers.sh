@@ -396,7 +396,7 @@ pipeline_check_review_exists() {
   review_id="$(
     set -o pipefail
     gh api "repos/${repo}/pulls/${pr}/reviews" --paginate 2>"$_gh_err" \
-      | jq -s -r --argjson lastId "${last_review_id:-0}" \
+      | jq -s -r --argjson lastId "$last_review_id" \
         '[add // [] | .[] | select(.id > $lastId) | select(.body | startswith("## Review Summary"))] | last | .id // empty'
   )" || {
     printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2

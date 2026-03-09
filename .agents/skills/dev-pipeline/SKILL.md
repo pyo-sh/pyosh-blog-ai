@@ -126,7 +126,19 @@ Resolve worktree path first (needed by all sub-steps including recovery):
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
 ```
 
-Recovery entry:
+Recovery entry - check local worktree first, then GitHub API:
+
+```bash
+LOCAL_HEAD=$(git -C "$WORKTREE_PATH" rev-parse HEAD 2>/dev/null || true)
+```
+
+If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA`, a local commit exists (possibly unpushed). Push it and skip to 4d:
+
+```bash
+pipeline_push_branch_safely "$WORKTREE_PATH"
+```
+
+Otherwise check the remote:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
@@ -194,7 +206,10 @@ gh pr diff "$PR" -R "$(pipeline_repo_name "$AREA")"
 
 Then:
 - `skipReview: true` -> update `.step = "merge"`, go to Step 6
-- otherwise ask the user: Re-review / Merge as-is / Manual edit
+- otherwise ask the user:
+  - Re-review -> update `.step = "review"`, go to Step 2
+  - Merge as-is -> update `.step = "merge"`, go to Step 6
+  - Manual edit -> stop and report (user edits manually, then resumes pipeline)
 
 ### 5. No critical issues
 
