@@ -508,7 +508,9 @@ orch_check_completion() {
     local dispatch_ts now_ts
     dispatch_ts=$(date -d "$dispatched_at" +%s) || dispatch_ts=0
     now_ts=$(date +%s)
-    if [ $((now_ts - dispatch_ts)) -lt 60 ]; then
+    local alive_duration=$((now_ts - dispatch_ts))
+    # If process just died (< 60s since dispatch), wait for exit file
+    if [ "$alive_duration" -lt 60 ]; then
       echo "running"; return 0
     fi
   fi
@@ -525,20 +527,20 @@ orch_check_completion() {
   fi
 
   local pr_states
-  if pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]'); then
-    if echo "$pr_states" | grep -q '"MERGED"'; then
-      # PR merged but no terminal.json: process was killed before trap could write it.
-      # Treat as abnormal_exit so the orchestrator can inspect and decide.
-      >&2 echo "[orchestrator] #${issue}: merged PR found but no terminal.json - abnormal_exit"
-      echo "abnormal_exit"; return 0
-    fi
-    if echo "$pr_states" | grep -q '"OPEN"'; then
-      # PR open but process dead and no terminal.json - abnormal exit mid-pipeline
-      echo "abnormal_exit"; return 0
-    fi
+  if ! pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]'); then
+    # gh command failed - don't judge on API error
+    echo "running"; return 0
   fi
 
-  # No terminal file, no process, no PR (or gh failed)
+  if echo "$pr_states" | grep -q '"MERGED"'; then
+    echo "completed"; return 0
+  fi
+  if echo "$pr_states" | grep -q '"OPEN"'; then
+    # PR exists but process dead and no exit file - abnormal exit
+    echo "abnormal_exit"; return 0
+  fi
+
+  # No terminal file, no process, no PR found
   echo "failed"; return 0
 }
 

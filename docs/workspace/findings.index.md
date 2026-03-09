@@ -21,6 +21,7 @@
 | 013 | Orchestrator pane release 누락 - interactive mode 잔류 | 2026-03-06 | #orchestrator #pane #release #tmux #claude-code |
 | 014 | Headless dispatch architecture - tmux pane에서 claude -p 백그라운드 프로세스로 | 2026-03-07 | #headless #claude-p #pid #dispatch #merge-queue |
 | 015 | agent-tracker 과도 설계 - `/proc` BFS가 tmux API보다 나쁜 이유 | 2026-03-08 | #agent-tracker #proc #tmux #overengineering #process-detection |
+| 017 | pipeline_run_headless_core CLAUDECODE 환경변수 전파 버그 | 2026-03-09 | #pipeline #headless #claude-p #claudecode #env-var #nested-session |
 | 016 | Pipeline cwd 혼용 진단 및 3-way 분리 | 2026-03-09 | #pipeline #cwd #worktree #monorepo #skill-discovery #merge-lock |
 
 ## 상세 문서
@@ -40,6 +41,7 @@
 - [findings.013-orchestrator-pane-release.md](./findings/findings.013-orchestrator-pane-release.md) - Orchestrator pane release 누락: interactive mode 잔류, Ctrl+C fallback, `-p` 비호환
 - [findings.014-headless-dispatch-architecture.md](./findings/findings.014-headless-dispatch-architecture.md) - tmux pane → claude -p 헤드리스 전환: nested headless, CLAUDECODE= unset, $BASHPID, merge queue
 - [findings.015-agent-tracker-overengineering.md](./findings/findings.015-agent-tracker-overengineering.md) - agent-tracker 과도 설계: /proc BFS vs tmux API, AI 행동 패턴 분석, 단순화 원칙
+- [findings.017-pipeline-headless-claudecode-env.md](./findings/findings.017-pipeline-headless-claudecode-env.md) - pipeline_run_headless_core CLAUDECODE 미해제: Claude Code 세션 안에서 claude -p 호출 시 중첩 세션 오류, unset CLAUDECODE 해결
 - [findings.016-pipeline-cwd-separation.md](./findings/findings.016-pipeline-cwd-separation.md) - Pipeline cwd 혼용 진단: skill cwd / repo dir / worktree dir 3-way 분리, TTL merge lock, area-scoped 경로
 
 ## 주요 원칙
@@ -61,7 +63,7 @@
 - **캐시 제거가 캐시 무효화보다 낫다** → /proc 탐색 비용은 무시 가능. 캐시 무효화 버그 위험이 더 큼
 - **다단계 프로세스 체인에서 PPID는 불안정** → wrapper 경유 시 env var로 안정 식별자 전달
 - **env var export 삭제 전 소비처 확인 필수** → `grep -r VAR_NAME` 후 제거
-- **`CLAUDECODE=` unset 필수** → 자식 claude -p가 부모 환경변수 상속하면 충돌
+- **`CLAUDECODE=` unset 필수** → 자식 claude -p가 부모 환경변수 상속하면 충돌. `pipeline_run_headless_core`는 내부 서브쉘에서 `unset CLAUDECODE` 선행 필요 (orch-dispatch-wrapper는 setsid로 격리되어 무관)
 - **`$$` 대신 `$BASHPID`** → 서브셸/백그라운드에서 `$$`는 top-level shell PID. lock PID 기록 시 `${BASHPID:-$$}` 사용
 - **병렬 merge는 lock 직렬화 필수** → 같은 area 동시 merge 시 rebase 충돌. `mkdir` atomic lock + PID stale 감지
 - **가장 높은 수준의 API를 사용할 것** → tmux `#{pane_current_command}`, `ps -t`로 충분하면 `/proc` BFS 탐색 불필요. 저수준 재구현은 환경별 깨짐 위험이 더 큼

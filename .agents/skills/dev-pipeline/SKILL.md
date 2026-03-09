@@ -13,7 +13,7 @@ description: Orchestrate /dev-build -> /dev-review -> /dev-resolve -> merge for 
 4. **Merge lock is held inside one helper call** (`pipeline_merge_pr`), not across multiple Bash tool calls.
 5. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees`).
 
-> Source helpers: `source scripts/pipeline-helpers.sh`
+> Source helpers: `source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`
 > Canonical worktree path: `.workspace/worktrees/{area}/issue-{N}`
 > Canonical state path: `.workspace/pipeline/{area}/issue-{N}.state.json`
 
@@ -28,7 +28,7 @@ For any long-running `pipeline_run_review` or `pipeline_run_resolve` Bash call, 
 Run:
 
 ```bash
-source scripts/pipeline-helpers.sh
+source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh
 pipeline_init "$AREA"
 STATE_FILE=$(pipeline_state_path "$ISSUE" "$AREA")
 ```
@@ -76,9 +76,11 @@ Recovery entry:
 
 ```bash
 REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
+RC=$?
+[ $RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews - abort"; return 1; }
 ```
 
-If found, skip to Step 3.
+If found (`RC=0`), skip to Step 3.
 
 Otherwise start headless review **from monorepo root** using the stage-specific wrapper:
 
@@ -121,9 +123,11 @@ Recovery entry:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
+RC=$?
+[ $RC -eq 2 ] && { echo "[pipeline] gh API error checking commits - abort"; return 1; }
 ```
 
-If found, skip to Step 4b.
+If found (`RC=0`), skip to Step 4b.
 
 Otherwise run the resolve wrapper:
 
