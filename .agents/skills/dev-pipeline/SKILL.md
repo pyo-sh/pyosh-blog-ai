@@ -106,7 +106,7 @@ if [ -n "$REVIEW_ID" ]; then
 elif [ $RC -ne 0 ]; then
   # Headless failed + no review -> pipeline_stage_retry, then retry Step 2
 else
-  # Headless succeeded but no review posted -> unexpected; escalate
+  # Headless succeeded but no review posted -> pipeline_format_escalation, report to user
 fi
 ```
 
@@ -124,7 +124,7 @@ Update:
 
 Then decide:
 - `CHANGES_REQUESTED` or 1+ Critical -> update `.step = "resolve"`, go to Step 4
-- Approved / zero Critical -> Step 5
+- Approved / zero Critical -> update `.step = "approved"`, go to Step 5
 - Pending / dismissed -> stop and report
 
 ### 4. Resolve (`step: resolve`) - direct
@@ -153,7 +153,7 @@ pipeline_push_branch_safely "$WORKTREE_PATH"
 
 If `LOCAL_HEAD` differs but the working tree is dirty, report to the user for manual resolution (uncommitted changes from a previous session may exist).
 
-Otherwise (LOCAL_HEAD matches LAST_COMMIT_SHA) check the remote:
+Otherwise (LOCAL_HEAD matches LAST_COMMIT_SHA), check for dirty/staged state first. If `git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet` fails, report to the user (partial resolve from a previous session may exist). Then check the remote:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")

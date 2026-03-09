@@ -644,7 +644,8 @@ pipeline_merge_pr() {
       exit 1
     }
 
-    pipeline_release_merge_lock "$area" "$issue" || exit 1
+    pipeline_release_merge_lock "$area" "$issue" || \
+      printf '[pipeline] warning: merge succeeded but lock release failed for area=%s issue=#%s\n' "$area" "$issue" >&2
     trap - EXIT INT TERM
   )
   merge_rc=$?
