@@ -1,17 +1,18 @@
 ---
 name: dev-pipeline
-description: Orchestrate /dev-build -> /dev-review -> /dev-resolve -> merge for a monorepo with area-scoped worktrees. Headless Claude sessions always start from monorepo root so skills resolve correctly; code edits always happen in the issue worktree. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
+description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge for a monorepo with area-scoped worktrees. Headless review sessions start from monorepo root so skills resolve correctly; resolve runs directly in the pipeline session. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
 ---
 
 # Dev-Pipeline
 
 ## Non-negotiable invariants
 
-1. **Claude headless cwd is always monorepo root** (`$MONOREPO_ROOT`). Never start `claude -p` from a worktree.
+1. **Claude headless review cwd is always monorepo root** (`$MONOREPO_ROOT`). Never start `claude -p` from a worktree.
 2. **Feature-branch file edits and feature-branch git sync happen only in the issue worktree**.
 3. **gh commands use explicit repo selection** (`-R owner/name`) or an explicit repo dir.
 4. **Merge lock is held inside one helper call** (`pipeline_merge_pr`), not across multiple Bash tool calls.
 5. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees`).
+6. **Resolve runs directly in the pipeline session**, not as a headless sub-agent.
 
 > Source helpers: `source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`
 > Canonical worktree path: `.workspace/worktrees/{area}/issue-{N}`
@@ -19,7 +20,7 @@ description: Orchestrate /dev-build -> /dev-review -> /dev-resolve -> merge for 
 
 ## Required runtime shape
 
-For any long-running `pipeline_run_review` or `pipeline_run_resolve` Bash call, the Bash tool invocation itself must use **background mode**. The helper remains synchronous, but the outer tool call must not be foreground-blocked because the Bash-tool timeout can be shorter than Claude's internal timeout.
+For any long-running `pipeline_run_review` Bash call, the Bash tool invocation itself must use **background mode**. The helper remains synchronous, but the outer tool call must not be foreground-blocked because the Bash-tool timeout can be shorter than Claude's internal timeout.
 
 ## Workflow
 
@@ -117,7 +118,7 @@ Then decide:
 - Approved / zero Critical -> Step 5
 - Pending / dismissed -> stop and report
 
-### 4. Resolve (`step: resolve`)
+### 4. Resolve (`step: resolve`) - direct
 
 Recovery entry:
 
@@ -127,24 +128,55 @@ RC=$?
 [ $RC -eq 2 ] && { echo "[pipeline] gh API error checking commits - abort"; return 1; }
 ```
 
-If found (`RC=0`), skip to Step 4b.
+If found (`RC=0`), skip to Step 4c.
 
-Otherwise run the resolve wrapper:
+Otherwise resolve directly in this pipeline session:
+
+#### 4a. Read review and inline comments
+
+```bash
+REVIEW_JSON=$(pipeline_fetch_review "$AREA" "$PR" "$REVIEW_ID")
+COMMENTS_JSON=$(pipeline_fetch_review_comments "$AREA" "$PR" "$REVIEW_ID")
+```
+
+Parse the review body for severity labels (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`) and inline comments for file-level feedback.
+
+#### 4b. Fix code in the worktree
 
 ```bash
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
-LOG=$(pipeline_run_resolve "$ISSUE" "$AREA" "$PR" "$MODEL")
-RC=$?
-NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
 ```
 
 Rules:
-- The Claude process still starts from `$MONOREPO_ROOT`.
-- The prompt and exported env vars tell `/dev-resolve` which repo dir and worktree dir to use.
-- All file edits must happen in `WORKTREE_PATH`.
-- This Bash call itself must run in background mode.
+- All source-file edits must happen in `WORKTREE_PATH`. Use Read/Edit/Write tools with absolute worktree paths.
+- `[CRITICAL]` and `[WARNING]` items must be fixed.
+- `[SUGGESTION]` items should be fixed if valid, otherwise skip with a reason.
+- Do not change code unrelated to the review feedback.
 
-### 4b. Process resolve result (`step: resolve`)
+After applying fixes, commit and push:
+
+```bash
+git -C "$WORKTREE_PATH" add -A
+git -C "$WORKTREE_PATH" commit -m "fix: address review comments (#${ISSUE})"
+pipeline_push_branch_safely "$WORKTREE_PATH"
+```
+
+#### 4c. Post response and update state
+
+Write and post a response comment summarizing fixed and skipped items:
+
+```bash
+MSG_FILE=$(pipeline_message_path "$AREA" "$PR" response)
+# Write response body to MSG_FILE (Fixed table | Skipped table)
+gh pr comment "$PR" -R "$(pipeline_repo_name "$AREA")" --body-file "$MSG_FILE"
+rm -f "$MSG_FILE"
+```
+
+Check the new commit SHA and update state:
+
+```bash
+NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
+```
 
 Update:
 - `.lastCommitSha = NEW_SHA`
@@ -212,6 +244,7 @@ Run `/dev-log`, then delete the state file only after `/dev-log` succeeds.
 ## Constraints
 
 - Never merge without user approval
-- Never edit source files in the pipeline session itself; source edits happen only in `/dev-build` or headless `/dev-resolve`
+- Source edits in the pipeline session are allowed only during the resolve step (Step 4b), and only in the issue worktree
+- Build-phase source edits happen only in `/dev-build`
 - Git metadata operations required for merge are allowed
 - On unrecoverable error: save state, then report with `pipeline_format_escalation`

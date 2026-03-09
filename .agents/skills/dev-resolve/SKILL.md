@@ -7,30 +7,6 @@ description: Respond to PR review comments. Reads review feedback, applies fixes
 
 Fix reviewed items, record the work, push, and request re-review.
 
-## Runtime contract when invoked by dev-pipeline
-
-The parent pipeline may launch this skill from monorepo root. Use these environment variables if present:
-
-- `PIPELINE_AREA`
-- `PIPELINE_REPO`
-- `PIPELINE_REPO_DIR`
-- `PIPELINE_WORKTREE_DIR`
-- `PIPELINE_PR`
-- `PIPELINE_ISSUE`
-- `PIPELINE_MONOREPO_ROOT`
-
-Do not assume the current cwd is the repo checkout or the worktree.
-
-Recommended variables:
-
-```bash
-REPO="${PIPELINE_REPO:?PIPELINE_REPO is required}"
-REPO_DIR="${PIPELINE_REPO_DIR:?PIPELINE_REPO_DIR is required}"
-WORKTREE_DIR="${PIPELINE_WORKTREE_DIR:?PIPELINE_WORKTREE_DIR is required}"
-PR="${PIPELINE_PR:?PIPELINE_PR is required}"
-ISSUE="${PIPELINE_ISSUE:?PIPELINE_ISSUE is required}"
-```
-
 ## Workflow
 
 ### 1. Read review

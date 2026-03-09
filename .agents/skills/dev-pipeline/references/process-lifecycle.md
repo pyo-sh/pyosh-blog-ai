@@ -1,21 +1,24 @@
 # Process lifecycle
 
-## Headless pattern
+## Headless pattern (review only)
 
-Review and resolve run as synchronous `claude -p` subprocesses via `pipeline_run_headless_core()`. The pipeline blocks until exit, then checks GitHub API for results.
+Review runs as a synchronous `claude -p` subprocess via `pipeline_run_headless_core()`. The pipeline blocks until exit, then checks GitHub API for results.
 
 ```
 pipeline_run_headless_core(skill_cwd, prompt, issue, area, stage, repo_dir, worktree_dir, pr [, model])
   -> timeout $SEC claude -p [--model $MODEL] --dangerously-skip-permissions ... "$prompt" > $LOG
   -> returns exit code: 0=success, 124=timeout, other=error
   -> ALWAYS check API after exit (result may exist even on non-zero exit)
-  -> model: optional. Pass to ensure review/resolve use the same model as the pipeline.
+  -> model: optional. Pass to ensure review uses the same model as the pipeline.
 ```
 
 | Stage | Tools | Max turns | Timeout |
 |-------|-------|-----------|---------|
 | review | `Bash,Read,Skill` | 15 | 900s |
-| resolve | `Bash,Read,Edit,Write,Grep,Glob,Skill` | 25 | 900s |
+
+## Direct resolve
+
+Resolve runs directly in the pipeline session. The pipeline reads the review via `pipeline_fetch_review()` and `pipeline_fetch_review_comments()`, then applies fixes using Read/Edit/Write tools in the issue worktree. After committing and pushing, it posts a response comment to the PR.
 
 ## Merge queue
 
@@ -50,7 +53,6 @@ Per-stage retry via `pipeline_stage_retry()` (max 3). Log actions with `pipeline
   "step": "review", "reviewRound": 1, "lastReviewId": 0,
   "lastCommitSha": "{SHA}", "skipReview": false,
   "reviewLog": ".workspace/pipeline/logs/issue-42-review.log",
-  "resolveLog": ".workspace/pipeline/logs/issue-42-resolve.log",
   "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
   "maxStageRetries": 3,
   "recoveryLog": [],

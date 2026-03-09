@@ -3,11 +3,12 @@
 # Shell helpers for dev-pipeline.
 #
 # Design invariants:
-# 1) Claude headless sessions always start from MONOREPO_ROOT so .claude/skills resolve.
+# 1) Claude headless review sessions always start from MONOREPO_ROOT so .claude/skills resolve.
 # 2) gh commands always use explicit repo (-R owner/name), never implicit cwd.
 # 3) Feature-branch git operations always run in the issue worktree.
 # 4) Merge runs through a single helper that acquires and releases the lock in one shell process.
 # 5) All transient artifacts are area-scoped to avoid client/server collisions.
+# 6) Resolve runs directly in the pipeline session, not as a headless sub-agent.
 
 _PIPELINE_HELPERS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 _PIPELINE_SEARCH_DIR="$_PIPELINE_HELPERS_DIR"
@@ -214,39 +215,24 @@ Rules:
 PROMPT_REVIEW
 }
 
-pipeline_resolve_prompt() {
-  local issue=$1
-  local area=$2
-  local pr=$3
-  local repo repo_dir worktree_dir
+pipeline_fetch_review_comments() {
+  # Fetch inline review comments for a specific review.
+  # Returns JSON array of {path, line, side, body} objects.
+  # Usage: pipeline_fetch_review_comments <area> <pr> <review_id>
+  local area=$1
+  local pr=$2
+  local review_id=$3
+  local repo
 
   repo="$(pipeline_repo_name "$area")" || return 1
-  repo_dir="$(pipeline_repo_dir "$area")" || return 1
-  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area")" || return 1
-
-  cat <<PROMPT_RESOLVE
-/dev-resolve
-Target issue: #$issue
-Target PR: #$pr
-Target area: $area
-GitHub repo: $repo
-Repo dir on disk: $repo_dir
-Worktree dir for all source edits: $worktree_dir
-Session skill root: $MONOREPO_ROOT
-
-Rules:
-- Skills must resolve from $MONOREPO_ROOT. Do not launch or resolve skills from the worktree.
-- All source-file edits and feature-branch git commands must run in "$worktree_dir".
-- All repo-level gh commands must use either "gh ... -R $repo" or "$repo_dir" explicitly.
-- Fix only the reviewed items, then push and post the response comment.
-- After posting the response, exit immediately.
-PROMPT_RESOLVE
+  gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" \
+    --jq '[.[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]'
 }
 
 pipeline_run_headless_core() {
-  # Synchronous low-level runner.
+  # Synchronous low-level runner for headless review.
   # IMPORTANT: In Claude Code skills, the outer Bash tool call for this function
-  # should use run_in_background: true for long-running review/resolve steps.
+  # should use run_in_background: true for long-running review steps.
   #
   # Usage:
   #   pipeline_run_headless_core <skill_cwd> <prompt> <issue> <area> <stage> <repo_dir> <worktree_dir> <pr> [model]
@@ -273,11 +259,6 @@ pipeline_run_headless_core() {
     review)
       tools='Bash,Read,Skill'
       max_turns=15
-      timeout_sec=900
-      ;;
-    resolve)
-      tools='Bash,Read,Edit,Write,Grep,Glob,Skill'
-      max_turns=25
       timeout_sec=900
       ;;
     *)
@@ -390,23 +371,6 @@ pipeline_run_review() {
     "$prompt" \
     "$issue" "$area" review \
     "$repo_dir" '' "$pr" "$model"
-}
-
-pipeline_run_resolve() {
-  local issue=$1
-  local area=$2
-  local pr=$3
-  local model=${4:-}
-  local repo_dir worktree_dir prompt
-
-  repo_dir="$(pipeline_repo_dir "$area")" || return 1
-  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area")" || return 1
-  prompt="$(pipeline_resolve_prompt "$issue" "$area" "$pr")" || return 1
-  pipeline_run_headless_core \
-    "$(pipeline_skill_cwd)" \
-    "$prompt" \
-    "$issue" "$area" resolve \
-    "$repo_dir" "$worktree_dir" "$pr" "$model"
 }
 
 pipeline_check_review_exists() {
@@ -680,10 +644,7 @@ pipeline_cleanup() {
   rm -f \
     "$(pipeline_log_path "$issue" "$area" review)" \
     "$(pipeline_err_path "$issue" "$area" review)" \
-    "$(pipeline_log_path "$issue" "$area" resolve)" \
-    "$(pipeline_err_path "$issue" "$area" resolve)" \
-    "$(pipeline_headless_meta_path "$issue" "$area" review)" \
-    "$(pipeline_headless_meta_path "$issue" "$area" resolve)"
+    "$(pipeline_headless_meta_path "$issue" "$area" review)"
 
   if [ -n "$wt" ] && [ "$wt" != 'PATH_INVALID' ] && [ -d "$wt" ]; then
     git -C "$repo_dir" worktree remove "$wt" --force || true
