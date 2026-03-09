@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-09 | Orchestrator terminal result contract - terminal.json schema 도입, orch_check_completion 재작성 (terminal file만이 completed 근거), PR fallback 보조화 (#78) | done |
 | 2026-03-09 | Claude Code shared config bootstrap - CLAUDE.md 모듈 분리, .claude/rules/ + settings.json + validate-bash.py hook, bootstrap 스크립트, permissions 축소 (#115) | done |
 | 2026-03-09 | Pipeline cwd 3-way 분리 - skill cwd / repo dir / worktree dir 혼용 수정, area-scoped 경로, TTL merge lock, 숨은 버그 8건 수정 (#106) | done |
 | 2026-03-08 | Orchestrator/pipeline 신뢰성 전면 개편 - attemptId, setsid+PGID, provider health circuit breaker, heartbeat, skipped_dep_failed, flock (#76) | done |

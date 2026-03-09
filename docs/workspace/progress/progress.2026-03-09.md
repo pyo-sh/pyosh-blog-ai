@@ -23,6 +23,38 @@
 - `.claude/README.md` 제거: Claude Code가 자동 로드하지 않으므로 각 repo 복사 불필요
 - validate-bash.py: Python 3.7+ 호환 (`str | None` 대신 `Optional[str]`)
 
+## Orchestrator terminal result contract 도입 (#78)
+
+오케스트레이터 완료 판정을 명시적 terminal.json 계약 기반으로 재설계했다.
+
+### 변경 파일
+
+- `.agents/skills/dev-orchestrator/scripts/orch-dispatch-wrapper.sh` - 인자 2개 추가 (`ISSUE`, `PIPELINE_STATE_FILE`), `.exit` → `terminal.json` 리네임, schemaVersion/prNumber/merged/headSha/finishedAt/reason 필드 포함 jq 기반 출력
+- `.agents/skills/dev-orchestrator/scripts/orchestrate-helpers.sh` - `orch_signal_path` → `orch_terminal_path` (alias 유지), `orch_dispatch`에 `pipeline_state_file` 변수 추가 + wrapper 호출 인자 확장, `orch_check_completion` 재작성
+- `.agents/skills/dev-orchestrator/references/state-detection.md` - terminal result contract 섹션 신설, PR fallback 테이블에서 merged=completed 경로 제거
+
+### orch_check_completion 변경 요약
+
+- **이전**: merged PR → `completed` (terminal file 없어도 판정 가능)
+- **이후**: terminal.json만이 `completed`/`failed`의 유일한 근거
+- PR fallback: merged PR → `abnormal_exit` (trap이 SIGKILL로 실행 불가였음을 의미), open PR → `abnormal_exit`, PR 없음 → `failed`
+
+### terminal.json 스키마 (schemaVersion 1)
+
+```json
+{
+  "schemaVersion": 1,
+  "attemptId": "batch-20260308-issue78-attempt0",
+  "issue": 78,
+  "status": "completed",
+  "prNumber": 123,
+  "merged": true,
+  "headSha": "abc1234",
+  "finishedAt": "2026-03-09T20:27:00Z",
+  "reason": "pipeline completed at step=log"
+}
+```
+
 ## Pipeline cwd 3-way 분리 (#106)
 
 파이프라인의 skill cwd / repo dir / worktree dir 혼용 문제를 구조적으로 수정했다.
