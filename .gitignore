@@ -9,6 +9,10 @@
 ## Skills are managed by User
 skills-lock.json
 
+## Claude Code local overrides (personal, machine-specific)
+CLAUDE.local.md
+.claude/settings.local.json
+
 ## AI workspace (worktrees, pipeline state, locks)
 .workspace/
 .pnpm-store
