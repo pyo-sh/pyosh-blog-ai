@@ -1,5 +1,28 @@
 # 2026-03-09 Progress
 
+## Claude Code shared config bootstrap setup (#115)
+
+단일 CLAUDE.md를 모듈식 공유 설정으로 분리하고, bootstrap 스크립트와 bash validation hook을 도입했다.
+
+### 구조 변경
+
+- `CLAUDE.md` - 134행 → 36행으로 축소, 세부 규칙은 `.claude/rules/`로 이동
+- `.claude/settings.json` - permissions allowlist (읽기 전용 git branch 패턴), deny list (.env, secrets), PreToolUse hook 등록
+- `.claude/hooks/validate-bash.py` - curl|sh, eval, source <(...) 차단, rm -rf/git clean/sudo/2>&1 확인 요청, 파이프/&& 복잡도 검사
+- `.claude/rules/*.md` - bash, git-safety, worktree-workflow, docs-context, markdown-writing (path-scoped)
+- `tools/claude/bootstrap.sh` - root/client/server 템플릿 동기화, child repo claudeMdExcludes 생성 (create-only)
+- `tools/claude/templates/` - repo별 + shared 템플릿 소스
+- `tools/claude/README.md`, `README.ko.md` - 온보딩 가이드
+
+### 주요 결정
+
+- hook command 경로: `$CLAUDE_PROJECT_DIR` 사용 (상대 경로 대신)
+- `Bash(git branch *)` → 읽기 전용 하위 패턴 6개 분리, `Bash(find . -maxdepth *)` 제거
+- `settings.local.json` 덮어쓰기 방지: bootstrap은 파일 없을 때만 생성
+- `ensure_git_info_exclude`: `git rev-parse --git-path info/exclude`로 worktree 호환
+- `.claude/README.md` 제거: Claude Code가 자동 로드하지 않으므로 각 repo 복사 불필요
+- validate-bash.py: Python 3.7+ 호환 (`str | None` 대신 `Optional[str]`)
+
 ## Pipeline cwd 3-way 분리 (#106)
 
 파이프라인의 skill cwd / repo dir / worktree dir 혼용 문제를 구조적으로 수정했다.
