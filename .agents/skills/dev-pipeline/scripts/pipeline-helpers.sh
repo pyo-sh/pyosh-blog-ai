@@ -351,11 +351,19 @@ pipeline_run_headless_core() {
     *) status='error' ;;
   esac
 
-  jq \
-    --arg status "$status" \
-    --argjson exitCode "$rc" \
-    '.status = $status | .exitCode = $exitCode | .finishedAt = (now | todate)' \
-    "$meta" > "$meta_tmp" && mv "$meta_tmp" "$meta"
+  if [ -f "$meta" ]; then
+    jq \
+      --arg status "$status" \
+      --argjson exitCode "$rc" \
+      '.status = $status | .exitCode = $exitCode | .finishedAt = (now | todate)' \
+      "$meta" > "$meta_tmp" && mv "$meta_tmp" "$meta"
+  else
+    jq -n \
+      --arg status "$status" \
+      --argjson exitCode "$rc" \
+      '{status: $status, exitCode: $exitCode, finishedAt: (now | todate)}' \
+      > "$meta_tmp" && mv "$meta_tmp" "$meta"
+  fi
 
   printf '%s\n' "$log"
   return "$rc"
@@ -607,7 +615,10 @@ pipeline_merge_pr() {
   worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
 
   pipeline_acquire_merge_lock "$area" "$issue" || return 1
+  # Guard the short window between lock acquisition and subshell start.
+  trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' INT TERM
 
+  local merge_rc
   (
     trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' EXIT INT TERM
 
@@ -639,6 +650,9 @@ pipeline_merge_pr() {
     trap - EXIT INT TERM
     pipeline_release_merge_lock "$area" "$issue"
   )
+  merge_rc=$?
+  trap - INT TERM
+  return "$merge_rc"
 }
 
 pipeline_cleanup() {

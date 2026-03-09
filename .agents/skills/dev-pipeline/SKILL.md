@@ -76,9 +76,11 @@ Recovery entry:
 
 ```bash
 REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
+RC=$?
+[ $RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews - abort"; return 1; }
 ```
 
-If found, skip to Step 3.
+If found (`RC=0`), skip to Step 3.
 
 Otherwise start headless review **from monorepo root** using the stage-specific wrapper:
 
@@ -121,9 +123,11 @@ Recovery entry:
 
 ```bash
 NEW_SHA=$(pipeline_check_new_commits "$AREA" "$PR" "$LAST_COMMIT_SHA")
+RC=$?
+[ $RC -eq 2 ] && { echo "[pipeline] gh API error checking commits - abort"; return 1; }
 ```
 
-If found, skip to Step 4b.
+If found (`RC=0`), skip to Step 4b.
 
 Otherwise run the resolve wrapper:
 
