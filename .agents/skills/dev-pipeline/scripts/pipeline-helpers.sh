@@ -644,7 +644,7 @@ pipeline_merge_pr() {
       exit 1
     }
 
-    pipeline_release_merge_lock "$area" "$issue"
+    pipeline_release_merge_lock "$area" "$issue" || exit 1
     trap - EXIT INT TERM
   )
   merge_rc=$?

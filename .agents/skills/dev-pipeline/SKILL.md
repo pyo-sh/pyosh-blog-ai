@@ -89,6 +89,8 @@ Otherwise start headless review **from monorepo root** using the stage-specific 
 LOG=$(pipeline_run_review "$ISSUE" "$AREA" "$PR" "$MODEL")
 RC=$?
 REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
+REVIEW_RC=$?
+[ $REVIEW_RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews after headless run - abort"; return 1; }
 ```
 
 Rules:
@@ -124,6 +126,8 @@ Resolve worktree path first (needed by all sub-steps including recovery):
 
 ```bash
 WORKTREE_PATH=$(pipeline_resolve_worktree_path "$ISSUE" "$AREA")
+RC=$?
+[ $RC -eq 3 ] && { echo "[pipeline] worktree not found - escalate"; pipeline_format_escalation "$ISSUE" "$AREA" "resolve"; return 1; }
 ```
 
 Recovery entry - check local worktree first, then GitHub API:
@@ -167,13 +171,17 @@ Rules:
 - `[SUGGESTION]` items should be fixed if valid, otherwise skip with a reason.
 - Do not change code unrelated to the review feedback.
 
-After applying fixes, commit and push:
+After applying fixes, commit and push (skip if no changes):
 
 ```bash
 git -C "$WORKTREE_PATH" add -A
-git -C "$WORKTREE_PATH" commit -m "fix: address review comments (#${ISSUE})"
-pipeline_push_branch_safely "$WORKTREE_PATH"
+if ! git -C "$WORKTREE_PATH" diff --cached --quiet; then
+  git -C "$WORKTREE_PATH" commit -m "fix: address review comments (#${ISSUE})"
+  pipeline_push_branch_safely "$WORKTREE_PATH"
+fi
 ```
+
+If no changes were staged (all items skipped or already fixed), skip directly to 4d without pushing.
 
 #### 4c. Post response comment
 
