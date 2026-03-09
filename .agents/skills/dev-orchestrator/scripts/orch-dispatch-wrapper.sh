@@ -1,19 +1,31 @@
 #!/bin/bash
 # orch-dispatch-wrapper.sh - Wrapper for dispatched pipeline processes
-# Provides: heartbeat, structured exit file (JSON), signal handling
+# Provides: heartbeat, terminal.json (explicit completion contract), signal handling
 #
-# Usage: bash orch-dispatch-wrapper.sh <attempt_id> <exit_file> <heartbeat_file> <pid_file> -- <command...>
+# Usage: bash orch-dispatch-wrapper.sh <attempt_id> <terminal_file> <heartbeat_file> <pid_file> <issue> <pipeline_state_file> -- <command...>
 #
 # The wrapper:
 #   1. Writes its PID to pid_file (= PGID when launched via setsid)
 #   2. Starts a heartbeat loop (updates heartbeat_file every 60s)
 #   3. Runs the given command
-#   4. On exit (normal or signal), writes a JSON exit file with attemptId
+#   4. On exit (normal or signal), writes terminal.json with full schema
+#
+# terminal.json schema (schemaVersion 1):
+#   schemaVersion  - always 1
+#   attemptId      - unique attempt identifier from orchestrator
+#   issue          - issue number (integer)
+#   status         - "completed" | "failed"
+#   prNumber       - PR number if pipeline created one, else null
+#   merged         - true if pipeline reached the log/done step, else false
+#   headSha        - last commit SHA on the PR branch if known, else null
+#   finishedAt     - ISO-8601 UTC timestamp
+#   reason         - human-readable summary of exit cause
 
 set -uo pipefail
 
-ATTEMPT_ID="$1"; EXIT_FILE="$2"; HEARTBEAT_FILE="$3"; PID_FILE="$4"
-shift 4
+ATTEMPT_ID="$1"; TERMINAL_FILE="$2"; HEARTBEAT_FILE="$3"; PID_FILE="$4"
+ISSUE="$5"; PIPELINE_STATE_FILE="$6"
+shift 6
 [ "${1:-}" = "--" ] && shift
 
 # Write our PID. When launched via setsid, $$ = session leader PID = PGID.
@@ -32,16 +44,57 @@ _HB_PID=$!
 # Ensure SIGTERM triggers EXIT trap (default bash behavior kills immediately)
 trap 'exit 143' TERM INT
 
-# Exit handler: always write structured exit file
+# Exit handler: always write terminal.json
 trap '
   _rc=$?
   kill "$_HB_PID" 2>/dev/null
   wait "$_HB_PID" 2>/dev/null
+
   _status="failed"
   [ $_rc -eq 0 ] && _status="completed"
-  printf "{\"attemptId\":\"%s\",\"status\":\"%s\",\"rc\":%d,\"endedAt\":\"%s\"}\n" \
-    "$ATTEMPT_ID" "$_status" "$_rc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    > "$EXIT_FILE"
+
+  # Enrich terminal.json from pipeline state if available
+  _pr_number="null"
+  _merged="false"
+  _head_sha="null"
+  _reason="pipeline exited with rc=$_rc"
+  if [ -f "$PIPELINE_STATE_FILE" ]; then
+    _pr_raw=$(jq -r ".pr // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || true
+    [ -n "$_pr_raw" ] && _pr_number="$_pr_raw"
+    _step=$(jq -r ".step // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || _step=""
+    _sha=$(jq -r ".lastCommitSha // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || true
+    [ -n "$_sha" ] && _head_sha="$_sha"
+    [ "$_step" = "log" ] || [ "$_step" = "done" ] && _merged="true"
+    [ $_rc -eq 0 ] && _reason="pipeline completed at step=${_step:-unknown}"
+  fi
+
+  _finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  # Write terminal.json; fall back to minimal printf if jq unavailable
+  if command -v jq >/dev/null 2>&1; then
+    jq -n \
+      --arg attemptId "$ATTEMPT_ID" \
+      --argjson issue "$ISSUE" \
+      --arg status "$_status" \
+      --argjson prNumber "$_pr_number" \
+      --argjson merged "$_merged" \
+      --arg headSha "$_head_sha" \
+      --arg finishedAt "$_finished_at" \
+      --arg reason "$_reason" \
+      "{schemaVersion:1, attemptId:\$attemptId, issue:\$issue,
+        status:\$status, prNumber:\$prNumber, merged:\$merged,
+        headSha:(if \$headSha == \"\" then null else \$headSha end),
+        finishedAt:\$finishedAt, reason:\$reason}" \
+      > "$TERMINAL_FILE" 2>/dev/null || \
+    printf "{\"schemaVersion\":1,\"attemptId\":\"%s\",\"issue\":%s,\"status\":\"%s\",\"finishedAt\":\"%s\"}\n" \
+      "$ATTEMPT_ID" "$ISSUE" "$_status" "$_finished_at" \
+      > "$TERMINAL_FILE"
+  else
+    printf "{\"schemaVersion\":1,\"attemptId\":\"%s\",\"issue\":%s,\"status\":\"%s\",\"finishedAt\":\"%s\"}\n" \
+      "$ATTEMPT_ID" "$ISSUE" "$_status" "$_finished_at" \
+      > "$TERMINAL_FILE"
+  fi
+
   rm -f "$PID_FILE" "$HEARTBEAT_FILE"
 ' EXIT
 
