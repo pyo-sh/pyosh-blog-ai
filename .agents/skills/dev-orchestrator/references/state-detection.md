@@ -3,61 +3,95 @@
 How the orchestrator determines whether a dispatched issue's pipeline has completed,
 failed, or stalled.
 
+## Terminal result contract
+
+`terminal.json` is the **sole basis** for a `completed` or `failed` result.
+No path reaches `completed` without a valid terminal file.
+
+Written by `orch-dispatch-wrapper.sh` via `trap EXIT`, covering normal exit and
+SIGTERM. Only SIGKILL prevents writing (trap cannot catch it). In that edge case
+the orchestrator receives `abnormal_exit` (see completion detection below).
+
+### Schema (schemaVersion 1)
+
+```
+.workspace/orchestrate/{area}/issue-{N}.terminal.json
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "attemptId": "batch-20260308-issue78-attempt0",
+  "issue": 78,
+  "status": "completed",
+  "prNumber": 123,
+  "merged": true,
+  "headSha": "abc1234def5678",
+  "finishedAt": "2026-03-08T12:34:56Z",
+  "reason": "pipeline completed at step=log"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schemaVersion` | integer | Always `1` for this revision |
+| `attemptId` | string | Matches the dispatch attempt ID in batch state |
+| `issue` | integer | GitHub issue number |
+| `status` | `"completed"` \| `"failed"` | Pipeline exit status |
+| `prNumber` | integer \| null | PR number if pipeline created one |
+| `merged` | boolean | `true` if pipeline reached `log`/`done` step |
+| `headSha` | string \| null | Last commit SHA on the PR branch if known |
+| `finishedAt` | ISO-8601 UTC | When the wrapper exit trap ran |
+| `reason` | string | Human-readable exit summary |
+
+**attemptId matching**: Only trust the terminal file if its `attemptId` matches the
+current dispatch's `attemptId` in batch state. Mismatched files are ignored (stale
+from a previous batch or retry).
+
 ## Completion detection
 
 `orch_check_completion <issue> <area_dir>` checks in priority order:
 
-### 1. Exit file JSON (highest priority)
+### 1. terminal.json (sole source of `completed` / `failed`)
 
-```
-.workspace/orchestrate/{area}/issue-{N}.exit
-```
+If the terminal file exists and the `attemptId` matches:
 
-JSON format with attemptId for stale file safety:
-
-```json
-{
-  "attemptId": "batch-20260308-issue29-attempt0",
-  "status": "completed",
-  "rc": 0,
-  "endedAt": "2026-03-08T12:34:56Z"
-}
-```
-
-**attemptId matching**: Only trust the exit file if its `attemptId` matches the
-current dispatch's `attemptId` in state. Mismatched files are ignored (stale from
-previous batch or retry).
-
-The exit file is written by `orch-dispatch-wrapper.sh` via `trap EXIT`, covering
-normal exit and SIGTERM. Only SIGKILL prevents writing (trap cannot catch it).
+| `status` field | Result |
+|----------------|--------|
+| `"completed"` | `completed` |
+| anything else | `failed` |
 
 ### 2. Process group alive (PGID)
 
-Check whether the process group is still running:
+No terminal file yet; check whether the process group is still running:
 
 ```bash
 orch_pgid_alive "$pgid"
 ```
 
-| Process group | Exit file | Result |
-|---------------|-----------|--------|
+| Process group | Terminal file | Result |
+|---------------|---------------|--------|
 | alive | absent | `running` |
-| alive | present + match | `completed` or `failed` (per exit file) |
-| dead | present + match | `completed` or `failed` (per exit file) |
+| alive | present + match | `completed` or `failed` (per terminal file) |
+| dead | present + match | `completed` or `failed` (per terminal file) |
 | dead | absent | fall through to method 3 |
 | dead | present + mismatch | fall through (stale file) |
 
-The `pipelineStarted` flag tracks whether the pipeline state file was ever observed.
-Prevents false `completed` when the state file hasn't been created yet.
+The `pipelineStarted` flag tracks whether the pipeline state file was ever observed
+(observability only - no effect on completion logic).
 
-### 3. Grace period (process dead, no exit file)
+### 3. Grace period (process dead, no terminal file)
 
-60-second grace period after process death. The exit handler may be writing the file,
-or there's a race between termination and file system flush.
+60-second grace period after process death. The exit handler may still be writing
+the file, or there is a race between termination and filesystem flush.
 
 After grace period: fall through to PR status check.
 
-### 4. PR status (fallback, provider-health-aware)
+### 4. PR status (supplementary only - never produces `completed`)
+
+Process is dead and terminal.json was not written (SIGKILL or trap failure).
+PR evidence helps distinguish `abnormal_exit` from `failed` but cannot confirm
+a successful completion.
 
 Before checking PR status, verify GitHub provider health:
 
@@ -68,10 +102,15 @@ Before checking PR status, verify GitHub provider health:
 | `hard_fault` | Return `running` (poll cycle should halt) |
 
 PR check uses `orch_gh` (provider health wrapper):
-- Merged PR exists -> `completed`
-- Open PR exists, process dead -> `abnormal_exit`
-- gh command failed -> `running` (don't judge on error)
-- No PR at all -> `failed`
+
+| PR state | Result | Note |
+|----------|--------|------|
+| Merged PR exists | `abnormal_exit` | Process killed before trap wrote terminal file |
+| Open PR exists | `abnormal_exit` | Process died mid-pipeline |
+| gh command failed | `running` | Don't judge on API error |
+| No PR at all | `failed` | No sign of progress |
+
+`abnormal_exit` triggers the retry path in `orch_poll_cycle`.
 
 Always use `-R <owner/repo>` for explicit repo targeting. Avoid deprecated fields
 like `projectCards` - use `number,title,state,body,url` only.
@@ -122,12 +161,12 @@ like `projectCards` - use `number,title,state,body,url` only.
 ```
 pending
   +-(dispatch)-> dispatched
-                   |-(exit file: ok)--------> completed
-                   |-(exit file: fail)-------> failed
-                   |-(abnormal exit, retry)--> dispatched (re-dispatch)
-                   |-(abnormal exit, no retry)-> failed
-                   +-(stall + dead + retry)--> dispatched (re-dispatch)
-                   +-(stall + dead + exhausted)-> failed
+                   |-(terminal.json: completed)---> completed
+                   |-(terminal.json: failed)-------> failed
+                   |-(abnormal exit, retry)---------> dispatched (re-dispatch)
+                   |-(abnormal exit, no retry)-------> failed
+                   +-(stall + dead + retry)---------> dispatched (re-dispatch)
+                   +-(stall + dead + exhausted)-----> failed
 
 blocked
   +-(all deps completed)--------------------> pending
