@@ -124,7 +124,6 @@ for item in "${TARGETS[@]}"; do
 
   copy_file "$TEMPLATE_DIR/$repo_key/CLAUDE.md" "$target/CLAUDE.md" "$repo_key"
   copy_file "$TEMPLATE_DIR/$repo_key/.claude/settings.json" "$target/.claude/settings.json" "$repo_key"
-  copy_file "$TEMPLATE_DIR/shared/.claude/README.md" "$target/.claude/README.md" "$repo_key"
   copy_file "$TEMPLATE_DIR/shared/.claude/hooks/validate-bash.py" "$target/.claude/hooks/validate-bash.py" "$repo_key"
   copy_tree "$TEMPLATE_DIR/shared/.claude/rules" "$target/.claude/rules" "$repo_key"
   copy_tree "$TEMPLATE_DIR/$repo_key/.claude/rules" "$target/.claude/rules" "$repo_key"
