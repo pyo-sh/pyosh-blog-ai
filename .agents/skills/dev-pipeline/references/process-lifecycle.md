@@ -56,6 +56,7 @@ Per-stage retry via `pipeline_stage_retry()` (max 3). Log actions with `pipeline
   },
   "step": "review", "lastReviewId": 0,
   "lastCommitSha": "{SHA}", "skipReview": false,
+  "reviewResolveRound": 0, "maxReviewResolveRounds": 5,
   "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
   "maxStageRetries": 3,
   "recoveryLog": [],

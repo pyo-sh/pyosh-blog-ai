@@ -66,6 +66,8 @@ Then run `/dev-build` as usual. After PR creation, write state with at least:
   "lastReviewId": 0,
   "lastCommitSha": "<sha>",
   "skipReview": false,
+  "reviewResolveRound": 0,
+  "maxReviewResolveRounds": 5,
   "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
   "maxStageRetries": 3
 }
@@ -122,10 +124,30 @@ Update:
 - `.lastReviewId = REVIEW_ID`
 - `.stageRetries.review = 0`
 
+Parse the review summary table to extract severity counts (`CRITICAL`, `WARNING`, `SUGGESTION`).
+
 Then decide:
-- `CHANGES_REQUESTED` or 1+ Critical -> update `.step = "resolve"`, go to Step 4
-- Approved / zero Critical -> update `.step = "approved"`, go to Step 5
-- Pending / dismissed -> stop and report
+
+```
+if Pending or dismissed:
+  stop and report
+
+if Critical > 0 or Warning > 0:
+  if reviewResolveRound >= maxReviewResolveRounds (5):
+    ask user: continue / merge as-is / abort
+  else:
+    update .step = "resolve", .reviewResolveRound += 1
+    go to Step 4 (auto)
+
+if Suggestion > 0 (but Critical = 0 and Warning = 0):
+  AI decides:
+    a) suggestions are trivial or debatable -> auto-merge (Step 6)
+    b) suggestions are valid and worth fixing -> resolve then re-review (Step 4, set skipReview = false)
+    c) suggestions are valid but no re-review needed -> resolve then merge (Step 4, set skipReview = true)
+
+if all counts = 0 (clean review):
+  auto-merge -> update .step = "merge", go to Step 6
+```
 
 ### 4. Resolve (`step: resolve`) - direct
 
@@ -217,29 +239,20 @@ Update:
 - `.lastCommitSha = NEW_SHA`
 - `.stageRetries.resolve = 0`
 
-Show PR diff:
-
-```bash
-gh pr diff "$PR" -R "$(pipeline_repo_name "$AREA")"
-```
-
 Then:
 - `skipReview: true` -> update `.step = "merge"`, go to Step 6
-- otherwise ask the user:
-  - Re-review -> update `.step = "review"`, go to Step 2
-  - Merge as-is -> update `.step = "merge"`, go to Step 6
-  - Manual edit -> stop and report (user edits manually, then resumes pipeline)
+- `skipReview: false` -> update `.step = "review"`, go to Step 2 (auto re-review)
 
-### 5. No critical issues
+### 5. Round limit reached (`reviewResolveRound >= maxReviewResolveRounds`)
 
-Show review summary and ask:
-- Merge -> update `.step = "merge"`, go to Step 6
-- Fix & Re-review -> update `.step = "resolve"`, go to Step 4
-- Fix & Merge -> set `skipReview=true`, update `.step = "resolve"`, then Step 4
+This step is entered from Step 3 when the review-resolve loop has exhausted its rounds but Critical/Warning items remain.
+
+Show the latest review summary and the round count, then ask the user:
+- Continue -> reset `.reviewResolveRound = 0`, update `.step = "resolve"`, go to Step 4
+- Merge as-is -> update `.step = "merge"`, go to Step 6
+- Abort -> stop and report
 
 ### 6. Merge (`step: merge`)
-
-Never merge without user approval (approval from Step 5 "Fix & Merge" or "Merge" counts).
 
 Recovery entry:
 
@@ -281,7 +294,8 @@ Run `/dev-log`, then delete the state file only after `/dev-log` succeeds.
 
 ## Constraints
 
-- Never merge without user approval
+- **Auto-merge** is allowed when: (1) review has Critical=0 AND Warning=0, or (2) user explicitly approves in Step 5
+- **User approval required** when: review-resolve loop reaches `maxReviewResolveRounds` with Critical/Warning still present (Step 5)
 - Source edits in the pipeline session are allowed only during the resolve step (Step 4b), and only in the issue worktree
 - Build-phase source edits happen only in `/dev-build`
 - Git metadata operations required for merge are allowed
