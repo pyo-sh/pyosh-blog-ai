@@ -114,7 +114,7 @@ Update:
 - `.stageRetries.review = 0`
 
 Then decide:
-- `CHANGES_REQUESTED` or 1+ Critical -> Step 4
+- `CHANGES_REQUESTED` or 1+ Critical -> update `.step = "resolve"`, go to Step 4
 - Approved / zero Critical -> Step 5
 - Pending / dismissed -> stop and report
 
@@ -193,19 +193,19 @@ gh pr diff "$PR" -R "$(pipeline_repo_name "$AREA")"
 ```
 
 Then:
-- `skipReview: true` -> Step 6
+- `skipReview: true` -> update `.step = "merge"`, go to Step 6
 - otherwise ask the user: Re-review / Merge as-is / Manual edit
 
 ### 5. No critical issues
 
 Show review summary and ask:
-- Merge -> Step 6
-- Fix & Re-review -> Step 4
-- Fix & Merge -> set `skipReview=true`, then Step 4
+- Merge -> update `.step = "merge"`, go to Step 6
+- Fix & Re-review -> update `.step = "resolve"`, go to Step 4
+- Fix & Merge -> set `skipReview=true`, update `.step = "resolve"`, then Step 4
 
 ### 6. Merge (`step: merge`)
 
-Never merge without user approval.
+Never merge without user approval (approval from Step 5 "Fix & Merge" or "Merge" counts).
 
 Recovery entry:
 

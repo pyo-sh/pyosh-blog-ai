@@ -6,7 +6,7 @@ Resume from state file on crash/disconnect. Jump to the `step` field - each step
 
 | step | Entry validation |
 |------|-----------------|
-| `build` | `gh pr list --head {branch}`. PR open -> `review`. Merged -> `log`. None -> re-run `/dev-build`. |
+| `build` | If `.branch` exists: `gh pr list --head {branch}`. PR open -> `review`. Merged -> `log`. None -> re-run `/dev-build`. If no state file or no `.branch`: start fresh. |
 | `review` | `pipeline_check_review_exists`. Found -> process review (count severities, decide next). Not found -> run headless. |
 | `resolve` | `pipeline_check_new_commits`. Found -> process result (show diff, ask user). Not found -> resolve directly in pipeline session. |
 | `merge` | `gh pr view --json state`. MERGED -> `log`. OPEN -> ask user for merge approval. |

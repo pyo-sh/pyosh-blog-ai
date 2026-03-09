@@ -227,8 +227,11 @@ pipeline_fetch_review_comments() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" --paginate \
-    --jq '[.[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]' 2>"$_gh_err" || {
+  (
+    set -o pipefail
+    gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" --paginate 2>"$_gh_err" \
+      | jq -s '[add // [] | .[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]'
+  ) || {
     printf '[pipeline] gh api error fetching review comments for PR #%s review %s in %s: %s\n' \
       "$pr" "$review_id" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
@@ -437,8 +440,8 @@ pipeline_check_new_commits() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  latest_sha="$(gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha' 2>"$_gh_err")" || {
-    printf '[pipeline] gh api error checking commits for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
+  latest_sha="$(gh pr view "$pr" -R "$repo" --json headRefOid --jq '.headRefOid' 2>"$_gh_err")" || {
+    printf '[pipeline] gh error checking head SHA for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
     return 2
   }
@@ -508,7 +511,7 @@ pipeline_format_escalation() {
         | map(select(.stage == $stage) | "  [\(.timestamp)] \(.error) -> \(.action) -> \(.result)")
         | .[]?),
       "",
-      "Worktree: \(.worktree // .paths.worktreeDir // "")",
+      "Worktree: \(.paths.worktreeDir // "")",
       "Branch: \(.branch // "")",
       "PR: #\(.pr // 0)",
       "",
