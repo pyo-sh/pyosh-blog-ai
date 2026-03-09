@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pipeline-helpers.fixed.sh
+# pipeline-helpers.sh
 # Shell helpers for dev-pipeline.
 #
 # Design invariants:

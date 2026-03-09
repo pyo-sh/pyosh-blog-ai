@@ -313,7 +313,7 @@ orch_dispatch() {
   # attemptId matching provides safety, but cleanup prevents confusion.
   rm -f "$terminal_file" "$heartbeat_file" "$pid_file" "$log" "$err_log"
 
-  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for review/resolve subprocesses (pass to pipeline_run_headless).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
+  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for the review subprocess (pass to pipeline_run_review).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
   local wrapper_script="$_ORCH_HELPERS_DIR/orch-dispatch-wrapper.sh"
 
