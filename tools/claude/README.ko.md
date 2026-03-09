@@ -29,8 +29,6 @@ tools/claude/
     │           └── backend-fastify.md
     └── shared/                   # 세 repo 모두에 복사
         └── .claude/
-            ├── hooks/
-            │   └── validate-bash.py
             └── rules/
                 ├── bash.md
                 ├── docs-context.md
@@ -42,7 +40,7 @@ tools/claude/
 ## bootstrap이 하는 일
 
 1. 각 repo의 `CLAUDE.md`와 `.claude/settings.json` 복사
-2. `shared/.claude/hooks/`와 `shared/.claude/rules/`를 세 repo 모두에 복사
+2. `shared/.claude/rules/`를 세 repo 모두에 복사
 3. repo별 `.claude/rules/`를 그 위에 덮어쓰기 (client 또는 server 규칙)
 4. client/server에 `claudeMdExcludes`가 포함된 `.claude/settings.local.json` 생성 (없을 때만 - 기존 파일은 덮어쓰지 않음)
 5. 각 repo의 `.git/info/exclude`에 `settings.local.json`과 `CLAUDE.local.md` 추가
@@ -64,7 +62,6 @@ bash tools/claude/bootstrap.sh --apply
 
 - `/memory` - 로드된 CLAUDE.md와 규칙
 - `/permissions` - allow, ask, deny 목록
-- `/hooks` - validate-bash.py 활성 여부
 
 ## 수정 방법
 
@@ -77,7 +74,7 @@ bash tools/claude/bootstrap.sh --apply
 | 내용 | 위치 |
 |------|------|
 | repo 목적, 기술 스택, 워크플로 | `templates/{repo}/CLAUDE.md` |
-| 권한, 훅, 환경변수 | `templates/{repo}/.claude/settings.json` |
+| 권한, 환경변수 | `templates/{repo}/.claude/settings.json` |
 | 공유 팀 규칙 (bash, git, docs) | `templates/shared/.claude/rules/` |
 | repo별 코딩 규칙 | `templates/{repo}/.claude/rules/` |
 | 개인 선호 | `CLAUDE.local.md` 또는 `.claude/settings.local.json` (여기에 넣지 않음) |
@@ -86,4 +83,3 @@ bash tools/claude/bootstrap.sh --apply
 
 - `settings.local.json`은 개인/머신별 파일입니다. bootstrap은 파일이 없을 때만 생성합니다.
 - workspace 디렉터리를 옮긴 경우 bootstrap을 다시 실행하여 child repo exclude의 절대 경로를 갱신하세요.
-- `validate-bash.py`는 Python 3.7+ 이 필요합니다.

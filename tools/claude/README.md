@@ -29,8 +29,6 @@ tools/claude/
     │           └── backend-fastify.md
     └── shared/                   # Copied to all three repos
         └── .claude/
-            ├── hooks/
-            │   └── validate-bash.py
             └── rules/
                 ├── bash.md
                 ├── docs-context.md
@@ -42,7 +40,7 @@ tools/claude/
 ## What bootstrap does
 
 1. Copies each repo's `CLAUDE.md` and `.claude/settings.json`
-2. Copies `shared/.claude/hooks/` and `shared/.claude/rules/` to all three repos
+2. Copies `shared/.claude/rules/` to all three repos
 3. Copies repo-specific `.claude/rules/` on top (client or server rules)
 4. Creates `.claude/settings.local.json` in client/server with `claudeMdExcludes` to prevent parent rule duplication (create-only - never overwrites existing)
 5. Adds `settings.local.json` and `CLAUDE.local.md` to each repo's `.git/info/exclude`
@@ -64,7 +62,6 @@ Open Claude Code in each repo and verify:
 
 - `/memory` - loaded CLAUDE.md and rules
 - `/permissions` - allow, ask, deny lists
-- `/hooks` - validate-bash.py is active
 
 ## How to edit
 
@@ -77,7 +74,7 @@ Open Claude Code in each repo and verify:
 | Content | Location |
 |---------|----------|
 | Repo purpose, tech stack, workflow | `templates/{repo}/CLAUDE.md` |
-| Permissions, hooks, env vars | `templates/{repo}/.claude/settings.json` |
+| Permissions, env vars | `templates/{repo}/.claude/settings.json` |
 | Shared team rules (bash, git, docs) | `templates/shared/.claude/rules/` |
 | Repo-specific coding rules | `templates/{repo}/.claude/rules/` |
 | Personal preferences | `CLAUDE.local.md` or `.claude/settings.local.json` (not here) |
@@ -86,4 +83,3 @@ Open Claude Code in each repo and verify:
 
 - `settings.local.json` is personal/machine-specific. Bootstrap creates it only if absent.
 - If you move the workspace directory, run bootstrap again to update absolute paths in child repo excludes.
-- `validate-bash.py` requires Python 3.7+.
