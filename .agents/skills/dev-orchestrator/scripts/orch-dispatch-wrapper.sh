@@ -39,8 +39,15 @@ trap '
   wait "$_HB_PID" 2>/dev/null
   _status="failed"
   [ $_rc -eq 0 ] && _status="completed"
-  printf "{\"attemptId\":\"%s\",\"status\":\"%s\",\"rc\":%d,\"endedAt\":\"%s\"}\n" \
-    "$ATTEMPT_ID" "$_status" "$_rc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  jq -n \
+    --arg attemptId "$ATTEMPT_ID" \
+    --arg status "$_status" \
+    --argjson rc "$_rc" \
+    --arg endedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{attemptId: $attemptId, status: $status, rc: $rc, endedAt: $endedAt}' \
+    > "$EXIT_FILE" 2>/dev/null || \
+  printf '{"attemptId":"%s","status":"%s","rc":%d}\n' \
+    "$ATTEMPT_ID" "$_status" "$_rc" \
     > "$EXIT_FILE"
   rm -f "$PID_FILE" "$HEARTBEAT_FILE"
 ' EXIT

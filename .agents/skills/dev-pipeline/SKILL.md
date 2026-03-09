@@ -28,7 +28,7 @@ For any long-running `pipeline_run_review` or `pipeline_run_resolve` Bash call, 
 Run:
 
 ```bash
-source scripts/pipeline-helpers.sh
+source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh
 pipeline_init "$AREA"
 STATE_FILE=$(pipeline_state_path "$ISSUE" "$AREA")
 ```

@@ -509,17 +509,20 @@ orch_check_completion() {
   fi
 
   local pr_states
-  if pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]'); then
-    if echo "$pr_states" | grep -q '"MERGED"'; then
-      echo "completed"; return 0
-    fi
-    if echo "$pr_states" | grep -q '"OPEN"'; then
-      # PR exists but process dead and no exit file - abnormal exit
-      echo "abnormal_exit"; return 0
-    fi
+  if ! pr_states=$(_orch_pr_list "$area" "$issue" all "number,state" '[.[].state]'); then
+    # gh command failed - don't judge on API error
+    echo "running"; return 0
   fi
 
-  # No exit file, no process, no PR (or gh failed)
+  if echo "$pr_states" | grep -q '"MERGED"'; then
+    echo "completed"; return 0
+  fi
+  if echo "$pr_states" | grep -q '"OPEN"'; then
+    # PR exists but process dead and no exit file - abnormal exit
+    echo "abnormal_exit"; return 0
+  fi
+
+  # No exit file, no process, no PR found
   echo "failed"; return 0
 }
 

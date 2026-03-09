@@ -361,7 +361,13 @@ pipeline_run_headless_core() {
     jq -n \
       --arg status "$status" \
       --argjson exitCode "$rc" \
-      '{status: $status, exitCode: $exitCode, finishedAt: (now | todate)}' \
+      --arg issue "$issue" \
+      --arg area "$area" \
+      --arg stage "$stage" \
+      --arg pr "$pr" \
+      '{status: $status, exitCode: $exitCode, finishedAt: (now | todate),
+        issue: ($issue | tonumber), area: $area, stage: $stage,
+        pr: ($pr | tonumber)}' \
       > "$meta_tmp" && mv "$meta_tmp" "$meta"
   fi
 
@@ -607,7 +613,7 @@ pipeline_merge_pr() {
   local issue=$1
   local area=$2
   local pr=$3
-  local branch=$4
+  local branch=$4  # unused inside this function; passed by callers for context
   local repo repo_dir worktree_dir pr_state
 
   repo="$(pipeline_repo_name "$area")" || return 1
