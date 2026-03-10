@@ -149,6 +149,13 @@ def test_pipeline_state_from_dict_unknown_step():
     assert state.step == PipelineStep.BUILD
 
 
+def test_pipeline_state_from_dict_legacy_review_step():
+    """Old state files may have step='review' instead of split steps.
+    This must be migrated to review_dispatch, not reset to BUILD."""
+    state = PipelineState.from_dict({"step": "review", "issue": 99})
+    assert state.step == PipelineStep.REVIEW_DISPATCH
+
+
 def test_pipeline_state_transition_log(sample_state):
     sample_state["transitionLog"] = [
         {"from": "build", "to": "review_dispatch", "reason": "ok", "ts": "2024-01-01T00:00:00Z"}

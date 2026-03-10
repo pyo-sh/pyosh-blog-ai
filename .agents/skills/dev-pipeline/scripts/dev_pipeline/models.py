@@ -125,6 +125,10 @@ class PipelineState:
     @classmethod
     def from_dict(cls, d: dict) -> "PipelineState":
         step_raw = d.get("step", "build")
+        # Migration: old state files may use "review" as a single step name.
+        # Map it to review_dispatch so the pipeline resumes at the correct stage.
+        _STEP_MIGRATION = {"review": "review_dispatch"}
+        step_raw = _STEP_MIGRATION.get(step_raw, step_raw)
         try:
             step = PipelineStep(step_raw)
         except ValueError:
