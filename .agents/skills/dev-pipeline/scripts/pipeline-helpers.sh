@@ -536,11 +536,17 @@ pipeline_run_review() {
     '.reviewJob = {runId:$runId,status:"running",startedAt:(now|todate),finishedAt:null,tool:$tool,model:$model}' \
     --arg runId "$run_id" --arg tool "$tool" --arg model "$model" 2>/dev/null || true
 
-  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  _pipeline_review_fail() {
+    pipeline_state_update "$issue" "$area" \
+      '.reviewJob.status = "failed" | .reviewJob.finishedAt = (now|todate)' 2>/dev/null || true
+    return 1
+  }
+
+  repo_dir="$(pipeline_repo_dir "$area")" || { _pipeline_review_fail; return 1; }
 
   case "$tool" in
     claude)
-      prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || return 1
+      prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || { _pipeline_review_fail; return 1; }
       pipeline_run_headless_core \
         "$(pipeline_skill_cwd)" \
         "$prompt" \
@@ -552,11 +558,10 @@ pipeline_run_review() {
       worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
       if [ -z "$worktree_dir" ] || [ "$worktree_dir" = 'PATH_INVALID' ]; then
         printf '[pipeline] codex review requires worktree for issue #%s area=%s\n' "$issue" "$area" >&2
-        pipeline_state_update "$issue" "$area" \
-          '.reviewJob.status = "failed" | .reviewJob.finishedAt = (now|todate)' 2>/dev/null || true
+        _pipeline_review_fail
         return 1
       fi
-      prompt="$(pipeline_codex_review_prompt "$issue" "$area" "$pr")" || return 1
+      prompt="$(pipeline_codex_review_prompt "$issue" "$area" "$pr")" || { _pipeline_review_fail; return 1; }
       pipeline_run_headless_core \
         "$(pipeline_skill_cwd)" \
         "$prompt" \

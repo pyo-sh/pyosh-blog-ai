@@ -332,7 +332,7 @@ This step is entered from Step 3 when the review-resolve loop has exhausted its 
 If headless (non-interactive): `pipeline_format_escalation`, exit (do not auto-merge with unresolved Critical/Warning).
 
 Otherwise show the latest review summary and the round count, then ask the user:
-- Continue -> reset `.reviewResolveRound = 0`, `.stageRetries.review = 0`, `.stageRetries.resolve = 0`, update `.step = "resolve"`, go to Step 4
+- Continue -> reset `.reviewResolveRound = 0`, `.stageRetries.review_dispatch = 0`, `.stageRetries.review_wait = 0`, `.stageRetries.review_process = 0`, `.stageRetries.resolve = 0`, update `.step = "resolve"`, go to Step 4
 - Merge as-is -> update `.step = "merge"`, go to Step 6
 - Abort -> stop and report
 
