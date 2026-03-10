@@ -21,7 +21,7 @@ The original design mixed three execution contexts into one variable (`workdir`)
 All items from the original audit have been fixed:
 
 1. `pipeline_recovery_log` jq variable - fixed with `--argjson entry`
-2. Merge lock stale detection - changed from PID-based to TTL-based
+2. Merge lock stale detection - changed from PID-based to TTL-based, with fencing verification for TOCTOU race and grace-period reclaim for incomplete (no-timestamp) locks
 3. `gh` helpers cwd dependency - all use explicit `-R owner/name`
 4. Log name collisions - area-scoped paths
 5. Message file name collisions - area-scoped paths

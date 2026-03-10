@@ -528,13 +528,34 @@ pipeline_acquire_merge_lock() {
     acquired_epoch="$(date -u -d "$acquired_ts" +%s 2>/dev/null || printf '0')"
     now_epoch="$(date -u +%s)"
 
+    local should_reclaim=false
+
     if [ "$acquired_epoch" -gt 0 ] && [ $((now_epoch - acquired_epoch)) -ge "$stale_after" ]; then
       printf '[pipeline] stale merge lock detected for area=%s issue=%s; reclaiming\n' "$area" "${holder_issue:-unknown}" >&2
+      should_reclaim=true
+    elif [ "$acquired_epoch" -eq 0 ]; then
+      # No valid timestamp: either being written right now, or crash residue.
+      # Use lock dir mtime to distinguish: if older than 30s, treat as crash residue.
+      local dir_mtime
+      dir_mtime="$(stat -c %Y "$lock_dir" 2>/dev/null || printf '%s' "$now_epoch")"
+      if [ $((now_epoch - dir_mtime)) -ge 30 ]; then
+        printf '[pipeline] incomplete merge lock (no timestamp after 30s) for area=%s; reclaiming\n' "$area" >&2
+        should_reclaim=true
+      fi
+    fi
+
+    if [ "$should_reclaim" = true ]; then
       rm -rf "$lock_dir"
       mkdir "$lock_dir" 2>/dev/null || continue
       printf '%s\n' "$issue" > "$lock_dir/issue"
       date -u +%Y-%m-%dT%H:%M:%SZ > "$lock_dir/acquired"
-      return 0
+      # Fencing: verify ownership after brief pause to detect concurrent reclaim race
+      sleep 0.2
+      if [ "$(cat "$lock_dir/issue" 2>/dev/null)" = "$issue" ]; then
+        return 0
+      fi
+      # Another process reclaimed between our rm-rf and verify; retry
+      continue
     fi
 
     if [ "$waited" -ge "$max_wait" ]; then
