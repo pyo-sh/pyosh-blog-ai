@@ -242,27 +242,36 @@ PROMPT_CODEX
 }
 
 _pipeline_post_codex_review() {
-  # Post Codex review output (from log file) to GitHub as a PR review comment.
+  # Post Codex final review message to GitHub as a PR review comment.
+  # Uses the --output-last-message file (not raw stdout log) to avoid preamble noise.
   # Usage: _pipeline_post_codex_review <issue> <area> <pr> <headless_rc>
   local issue=$1
   local area=$2
   local pr=$3
   local headless_rc=$4
-  local log repo msg_file
+  local log last_msg_file repo msg_file
 
   if [ "$headless_rc" -ne 0 ]; then
     return "$headless_rc"
   fi
 
   log="$(pipeline_log_path "$issue" "$area" review)"
-  if [ ! -s "$log" ]; then
+  last_msg_file="${log%.log}.last-message"
+
+  # Prefer the extracted last message; fall back to raw log if missing.
+  local source_file="$last_msg_file"
+  if [ ! -s "$source_file" ]; then
+    source_file="$log"
+  fi
+
+  if [ ! -s "$source_file" ]; then
     printf '[pipeline] codex review produced no output for issue #%s\n' "$issue" >&2
     return 1
   fi
 
   repo="$(pipeline_repo_name "$area")" || return 1
   msg_file="$(pipeline_message_path "$area" "$pr" review)"
-  cp "$log" "$msg_file"
+  cp "$source_file" "$msg_file"
 
   if ! gh pr review "$pr" -R "$repo" --comment --body-file "$msg_file"; then
     printf '[pipeline] failed to post codex review for PR #%s\n' "$pr" >&2
@@ -270,7 +279,7 @@ _pipeline_post_codex_review() {
     return 1
   fi
 
-  rm -f "$msg_file"
+  rm -f "$msg_file" "$last_msg_file"
   return 0
 }
 
@@ -401,8 +410,15 @@ pipeline_run_headless_core() {
       ;;
     codex)
       local review_cwd="${worktree_dir:-$repo_dir}"
-      cmd=(timeout "$timeout_sec" codex exec review --base origin/main)
+      local base_ref last_msg_file
+      base_ref="$(gh pr view "$pr" -R "$repo" --json baseRefName --jq '.baseRefName' 2>/dev/null)" || base_ref="main"
+      last_msg_file="${log%.log}.last-message"
+      cmd=(timeout "$timeout_sec" codex exec review --base "origin/${base_ref}")
       [ -n "$model" ] && cmd+=(--model "$model")
+      cmd+=(
+        -c "history.save_history=false"
+        --output-last-message "$last_msg_file"
+      )
       [ -n "$prompt" ] && cmd+=("$prompt")
       (
         cd -- "$review_cwd" || exit 3
