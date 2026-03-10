@@ -114,6 +114,14 @@ issue #80 acceptance criteria를 모두 충족했다. 대부분의 변경은 이
   - worker 종료 시 하위 프로세스 포함 종료 (kill -- -pgid, #76에서 적용)
   - process identity에 pgid + startTime 포함 (이번 PR)
 
+### 리뷰 수정 사항 (PR #125)
+
+codex 리뷰(1차)에서 `orch_dispatch` 내 2개 Critical 이슈 발견, claude 리뷰(2차)에서 1개 Suggestion 발견 - 모두 수정 후 merge.
+
+- `rm -f "$attempt_dir/terminal.json"` → `rm -f "$attempt_dir/terminal.json" "$attempt_dir/pid"` — 동일 attemptId 재사용 시 stale pid 파일로 인한 PID 오판 방지
+- pid-file 타임아웃 시 `setsid_bgpid=$!` 저장 + `kill -- -"$setsid_bgpid"` — 고아 백그라운드 프로세스 정리
+- `/proc/$pid/stat` field 22 파싱: `awk '{print $22}'` → `awk -F')' '{print $2}' | awk '{print $20}'` — comm 필드 공백 포함 시 field shift 방지
+
 ## Headless review agent dispatch - Claude Code / Codex tool selection (#123, PR #124)
 
 `pipeline_run_headless_core`에 tool dispatch를 추가하여 Claude Code와 Codex CLI 중 선택하여
