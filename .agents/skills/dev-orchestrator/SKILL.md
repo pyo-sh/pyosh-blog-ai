@@ -14,14 +14,18 @@ Batch orchestration: build dependency DAG from issues -> dispatch headless `clau
 
 **Ask the user** which AI agent/model to use for dispatched processes:
 
-| Agent value | Headless command |
-|-------------|-----------------|
-| `claude` | `claude -p --dangerously-skip-permissions ...` |
-| `claude:<model>` | `claude -p --model <model> --dangerously-skip-permissions ...` |
+| Agent value | Pipeline runner | Review subprocess |
+|-------------|----------------|-------------------|
+| `claude` | `claude -p` (default model) | `claude -p` with `/dev-review` skill |
+| `claude:<model>` | `claude -p --model <model>` | `claude -p --model <model>` with `/dev-review` skill |
+| `codex` | `claude -p` (default model) | `codex exec review --base origin/main` |
+| `codex:<model>` | `claude -p` (default model) | `codex exec review --model <model> --base origin/main` |
 
-Examples: `"claude"`, `"claude:sonnet"`, `"claude:opus"`.
+Examples: `"claude"`, `"claude:sonnet"`, `"codex"`, `"codex:o3"`.
 
-Store in state as `"agent": "claude:sonnet"` etc. Model aliases (`sonnet`, `opus`) are resolved by the CLI.
+The outer pipeline runner is always `claude -p` because the pipeline requires Claude Code skills. The tool value (`claude`/`codex`) controls which CLI runs the review subprocess. When tool is `codex`, the outer pipeline uses the default Claude model (the model applies to the review subprocess only).
+
+Store in state as `"agent": "codex:o3"` etc.
 
 ## State files
 

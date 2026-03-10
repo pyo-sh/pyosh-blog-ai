@@ -88,16 +88,19 @@ If found (`RC=0`), skip to Step 3.
 Otherwise start headless review **from monorepo root** using the stage-specific wrapper:
 
 ```bash
-LOG=$(pipeline_run_review "$ISSUE" "$AREA" "$PR" "$MODEL")
+LOG=$(pipeline_run_review "$ISSUE" "$AREA" "$PR" "$TOOL" "$MODEL")
 RC=$?
 REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
 REVIEW_RC=$?
 [ $REVIEW_RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews after headless run - abort"; return 1; }
 ```
 
+Tool defaults to `claude`. When `TOOL=codex`, review runs via `codex exec review --base origin/main` from the worktree, and the helper posts the stdout to GitHub automatically.
+
 Rules:
 - This Bash call itself must run in background mode.
-- Never pass the worktree path as Claude's process cwd.
+- For `claude`: never pass the worktree path as the process cwd.
+- For `codex`: the helper runs from the worktree (needed for `--base origin/main` diff).
 - Always treat GitHub API as source of truth after exit.
 
 Outcome (combine `RC` from headless run and `REVIEW_RC` from API check):

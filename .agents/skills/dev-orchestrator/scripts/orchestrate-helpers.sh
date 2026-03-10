@@ -315,10 +315,26 @@ orch_dispatch() {
   mkdir -p "$attempt_dir"
   rm -f "$attempt_dir/terminal.json"
 
-  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for the review subprocess (pass to pipeline_run_review).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
+  # Build review agent hint for the pipeline prompt.
+  # The tool value tells the pipeline which CLI to use for the review subprocess.
+  # The outer dispatch is always claude -p (pipeline requires Claude Code skills).
+  local review_agent_hint=""
+  if [ "$tool" != "claude" ]; then
+    review_agent_hint="Use tool \"$tool\"${model:+ and model \"$model\"} for the review subprocess (pass to pipeline_run_review)."
+  elif [ -n "$model" ]; then
+    review_agent_hint="Use model \"$model\" for the review subprocess (pass to pipeline_run_review)."
+  fi
+
+  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${review_agent_hint:+ $review_agent_hint} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
   local wrapper_script="$_ORCH_HELPERS_DIR/orch-dispatch-wrapper.sh"
   local pid_file="$attempt_dir/pid"
+
+  # Outer dispatch is always claude -p (pipeline requires Claude Code skills).
+  # Tool selection (claude/codex) applies to the review subprocess only.
+  # When tool != claude, the outer pipeline uses the default claude model.
+  local outer_model=""
+  [ "$tool" = "claude" ] && outer_model="$model"
 
   # Launch in a new session (setsid) for process group isolation.
   # The wrapper writes its PID (= PGID) to pid_file.
@@ -328,7 +344,7 @@ orch_dispatch() {
     "$attempt_id" "$attempt_dir" \
     "$issue" "$pipeline_state_file" -- \
     timeout -k 30 3600 claude -p \
-    ${model:+--model "$model"} --dangerously-skip-permissions \
+    ${outer_model:+--model "$outer_model"} --dangerously-skip-permissions \
     --no-session-persistence \
     --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \
     --max-turns 80 \

@@ -98,3 +98,40 @@ review-resolve 자동 루프(최대 5라운드)와 severity 기반 auto-merge �
 - findings.017: `pipeline_run_headless_core` CLAUDECODE 전파 버그 기록
 - process-lifecycle.md: 함수명, stale lock 설명, lock 디렉터리 내용 수정
 - state-detection.md: .exit 파일 스키마 반영
+
+## Headless review agent dispatch - Claude Code / Codex tool selection (#123, PR #124)
+
+`pipeline_run_headless_core`에 tool dispatch를 추가하여 Claude Code와 Codex CLI 중 선택하여
+PR 리뷰를 실행할 수 있게 했다. Pipeline 79 handoff에서 `codex`를 `claude -p --model codex`로
+잘못 전달하여 900초 타임아웃되던 문제를 근본적으로 해결한다.
+
+### 핵심 변경 - pipeline tool dispatch
+
+- `_pipeline_validate_tool()` 신규: tool 값 검증 (claude/codex만 허용)
+- `pipeline_run_headless_core` 시그니처: `[model]` → `[tool] [model]` (param 9, 10)
+- tool=claude: 기존 `claude -p` 로직 유지 (변경 없음)
+- tool=codex: `codex exec review --base origin/${base_ref}` 실행
+  - `--output-last-message`로 최종 메시지만 캡처 (raw stdout preamble 방지)
+  - `-c "history.save_history=false"`로 세션 비저장
+  - PR base ref를 `gh pr view --json baseRefName`으로 동적 조회
+  - worktree dir에서 실행 (feature branch diff 접근)
+- `pipeline_run_review` 시그니처: `model` → `tool` + `model`
+  - codex 경로: worktree 존재 검증, codex 전용 프롬프트, 리뷰 포스팅 자동 수행
+
+### Codex 리뷰 포스팅
+
+- `pipeline_codex_review_prompt()` 신규: `## Review Summary` 포맷 지시 프롬프트
+- `_pipeline_post_codex_review()` 신규: last-message 파일 → `gh pr review --body-file` 포스팅
+  - `--output-last-message` 파일 우선, 없을 시 raw log fallback
+
+### Orchestrator 연동
+
+- `orch_dispatch` prompt에 tool 정보 포함 (pipeline에 review tool 힌트 전달)
+- outer dispatch는 항상 `claude -p` 유지 (Codex는 Claude Code 스킬 실행 불가)
+- tool != claude일 때 outer model을 default로 설정 (model은 review subprocess에만 적용)
+- agent selection 테이블에 `codex`, `codex:<model>` 행 추가
+
+### dev-build Step 5 서브스킬 인식
+
+- `/dev-pipeline`에서 호출 시 "사용자에게 안내" 단계를 건너뛰고 호출자에게 제어 반환
+- 독립 실행 시 기존 동작 유지

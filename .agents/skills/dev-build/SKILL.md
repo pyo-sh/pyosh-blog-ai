@@ -66,7 +66,9 @@ rm .workspace/messages/pr-{N}-body.md
 
 ### 5. Next step
 
-Instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration.
+If called from `/dev-pipeline` (check: the conversation prompt contains `/dev-pipeline`), skip this step and return control to the caller.
+
+Otherwise, instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration.
 
 ### 6. Cleanup
 
