@@ -90,27 +90,15 @@ pipeline_worktree_path() {
 }
 
 pipeline_resolve_worktree_path() {
-  # Canonical path:   .workspace/worktrees/<area>/issue-<N>
-  # Legacy path #1:   .workspace/worktrees/issue-<N>
-  # Legacy path #2:   <area>/.workspace/worktrees/issue-<N>
+  # Canonical path: .workspace/worktrees/<area>/issue-<N>
   local issue=$1
   local area=$2
-  local canonical legacy_root legacy_area
+  local canonical
 
   canonical="$(pipeline_worktree_path "$issue" "$area")"
-  legacy_root="$WORKTREE_DIR/issue-${issue}"
-  legacy_area="$MONOREPO_ROOT/$area/.workspace/worktrees/issue-${issue}"
 
   if [ -d "$canonical" ]; then
     printf '%s\n' "$canonical"
-    return 0
-  fi
-  if [ -d "$legacy_root" ]; then
-    printf '%s\n' "$legacy_root"
-    return 0
-  fi
-  if [ -d "$legacy_area" ]; then
-    printf '%s\n' "$legacy_area"
     return 0
   fi
 

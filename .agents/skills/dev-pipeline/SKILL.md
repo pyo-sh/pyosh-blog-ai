@@ -34,7 +34,7 @@ pipeline_init "$AREA"
 STATE_FILE=$(pipeline_state_path "$ISSUE" "$AREA")
 ```
 
-If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions. If the state has no `.version` field or `.version < 2`, check for an existing open PR first (`gh pr list --head {branch}`). If an open PR exists, migrate the state to v2 (populate `.paths` from current helpers, set `.version = 2`, preserve `.branch`, `.pr`, `.issue`, `.step`). If no open PR exists, discard the v1 state and start fresh.
+If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; use helper functions.
 
 ### 1. Build (`step: build`)
 
