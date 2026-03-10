@@ -1,7 +1,8 @@
-"""Tests for review_normalizer.parse_review_body."""
+"""Tests for review_normalizer.parse_review_body and codex output normalization."""
 import pytest
 
 from dev_pipeline.review_normalizer import ReviewCounts, parse_review_body
+from dev_pipeline.review_runner import normalize_codex_output
 
 
 VALID_REVIEW = """## Review Summary
@@ -146,3 +147,61 @@ def test_dataclass_fields():
     assert counts.critical == 1
     assert counts.warning == 2
     assert counts.suggestion == 3
+
+
+# --- normalize_codex_output tests ---
+
+
+def test_normalize_valid_codex_output():
+    """Valid codex output starting with '## Review Summary' passes through."""
+    result = normalize_codex_output(VALID_REVIEW)
+    assert result == VALID_REVIEW
+    counts = parse_review_body(result)
+    assert counts.critical == 2
+
+
+def test_normalize_invalid_codex_output():
+    """Non-empty output without '## Review Summary' gets wrapped."""
+    raw = "Some codex output that doesn't match the template.\nLine two."
+    result = normalize_codex_output(raw)
+    assert result is not None
+    assert result.startswith("## Review Summary")
+    counts = parse_review_body(result)
+    assert counts.warning == 1
+    assert counts.critical == 0
+    assert counts.suggestion == 0
+
+
+def test_normalize_empty_codex_output():
+    """Empty or whitespace-only output returns None."""
+    assert normalize_codex_output("") is None
+    assert normalize_codex_output("   \n  \n") is None
+
+
+def test_normalize_strips_leading_whitespace():
+    """Valid output with leading whitespace is stripped so check_review_exists can match."""
+    raw = "\n  \n## Review Summary\n\n### Critical\n\nNone\n\n### Warning\n\nNone\n\n### Suggestion\n\nNone\n"
+    result = normalize_codex_output(raw)
+    assert result is not None
+    # Must literally start with '## Review Summary' (no leading whitespace)
+    # to match github_client.check_review_exists() body filter
+    assert result.startswith("## Review Summary")
+    counts = parse_review_body(result)
+    assert counts.critical == 0
+
+
+def test_normalize_roundtrip_with_check_review_contract():
+    """Normalized output must satisfy the same startswith check used by check_review_exists."""
+    cases = [
+        VALID_REVIEW,
+        "\n## Review Summary\n\n### Critical\n\n1. Bug\n\n### Warning\n\nNone\n\n### Suggestion\n\nNone\n",
+        "random codex stderr output\nmore lines",
+    ]
+    for raw in cases:
+        result = normalize_codex_output(raw)
+        if result is not None:
+            # This is the exact check from github_client.check_review_exists line 59
+            assert result.startswith("## Review Summary"), (
+                f"normalize_codex_output returned body that check_review_exists "
+                f"would reject: {result[:60]!r}"
+            )

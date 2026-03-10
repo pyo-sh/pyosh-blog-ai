@@ -48,13 +48,10 @@ as a Python package at `.agents/skills/dev-pipeline/scripts/dev_pipeline/`.
 | `pipeline_merge_pr` | `controller` | `merge_pr()` |
 | `pipeline_cleanup` | `controller` | `cleanup()` |
 
-## What is KEPT in shell
+## Migration complete
 
-- `SKILL.md` — the entrypoint called by Claude Code `/dev-pipeline` skill invocations.
-  It sources `pipeline-helpers.sh` and orchestrates the pipeline via bash when
-  `PIPELINE_RUNTIME=shell` (the default).
-- `pipeline-helpers.sh` — retained as-is for the shell runtime path.
-- The shell entrypoint calls `python -m dev_pipeline` when `PIPELINE_RUNTIME=python`.
+All `pipeline-helpers.sh` functions have been migrated to Python. The shell file
+has been removed. `SKILL.md` now calls the Python CLI directly.
 
 ## State schema version 2 (frozen)
 
@@ -127,29 +124,6 @@ A review is valid only when its body contains:
   - manual resume command.
 - Escalation messages are surfaced to the operator; the pipeline halts.
 
-## PIPELINE_RUNTIME feature flag
-
-```bash
-export PIPELINE_RUNTIME=python   # use Python implementation
-export PIPELINE_RUNTIME=shell    # use bash implementation (default)
-```
-
-When `PIPELINE_RUNTIME=python`, SKILL.md delegates to:
-
-```bash
-python -m dev_pipeline <subcommand> [args]
-```
-
-The Python CLI is installed as a module in
-`.agents/skills/dev-pipeline/scripts/dev_pipeline/`.
-
-Run directly (no install required) from the scripts directory:
-
-```bash
-cd .agents/skills/dev-pipeline/scripts
-python -m dev_pipeline --help
-```
-
 ## Package layout
 
 ```
@@ -170,7 +144,6 @@ python -m dev_pipeline --help
       review_runner.py
       state_store.py
     pyproject.toml
-    pipeline-helpers.sh   (retained)
   tests/
     __init__.py
     conftest.py

@@ -107,6 +107,116 @@ def cmd_parse_review(args) -> int:
         return 1
 
 
+def cmd_init(args) -> int:
+    """Create pipeline directories for an area."""
+    monorepo_root = _get_monorepo_root()
+    from .paths import pipeline_init
+
+    try:
+        pipeline_init(args.area, monorepo_root)
+        return 0
+    except Exception as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+
+def cmd_state_update(args) -> int:
+    """Update specific fields in pipeline state."""
+    monorepo_root = _get_monorepo_root()
+    from .state_store import state_exists, state_update
+
+    if not state_exists(args.issue, args.area, monorepo_root):
+        print(
+            f"No state found for issue #{args.issue} area={args.area}",
+            file=sys.stderr,
+        )
+        return 1
+
+    updates = {}
+    if args.step is not None:
+        updates["step"] = args.step
+    if args.last_review_id is not None:
+        updates["lastReviewId"] = args.last_review_id
+    if args.last_commit_sha is not None:
+        updates["lastCommitSha"] = args.last_commit_sha
+    if args.skip_review is not None:
+        updates["skipReview"] = args.skip_review
+    if args.review_resolve_round is not None:
+        updates["reviewResolveRound"] = args.review_resolve_round
+    if args.pr is not None:
+        updates["pr"] = args.pr
+    if args.branch is not None:
+        updates["branch"] = args.branch
+
+    if not updates:
+        print("No fields to update", file=sys.stderr)
+        return 2
+
+    try:
+        state_update(args.issue, args.area, monorepo_root, updates)
+        return 0
+    except Exception as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+
+def cmd_stage_retry(args) -> int:
+    """Increment stage retry counter, optionally append recovery log."""
+    monorepo_root = _get_monorepo_root()
+    from .state_store import recovery_log_append, stage_retry, state_exists
+
+    if not state_exists(args.issue, args.area, monorepo_root):
+        print(
+            f"No state found for issue #{args.issue} area={args.area}",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.error and args.action and args.result:
+        recovery_log_append(
+            args.issue, args.area, monorepo_root,
+            args.stage, args.error, args.action, args.result,
+        )
+
+    allowed = stage_retry(args.issue, args.area, monorepo_root, args.stage)
+    if allowed:
+        return 0
+    else:
+        return 1
+
+
+def cmd_check_review(args) -> int:
+    """Check GitHub for an existing actionable review."""
+    from .github_client import check_review_exists
+
+    try:
+        review_id = check_review_exists(
+            args.area, args.pr, args.last_review_id,
+        )
+        if review_id is not None:
+            print(review_id)
+            return 0
+        return 1
+    except RuntimeError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+
+def cmd_check_commits(args) -> int:
+    """Check GitHub for new commits on a PR."""
+    from .github_client import check_new_commits
+
+    try:
+        new_sha = check_new_commits(args.area, args.pr, args.last_commit_sha)
+        if new_sha is not None:
+            print(new_sha)
+            return 0
+        return 1
+    except RuntimeError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="dev_pipeline",
@@ -162,6 +272,48 @@ def main():
         help="Parse review body from stdin, output counts as JSON",
     )
     p_pr.set_defaults(func=cmd_parse_review)
+
+    # init
+    p_init = sub.add_parser("init", help="Create pipeline directories for an area")
+    p_init.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_init.set_defaults(func=cmd_init)
+
+    # state-update
+    p_su = sub.add_parser("state-update", help="Update fields in pipeline state")
+    p_su.add_argument("--issue", type=int, required=True)
+    p_su.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_su.add_argument("--step")
+    p_su.add_argument("--last-review-id", type=int)
+    p_su.add_argument("--last-commit-sha")
+    p_su.add_argument("--skip-review", type=lambda v: v.lower() in ("true", "1", "yes"))
+    p_su.add_argument("--review-resolve-round", type=int)
+    p_su.add_argument("--pr", type=int)
+    p_su.add_argument("--branch")
+    p_su.set_defaults(func=cmd_state_update)
+
+    # stage-retry
+    p_sr = sub.add_parser("stage-retry", help="Increment stage retry counter")
+    p_sr.add_argument("--issue", type=int, required=True)
+    p_sr.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_sr.add_argument("--stage", required=True)
+    p_sr.add_argument("--error", default="")
+    p_sr.add_argument("--action", default="")
+    p_sr.add_argument("--result", default="")
+    p_sr.set_defaults(func=cmd_stage_retry)
+
+    # check-review
+    p_cr = sub.add_parser("check-review", help="Check for existing actionable review")
+    p_cr.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_cr.add_argument("--pr", type=int, required=True)
+    p_cr.add_argument("--last-review-id", type=int, default=0)
+    p_cr.set_defaults(func=cmd_check_review)
+
+    # check-commits
+    p_cc = sub.add_parser("check-commits", help="Check for new commits on a PR")
+    p_cc.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_cc.add_argument("--pr", type=int, required=True)
+    p_cc.add_argument("--last-commit-sha", required=True)
+    p_cc.set_defaults(func=cmd_check_commits)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

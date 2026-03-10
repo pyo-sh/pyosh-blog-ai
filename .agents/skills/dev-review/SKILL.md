@@ -44,6 +44,29 @@ Review the diff first. Read specific files under `REPO_DIR` only when diff conte
 
 The review body **must start with `## Review Summary`**.
 
+#### Required review body format
+
+```markdown
+## Review Summary
+
+| Severity | Count |
+|----------|-------|
+| [CRITICAL] | N |
+| [WARNING] | N |
+| [SUGGESTION] | N |
+
+### Critical
+1. `file:line` - description
+
+### Warning
+1. `file:line` - description
+
+### Suggestion
+1. `file:line` - description
+```
+
+Use `--request-changes` when Critical >= 1, `--comment` otherwise.
+
 Write the temporary message file with an area-scoped name to avoid cross-repo collisions:
 
 ```bash
@@ -53,11 +76,11 @@ cat > "$MSG_FILE" <<'EOF_REVIEW'
 {body}
 EOF_REVIEW
 
-gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" --comment
+ACTION="--comment"
+[ "$CRITICAL" -ge 1 ] && ACTION="--request-changes"
+gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" "$ACTION"
 rm -f "$MSG_FILE"
 ```
-
-Use `--request-changes` when 1+ Critical exists.
 
 ## Constraints
 
