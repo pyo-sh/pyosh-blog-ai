@@ -544,8 +544,15 @@ orch_worktree_gc() {
 
 orch_orphan_gc() {
   # Usage: orch_orphan_gc <area>
-  # Scans .workspace/worktrees/{area}/issue-* for worktrees not in the active batch.
-  # Quarantines any orphan found. The quarantine/ subdirectory is excluded.
+  # Scans .workspace/worktrees/{area}/issue-* for worktrees that are
+  # neither in the active batch nor owned by an active pipeline run.
+  # Quarantines any true orphan found. The quarantine/ subdirectory is excluded.
+  #
+  # Two conditions must both be true before a worktree is quarantined:
+  #   1. The issue is not in .status[] of the current batch.state.json.
+  #   2. No pipeline state file exists at
+  #      .workspace/pipeline/{area}/issue-{N}.state.json
+  #      (which would indicate an independent /dev-pipeline run using that worktree).
   local area=$1
   local wt_base="$MONOREPO_ROOT/.workspace/worktrees/${area}"
 
@@ -554,7 +561,7 @@ orch_orphan_gc() {
   local state
   state=$(orch_state_read "$area") || return 0
 
-  local d base issue_num in_batch
+  local d base issue_num in_batch pipeline_state_file
   for d in "$wt_base"/issue-*/; do
     [ -d "$d" ] || continue
     base=$(basename "$d")
@@ -569,7 +576,13 @@ orch_orphan_gc() {
     in_batch=$(printf '%s' "$state" | jq -r --arg n "$issue_num" '.status[$n] // ""')
     if [ -n "$in_batch" ]; then continue; fi
 
-    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch) - quarantining"
+    # Skip if an active pipeline state file exists for this issue.
+    # This protects worktrees owned by independent /dev-pipeline runs that are
+    # not part of the current orchestrator batch.
+    pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue_num}.state.json"
+    if [ -f "$pipeline_state_file" ]; then continue; fi
+
+    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch and no active pipeline) - quarantining"
     orch_worktree_quarantine "$area" "$issue_num"
   done
 }
