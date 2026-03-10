@@ -993,11 +993,10 @@ orch_archive_batch() {
     return 1
   fi
 
-  local non_terminal dispatched_count
+  local non_terminal
   non_terminal=$(jq '[.status | to_entries[] | select(.value == "pending" or .value == "blocked" or .value == "dispatched")] | length' "$state_file")
-  dispatched_count=$(jq '(.dispatched // {}) | length' "$state_file")
-  if [ "${non_terminal:-0}" -gt 0 ] || [ "${dispatched_count:-0}" -gt 0 ]; then
-    >&2 echo "[orchestrator] orch_archive_batch: $non_terminal non-terminal issue(s) and $dispatched_count active dispatch(es) — archive blocked until all issues complete"
+  if [ "${non_terminal:-0}" -gt 0 ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: $non_terminal issue(s) still non-terminal — archive blocked until all issues complete"
     return 1
   fi
 
@@ -1012,9 +1011,10 @@ orch_archive_batch() {
   # Record high-precision creation time for deterministic rotation ordering.
   date +%s%N > "$archive_dir/.archived-at" 2>/dev/null || date +%s > "$archive_dir/.archived-at"
 
-  # Move all area-level files and directories except the archive directory itself.
+  # Move all area-level files and directories (including hidden) except archive.
   local item
-  for item in "$area_dir"/*; do
+  for item in "$area_dir"/* "$area_dir"/.[!.]*; do
+    [ -e "$item" ] || continue
     local base
     base=$(basename "$item")
     [ "$base" = "archive" ] && continue
