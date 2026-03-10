@@ -99,6 +99,21 @@ review-resolve 자동 루프(최대 5라운드)와 severity 기반 auto-merge �
 - process-lifecycle.md: 함수명, stale lock 설명, lock 디렉터리 내용 수정
 - state-detection.md: .exit 파일 스키마 반영
 
+## Orchestrator atomic state + process group termination (#80)
+
+flock 기반 직렬화, pgid 기반 worker 종료, dispatched worker process identity에 startTime 추가로
+issue #80 acceptance criteria를 모두 충족했다. 대부분의 변경은 이전 PR(#76)에서 적용됐으며,
+이번 PR에서 마지막으로 missing한 `startTime` 필드를 추가했다.
+
+### 핵심 변경
+
+- `orch_dispatch`: `pid` 확인 직후 `/proc/$pid/stat` field 22를 읽어 `startTime` 기록
+- dispatched state 스키마: `{ pid, pgid, startTime, attemptId, ... }` - process identity 완성
+- 모든 acceptance criteria 충족:
+  - 동시 state update 직렬화 (flock, #76에서 적용)
+  - worker 종료 시 하위 프로세스 포함 종료 (kill -- -pgid, #76에서 적용)
+  - process identity에 pgid + startTime 포함 (이번 PR)
+
 ## Headless review agent dispatch - Claude Code / Codex tool selection (#123, PR #124)
 
 `pipeline_run_headless_core`에 tool dispatch를 추가하여 Claude Code와 Codex CLI 중 선택하여

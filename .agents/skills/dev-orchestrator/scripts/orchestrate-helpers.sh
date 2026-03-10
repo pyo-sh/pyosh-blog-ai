@@ -366,6 +366,11 @@ orch_dispatch() {
   pid=$(cat "$pid_file")
   local pgid=$pid  # setsid session leader: PGID = PID
 
+  local start_time=""
+  if [ -f "/proc/$pid/stat" ]; then
+    start_time=$(awk '{print $22}' "/proc/$pid/stat") || true
+  fi
+
   if ! orch_process_alive "$pid"; then
     >&2 echo "[orchestrator] Process died immediately for issue #${issue}"
     return 1
@@ -376,7 +381,7 @@ orch_dispatch() {
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   if ! orch_state_update "$area" \
     ".dispatched[\"$issue\"] = {
-       pid: $pid, pgid: $pgid, attemptId: \"$attempt_id\",
+       pid: $pid, pgid: $pgid, startTime: \"$start_time\", attemptId: \"$attempt_id\",
        attemptDir: \"$attempt_dir\", dispatchedAt: \"$now\", lastActivity: \"$now\",
        lastCommitSha: null, lastCpuJiffies: \"0\",
        pipelineStarted: false, retryCount: $retry_count

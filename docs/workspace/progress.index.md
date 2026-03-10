@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-10 | Orchestrator atomic state + process group termination - dispatched worker identity에 startTime 추가, flock 직렬화 + kill -- -pgid 기존 구현 확인, acceptance criteria 완료 (#80) | done |
 | 2026-03-10 | Headless review agent dispatch - Claude Code / Codex tool selection, `pipeline_run_headless_core` tool 파라미터 추가, codex exec review 연동, `--output-last-message` + 동적 base ref + codex review 포스팅 (#123, PR #124) | done |
 | 2026-03-10 | Attempt isolation - attemptId + artifact directory separation, attemptId format `issue-{N}-a{M}`, per-attempt directory `.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/`, previous attempt artifact preservation (#79) | done |
 | 2026-03-10 | Pipeline direct resolve + auto-merge - headless resolve 제거, 직접 resolve 전환, review-resolve 자동 루프(5라운드), severity 기반 auto-merge, lock fencing+grace-period reclaim (#120, PR #121) | done |
