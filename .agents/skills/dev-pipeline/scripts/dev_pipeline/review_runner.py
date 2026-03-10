@@ -17,7 +17,12 @@ from .paths import (
     pipeline_init,
     resolve_worktree_path,
 )
-from .state_store import state_read, state_update
+from .models import ReviewJobStatus
+from .state_store import recovery_log_append, state_read, state_update
+
+# Stale review job timeout (seconds). Jobs running longer than this are
+# considered stuck and eligible for reclaim.
+REVIEW_JOB_STALE_TIMEOUT_SECS = 1800  # 30 minutes
 
 
 def _now_iso() -> str:
@@ -113,16 +118,30 @@ def dispatch_review(
     """Dispatch a review subprocess. Returns exit code."""
     repo = area_repo_name(area)
 
-    # Duplicate dispatch guard
+    # Duplicate dispatch guard with stale detection
     try:
-        data = state_read(issue, area, monorepo_root)
-        if data.get("reviewJob", {}).get("status") == "running":
-            print(
-                f"[review_runner] review job already running for issue #{issue} "
-                f"area={area} - duplicate dispatch prevented",
-                file=sys.stderr,
-            )
-            return 1
+        state = state_read(issue, area, monorepo_root)
+        if state.review_job.status == ReviewJobStatus.RUNNING:
+            if state.review_job.is_stale(REVIEW_JOB_STALE_TIMEOUT_SECS):
+                print(
+                    f"[review_runner] stale review job detected for issue #{issue} "
+                    f"area={area} (startedAt={state.review_job.started_at}) - reclaiming",
+                    file=sys.stderr,
+                )
+                recovery_log_append(
+                    issue, area, monorepo_root,
+                    "review_dispatch",
+                    f"stale review job (runId={state.review_job.run_id})",
+                    "reclaim",
+                    "proceeding with new dispatch",
+                )
+            else:
+                print(
+                    f"[review_runner] review job already running for issue #{issue} "
+                    f"area={area} - duplicate dispatch prevented",
+                    file=sys.stderr,
+                )
+                return 3  # "already running" — distinct from error (1) or unknown tool (2)
     except Exception:
         pass
 

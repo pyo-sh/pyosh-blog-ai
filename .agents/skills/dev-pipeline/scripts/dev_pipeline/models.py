@@ -1,5 +1,6 @@
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -39,6 +40,19 @@ class ReviewJob:
             "tool": self.tool,
             "model": self.model,
         }
+
+    def is_stale(self, timeout_secs: int = 1800) -> bool:
+        """Check if this running job has exceeded the stale timeout."""
+        if self.status != ReviewJobStatus.RUNNING:
+            return False
+        if not self.started_at:
+            return True  # Running with no start time is stale
+        try:
+            started = datetime.fromisoformat(self.started_at.replace("Z", "+00:00"))
+            elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+            return elapsed > timeout_secs
+        except (ValueError, TypeError):
+            return True  # Unparseable → treat as stale
 
     @classmethod
     def from_dict(cls, d: dict) -> "ReviewJob":

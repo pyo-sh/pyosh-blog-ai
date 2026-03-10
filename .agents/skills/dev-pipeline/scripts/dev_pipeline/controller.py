@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from .models import PipelineState
 from .state_store import state_read
 
 
@@ -13,33 +14,30 @@ def format_escalation(issue: int, area: str, stage: str, monorepo_root: Path) ->
     except Exception as e:
         return f"[pipeline] ESCALATION: stage {stage} failed. Unable to read state: {e}"
 
-    transition_log = state.get("transitionLog", [])
     last_transition = "none"
-    if transition_log:
-        last = transition_log[-1]
+    if state.transition_log:
+        last = state.transition_log[-1]
         last_transition = f"{last.get('from')} -> {last.get('to')}"
 
-    recovery = state.get("recoveryLog", [])
     recovery_lines = [
         f"  [{r.get('timestamp')}] {r.get('error')} -> {r.get('action')} -> {r.get('result')}"
-        for r in recovery
+        for r in state.recovery_log
         if r.get("stage") == stage
     ] or ["  (none)"]
 
-    paths = state.get("paths", {})
-    worktree = paths.get("worktreeDir", "N/A")
-    repo = paths.get("repoDir", "N/A")
+    worktree = state.paths.worktree_dir or "N/A"
+    repo = state.paths.repo_dir or "N/A"
 
     lines = [
         f"[pipeline] ESCALATION: stage {stage} failed (max retries reached).",
         "",
         "Current state:",
-        f"  step:         {state.get('step')}",
-        f"  PR:           #{state.get('pr', 0)}",
-        f"  branch:       {state.get('branch', '')}",
-        f"  round:        {state.get('reviewResolveRound', 0)}/{state.get('maxReviewResolveRounds', 5)}",
-        f"  review job:   {state.get('reviewJob', {}).get('status', 'n/a')} "
-        f"(runId: {state.get('reviewJob', {}).get('runId', 'n/a')})",
+        f"  step:         {state.step.value}",
+        f"  PR:           #{state.pr}",
+        f"  branch:       {state.branch}",
+        f"  round:        {state.review_resolve_round}/{state.max_review_resolve_rounds}",
+        f"  review job:   {state.review_job.status.value} "
+        f"(runId: {state.review_job.run_id or 'n/a'})",
         "",
         f"Last successful transition: {last_transition}",
         "",
@@ -159,11 +157,12 @@ def list_pipelines(monorepo_root: Path) -> list:
     for f in pipeline_dir.glob("*/issue-*.state.json"):
         try:
             data = json.loads(f.read_text())
+            state = PipelineState.from_dict(data)
             results.append({
-                "issue": data.get("issue"),
-                "area": data.get("area"),
-                "step": data.get("step"),
-                "pr": data.get("pr", 0),
+                "issue": state.issue,
+                "area": state.area,
+                "step": state.step.value,
+                "pr": state.pr,
             })
         except Exception:
             pass
