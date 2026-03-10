@@ -154,6 +154,17 @@ Run `/dev-log` to record batch completion.
 - Avoid deprecated `gh` fields (`projectCards` etc.) - use `number,title,state,body,url`
 - On unrecoverable error: save state, report to user
 
+## Worktree lifecycle
+
+Each dispatched worker runs inside a dedicated worktree at `.workspace/worktrees/{area}/issue-{N}/`. The orchestrator manages the full lifecycle:
+
+- **Dispatch** - `orch_worktree_prepare` quarantines any stale worktree before launching the new attempt, preventing `git worktree add` failures on retry.
+- **Completion** - `orch_worktree_gc` removes the worktree on `completed` and quarantines it on `failed` or abnormal exit (retry exhausted / stall kill).
+- **Orphan GC** - `orch_orphan_gc` runs at the start of each poll cycle and quarantines worktrees belonging to issues not in the active batch.
+- **Disk budget** - `orch_disk_budget_gc` enforces a 500 MB ceiling on the quarantine directory, removing the oldest entries when exceeded.
+
+Quarantine path: `.workspace/worktrees/{area}/quarantine/issue-{N}-{timestamp}/`
+
 ## References
 
 - [Dependency resolution](references/dependency-resolution.md) - DAG construction, cycle detection, edge cases
