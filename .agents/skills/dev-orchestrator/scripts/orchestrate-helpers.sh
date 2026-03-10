@@ -458,25 +458,6 @@ _orch_worktree_repo_dir() {
   monorepo_area_dir "$area"
 }
 
-_orch_pipeline_state_is_live() {
-  # Usage: _orch_pipeline_state_is_live <area> <issue>
-  # Returns 0 if the pipeline state file exists AND was modified within the
-  # last 30 minutes (indicating a live or recently active /dev-pipeline run).
-  # Returns 1 if the file does not exist or is older than 30 minutes (stale).
-  #
-  # Stale state files are common after crashes or kills: dev-pipeline cleanup
-  # deletes the state file only on the success path (log step). Failed or
-  # interrupted runs leave the file behind.
-  local area=$1 issue=$2
-  local state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
-  [ -f "$state_file" ] || return 1
-  local mtime now elapsed
-  mtime=$(stat -c %Y "$state_file" 2>/dev/null) || return 1
-  now=$(date +%s)
-  elapsed=$(( now - mtime ))
-  [ "$elapsed" -lt 1800 ]
-}
-
 orch_worktree_quarantine() {
   # Usage: orch_worktree_quarantine <area> <issue>
   # Moves the issue worktree to a timestamped quarantine directory.
@@ -561,11 +542,15 @@ orch_worktree_remove() {
 orch_worktree_prepare() {
   # Usage: orch_worktree_prepare <area> <issue>
   # Ensures no stale worktree exists before dispatching a new attempt.
-  # If a stale worktree is found AND no LIVE pipeline owns it, quarantines it.
-  # Liveness is determined by _orch_pipeline_state_is_live (30 min TTL on the
-  # state file mtime). Stale state files left by crashed or killed pipelines
-  # are ignored so retries are not permanently blocked.
-  # Returns: 0 if ready to dispatch, 1 on live conflict or error.
+  # If a stale worktree exists it is quarantined unconditionally.
+  #
+  # No pipeline-state liveness check is performed here. This function is
+  # only called from orch_dispatch, which is only reached after the
+  # orchestrator has explicitly decided to dispatch (pending) or retry
+  # (after confirming the prior process is dead/killed). The orchestrator
+  # owns the dispatch decision; any existing pipeline state file at this
+  # point belongs to our own prior attempt and is safe to override.
+  # Returns: 0 if ready to dispatch, 1 on error.
   local area=$1 issue=$2
   local wt_path
   wt_path=$(orch_worktree_path "$area" "$issue")
@@ -574,13 +559,6 @@ orch_worktree_prepare() {
     # No stale worktree; prune any orphaned git metadata.
     git -C "$(_orch_worktree_repo_dir "$area")" worktree prune 2>/dev/null || true
     return 0
-  fi
-
-  # Refuse to quarantine if a LIVE standalone pipeline is using this worktree.
-  # A stale state file from a dead pipeline is ignored (returns 1 from is_live).
-  if _orch_pipeline_state_is_live "$area" "$issue"; then
-    >&2 echo "[orchestrator] orch_worktree_prepare: live pipeline detected for #${issue} (state file modified < 30 min ago) - cannot dispatch"
-    return 1
   fi
 
   >&2 echo "[orchestrator] Stale worktree found for #${issue} - quarantining before retry"
@@ -602,15 +580,17 @@ orch_worktree_gc() {
 
 orch_orphan_gc() {
   # Usage: orch_orphan_gc <area>
-  # Scans .workspace/worktrees/{area}/issue-* for worktrees that are
-  # neither in the active batch nor owned by an active pipeline run.
-  # Quarantines any true orphan found. The quarantine/ subdirectory is excluded.
-  #
-  # Two conditions must both be true before a worktree is quarantined:
+  # Scans .workspace/worktrees/{area}/issue-* for truly orphan worktrees and
+  # quarantines them. A worktree is an orphan only when BOTH conditions hold:
   #   1. The issue is not in .status[] of the current batch.state.json.
   #   2. No pipeline state file exists at
-  #      .workspace/pipeline/{area}/issue-{N}.state.json
-  #      (which would indicate an independent /dev-pipeline run using that worktree).
+  #      .workspace/pipeline/{area}/issue-{N}.state.json.
+  #
+  # A state file of ANY age is treated as a valid owner signal. This is
+  # intentionally conservative: a standalone /dev-pipeline in review_wait
+  # can be idle for hours without touching the state file, but it still
+  # expects the worktree to remain in place for the eventual resolve step.
+  # The quarantine/ subdirectory is excluded from scanning.
   local area=$1
   local wt_base="$MONOREPO_ROOT/.workspace/worktrees/${area}"
 
@@ -634,12 +614,12 @@ orch_orphan_gc() {
     in_batch=$(printf '%s' "$state" | jq -r --arg n "$issue_num" '.status[$n] // ""')
     if [ -n "$in_batch" ]; then continue; fi
 
-    # Skip if a LIVE pipeline state file exists for this issue.
-    # Liveness uses a 30 min TTL (same as orch_worktree_prepare) to avoid
-    # blocking on stale state files left by crashed/killed pipelines.
-    if _orch_pipeline_state_is_live "$area" "$issue_num"; then continue; fi
+    # Skip if any pipeline state file exists for this issue.
+    # A state file of any age means a pipeline owns the worktree — it may be
+    # live, paused in review_wait, or crashed but recoverable.
+    if [ -f "$PIPELINE_DIR/${area}/issue-${issue_num}.state.json" ]; then continue; fi
 
-    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch, no live pipeline) - quarantining"
+    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch, no pipeline state) - quarantining"
     orch_worktree_quarantine "$area" "$issue_num"
   done
 }
