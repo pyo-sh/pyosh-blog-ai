@@ -289,7 +289,7 @@ def normalize_codex_output(raw: str) -> str | None:
         return None
 
     if raw.lstrip().startswith("## Review Summary"):
-        return raw
+        return raw.lstrip()
 
     return f"""## Review Summary
 

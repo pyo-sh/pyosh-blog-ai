@@ -170,8 +170,10 @@ if [ -n "$REVIEW_ID" ]; then
 else
   JOB_STATUS=$(cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline state --issue "$ISSUE" --area "$AREA" | jq -r '.reviewJob.status')
   if [ "$JOB_STATUS" = "failed" ]; then
-    # Job failed + no review -> stage-retry, set step=review_dispatch, re-enter 2a
-    cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline stage-retry --issue "$ISSUE" --area "$AREA" --step review_dispatch
+    # Job failed + no review -> stage-retry, update step, re-enter 2a
+    cd .agents/skills/dev-pipeline/scripts
+    python -m dev_pipeline stage-retry --issue "$ISSUE" --area "$AREA" --stage review_dispatch
+    python -m dev_pipeline state-update --issue "$ISSUE" --area "$AREA" --step review_dispatch
   else
     # Headless succeeded but no review posted -> escalation, report to user
     cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step review_wait
