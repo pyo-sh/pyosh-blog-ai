@@ -495,15 +495,26 @@ orch_worktree_quarantine() {
   dest="${quarantine_dir}/issue-${issue}-${ts}"
   mkdir -p "$quarantine_dir"
 
+  # Avoid name collisions when the same issue is quarantined more than once
+  # per second (e.g., an immediate retry failure on the same poll cycle).
+  # Append an incrementing counter until the path is unused.
+  local _seq=0
+  while [ -e "$dest" ]; do
+    _seq=$((_seq + 1))
+    dest="${quarantine_dir}/issue-${issue}-${ts}-${_seq}"
+  done
+
   if ! mv "$wt_path" "$dest"; then
     >&2 echo "[orchestrator] WARNING: failed to quarantine worktree for #${issue}"
     return 1
   fi
 
   # Rename the git worktree entry to a quarantine-scoped name.
-  # This frees the original entry name so `git worktree add` can reuse the path.
+  # Derive the suffix from the actual dest basename so both names stay in sync
+  # even when the counter suffix was appended above.
   if [ -n "$entry_name" ] && [ -d "$repo_dir/.git/worktrees/$entry_name" ]; then
-    local new_entry_name="quarantine-${issue}-${ts}"
+    local _dest_base; _dest_base=$(basename "$dest")
+    local new_entry_name="quarantine-${_dest_base#issue-}"
     local new_entry_dir="$repo_dir/.git/worktrees/$new_entry_name"
     if mv "$repo_dir/.git/worktrees/$entry_name" "$new_entry_dir" 2>/dev/null; then
       # Update gitdir in the renamed entry to point to the quarantine .git file.
