@@ -198,8 +198,11 @@ Otherwise resolve directly in this pipeline session:
 
 ```bash
 REVIEW_JSON=$(pipeline_fetch_review "$AREA" "$PR" "$REVIEW_ID")
+[ -z "$REVIEW_JSON" ] && { echo "[pipeline] failed to fetch review - abort resolve"; return 1; }
 COMMENTS_JSON=$(pipeline_fetch_review_comments "$AREA" "$PR" "$REVIEW_ID")
 ```
+
+If `pipeline_fetch_review` fails, abort the resolve step (`pipeline_stage_retry`, then retry). `pipeline_fetch_review_comments` failure is non-fatal (inline comments are supplementary; the review body contains severity labels).
 
 Parse the review body for severity labels (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`) and inline comments for file-level feedback.
 
