@@ -134,14 +134,16 @@ if Pending or dismissed:
 
 if Critical > 0 or Warning > 0:
   if reviewResolveRound >= maxReviewResolveRounds (5):
-    ask user: continue / merge as-is / abort
+    if headless (non-interactive): auto-abort, pipeline_format_escalation, exit
+    else: ask user: continue / merge as-is / abort
   else:
     update .step = "resolve", .reviewResolveRound += 1
     go to Step 4 (auto)
 
 if Suggestion > 0 (but Critical = 0 and Warning = 0):
   if reviewResolveRound >= maxReviewResolveRounds (5):
-    ask user: merge as-is / fix suggestions / abort
+    if headless (non-interactive): auto-merge (suggestions are non-blocking)
+    else: ask user: merge as-is / fix suggestions / abort
   else:
     AI decides:
       a) suggestions are trivial or debatable -> auto-merge (Step 6)
@@ -170,7 +172,7 @@ LOCAL_HEAD=$(git -C "$WORKTREE_PATH" rev-parse HEAD 2>/dev/null || true)
 
 If `LOCAL_HEAD` is empty, the worktree is corrupt - escalate and abort.
 
-If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA` and the working tree is clean (`git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet`), a local commit exists (possibly unpushed). Push it and skip to 4d:
+If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA` and the working tree is clean (`git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet`), a local commit exists (possibly unpushed). Push it and skip to 4d. If push fails, `pipeline_stage_retry` and retry the resolve step:
 
 ```bash
 pipeline_push_branch_safely "$WORKTREE_PATH"
@@ -252,7 +254,9 @@ Then:
 
 This step is entered from Step 3 when the review-resolve loop has exhausted its rounds but Critical/Warning items remain.
 
-Show the latest review summary and the round count, then ask the user:
+If headless (non-interactive): `pipeline_format_escalation`, exit (do not auto-merge with unresolved Critical/Warning).
+
+Otherwise show the latest review summary and the round count, then ask the user:
 - Continue -> reset `.reviewResolveRound = 0`, `.stageRetries.review = 0`, `.stageRetries.resolve = 0`, update `.step = "resolve"`, go to Step 4
 - Merge as-is -> update `.step = "merge"`, go to Step 6
 - Abort -> stop and report
