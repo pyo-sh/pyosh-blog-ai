@@ -27,6 +27,16 @@ PIPELINE_LOG_DIR="$PIPELINE_DIR/logs"
 PIPELINE_MESSAGE_DIR="$MONOREPO_ROOT/.workspace/messages"
 WORKTREE_DIR="$MONOREPO_ROOT/.workspace/worktrees"
 
+_pipeline_validate_tool() {
+  case "$1" in
+    claude|codex) return 0 ;;
+    *)
+      printf '[pipeline] unknown tool: %s (expected: claude, codex)\n' "$1" >&2
+      return 1
+      ;;
+  esac
+}
+
 pipeline_skill_cwd() {
   printf '%s\n' "$MONOREPO_ROOT"
 }
@@ -203,6 +213,67 @@ Rules:
 PROMPT_REVIEW
 }
 
+pipeline_codex_review_prompt() {
+  local issue=$1
+  local area=$2
+  local pr=$3
+
+  cat <<'PROMPT_CODEX'
+Output your review in exactly this format:
+
+## Review Summary
+
+**Verdict**: Approve | Request changes — N Critical issue(s) found.
+
+(Summary paragraph)
+
+### Critical
+
+(Numbered items with **bold title** and file path. "None" if empty.)
+
+### Warning
+
+(Numbered items. "None" if empty.)
+
+### Suggestions
+
+(Numbered items. "None" if empty.)
+PROMPT_CODEX
+}
+
+_pipeline_post_codex_review() {
+  # Post Codex review output (from log file) to GitHub as a PR review comment.
+  # Usage: _pipeline_post_codex_review <issue> <area> <pr> <headless_rc>
+  local issue=$1
+  local area=$2
+  local pr=$3
+  local headless_rc=$4
+  local log repo msg_file
+
+  if [ "$headless_rc" -ne 0 ]; then
+    return "$headless_rc"
+  fi
+
+  log="$(pipeline_log_path "$issue" "$area" review)"
+  if [ ! -s "$log" ]; then
+    printf '[pipeline] codex review produced no output for issue #%s\n' "$issue" >&2
+    return 1
+  fi
+
+  repo="$(pipeline_repo_name "$area")" || return 1
+  msg_file="$(pipeline_message_path "$area" "$pr" review)"
+  cp "$log" "$msg_file"
+
+  if ! gh pr review "$pr" -R "$repo" --comment --body-file "$msg_file"; then
+    printf '[pipeline] failed to post codex review for PR #%s\n' "$pr" >&2
+    rm -f "$msg_file"
+    return 1
+  fi
+
+  rm -f "$msg_file"
+  return 0
+}
+
 pipeline_fetch_review_comments() {
   # Fetch inline review comments for a specific review.
   # Returns JSON array of {path, line, side, body} objects.
@@ -234,7 +305,7 @@ pipeline_run_headless_core() {
   # should use run_in_background: true for long-running review steps.
   #
   # Usage:
-  #   pipeline_run_headless_core <skill_cwd> <prompt> <issue> <area> <stage> <repo_dir> <worktree_dir> <pr> [model]
+  #   pipeline_run_headless_core <skill_cwd> <prompt> <issue> <area> <stage> <repo_dir> <worktree_dir> <pr> [tool] [model]
   local skill_cwd=$1
   local prompt=$2
   local issue=$3
@@ -243,7 +314,10 @@ pipeline_run_headless_core() {
   local repo_dir=$6
   local worktree_dir=$7
   local pr=$8
-  local model=${9:-}
+  local tool=${9:-claude}
+  local model=${10:-}
+
+  _pipeline_validate_tool "$tool" || return 2
 
   local log err meta repo tools max_turns timeout_sec cmd rc status meta_tmp
 
@@ -279,9 +353,11 @@ pipeline_run_headless_core() {
     --arg skillCwd "$skill_cwd" \
     --arg log "$log" \
     --arg err "$err" \
+    --arg tool "$tool" \
     --arg model "$model" \
     '{
       status: $status,
+      tool: $tool,
       issue: ($issue | tonumber),
       area: $area,
       stage: $stage,
@@ -298,31 +374,42 @@ pipeline_run_headless_core() {
       exitCode: null
     }' > "$meta_tmp" && mv "$meta_tmp" "$meta"
 
-  cmd=(timeout "$timeout_sec" claude -p)
-  if [ -n "$model" ]; then
-    cmd+=(--model "$model")
-  fi
-  cmd+=(
-    --dangerously-skip-permissions
-    --no-session-persistence
-    --allowedTools "$tools"
-    --max-turns "$max_turns"
-    "$prompt"
-  )
-
-  (
-    cd -- "$skill_cwd" || exit 3
-    unset CLAUDECODE
-    PIPELINE_MONOREPO_ROOT="$MONOREPO_ROOT" \
-    PIPELINE_AREA="$area" \
-    PIPELINE_REPO="$repo" \
-    PIPELINE_REPO_DIR="$repo_dir" \
-    PIPELINE_WORKTREE_DIR="$worktree_dir" \
-    PIPELINE_STAGE="$stage" \
-    PIPELINE_ISSUE="$issue" \
-    PIPELINE_PR="$pr" \
-    "${cmd[@]}" > "$log" 2> "$err"
-  )
+  case "$tool" in
+    claude)
+      cmd=(timeout "$timeout_sec" claude -p)
+      [ -n "$model" ] && cmd+=(--model "$model")
+      cmd+=(
+        --dangerously-skip-permissions
+        --no-session-persistence
+        --allowedTools "$tools"
+        --max-turns "$max_turns"
+        "$prompt"
+      )
+      (
+        cd -- "$skill_cwd" || exit 3
+        unset CLAUDECODE
+        PIPELINE_MONOREPO_ROOT="$MONOREPO_ROOT" \
+        PIPELINE_AREA="$area" \
+        PIPELINE_REPO="$repo" \
+        PIPELINE_REPO_DIR="$repo_dir" \
+        PIPELINE_WORKTREE_DIR="$worktree_dir" \
+        PIPELINE_STAGE="$stage" \
+        PIPELINE_ISSUE="$issue" \
+        PIPELINE_PR="$pr" \
+        "${cmd[@]}" > "$log" 2> "$err"
+      )
+      ;;
+    codex)
+      local review_cwd="${worktree_dir:-$repo_dir}"
+      cmd=(timeout "$timeout_sec" codex exec review --base origin/main)
+      [ -n "$model" ] && cmd+=(--model "$model")
+      [ -n "$prompt" ] && cmd+=("$prompt")
+      (
+        cd -- "$review_cwd" || exit 3
+        "${cmd[@]}" > "$log" 2> "$err"
+      )
+      ;;
+  esac
   rc=$?
 
   case "$rc" in
@@ -360,16 +447,40 @@ pipeline_run_review() {
   local issue=$1
   local area=$2
   local pr=$3
-  local model=${4:-}
-  local repo_dir prompt
+  local tool=${4:-claude}
+  local model=${5:-}
+  local repo_dir worktree_dir prompt rc
+
+  _pipeline_validate_tool "$tool" || return 2
 
   repo_dir="$(pipeline_repo_dir "$area")" || return 1
-  prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || return 1
-  pipeline_run_headless_core \
-    "$(pipeline_skill_cwd)" \
-    "$prompt" \
-    "$issue" "$area" review \
-    "$repo_dir" '' "$pr" "$model"
+
+  case "$tool" in
+    claude)
+      prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || return 1
+      pipeline_run_headless_core \
+        "$(pipeline_skill_cwd)" \
+        "$prompt" \
+        "$issue" "$area" review \
+        "$repo_dir" '' "$pr" "$tool" "$model"
+      ;;
+    codex)
+      worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
+      if [ -z "$worktree_dir" ] || [ "$worktree_dir" = 'PATH_INVALID' ]; then
+        printf '[pipeline] codex review requires worktree for issue #%s area=%s\n' "$issue" "$area" >&2
+        return 1
+      fi
+      prompt="$(pipeline_codex_review_prompt "$issue" "$area" "$pr")" || return 1
+      pipeline_run_headless_core \
+        "$(pipeline_skill_cwd)" \
+        "$prompt" \
+        "$issue" "$area" review \
+        "$repo_dir" "$worktree_dir" "$pr" "$tool" "$model"
+      rc=$?
+      _pipeline_post_codex_review "$issue" "$area" "$pr" "$rc"
+      return $?
+      ;;
+  esac
 }
 
 pipeline_check_review_exists() {
