@@ -991,10 +991,11 @@ orch_archive_batch() {
     return 1
   fi
 
-  local non_terminal
+  local non_terminal dispatched_count
   non_terminal=$(jq '[.status | to_entries[] | select(.value == "pending" or .value == "blocked" or .value == "dispatched")] | length' "$state_file")
-  if [ "${non_terminal:-0}" -gt 0 ]; then
-    >&2 echo "[orchestrator] orch_archive_batch: $non_terminal issue(s) still non-terminal — archive blocked until all issues complete"
+  dispatched_count=$(jq '(.dispatched // {}) | length' "$state_file")
+  if [ "${non_terminal:-0}" -gt 0 ] || [ "${dispatched_count:-0}" -gt 0 ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: $non_terminal non-terminal issue(s) and $dispatched_count active dispatch(es) — archive blocked until all issues complete"
     return 1
   fi
 
@@ -1085,14 +1086,13 @@ orch_archive_rotate() {
     return 0
   fi
 
-  # Collect directories with their mtimes, sort oldest-first.
+  # Collect directories sorted oldest-first by name (batchId starts with YYYYMMDD-HHMMSS,
+  # so lexicographic order equals chronological order and is stable for same-second batches).
   local entries=()
   local d
   for d in "$archive_root"/*/; do
     [ -d "$d" ] || continue
-    local mtime
-    mtime=$(stat -c %Y "$d")
-    entries+=("$mtime $d")
+    entries+=("$(basename "$d") $d")
   done
 
   local total=${#entries[@]}
@@ -1102,7 +1102,7 @@ orch_archive_rotate() {
 
   local to_delete=$(( total - max_keep ))
   local sorted
-  sorted=$(printf '%s\n' "${entries[@]}" | sort -n)
+  sorted=$(printf '%s\n' "${entries[@]}" | sort)
 
   local deleted=0
   while IFS= read -r line; do
