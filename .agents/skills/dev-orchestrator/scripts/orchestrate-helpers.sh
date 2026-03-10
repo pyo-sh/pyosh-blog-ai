@@ -309,7 +309,11 @@ orch_dispatch() {
   local pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
 
   # Each attempt gets its own directory. Previous attempt artifacts are preserved.
+  # Remove stale terminal.json to prevent cross-batch collision: same attemptId
+  # (e.g., issue-5-a0) across different batches would share the directory, and
+  # orch_check_completion would read the old terminal.json as a valid result.
   mkdir -p "$attempt_dir"
+  rm -f "$attempt_dir/terminal.json"
 
   local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for the review subprocess (pass to pipeline_run_review).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
@@ -591,7 +595,8 @@ orch_detect_stall() {
   local pgid wrapper_pid last_activity last_cpu last_sha attempt_id
   IFS=$'\t' read -r pgid wrapper_pid last_activity last_cpu last_sha attempt_id <<< "$fields"
 
-  # Resolve attempt directory for heartbeat and log paths
+  # Resolve attempt directory for heartbeat and log paths.
+  # attempt_id may be empty for legacy state entries that predate attempt isolation.
   local attempt_dir=""
   if [ -n "$attempt_id" ]; then
     attempt_dir=$(orch_attempt_dir "$area" "$issue" "$attempt_id")

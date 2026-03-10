@@ -46,7 +46,7 @@ the orchestrator receives `abnormal_exit` (see completion detection below).
 | `finishedAt` | ISO-8601 UTC | When the wrapper exit trap ran |
 | `reason` | string | Human-readable exit summary |
 
-**Attempt isolation**: Each attempt writes to its own directory (`issues/{N}/attempts/{attemptId}/`). Previous attempt artifacts are preserved. The `attemptId` field in terminal.json is still validated as a safety net, but stale file collision is structurally prevented by directory separation.
+**Attempt isolation**: Each attempt writes to its own directory (`issues/{N}/attempts/{attemptId}/`). Previous attempt artifacts are preserved. Within a batch, directory separation prevents stale collision across retries. Across batches, `orch_dispatch` removes `terminal.json` before launching the wrapper (same attemptId may reoccur across batches since batchId is not part of the format). The `attemptId` field in terminal.json provides an additional validation layer.
 
 ## Completion detection
 
