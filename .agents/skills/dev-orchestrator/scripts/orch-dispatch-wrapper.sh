@@ -2,11 +2,18 @@
 # orch-dispatch-wrapper.sh - Wrapper for dispatched pipeline processes
 # Provides: heartbeat, terminal.json (explicit completion contract), signal handling
 #
-# Usage: bash orch-dispatch-wrapper.sh <attempt_id> <terminal_file> <heartbeat_file> <pid_file> <issue> <pipeline_state_file> -- <command...>
+# Usage: bash orch-dispatch-wrapper.sh <attempt_id> <attempt_dir> <issue> <pipeline_state_file> -- <command...>
+#
+# Artifact paths are derived from <attempt_dir>:
+#   {attempt_dir}/pid            - wrapper PID (= PGID when launched via setsid)
+#   {attempt_dir}/heartbeat      - epoch timestamp, updated every 60s
+#   {attempt_dir}/terminal.json  - completion contract (written on exit)
+#   {attempt_dir}/worker.log     - stdout (set up by orch_dispatch via redirect)
+#   {attempt_dir}/worker.err     - stderr (set up by orch_dispatch via redirect)
 #
 # The wrapper:
-#   1. Writes its PID to pid_file (= PGID when launched via setsid)
-#   2. Starts a heartbeat loop (updates heartbeat_file every 60s)
+#   1. Writes its PID to pid file (= PGID when launched via setsid)
+#   2. Starts a heartbeat loop (updates heartbeat file every 60s)
 #   3. Runs the given command
 #   4. On exit (normal or signal), writes terminal.json with full schema
 #
@@ -23,10 +30,15 @@
 
 set -uo pipefail
 
-ATTEMPT_ID="$1"; TERMINAL_FILE="$2"; HEARTBEAT_FILE="$3"; PID_FILE="$4"
-ISSUE="$5"; PIPELINE_STATE_FILE="$6"
-shift 6
+ATTEMPT_ID="$1"; ATTEMPT_DIR="$2"
+ISSUE="$3"; PIPELINE_STATE_FILE="$4"
+shift 4
 [ "${1:-}" = "--" ] && shift
+
+# Derive artifact paths from attempt directory
+PID_FILE="$ATTEMPT_DIR/pid"
+HEARTBEAT_FILE="$ATTEMPT_DIR/heartbeat"
+TERMINAL_FILE="$ATTEMPT_DIR/terminal.json"
 
 # Write our PID. When launched via setsid, $$ = session leader PID = PGID.
 echo $$ > "$PID_FILE"

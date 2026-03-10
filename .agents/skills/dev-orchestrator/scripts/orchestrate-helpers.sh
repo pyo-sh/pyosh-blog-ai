@@ -6,11 +6,12 @@
 # Each issue gets its own background process running /dev-pipeline.
 #
 # Key design decisions:
-#   - attemptId: unique per dispatch attempt, prevents stale file collision
+#   - attempt isolation: each dispatch gets its own directory (issues/{N}/attempts/{attemptId}/)
+#   - attemptId: issue-{N}-a{M} format, unique per dispatch attempt
 #   - setsid + PGID: process group based lifecycle management
 #   - flock: state file locking for correctness
 #   - provider health: circuit breaker for GitHub API failures
-#   - exit file JSON: explicit completion signal with attemptId matching
+#   - terminal.json: explicit completion signal with attemptId matching
 #   - heartbeat: explicit activity signal from dispatch wrapper
 #   - skipped_dep_failed: failed dependency propagation without dispatching
 
@@ -29,26 +30,30 @@ orch_state_path() {
   echo "$ORCH_BASE/${area}/batch.state.json"
 }
 
+orch_attempt_id() {
+  # Generate a unique attempt identifier.
+  # Format: issue-{N}-a{M}
+  local issue=$1
+  local retry_count=$2
+  echo "issue-${issue}-a${retry_count}"
+}
+
+orch_attempt_dir() {
+  # Returns the attempt directory for a dispatched issue.
+  # Each attempt gets its own directory so previous attempt artifacts are preserved.
+  local area=$1
+  local issue=$2
+  local attempt_id=$3
+  echo "$ORCH_BASE/${area}/issues/${issue}/attempts/${attempt_id}"
+}
+
 orch_terminal_path() {
-  # Returns the terminal.json path for a dispatched issue.
+  # Returns the terminal.json path for a dispatched issue attempt.
   # The terminal file is the sole completion contract between the pipeline and orchestrator.
   local area=$1
   local issue=$2
-  echo "$ORCH_BASE/${area}/issue-${issue}.terminal.json"
-}
-
-# Alias kept for call sites that used the old name; prefer orch_terminal_path.
-orch_signal_path() {
-  orch_terminal_path "$@"
-}
-
-orch_attempt_id() {
-  # Generate a unique attempt identifier.
-  # Format: {batchId}-issue{N}-attempt{M}
-  local batch_id=$1
-  local issue=$2
-  local retry_count=$3
-  echo "${batch_id}-issue${issue}-attempt${retry_count}"
+  local attempt_id=$3
+  echo "$(orch_attempt_dir "$area" "$issue" "$attempt_id")/terminal.json"
 }
 
 orch_init() {
@@ -293,43 +298,37 @@ orch_dispatch() {
   area=$(monorepo_area_from_dir "$area_dir")
   local repo
   repo=$(monorepo_area_repo "$area")
-  local batch_id
-  batch_id=$(orch_state_read "$area" | jq -r '.batchId')
 
   local tool model
   read -r tool model <<< "$(_orch_parse_agent "$agent")"
 
-  local log="$ORCH_BASE/${area}/issue-${issue}.log"
-  local err_log="$ORCH_BASE/${area}/issue-${issue}.err"
-  local terminal_file
-  terminal_file=$(orch_terminal_path "$area" "$issue")
-  local heartbeat_file="$ORCH_BASE/${area}/issue-${issue}.heartbeat"
-  local pid_file="$ORCH_BASE/${area}/issue-${issue}.pid"
-  local pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
   local attempt_id
-  attempt_id=$(orch_attempt_id "$batch_id" "$issue" "$retry_count")
+  attempt_id=$(orch_attempt_id "$issue" "$retry_count")
+  local attempt_dir
+  attempt_dir=$(orch_attempt_dir "$area" "$issue" "$attempt_id")
+  local pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
 
-  # Pre-dispatch cleanup: remove stale files from previous attempts.
-  # attemptId matching provides safety, but cleanup prevents confusion.
-  rm -f "$terminal_file" "$heartbeat_file" "$pid_file" "$log" "$err_log"
+  # Each attempt gets its own directory. Previous attempt artifacts are preserved.
+  mkdir -p "$attempt_dir"
 
   local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${model:+ Use model \"${model}\" for the review subprocess (pass to pipeline_run_review).} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
 
   local wrapper_script="$_ORCH_HELPERS_DIR/orch-dispatch-wrapper.sh"
+  local pid_file="$attempt_dir/pid"
 
   # Launch in a new session (setsid) for process group isolation.
   # The wrapper writes its PID (= PGID) to pid_file.
   # timeout -k sends SIGKILL 30s after initial signal as runtime upper bound.
   cd "$MONOREPO_ROOT" || return 1
   setsid bash "$wrapper_script" \
-    "$attempt_id" "$terminal_file" "$heartbeat_file" "$pid_file" \
+    "$attempt_id" "$attempt_dir" \
     "$issue" "$pipeline_state_file" -- \
     timeout -k 30 3600 claude -p \
     ${model:+--model "$model"} --dangerously-skip-permissions \
     --no-session-persistence \
     --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \
     --max-turns 80 \
-    "$prompt" > "$log" 2>"$err_log" &
+    "$prompt" > "$attempt_dir/worker.log" 2>"$attempt_dir/worker.err" &
 
   # Wait for wrapper to write its PID
   local wait_count=0
@@ -358,7 +357,7 @@ orch_dispatch() {
   if ! orch_state_update "$area" \
     ".dispatched[\"$issue\"] = {
        pid: $pid, pgid: $pgid, attemptId: \"$attempt_id\",
-       log: \"$log\", dispatchedAt: \"$now\", lastActivity: \"$now\",
+       attemptDir: \"$attempt_dir\", dispatchedAt: \"$now\", lastActivity: \"$now\",
        lastCommitSha: null, lastCpuJiffies: \"0\",
        pipelineStarted: false, retryCount: $retry_count
      }
@@ -457,24 +456,27 @@ orch_check_completion() {
   pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
 
   # 1. terminal.json (sole source of "completed" / "failed" results)
-  local terminal_file
-  terminal_file=$(orch_terminal_path "$area" "$issue")
-  if [ -f "$terminal_file" ]; then
-    local terminal_json
-    terminal_json=$(cat "$terminal_file")
-    local file_attempt
-    file_attempt=$(echo "$terminal_json" | jq -r '.attemptId // empty')
+  # With attempt isolation, the terminal file lives in the current attempt's directory.
+  if [ -n "$current_attempt" ]; then
+    local terminal_file
+    terminal_file=$(orch_terminal_path "$area" "$issue" "$current_attempt")
+    if [ -f "$terminal_file" ]; then
+      local terminal_json
+      terminal_json=$(cat "$terminal_file")
+      local file_attempt
+      file_attempt=$(echo "$terminal_json" | jq -r '.attemptId // empty')
 
-    if [ -n "$current_attempt" ] && [ "$file_attempt" != "$current_attempt" ]; then
-      # Stale terminal file from a different attempt - ignore
-      >&2 echo "[orchestrator] Ignoring stale terminal file for #${issue} (attempt mismatch: file=$file_attempt, current=$current_attempt)"
-    else
-      local terminal_status
-      terminal_status=$(echo "$terminal_json" | jq -r '.status // "failed"')
-      if [ "$terminal_status" = "completed" ]; then
-        echo "completed"; return 0
+      if [ "$file_attempt" != "$current_attempt" ]; then
+        # attemptId mismatch safety net (should not happen with isolated dirs)
+        >&2 echo "[orchestrator] Ignoring terminal file for #${issue} (attempt mismatch: file=$file_attempt, current=$current_attempt)"
       else
-        echo "failed"; return 0
+        local terminal_status
+        terminal_status=$(echo "$terminal_json" | jq -r '.status // "failed"')
+        if [ "$terminal_status" = "completed" ]; then
+          echo "completed"; return 0
+        else
+          echo "failed"; return 0
+        fi
       fi
     fi
   fi
@@ -585,13 +587,19 @@ orch_detect_stall() {
   fields=$(echo "$state" | jq -r --arg i "$issue" '
     .dispatched[$i] // {} |
     [.pgid // "", .pid // "", .lastActivity // "",
-     .lastCpuJiffies // "0", .lastCommitSha // ""] | @tsv')
-  local pgid wrapper_pid last_activity last_cpu last_sha
-  IFS=$'\t' read -r pgid wrapper_pid last_activity last_cpu last_sha <<< "$fields"
+     .lastCpuJiffies // "0", .lastCommitSha // "", .attemptId // ""] | @tsv')
+  local pgid wrapper_pid last_activity last_cpu last_sha attempt_id
+  IFS=$'\t' read -r pgid wrapper_pid last_activity last_cpu last_sha attempt_id <<< "$fields"
+
+  # Resolve attempt directory for heartbeat and log paths
+  local attempt_dir=""
+  if [ -n "$attempt_id" ]; then
+    attempt_dir=$(orch_attempt_dir "$area" "$issue" "$attempt_id")
+  fi
 
   # 1. Heartbeat check (strongest signal)
-  local hb_file="$ORCH_BASE/${area}/issue-${issue}.heartbeat"
-  if [ -f "$hb_file" ]; then
+  local hb_file="${attempt_dir:+${attempt_dir}/heartbeat}"
+  if [ -n "$hb_file" ] && [ -f "$hb_file" ]; then
     local hb_ts now_ts
     hb_ts=$(cat "$hb_file")
     now_ts=$(date +%s)
@@ -627,8 +635,8 @@ orch_detect_stall() {
   local stall_reason="no heartbeat"
 
   # 3a. Log file mtime
-  local log_file="$ORCH_BASE/${area}/issue-${issue}.log"
-  if [ -f "$log_file" ]; then
+  local log_file="${attempt_dir:+${attempt_dir}/worker.log}"
+  if [ -n "$log_file" ] && [ -f "$log_file" ]; then
     local log_mtime
     log_mtime=$(stat -c %Y "$log_file")
     if [ $((now_ts - log_mtime)) -lt "$threshold" ]; then
