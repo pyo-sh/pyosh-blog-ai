@@ -304,6 +304,13 @@ orch_dispatch() {
   local tool model
   read -r tool model <<< "$(_orch_parse_agent "$agent")"
 
+  # Clean up any stale worktree from a previous attempt before launching the new one.
+  # This prevents /dev-build from failing on `git worktree add` when the path exists.
+  orch_worktree_prepare "$area" "$issue" "$retry_count" || {
+    >&2 echo "[orchestrator] orch_dispatch: worktree prepare failed for #${issue}"
+    return 1
+  }
+
   local attempt_id
   attempt_id=$(orch_attempt_id "$issue" "$retry_count")
   local attempt_dir
@@ -392,7 +399,8 @@ orch_dispatch() {
        lastCommitSha: null, lastCpuJiffies: \"0\",
        pipelineStarted: false, retryCount: $retry_count
      }
-     | .status[\"$issue\"] = \"dispatched\""; then
+     | .status[\"$issue\"] = \"dispatched\"
+     | .everDispatched[\"$issue\"] = true"; then
     >&2 echo "[orchestrator] State recording failed for #${issue} - killing orphan PGID $pgid"
     orch_stop_process "$area" "$issue"
     return 1
@@ -432,6 +440,243 @@ orch_stop_process() {
   if orch_pgid_alive "$pgid"; then
     kill -9 -- -"$pgid" 2>/dev/null
   fi
+}
+
+# ──────────────────────────────────────────────
+# Worktree lifecycle management
+# ──────────────────────────────────────────────
+
+orch_worktree_path() {
+  # Usage: orch_worktree_path <area> <issue>
+  # Returns canonical worktree path for an issue.
+  local area=$1 issue=$2
+  echo "$MONOREPO_ROOT/.workspace/worktrees/${area}/issue-${issue}"
+}
+
+_orch_worktree_repo_dir() {
+  # Internal: returns the repo directory for the area.
+  local area=$1
+  monorepo_area_dir "$area"
+}
+
+orch_worktree_quarantine() {
+  # Usage: orch_worktree_quarantine <area> <issue>
+  # Moves the issue worktree to a timestamped quarantine directory.
+  #
+  # Two git-metadata operations happen after the move:
+  #   1. The worktree entry in .git/worktrees/ is renamed to a quarantine-
+  #      scoped name. This frees the original registration so that a retry
+  #      can call `git worktree add` at the same path without getting
+  #      "already used by worktree" errors.
+  #   2. Both the entry's gitdir file and the worktree's .git file are
+  #      updated to reflect the new entry name and quarantine path, so that
+  #      git commands (log, status, diff) continue to work inside the
+  #      quarantined directory.
+  local area=$1 issue=$2
+  local wt_path repo_dir quarantine_dir ts dest
+  wt_path=$(orch_worktree_path "$area" "$issue")
+  repo_dir=$(_orch_worktree_repo_dir "$area")
+  quarantine_dir="$MONOREPO_ROOT/.workspace/worktrees/${area}/quarantine"
+
+  if [ ! -d "$wt_path" ]; then
+    return 0
+  fi
+
+  # Read the worktree's .git file to find the entry directory before moving.
+  # Format: "gitdir: /path/to/.git/worktrees/{entry-name}"
+  local git_file="$wt_path/.git"
+  local entry_dir entry_name
+  if [ -f "$git_file" ]; then
+    entry_dir=$(sed 's/^gitdir: //' "$git_file")
+    entry_name=$(basename "$entry_dir")
+  fi
+
+  ts=$(date +%Y%m%d-%H%M%S)
+  dest="${quarantine_dir}/issue-${issue}-${ts}"
+  mkdir -p "$quarantine_dir"
+
+  # Avoid name collisions when the same issue is quarantined more than once
+  # per second (e.g., an immediate retry failure on the same poll cycle).
+  # Append an incrementing counter until the path is unused.
+  local _seq=0
+  while [ -e "$dest" ]; do
+    _seq=$((_seq + 1))
+    dest="${quarantine_dir}/issue-${issue}-${ts}-${_seq}"
+  done
+
+  if ! mv "$wt_path" "$dest"; then
+    >&2 echo "[orchestrator] WARNING: failed to quarantine worktree for #${issue}"
+    return 1
+  fi
+
+  # Rename the git worktree entry to a quarantine-scoped name.
+  # Derive the suffix from the actual dest basename so both names stay in sync
+  # even when the counter suffix was appended above.
+  if [ -n "$entry_name" ] && [ -d "$repo_dir/.git/worktrees/$entry_name" ]; then
+    local _dest_base; _dest_base=$(basename "$dest")
+    local new_entry_name="quarantine-${_dest_base#issue-}"
+    local new_entry_dir="$repo_dir/.git/worktrees/$new_entry_name"
+    if mv "$repo_dir/.git/worktrees/$entry_name" "$new_entry_dir" 2>/dev/null; then
+      # Update gitdir in the renamed entry to point to the quarantine .git file.
+      printf '%s' "${dest}/.git" > "$new_entry_dir/gitdir"
+      # Update the quarantine .git file to point back to the renamed entry.
+      printf 'gitdir: %s' "$new_entry_dir" > "$dest/.git"
+    fi
+  fi
+
+  >&2 echo "[orchestrator] Quarantined worktree for #${issue}: $dest"
+  orch_disk_budget_gc "$area"
+}
+
+orch_worktree_remove() {
+  # Usage: orch_worktree_remove <area> <issue>
+  # Removes the issue worktree and its git registration.
+  # Falls back to rm -rf + prune if git worktree remove fails.
+  local area=$1 issue=$2
+  local wt_path repo_dir
+  wt_path=$(orch_worktree_path "$area" "$issue")
+  repo_dir=$(_orch_worktree_repo_dir "$area")
+
+  if [ ! -d "$wt_path" ]; then
+    git -C "$repo_dir" worktree prune 2>/dev/null || true
+    return 0
+  fi
+
+  if git -C "$repo_dir" worktree remove --force "$wt_path" 2>/dev/null; then
+    >&2 echo "[orchestrator] Removed worktree for #${issue}"
+  else
+    rm -rf "$wt_path"
+    git -C "$repo_dir" worktree prune 2>/dev/null || true
+    >&2 echo "[orchestrator] Force-removed worktree for #${issue}"
+  fi
+}
+
+orch_worktree_prepare() {
+  # Usage: orch_worktree_prepare <area> <issue> [retry_count]
+  # Ensures no stale worktree exists before dispatching a new attempt.
+  # Quarantines any existing worktree unconditionally.
+  #
+  # A pre-existing worktree on first dispatch (retry_count == 0) is treated
+  # as a stale artifact from a previous batch or an abandoned run and is
+  # always quarantined. This allows automatic batch recovery without manual
+  # cleanup when the orchestrator is restarted after a crash. Running the
+  # orchestrator and a manual session concurrently for the same issue is not
+  # supported and should be avoided by the operator.
+  #
+  # Returns: 0 if ready to dispatch, 1 on error.
+  local area=$1 issue=$2 retry_count=${3:-0}
+  local wt_path
+  wt_path=$(orch_worktree_path "$area" "$issue")
+
+  if [ ! -d "$wt_path" ]; then
+    # No stale worktree; prune any orphaned git metadata.
+    git -C "$(_orch_worktree_repo_dir "$area")" worktree prune 2>/dev/null || true
+    return 0
+  fi
+
+  >&2 echo "[orchestrator] Stale worktree found for #${issue} - quarantining before dispatch"
+  orch_worktree_quarantine "$area" "$issue"
+}
+
+orch_worktree_gc() {
+  # Usage: orch_worktree_gc <area> <issue> <disposition>
+  # disposition: "completed" (remove) | "failed" (quarantine)
+  local area=$1 issue=$2 disposition=$3
+  case "$disposition" in
+    completed) orch_worktree_remove "$area" "$issue" ;;
+    failed)    orch_worktree_quarantine "$area" "$issue" ;;
+    *)
+      >&2 echo "[orchestrator] orch_worktree_gc: unknown disposition '${disposition}' for #${issue}"
+      ;;
+  esac
+}
+
+orch_orphan_gc() {
+  # Usage: orch_orphan_gc <area>
+  # Cleans up worktrees for issues in the CURRENT batch that have reached a
+  # terminal status (completed, failed, skipped_dep_failed) but whose worktrees
+  # were not removed by orch_worktree_gc, e.g. due to an orchestrator crash
+  # between completion detection and the GC call.
+  #
+  # Only issues inside the current batch.state.json are examined. Worktrees for
+  # issues outside the batch — including manual /dev-build sessions, standalone
+  # /dev-pipeline runs, and artifacts from previous batches — are intentionally
+  # left untouched. This prevents cross-batch false-positives regardless of
+  # whether orch_archive_batch was called after the previous batch.
+  local area=$1
+
+  local state
+  state=$(orch_state_read "$area") || return 0
+
+  local issue status ever_dispatched wt_path
+  while IFS= read -r issue; do
+    [ -n "$issue" ] || continue
+
+    status=$(printf '%s' "$state" | jq -r --arg n "$issue" '.status[$n]')
+    case "$status" in
+      completed|failed) ;;
+      *) continue ;;  # pending, blocked, dispatched, skipped_dep_failed — never touch
+    esac
+
+    # Only GC worktrees for issues the orchestrator actually dispatched in
+    # this batch. Issues marked skipped_dep_failed or failed without a
+    # dispatch attempt (e.g., due to orch_worktree_prepare conflict) never
+    # owned the canonical worktree path; any directory there belongs to an
+    # external session and must not be quarantined.
+    ever_dispatched=$(printf '%s' "$state" | jq -r --arg n "$issue" '.everDispatched[$n] // false')
+    [ "$ever_dispatched" = "true" ] || continue
+
+    wt_path=$(orch_worktree_path "$area" "$issue")
+    [ -d "$wt_path" ] || continue
+
+    >&2 echo "[orchestrator] Orphan worktree for #${issue} (status=${status}) not cleaned up - quarantining"
+    if [ "$status" = "completed" ]; then
+      orch_worktree_remove "$area" "$issue"
+    else
+      orch_worktree_quarantine "$area" "$issue"
+    fi
+  done < <(printf '%s' "$state" | jq -r '.status | keys[]')
+}
+
+orch_disk_budget_gc() {
+  # Usage: orch_disk_budget_gc <area> [budget_mb]
+  # Enforces disk budget on the quarantine directory.
+  # Removes oldest quarantine entries (by mtime) when total exceeds budget_mb.
+  # Default budget: 500 MB.
+  local area=$1 budget_mb=${2:-500}
+  local quarantine_dir="$MONOREPO_ROOT/.workspace/worktrees/${area}/quarantine"
+
+  if [ ! -d "$quarantine_dir" ]; then return 0; fi
+
+  local total_mb
+  total_mb=$(du -sm "$quarantine_dir" 2>/dev/null | awk '{print $1}') || total_mb=0
+
+  if [ "${total_mb:-0}" -le "$budget_mb" ]; then return 0; fi
+
+  >&2 echo "[orchestrator] Quarantine disk usage ${total_mb}MB > budget ${budget_mb}MB - pruning oldest entries"
+
+  # Build list of entries sorted oldest-first by mtime.
+  local entries=()
+  local d
+  for d in "$quarantine_dir"/issue-*/; do
+    [ -d "$d" ] || continue
+    local mtime
+    mtime=$(stat -c %Y "$d" 2>/dev/null) || mtime=0
+    entries+=("$mtime $d")
+  done
+
+  local sorted
+  sorted=$(printf '%s\n' "${entries[@]}" | sort -n)
+
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    local old_dir
+    old_dir=$(echo "$line" | cut -d' ' -f2-)
+    rm -rf "$old_dir"
+    >&2 echo "[orchestrator] Disk budget GC: removed quarantine entry $(basename "$old_dir")"
+    total_mb=$(du -sm "$quarantine_dir" 2>/dev/null | awk '{print $1}') || total_mb=0
+    [ "${total_mb:-0}" -le "$budget_mb" ] && break
+  done <<< "$sorted"
 }
 
 # ──────────────────────────────────────────────
@@ -799,6 +1044,9 @@ orch_poll_cycle() {
     return 1
   fi
 
+  # Scan for and clean up orphan worktrees from previous batches or aborted runs.
+  orch_orphan_gc "$area"
+
   local state
   state=$(orch_state_read "$area")
   local dispatched_issues
@@ -818,6 +1066,7 @@ orch_poll_cycle() {
         orch_status_set "$area" "$issue" "$result"
         orch_state_update "$area" "del(.dispatched[\"$issue\"])"
         >&2 echo "[orchestrator] Issue #${issue}: ${result}"
+        orch_worktree_gc "$area" "$issue" "$result"
         local newly_unblocked
         newly_unblocked=$(orch_unblock "$area" "$issue")
         [ -n "$newly_unblocked" ] && >&2 echo "[orchestrator] Unblocked: $newly_unblocked"
@@ -833,29 +1082,36 @@ orch_poll_cycle() {
           local merged_pr
           merged_pr=$(_orch_pr_list "$area" "$issue" merged "number" '.[0].number') || true
           if [ -n "$merged_pr" ] && [ "$merged_pr" != "null" ]; then
-            >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking failed - manual review recommended."
+            >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking completed."
             # Record a durable signal in batch state so operators can detect this edge case
             # without digging through logs. Visible in orch_print_summary output.
             local _now
             _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             orch_state_update "$area" \
               ".mergedWithoutTerminal = ((.mergedWithoutTerminal // []) + [{issue: ($issue | tonumber), pr: ($merged_pr | tonumber), detectedAt: \"$_now\"}])" || true
-            _orch_mark_failed_and_unblock "$area" "$issue"
+            # PR is merged: treat as completed so dependents unblock correctly.
+            orch_status_set "$area" "$issue" "completed"
+            orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+            orch_unblock "$area" "$issue" || true
+            orch_worktree_gc "$area" "$issue" "completed"
           else
             >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
             orch_state_update "$area" "del(.dispatched[\"$issue\"])"
             local new_pid
+            # orch_dispatch calls orch_worktree_prepare to clean up the stale worktree.
             new_pid=$(orch_dispatch "$issue" "$area_dir" "$agent" "$((retry_count + 1))")
             if [ -n "$new_pid" ]; then
               >&2 echo "[orchestrator] Re-dispatched #${issue} - PID $new_pid"
             else
               >&2 echo "[orchestrator] Re-dispatch failed for #${issue} - marking failed"
               _orch_mark_failed_and_unblock "$area" "$issue"
+              orch_worktree_gc "$area" "$issue" "failed"
             fi
           fi
         else
           >&2 echo "[orchestrator] Issue #${issue}: abnormal_exit (retry exhausted)"
           _orch_mark_failed_and_unblock "$area" "$issue"
+          orch_worktree_gc "$area" "$issue" "failed"
         fi
         ;;
       # "running" - no action
@@ -892,6 +1148,7 @@ orch_poll_cycle() {
         >&2 echo "[orchestrator] STALL: Issue #${issue} - retry exhausted, marking failed"
         orch_stop_process "$area" "$issue"
         _orch_mark_failed_and_unblock "$area" "$issue"
+        orch_worktree_gc "$area" "$issue" "failed"
       else
         >&2 echo "[orchestrator] STALL detected: Issue #${issue} - no activity for threshold period"
         >&2 echo "[orchestrator] Process group alive. Consider: stop, retry, or skip"
@@ -922,7 +1179,11 @@ orch_poll_cycle() {
         >&2 echo "[orchestrator] Dispatched #${issue} - PID $pid"
         dispatched_count=$((dispatched_count + 1))
       else
-        >&2 echo "[orchestrator] Failed to dispatch #${issue}"
+        # Transient launcher failure (process died immediately, state-update
+        # error, etc.). Leave the issue pending so the next poll cycle retries.
+        # orch_worktree_prepare now quarantines unconditionally, so there is no
+        # longer a persistent worktree-conflict case that would loop forever.
+        >&2 echo "[orchestrator] Failed to dispatch #${issue} - will retry next cycle"
       fi
     done
   fi
