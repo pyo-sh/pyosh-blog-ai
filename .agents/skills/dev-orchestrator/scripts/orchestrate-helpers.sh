@@ -306,7 +306,7 @@ orch_dispatch() {
 
   # Clean up any stale worktree from a previous attempt before launching the new one.
   # This prevents /dev-build from failing on `git worktree add` when the path exists.
-  orch_worktree_prepare "$area" "$issue" || {
+  orch_worktree_prepare "$area" "$issue" "$retry_count" || {
     >&2 echo "[orchestrator] orch_dispatch: worktree prepare failed for #${issue}"
     return 1
   }
@@ -540,18 +540,20 @@ orch_worktree_remove() {
 }
 
 orch_worktree_prepare() {
-  # Usage: orch_worktree_prepare <area> <issue>
+  # Usage: orch_worktree_prepare <area> <issue> [retry_count]
   # Ensures no stale worktree exists before dispatching a new attempt.
-  # If a stale worktree exists it is quarantined unconditionally.
   #
-  # No pipeline-state liveness check is performed here. This function is
-  # only called from orch_dispatch, which is only reached after the
-  # orchestrator has explicitly decided to dispatch (pending) or retry
-  # (after confirming the prior process is dead/killed). The orchestrator
-  # owns the dispatch decision; any existing pipeline state file at this
-  # point belongs to our own prior attempt and is safe to override.
-  # Returns: 0 if ready to dispatch, 1 on error.
-  local area=$1 issue=$2
+  # retry_count == 0 (first dispatch): a pre-existing worktree signals an
+  # external session (manual /dev-build or standalone /dev-pipeline that was
+  # started before the orchestrator batch). Refuse the dispatch (return 1) so
+  # the caller can skip or fail the issue rather than silently moving active
+  # work. The worktree path is not touched.
+  #
+  # retry_count > 0 (retry): the existing worktree belongs to the orchestrator's
+  # own previous attempt. Quarantine it unconditionally.
+  #
+  # Returns: 0 if ready to dispatch, 1 on error or conflict.
+  local area=$1 issue=$2 retry_count=${3:-0}
   local wt_path
   wt_path=$(orch_worktree_path "$area" "$issue")
 
@@ -561,7 +563,12 @@ orch_worktree_prepare() {
     return 0
   fi
 
-  >&2 echo "[orchestrator] Stale worktree found for #${issue} - quarantining before retry"
+  if [ "$retry_count" -eq 0 ]; then
+    >&2 echo "[orchestrator] WARNING: worktree for #${issue} already exists on first dispatch - refusing (external session or orphan from a previous batch; manual cleanup required)"
+    return 1
+  fi
+
+  >&2 echo "[orchestrator] Stale worktree found for #${issue} (retry ${retry_count}) - quarantining before retry"
   orch_worktree_quarantine "$area" "$issue"
 }
 
@@ -580,59 +587,41 @@ orch_worktree_gc() {
 
 orch_orphan_gc() {
   # Usage: orch_orphan_gc <area>
-  # Scans .workspace/worktrees/{area}/issue-* for truly orphan worktrees and
-  # quarantines them. A worktree is an orphan only when ALL conditions hold:
-  #   1. The issue is not in .status[] of the current batch.state.json.
-  #   2. The orchestrator has an issues directory for this issue at
-  #      .workspace/orchestrate/{area}/issues/{N}/ (created by orch_dispatch).
-  #      Worktrees created by manual /dev-build flows (no issues dir) are
-  #      left alone unconditionally.
-  #   3. No pipeline state file exists at
-  #      .workspace/pipeline/{area}/issue-{N}.state.json.
+  # Cleans up worktrees for issues in the CURRENT batch that have reached a
+  # terminal status (completed, failed, skipped_dep_failed) but whose worktrees
+  # were not removed by orch_worktree_gc, e.g. due to an orchestrator crash
+  # between completion detection and the GC call.
   #
-  # A state file of ANY age is treated as a valid owner signal. This is
-  # intentionally conservative: a standalone /dev-pipeline in review_wait
-  # can be idle for hours without touching the state file, but it still
-  # expects the worktree to remain in place for the eventual resolve step.
-  # The quarantine/ subdirectory is excluded from scanning.
+  # Only issues inside the current batch.state.json are examined. Worktrees for
+  # issues outside the batch — including manual /dev-build sessions, standalone
+  # /dev-pipeline runs, and artifacts from previous batches — are intentionally
+  # left untouched. This prevents cross-batch false-positives regardless of
+  # whether orch_archive_batch was called after the previous batch.
   local area=$1
-  local wt_base="$MONOREPO_ROOT/.workspace/worktrees/${area}"
-
-  if [ ! -d "$wt_base" ]; then return 0; fi
 
   local state
   state=$(orch_state_read "$area") || return 0
 
-  local d base issue_num in_batch
-  for d in "$wt_base"/issue-*/; do
-    [ -d "$d" ] || continue
-    base=$(basename "$d")
-    issue_num="${base#issue-}"
+  local issue status wt_path
+  while IFS= read -r issue; do
+    [ -n "$issue" ] || continue
 
-    # Skip if not purely numeric (e.g. malformed directory names)
-    case "$issue_num" in
-      *[!0-9]*) continue ;;
+    status=$(printf '%s' "$state" | jq -r --arg n "$issue" '.status[$n]')
+    case "$status" in
+      completed|failed|skipped_dep_failed) ;;
+      *) continue ;;
     esac
 
-    # Skip issues that are active in the current batch
-    in_batch=$(printf '%s' "$state" | jq -r --arg n "$issue_num" '.status[$n] // ""')
-    if [ -n "$in_batch" ]; then continue; fi
+    wt_path=$(orch_worktree_path "$area" "$issue")
+    [ -d "$wt_path" ] || continue
 
-    # Skip if this issue was never managed by the orchestrator.
-    # Manual /dev-build flows create the canonical issue-{N} worktree but do not
-    # create an orchestrator issues directory. Only candidates that the orchestrator
-    # dispatched (evidenced by the issues/{N}/ directory created in orch_dispatch)
-    # are eligible for orphan GC.
-    if [ ! -d "$ORCH_BASE/${area}/issues/${issue_num}" ]; then continue; fi
-
-    # Skip if any pipeline state file exists for this issue.
-    # A state file of any age means a pipeline owns the worktree — it may be
-    # live, paused in review_wait, or crashed but recoverable.
-    if [ -f "$PIPELINE_DIR/${area}/issue-${issue_num}.state.json" ]; then continue; fi
-
-    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch, no pipeline state) - quarantining"
-    orch_worktree_quarantine "$area" "$issue_num"
-  done
+    >&2 echo "[orchestrator] Orphan worktree for #${issue} (status=${status}) not cleaned up - quarantining"
+    if [ "$status" = "completed" ]; then
+      orch_worktree_remove "$area" "$issue"
+    else
+      orch_worktree_quarantine "$area" "$issue"
+    fi
+  done < <(printf '%s' "$state" | jq -r '.status | keys[]')
 }
 
 orch_disk_budget_gc() {
