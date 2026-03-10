@@ -24,7 +24,6 @@
 ## Next Steps
 
 
-
 ## Notes
 
 - Related PR: #127 (feat/issue-81-archive-rotation) merged into main
