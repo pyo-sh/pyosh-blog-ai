@@ -993,8 +993,8 @@ orch_archive_batch() {
 
   local archive_dir="$area_dir/archive/$batch_id"
   if [ -d "$archive_dir" ]; then
-    >&2 echo "[orchestrator] orch_archive_batch: archive already exists at $archive_dir"
-    return 0
+    >&2 echo "[orchestrator] orch_archive_batch: archive already exists at $archive_dir (batchId collision — stale state may remain in $area_dir)"
+    return 1
   fi
 
   mkdir -p "$archive_dir"
