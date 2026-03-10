@@ -581,9 +581,13 @@ orch_worktree_gc() {
 orch_orphan_gc() {
   # Usage: orch_orphan_gc <area>
   # Scans .workspace/worktrees/{area}/issue-* for truly orphan worktrees and
-  # quarantines them. A worktree is an orphan only when BOTH conditions hold:
+  # quarantines them. A worktree is an orphan only when ALL conditions hold:
   #   1. The issue is not in .status[] of the current batch.state.json.
-  #   2. No pipeline state file exists at
+  #   2. The orchestrator has an issues directory for this issue at
+  #      .workspace/orchestrate/{area}/issues/{N}/ (created by orch_dispatch).
+  #      Worktrees created by manual /dev-build flows (no issues dir) are
+  #      left alone unconditionally.
+  #   3. No pipeline state file exists at
   #      .workspace/pipeline/{area}/issue-{N}.state.json.
   #
   # A state file of ANY age is treated as a valid owner signal. This is
@@ -613,6 +617,13 @@ orch_orphan_gc() {
     # Skip issues that are active in the current batch
     in_batch=$(printf '%s' "$state" | jq -r --arg n "$issue_num" '.status[$n] // ""')
     if [ -n "$in_batch" ]; then continue; fi
+
+    # Skip if this issue was never managed by the orchestrator.
+    # Manual /dev-build flows create the canonical issue-{N} worktree but do not
+    # create an orchestrator issues directory. Only candidates that the orchestrator
+    # dispatched (evidenced by the issues/{N}/ directory created in orch_dispatch)
+    # are eligible for orphan GC.
+    if [ ! -d "$ORCH_BASE/${area}/issues/${issue_num}" ]; then continue; fi
 
     # Skip if any pipeline state file exists for this issue.
     # A state file of any age means a pipeline owns the worktree — it may be
