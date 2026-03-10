@@ -309,11 +309,12 @@ orch_dispatch() {
   local pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
 
   # Each attempt gets its own directory. Previous attempt artifacts are preserved.
-  # Remove stale terminal.json to prevent cross-batch collision: same attemptId
+  # Remove stale terminal.json and pid to prevent cross-batch collision: same attemptId
   # (e.g., issue-5-a0) across different batches would share the directory, and
   # orch_check_completion would read the old terminal.json as a valid result.
+  # The pid file must also be cleared so the startup-wait loop does not read a stale PID.
   mkdir -p "$attempt_dir"
-  rm -f "$attempt_dir/terminal.json"
+  rm -f "$attempt_dir/terminal.json" "$attempt_dir/pid"
 
   # Build review agent hint for the pipeline prompt.
   # The tool value tells the pipeline which CLI to use for the review subprocess.
@@ -349,6 +350,7 @@ orch_dispatch() {
     --allowedTools "Bash,Read,Edit,Write,Grep,Glob,Skill,Agent" \
     --max-turns 80 \
     "$prompt" > "$attempt_dir/worker.log" 2>"$attempt_dir/worker.err" &
+  local setsid_bgpid=$!
 
   # Wait for wrapper to write its PID
   local wait_count=0
@@ -359,12 +361,19 @@ orch_dispatch() {
 
   if [ ! -f "$pid_file" ]; then
     >&2 echo "[orchestrator] Process failed to start for issue #${issue} (no pid file after 5s)"
+    # Kill the orphaned setsid process group to prevent untracked background workers.
+    kill -- -"$setsid_bgpid" 2>/dev/null || kill "$setsid_bgpid" 2>/dev/null || true
     return 1
   fi
 
   local pid
   pid=$(cat "$pid_file")
   local pgid=$pid  # setsid session leader: PGID = PID
+
+  local start_time=""
+  if [ -f "/proc/$pid/stat" ]; then
+    start_time=$(awk -F')' '{print $2}' "/proc/$pid/stat" | awk '{print $20}') || true
+  fi
 
   if ! orch_process_alive "$pid"; then
     >&2 echo "[orchestrator] Process died immediately for issue #${issue}"
@@ -376,7 +385,7 @@ orch_dispatch() {
   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   if ! orch_state_update "$area" \
     ".dispatched[\"$issue\"] = {
-       pid: $pid, pgid: $pgid, attemptId: \"$attempt_id\",
+       pid: $pid, pgid: $pgid, startTime: \"$start_time\", attemptId: \"$attempt_id\",
        attemptDir: \"$attempt_dir\", dispatchedAt: \"$now\", lastActivity: \"$now\",
        lastCommitSha: null, lastCpuJiffies: \"0\",
        pipelineStarted: false, retryCount: $retry_count
