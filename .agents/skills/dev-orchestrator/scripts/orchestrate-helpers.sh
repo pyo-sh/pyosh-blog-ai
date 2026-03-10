@@ -460,31 +460,52 @@ _orch_worktree_repo_dir() {
 
 orch_worktree_quarantine() {
   # Usage: orch_worktree_quarantine <area> <issue>
-  # Moves the issue worktree to a timestamped quarantine directory for inspection.
-  # Prunes stale git worktree metadata after the move.
+  # Moves the issue worktree to a timestamped quarantine directory.
+  #
+  # Git metadata is preserved: after the move, the main repo's
+  # .git/worktrees/{name}/gitdir backlink is updated to the new quarantine path
+  # so that git commands (log, status, diff) continue to work inside the
+  # quarantined directory. Pruning is intentionally deferred — calling
+  # git worktree prune immediately after mv would remove the worktree entry
+  # and make the checkout unusable for post-mortem inspection.
   local area=$1 issue=$2
-  local wt_path repo_dir quarantine_dir ts dest
+  local wt_path repo_dir quarantine_dir ts dest old_gitdir_path
   wt_path=$(orch_worktree_path "$area" "$issue")
   repo_dir=$(_orch_worktree_repo_dir "$area")
   quarantine_dir="$MONOREPO_ROOT/.workspace/worktrees/${area}/quarantine"
 
   if [ ! -d "$wt_path" ]; then
-    # No worktree to quarantine; prune any stale git metadata.
-    git -C "$repo_dir" worktree prune 2>/dev/null || true
     return 0
   fi
+
+  # Record the pre-move gitdir path so we can update the backlink after mv.
+  old_gitdir_path="${wt_path}/.git"
 
   ts=$(date +%Y%m%d-%H%M%S)
   dest="${quarantine_dir}/issue-${issue}-${ts}"
   mkdir -p "$quarantine_dir"
-  if mv "$wt_path" "$dest"; then
-    git -C "$repo_dir" worktree prune 2>/dev/null || true
-    >&2 echo "[orchestrator] Quarantined worktree for #${issue}: $dest"
-    orch_disk_budget_gc "$area"
-  else
+
+  if ! mv "$wt_path" "$dest"; then
     >&2 echo "[orchestrator] WARNING: failed to quarantine worktree for #${issue}"
     return 1
   fi
+
+  # Update the gitdir backlink in the main repo's worktree entry so that
+  # git operations work inside the quarantine directory.
+  # .git/worktrees/{name}/gitdir holds the absolute path to the worktree's
+  # .git file. After mv that path is stale; point it to the new location.
+  local new_gitdir_path="${dest}/.git"
+  local gitdir_file
+  for gitdir_file in "${repo_dir}/.git/worktrees"/*/gitdir; do
+    [ -f "$gitdir_file" ] || continue
+    if [ "$(cat "$gitdir_file")" = "$old_gitdir_path" ]; then
+      printf '%s' "$new_gitdir_path" > "$gitdir_file"
+      break
+    fi
+  done
+
+  >&2 echo "[orchestrator] Quarantined worktree for #${issue}: $dest"
+  orch_disk_budget_gc "$area"
 }
 
 orch_worktree_remove() {
@@ -513,8 +534,12 @@ orch_worktree_remove() {
 orch_worktree_prepare() {
   # Usage: orch_worktree_prepare <area> <issue>
   # Ensures no stale worktree exists before dispatching a new attempt.
-  # If a stale worktree is found, quarantines it.
-  # Returns: 0 if ready, 1 on error.
+  # If a stale worktree is found AND no active pipeline state exists for the
+  # issue, quarantines it. An existing pipeline state file signals that a
+  # standalone /dev-pipeline run already owns the worktree; in that case the
+  # worktree is left in place and dispatch is aborted to avoid disrupting
+  # the live run.
+  # Returns: 0 if ready to dispatch, 1 on conflict or error.
   local area=$1 issue=$2
   local wt_path
   wt_path=$(orch_worktree_path "$area" "$issue")
@@ -523,6 +548,13 @@ orch_worktree_prepare() {
     # No stale worktree; prune any orphaned git metadata.
     git -C "$(_orch_worktree_repo_dir "$area")" worktree prune 2>/dev/null || true
     return 0
+  fi
+
+  # A pipeline state file signals an active /dev-pipeline run using this worktree.
+  # Do not quarantine — that would pull the checkout out from under a live run.
+  if [ -f "$PIPELINE_DIR/${area}/issue-${issue}.state.json" ]; then
+    >&2 echo "[orchestrator] orch_worktree_prepare: standalone pipeline active for #${issue} - cannot dispatch; worktree is owned by an active /dev-pipeline run"
+    return 1
   fi
 
   >&2 echo "[orchestrator] Stale worktree found for #${issue} - quarantining before retry"
