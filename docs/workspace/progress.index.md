@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-11 | Worker worktree isolation + GC for orchestrator - `orch_worktree_quarantine` (git metadata preservation + name collision), `orch_orphan_gc` (current-batch + `everDispatched` guard), `orch_disk_budget_gc` (500 MB ceiling), `everDispatched[N]` batch flag, `abnormal_exit`+merged PR→`completed` fix; SKILL.md lifecycle section; 11라운드 Codex 리뷰 (#82, PR #137) | done |
 | 2026-03-11 | dev-pipeline shell 잔재 제거 + dev-resolve 정리 + review template 준수 - `pipeline-helpers.sh`/`smoke-test.sh` 삭제, CLI 5개 추가(init/state-update/stage-retry/check-review/check-commits), SKILL.md shell→Python CLI 재작성, codex `normalize_codex_output()` blockquote 방식; 133 tests (#129, #133, PR #136) | done |
 | 2026-03-11 | dev-pipeline Python 마이그레이션 리뷰 피드백 수정 - CLAUDECODE env, step migration, review state filter, area validation, typed model, stale recovery, cmd_state fix, path validation, max review id; 128 tests (#129, #133, PR #134) | done |
 | 2026-03-11 | dev-pipeline 안정화 Epic 1 - review 3분할, `pipeline_run_review` 단일 진입점, `reviewJob` 메타 + 중복 방지, `pipeline_parse_review_body`, resolve 결정 테이블, state machine 전이 테이블, `pipeline_log_transition`, smoke test (#131, PR #130) | done |
