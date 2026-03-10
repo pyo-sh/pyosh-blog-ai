@@ -416,10 +416,11 @@ pipeline_run_headless_core() {
       cmd=(timeout "$timeout_sec" codex exec review --base "origin/${base_ref}")
       [ -n "$model" ] && cmd+=(--model "$model")
       cmd+=(
-        -c "history.save_history=false"
         --output-last-message "$last_msg_file"
       )
-      [ -n "$prompt" ] && cmd+=("$prompt")
+      # NOTE: codex exec review --base is mutually exclusive with [PROMPT].
+      # The format prompt is passed via pipeline_codex_review_prompt but cannot
+      # be used alongside --base. Drop the prompt when --base is active.
       (
         cd -- "$review_cwd" || exit 3
         "${cmd[@]}" > "$log" 2> "$err"

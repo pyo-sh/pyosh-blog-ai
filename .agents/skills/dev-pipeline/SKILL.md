@@ -48,7 +48,27 @@ git -C "$REPO_DIR" fetch origin
 git -C "$REPO_DIR" rebase origin/main || git -C "$REPO_DIR" merge origin/main
 ```
 
-Then run `/dev-build` as usual. After PR creation, write state with at least:
+Before calling `/dev-build`, write a minimal state file to establish a recovery entry point:
+
+```bash
+WORKTREE_PATH=$(pipeline_worktree_path "$ISSUE" "$AREA")
+cat > "$STATE_FILE" <<EOF
+{"version":2,"issue":$ISSUE,"area":"$AREA","pr":0,"branch":"","paths":{"skillCwd":"$MONOREPO_ROOT","repoDir":"$REPO_DIR","worktreeDir":"$WORKTREE_PATH"},"step":"build","lastReviewId":0,"lastCommitSha":"","skipReview":false,"reviewResolveRound":0,"maxReviewResolveRounds":5,"stageRetries":{"build":0,"review":0,"resolve":0,"merge":0},"maxStageRetries":3}
+EOF
+```
+
+Then run `/dev-build` as usual.
+
+After `/dev-build` returns, immediately (without ending your turn) read the PR number and branch, then update state to `step: "review"`:
+
+```bash
+WORKTREE_PATH=$(pipeline_worktree_path "$ISSUE" "$AREA")
+BRANCH=$(git -C "$WORKTREE_PATH" rev-parse --abbrev-ref HEAD)
+PR=$(gh pr list -R "$REPO" --head "$BRANCH" --json number --jq '.[0].number')
+LAST_COMMIT_SHA=$(git -C "$WORKTREE_PATH" rev-parse HEAD)
+```
+
+Then write the full state:
 
 ```json
 {
@@ -72,6 +92,8 @@ Then run `/dev-build` as usual. After PR creation, write state with at least:
   "maxStageRetries": 3
 }
 ```
+
+After writing state, immediately proceed to Step 2 (review). Do not output a progress message to the user and do not end your turn between pipeline steps.
 
 ### 2. Review (`step: review`)
 
@@ -316,6 +338,7 @@ pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH" "$PR"
 
 ## Constraints
 
+- **Do not end your turn between pipeline steps.** After each step completes, immediately proceed to the next step without outputting a progress summary to the user. Only report at major milestones (build complete with PR link, final merge success) or on error.
 - **Auto-merge** is allowed when: (1) review has Critical=0 AND Warning=0, or (2) user explicitly approves in Step 5
 - **User approval required** when: review-resolve loop reaches `maxReviewResolveRounds` with Critical/Warning still present (Step 5)
 - Source edits in the pipeline session are allowed only during the resolve step (Step 4b), and only in the issue worktree
