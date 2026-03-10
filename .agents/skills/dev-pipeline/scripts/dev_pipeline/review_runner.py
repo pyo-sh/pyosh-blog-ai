@@ -291,6 +291,8 @@ def normalize_codex_output(raw: str) -> str | None:
     if raw.lstrip().startswith("## Review Summary"):
         return raw.lstrip()
 
+    quoted = "\n".join(f"   > {line}" for line in raw.splitlines())
+
     return f"""## Review Summary
 
 **Verdict**: Request changes - 1 Warning issue found.
@@ -307,9 +309,7 @@ None
    The original Codex review output did not satisfy the required format.
    Review the raw content below and triage manually.
 
-   ```text
-   {raw}
-   ```
+{quoted}
 
 ### Suggestion
 
