@@ -406,8 +406,16 @@ def _dispatch_codex(
     )
 
     # Post codex review output to GitHub
-    if result.rc == 0 and log.exists() and log.stat().st_size > 0:
+    if result.rc == 0:
         from .github_client import post_review_comment
+
+        if not log.exists() or log.stat().st_size == 0:
+            print(
+                f"[review_runner] codex exited 0 but produced no output for "
+                f"issue #{issue} area={area} pr=#{pr}",
+                file=sys.stderr,
+            )
+            return 1
 
         raw = log.read_text()
         normalized = normalize_codex_output(raw)

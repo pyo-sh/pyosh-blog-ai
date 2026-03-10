@@ -285,9 +285,8 @@ If no changes were staged (all items skipped or already fixed), skip directly to
 Write and post a response comment summarizing fixed and skipped items:
 
 ```bash
-MSG_DIR="/workspace/.workspace/pipeline/${AREA}/messages"
-mkdir -p "$MSG_DIR"
-MSG_FILE="${MSG_DIR}/pr-${PR}-response.md"
+MSG_FILE="/workspace/.workspace/messages/${AREA}-pr-${PR}-response.md"
+mkdir -p "$(dirname "$MSG_FILE")"
 # Write response body to MSG_FILE (Fixed table | Skipped table)
 gh pr comment "$PR" -R "$REPO" --body-file "$MSG_FILE"
 rm -f "$MSG_FILE"
