@@ -554,22 +554,16 @@ orch_worktree_remove() {
 orch_worktree_prepare() {
   # Usage: orch_worktree_prepare <area> <issue> [retry_count]
   # Ensures no stale worktree exists before dispatching a new attempt.
+  # Quarantines any existing worktree unconditionally.
   #
-  # retry_count > 0: the orchestrator is retrying a known-failed attempt.
-  # The existing worktree belongs to our previous attempt — quarantine it.
+  # A pre-existing worktree on first dispatch (retry_count == 0) is treated
+  # as a stale artifact from a previous batch or an abandoned run and is
+  # always quarantined. This allows automatic batch recovery without manual
+  # cleanup when the orchestrator is restarted after a crash. Running the
+  # orchestrator and a manual session concurrently for the same issue is not
+  # supported and should be avoided by the operator.
   #
-  # retry_count == 0 (first dispatch in current batch): use .everDispatched
-  # from batch state to decide:
-  #   - everDispatched["N"] == true: the issue was dispatched earlier in the
-  #     current batch (e.g., the orchestrator crashed between dispatch and GC).
-  #     The worktree is our own stale artifact — quarantine it.
-  #   - everDispatched["N"] absent/false: the worktree was created by an
-  #     external session (manual /dev-build or a previous batch that was not
-  #     archived). Refuse the dispatch (return 1) so the caller can mark the
-  #     issue failed and report a conflict rather than silently overwriting
-  #     active work.
-  #
-  # Returns: 0 if ready to dispatch, 1 on conflict or error.
+  # Returns: 0 if ready to dispatch, 1 on error.
   local area=$1 issue=$2 retry_count=${3:-0}
   local wt_path
   wt_path=$(orch_worktree_path "$area" "$issue")
@@ -580,26 +574,8 @@ orch_worktree_prepare() {
     return 0
   fi
 
-  if [ "$retry_count" -gt 0 ]; then
-    >&2 echo "[orchestrator] Stale worktree found for #${issue} (retry ${retry_count}) - quarantining before retry"
-    orch_worktree_quarantine "$area" "$issue"
-    return $?
-  fi
-
-  # First dispatch: check whether the issue was previously dispatched in the
-  # current batch. If yes, the stale worktree is ours to clean up. If no,
-  # treat it as an external conflict and refuse.
-  local ever_dispatched
-  ever_dispatched=$(orch_state_read "$area" 2>/dev/null | \
-    jq -r --arg n "$issue" '.everDispatched[$n] // false')
-
-  if [ "$ever_dispatched" = "true" ]; then
-    >&2 echo "[orchestrator] Stale worktree from previous dispatch for #${issue} - quarantining"
-    orch_worktree_quarantine "$area" "$issue"
-  else
-    >&2 echo "[orchestrator] WARNING: worktree for #${issue} exists but was not created by the current batch - refusing (external session or unarchived previous batch)"
-    return 1
-  fi
+  >&2 echo "[orchestrator] Stale worktree found for #${issue} - quarantining before dispatch"
+  orch_worktree_quarantine "$area" "$issue"
 }
 
 orch_worktree_gc() {
