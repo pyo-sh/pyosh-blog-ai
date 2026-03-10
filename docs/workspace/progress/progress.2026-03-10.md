@@ -1,5 +1,22 @@
 # 2026-03-10 Progress
 
+## Attempt isolation - attemptId + artifact directory separation (#79)
+
+attemptId를 `issue-{N}-a{M}` 포맷으로 변경하고, per-attempt 디렉토리 구조를 도입하여
+retry 시 이전 attempt artifact를 보존하도록 했다.
+
+### 핵심 변경
+
+- `orch_attempt_id` 포맷: `{batchId}-issue{N}-attempt{M}` → `issue-{N}-a{M}`
+- `orch_attempt_dir()` 신규: `.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/`
+- `orch_terminal_path()` 시그니처 변경: `(area, issue)` → `(area, issue, attemptId)`
+- `orch_dispatch`: flat file 대신 attempt dir 생성, cross-batch collision 방지용 `rm -f terminal.json`
+- `orch-dispatch-wrapper.sh`: `attempt_dir` 파라미터 수용, 파일 경로 파생
+- `orch_check_completion` / `orch_detect_stall`: attempt dir 기반 경로 해석
+- dispatched state: `log` 필드 → `attemptDir` 필드
+- `orch_signal_path` alias 제거
+- SKILL.md, state-detection.md, recovery.md 업데이트
+
 ## Pipeline direct resolve + auto-merge (PR #121, #120)
 
 headless `/dev-resolve` sub-agent를 제거하고 pipeline 세션에서 직접 resolve하도록 전환했다.

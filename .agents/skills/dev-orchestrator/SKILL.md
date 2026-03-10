@@ -26,18 +26,23 @@ Store in state as `"agent": "claude:sonnet"` etc. Model aliases (`sonnet`, `opus
 ## State files
 
 ```
-.workspace/orchestrate/{area}/batch.state.json   # batch-level DAG + status + provider health
-.workspace/orchestrate/{area}/issue-{N}.exit     # exit file JSON (attemptId, status, rc, endedAt)
-.workspace/orchestrate/{area}/issue-{N}.log      # stdout from headless process
-.workspace/orchestrate/{area}/issue-{N}.err      # stderr from headless process
-.workspace/orchestrate/{area}/issue-{N}.heartbeat  # epoch timestamp, updated every 60s
-.workspace/orchestrate/{area}/issue-{N}.pid      # wrapper PID (= PGID), transient
-.workspace/orchestrate/{area}/gh-errors.log      # captured stderr from failed gh calls
+.workspace/orchestrate/{area}/batch.state.json                          # batch-level DAG + status + provider health
+.workspace/orchestrate/{area}/gh-errors.log                             # captured stderr from failed gh calls
+.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/          # per-attempt artifact directory
+  terminal.json   # completion contract (attemptId, status, prNumber, merged, headSha)
+  worker.log      # stdout from headless process
+  worker.err      # stderr from headless process
+  heartbeat       # epoch timestamp, updated every 60s
+  pid             # wrapper PID (= PGID), transient
 ```
+
+`attemptId` format: `issue-{N}-a{M}` where M is the retry count (0-based).
+
+Each retry creates a new attempt directory. Previous attempt artifacts are preserved for debugging. Stale artifact confusion is eliminated because paths are unique per attempt.
 
 Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
 
-State file updates use `flock` for mutual exclusion. Exit files use JSON with `attemptId` matching to prevent stale file collision across batches and retries.
+State file updates use `flock` for mutual exclusion.
 
 ## Workflow
 

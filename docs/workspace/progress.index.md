@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-10 | Attempt isolation - attemptId + artifact directory separation, attemptId format `issue-{N}-a{M}`, per-attempt directory `.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/`, previous attempt artifact preservation (#79) | done |
 | 2026-03-10 | Pipeline direct resolve + auto-merge - headless resolve 제거, 직접 resolve 전환, review-resolve 자동 루프(5라운드), severity 기반 auto-merge, lock fencing+grace-period reclaim (#120, PR #121) | done |
 | 2026-03-10 | Pipeline headless CLAUDECODE unset + audit fixes - CLAUDECODE 미해제 버그 수정, gh stderr mktemp 격리, meta guard, merge lock 서브셸, rc=2 API 오류, SKILL.md 경로 수정 (PR #119) | done |
 | 2026-03-09 | Orchestrator terminal result contract - terminal.json schema 도입, orch_check_completion 재작성 (terminal file만이 completed 근거), PR fallback 보조화 (#78) | done |

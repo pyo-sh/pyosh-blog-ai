@@ -39,7 +39,7 @@ fi
 ### 3. Reconcile dispatched issues
 
 For each issue with status `dispatched`, check completion using the priority chain
-(exit file JSON + attemptId match, then process group alive, then PR status):
+(terminal.json in attempt directory + attemptId match, then process group alive, then PR status):
 
 ```bash
 DISPATCHED=$(echo "$STATE" | jq -r '.dispatched | keys[]')
@@ -132,11 +132,14 @@ Maximum 1 automatic re-dispatch per issue. Track in state:
   "5": {
     "pid": 12345,
     "pgid": 12345,
-    "attemptId": "batch-20260308-issue5-attempt1",
+    "attemptId": "issue-5-a1",
+    "attemptDir": ".workspace/orchestrate/{area}/issues/5/attempts/issue-5-a1",
     "retryCount": 1
   }
 }
 ```
+
+Each retry creates a new attempt directory. Previous attempt artifacts (`issue-5-a0/`) remain for debugging.
 
 If `retryCount >= 1` and process dies again, mark `failed` and report to user.
 Do not retry a third time automatically.

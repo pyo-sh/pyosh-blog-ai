@@ -15,13 +15,15 @@ the orchestrator receives `abnormal_exit` (see completion detection below).
 ### Schema (schemaVersion 1)
 
 ```
-.workspace/orchestrate/{area}/issue-{N}.terminal.json
+.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/terminal.json
 ```
+
+`attemptId` format: `issue-{N}-a{M}` (e.g., `issue-78-a0` for first attempt).
 
 ```json
 {
   "schemaVersion": 1,
-  "attemptId": "batch-20260308-issue78-attempt0",
+  "attemptId": "issue-78-a0",
   "issue": 78,
   "status": "completed",
   "prNumber": 123,
@@ -44,9 +46,7 @@ the orchestrator receives `abnormal_exit` (see completion detection below).
 | `finishedAt` | ISO-8601 UTC | When the wrapper exit trap ran |
 | `reason` | string | Human-readable exit summary |
 
-**attemptId matching**: Only trust the terminal file if its `attemptId` matches the
-current dispatch's `attemptId` in batch state. Mismatched files are ignored (stale
-from a previous batch or retry).
+**Attempt isolation**: Each attempt writes to its own directory (`issues/{N}/attempts/{attemptId}/`). Previous attempt artifacts are preserved. Within a batch, directory separation prevents stale collision across retries. Across batches, `orch_dispatch` removes `terminal.json` before launching the wrapper (same attemptId may reoccur across batches since batchId is not part of the format). The `attemptId` field in terminal.json provides an additional validation layer.
 
 ## Completion detection
 
@@ -121,7 +121,7 @@ like `projectCards` - use `number,title,state,body,url` only.
 
 ### Detection priority
 
-1. **Heartbeat** (strongest): `.workspace/orchestrate/{area}/issue-{N}.heartbeat`
+1. **Heartbeat** (strongest): `{attemptDir}/heartbeat`
    - Written every 60s by `orch-dispatch-wrapper.sh`
    - If last heartbeat < 120s ago -> `active`
 
