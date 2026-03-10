@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-11 | Codex headless review 3 bugs + SKILL turn conflict - `--sandbox danger-full-access` → `--dangerously-bypass-approvals-and-sandbox`, stderr→log redirect, SKILL.md turn-end + task-notification wait + review carve-out (#128) | done |
 | 2026-03-11 | Archive + rotation for orchestrator - `orch_archive_batch` / `orch_archive_list` / `orch_archive_rotate` helper functions, batchId collision-resistance, `.archived-at` rotation ordering, SKILL.md + recovery.md 업데이트 (#81, PR #127) | done |
 | 2026-03-10 | Pipeline auto-proceed + codex review bug fixes - build 후 자동 진행 미작동(pre-build state + 턴 종료 금지), codex --base+prompt 충돌, config schema 오류, sandbox 중첩 getdents64 차단(danger-full-access), --output-last-message 빈 파일(stdout 직접 사용) | done |
 | 2026-03-10 | Orchestrator atomic state + process group termination - dispatched worker identity에 startTime 추가, flock 직렬화 + kill -- -pgid 기존 구현 확인, acceptance criteria 완료 (#80) | done |

@@ -3,6 +3,7 @@
 ## Completed
 
 - [x] Archive + rotation for orchestrator - `orch_archive_batch`, `orch_archive_list`, `orch_archive_rotate` helper functions added to `orchestrate-helpers.sh`; SKILL.md Step 6 + recovery.md updated; batchId collision-resistance improved (#81, PR #127)
+- [x] Codex headless review 3 bugs + SKILL turn conflict - `--sandbox danger-full-access` → `--dangerously-bypass-approvals-and-sandbox`; codex stderr→log redirect (`> /dev/null 2>"$log"`); SKILL.md Required runtime shape + Step 2 turn-end + task-notification wait clarified; codex "stdout" note corrected to "stderr"; "Do not end turn" constraint got review carve-out (#128)
 
 ## Discoveries
 
@@ -21,7 +22,7 @@
 
 ## Next Steps
 
-- [ ] Fix `--sandbox danger-full-access` invalid flag bug in `pipeline-helpers.sh` line 412 (separate issue)
+
 
 ## Notes
 
