@@ -96,8 +96,8 @@ If the batch is already complete (all issues terminal) but state file remains:
 
 ```bash
 orch_print_summary "$AREA"
-rm -rf ".workspace/orchestrate/$AREA/"
-echo "[recovery] Stale state cleaned up."
+orch_archive_batch "$AREA"
+echo "[recovery] Stale state archived."
 ```
 
 ## Per-status recovery

@@ -67,8 +67,10 @@ orch_init() {
 
   mkdir -p "$ORCH_BASE/$area"
 
-  local batch_id
-  batch_id="batch-$(date +%Y%m%d-%H%M%S)"
+  local batch_id nonce
+  # Use shell arithmetic to avoid SIGPIPE from tr|head under set -e -o pipefail.
+  nonce=$(printf '%04x' "$(( (RANDOM % 256) * 256 + (RANDOM % 256) ))")
+  batch_id="batch-$(date +%Y%m%d-%H%M%S)-${nonce}"
 
   # Filter DAG: remove deps not in the batch to prevent permanent blocks.
   # External deps (closed issues, out-of-batch) are treated as already satisfied.
@@ -964,4 +966,160 @@ orch_print_summary() {
     echo "These are marked 'failed' but the PR was actually merged. Manual review recommended:"
     echo "$state" | jq -r '(.mergedWithoutTerminal // [])[] | "  Issue #\(.issue) - PR #\(.pr) - detected \(.detectedAt)"'
   fi
+}
+
+# ──────────────────────────────────────────────
+# Archive + rotation
+# ──────────────────────────────────────────────
+
+orch_archive_batch() {
+  # Usage: orch_archive_batch <area>
+  # Moves the completed batch directory to archive/{batchId}/ for audit preservation.
+  # Applies rotation policy after archiving (see orch_archive_rotate).
+  # Returns: 0 on success, 1 on failure.
+  local area=$1
+  local area_dir="$ORCH_BASE/$area"
+  local state_file="$area_dir/batch.state.json"
+
+  if [ ! -f "$state_file" ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: no state file at $state_file"
+    return 1
+  fi
+
+  local batch_id
+  batch_id=$(jq -r '.batchId // empty' "$state_file")
+  if [ -z "$batch_id" ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: batchId missing from state"
+    return 1
+  fi
+
+  local non_terminal
+  non_terminal=$(jq '[.status | to_entries[] | select(.value == "pending" or .value == "blocked" or .value == "dispatched")] | length' "$state_file")
+  if [ "${non_terminal:-0}" -gt 0 ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: $non_terminal issue(s) still non-terminal — archive blocked until all issues complete"
+    return 1
+  fi
+
+  local archive_dir="$area_dir/archive/$batch_id"
+  if [ -d "$archive_dir" ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: archive already exists at $archive_dir (batchId collision — stale state may remain in $area_dir)"
+    return 1
+  fi
+
+  mkdir -p "$archive_dir"
+
+  # Record high-precision creation time for deterministic rotation ordering.
+  date +%s%N > "$archive_dir/.archived-at" 2>/dev/null || date +%s > "$archive_dir/.archived-at"
+
+  # Move all area-level files and directories (including hidden) except archive.
+  local item
+  for item in "$area_dir"/* "$area_dir"/.[!.]*; do
+    [ -e "$item" ] || continue
+    local base
+    base=$(basename "$item")
+    [ "$base" = "archive" ] && continue
+    mv "$item" "$archive_dir/"
+  done
+
+  >&2 echo "[orchestrator] Archived batch $batch_id to $archive_dir"
+
+  orch_archive_rotate "$area"
+  return 0
+}
+
+orch_archive_list() {
+  # Usage: orch_archive_list <area>
+  # Prints a table of archived batches for the given area, newest first.
+  # Columns: batchId | archivedAt (mtime) | issues | statuses
+  local area=$1
+  local archive_root="$ORCH_BASE/$area/archive"
+
+  if [ ! -d "$archive_root" ]; then
+    echo "(no archives for area: $area)"
+    return 0
+  fi
+
+  echo ""
+  echo "=== Archived Batches: $area ==="
+  printf "%-26s %-22s %-10s %s\n" "BatchId" "ArchivedAt" "Issues" "Statuses"
+  echo "-----------------------------------------------------------------------"
+
+  # Sort by modification time, newest first (stat -c %Y gives epoch seconds).
+  local entries=()
+  local d
+  for d in "$archive_root"/*/; do
+    [ -d "$d" ] || continue
+    local mtime
+    mtime=$(stat -c %Y "$d")
+    entries+=("$mtime $d")
+  done
+
+  # Sort descending by mtime
+  local sorted
+  sorted=$(printf '%s\n' "${entries[@]}" | sort -rn)
+
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    local entry_dir
+    entry_dir=$(echo "$line" | cut -d' ' -f2-)
+    local bid
+    bid=$(basename "$entry_dir")
+    local archived_at
+    archived_at=$(stat -c %y "$entry_dir" | cut -c1-19)
+    local state_file="$entry_dir/batch.state.json"
+    local issue_count="?"
+    local statuses="?"
+    if [ -f "$state_file" ]; then
+      issue_count=$(jq '.issues | length' "$state_file")
+      statuses=$(jq -r '.status | to_entries | map("\(.key):\(.value)") | join(" ")' "$state_file")
+    fi
+    printf "%-26s %-22s %-10s %s\n" "$bid" "$archived_at" "$issue_count" "$statuses"
+  done <<< "$sorted"
+
+  echo "======================================================================="
+}
+
+orch_archive_rotate() {
+  # Usage: orch_archive_rotate <area> [max_keep]
+  # Deletes oldest archived batches, keeping only the most recent max_keep entries.
+  # Default: keep last 5. Deletion is permanent (oldest archives are removed).
+  local area=$1
+  local max_keep=${2:-5}
+  local archive_root="$ORCH_BASE/$area/archive"
+
+  if [ ! -d "$archive_root" ]; then
+    return 0
+  fi
+
+  # Collect directories sorted oldest-first by .archived-at timestamp for deterministic rotation.
+  local entries=()
+  local d
+  for d in "$archive_root"/*/; do
+    [ -d "$d" ] || continue
+    local ts
+    ts=$(cat "$d/.archived-at" 2>/dev/null || stat -c %Y "$d")
+    entries+=("$ts $d")
+  done
+
+  local total=${#entries[@]}
+  if [ "$total" -le "$max_keep" ]; then
+    return 0
+  fi
+
+  local to_delete=$(( total - max_keep ))
+  local sorted
+  sorted=$(printf '%s\n' "${entries[@]}" | sort -n)
+
+  local deleted=0
+  while IFS= read -r line; do
+    [ "$deleted" -ge "$to_delete" ] && break
+    [ -z "$line" ] && continue
+    local old_dir
+    old_dir=$(echo "$line" | cut -d' ' -f2-)
+    local old_bid
+    old_bid=$(basename "$old_dir")
+    rm -rf "$old_dir"
+    >&2 echo "[orchestrator] Rotated out old archive: $old_bid"
+    deleted=$(( deleted + 1 ))
+  done <<< "$sorted"
 }
