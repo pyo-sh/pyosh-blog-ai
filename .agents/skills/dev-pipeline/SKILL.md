@@ -13,14 +13,35 @@ description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge 
 4. **Merge lock is held inside one helper call** (`pipeline_merge_pr`), not across multiple Bash tool calls.
 5. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees`).
 6. **Resolve runs directly in the pipeline session**, not as a headless sub-agent.
+7. **Review dispatch always goes through `pipeline_run_review`**. Never run `codex exec review` or `claude -p` for review directly in the pipeline session.
 
 > Source helpers: `source .agents/skills/dev-pipeline/scripts/pipeline-helpers.sh`
 > Canonical worktree path: `.workspace/worktrees/{area}/issue-{N}`
 > Canonical state path: `.workspace/pipeline/{area}/issue-{N}.state.json`
 
+## State machine
+
+| From step | To step | Trigger | Turn break? |
+|---|---|---|---|
+| `build` | `review_dispatch` | /dev-build + PR created | No |
+| `review_dispatch` | `review_wait` | Background review dispatched | **Yes** - end turn |
+| `review_wait` | `review_process` | Task-notification + review found on GitHub | No |
+| `review_wait` | `review_dispatch` | Task-notification + review not found + job failed | No |
+| `review_process` | `resolve` | Critical > 0 or Warning > 0 | No |
+| `review_process` | `merge` | Critical = 0 and Warning = 0 | No |
+| `resolve` | `review_dispatch` | skipReview=false, fixes applied | No |
+| `resolve` | `merge` | skipReview=true | No |
+| `merge` | `log` | PR merged | No |
+| `log` | (done) | Cleanup complete | No |
+
+Only `review_dispatch -> review_wait` requires a turn break.
+All other transitions must happen within the same turn.
+
 ## Required runtime shape
 
 For any long-running `pipeline_run_review` Bash call, the Bash tool invocation itself must use **background mode**. The helper remains synchronous, but the outer tool call must not be foreground-blocked because the Bash-tool timeout can be shorter than Claude's internal timeout.
+
+After launching the background Bash call for review (step `review_dispatch`), **end your turn immediately and wait for the task-notification**. Do not sleep, poll, or output intermediate status. Resume processing only after you receive the completion notification. This is the only pipeline step where ending the turn between steps is correct - it is required to avoid forbidden sleep/poll behaviour while waiting for a long-running background process.
 
 ## Workflow
 
@@ -53,13 +74,13 @@ Before calling `/dev-build`, write a minimal state file to establish a recovery 
 ```bash
 WORKTREE_PATH=$(pipeline_worktree_path "$ISSUE" "$AREA")
 cat > "$STATE_FILE" <<EOF
-{"version":2,"issue":$ISSUE,"area":"$AREA","pr":0,"branch":"","paths":{"skillCwd":"$MONOREPO_ROOT","repoDir":"$REPO_DIR","worktreeDir":"$WORKTREE_PATH"},"step":"build","lastReviewId":0,"lastCommitSha":"","skipReview":false,"reviewResolveRound":0,"maxReviewResolveRounds":5,"stageRetries":{"build":0,"review":0,"resolve":0,"merge":0},"maxStageRetries":3}
+{"version":2,"issue":$ISSUE,"area":"$AREA","pr":0,"branch":"","paths":{"skillCwd":"$MONOREPO_ROOT","repoDir":"$REPO_DIR","worktreeDir":"$WORKTREE_PATH"},"step":"build","lastReviewId":0,"lastCommitSha":"","skipReview":false,"reviewResolveRound":0,"maxReviewResolveRounds":5,"stageRetries":{"build":0,"review_dispatch":0,"review_wait":0,"review_process":0,"resolve":0,"merge":0},"maxStageRetries":3,"reviewJob":{"runId":"","status":"idle","startedAt":null,"finishedAt":null,"tool":"","model":""},"transitionLog":[]}
 EOF
 ```
 
 Then run `/dev-build` as usual.
 
-After `/dev-build` returns, immediately (without ending your turn) read the PR number and branch, then update state to `step: "review"`:
+After `/dev-build` returns, immediately (without ending your turn) read the PR number and branch, then update state to `step: "review_dispatch"`:
 
 ```bash
 WORKTREE_PATH=$(pipeline_worktree_path "$ISSUE" "$AREA")
@@ -82,22 +103,24 @@ Then write the full state:
     "repoDir": "/workspace/client",
     "worktreeDir": "/workspace/.workspace/worktrees/client/issue-42"
   },
-  "step": "review",
+  "step": "review_dispatch",
   "lastReviewId": 0,
   "lastCommitSha": "<sha>",
   "skipReview": false,
   "reviewResolveRound": 0,
   "maxReviewResolveRounds": 5,
-  "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
-  "maxStageRetries": 3
+  "stageRetries": { "build": 0, "review_dispatch": 0, "review_wait": 0, "review_process": 0, "resolve": 0, "merge": 0 },
+  "maxStageRetries": 3,
+  "reviewJob": { "runId": "", "status": "idle", "startedAt": null, "finishedAt": null, "tool": "", "model": "" },
+  "transitionLog": []
 }
 ```
 
-After writing state, immediately proceed to Step 2 (review). Do not output a progress message to the user and do not end your turn between pipeline steps.
+After writing state, immediately proceed to Step 2a (review dispatch). Do not output a progress message to the user and do not end your turn between pipeline steps.
 
-### 2. Review (`step: review`)
+### 2a. Review dispatch (`step: review_dispatch`)
 
-Recovery entry:
+Check GitHub for an existing review first:
 
 ```bash
 REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
@@ -105,39 +128,50 @@ RC=$?
 [ $RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews - abort"; return 1; }
 ```
 
-If found (`RC=0`), skip to Step 3.
+If found (`RC=0`), skip directly to Step 3 (`review_process`).
 
-Otherwise start headless review **from monorepo root** using the stage-specific wrapper:
+Otherwise write job metadata and dispatch the background review:
 
 ```bash
+pipeline_state_update "$ISSUE" "$AREA" '.step = "review_wait"'
 LOG=$(pipeline_run_review "$ISSUE" "$AREA" "$PR" "$TOOL" "$MODEL")
-RC=$?
-REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
-REVIEW_RC=$?
-[ $REVIEW_RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews after headless run - abort"; return 1; }
 ```
 
-Tool defaults to `claude`. When `TOOL=codex`, review runs via `codex exec review --base origin/main` from the worktree, and the helper posts the stdout to GitHub automatically.
+Tool defaults to `claude`. When `TOOL=codex`, review runs via `codex exec review --base origin/main` from the worktree, and the helper posts the output to GitHub automatically. Note: codex writes all output (progress + final review) to stderr; stdout is always empty. The helper redirects stderr to the log file and discards stdout.
 
 Rules:
 - This Bash call itself must run in background mode.
 - For `claude`: never pass the worktree path as the process cwd.
 - For `codex`: the helper runs from the worktree (needed for `--base origin/main` diff).
 - Always treat GitHub API as source of truth after exit.
+- **End turn immediately after dispatching.** Do not sleep, poll, or output intermediate status.
 
-Outcome (combine `RC` from headless run and `REVIEW_RC` from API check):
+### 2b. Review wait (`step: review_wait`)
+
+Entered on resume after task-notification. Check GitHub and job metadata:
+
+```bash
+REVIEW_ID=$(pipeline_check_review_exists "$AREA" "$PR" "$LAST_REVIEW_ID")
+RC=$?
+[ $RC -eq 2 ] && { echo "[pipeline] gh API error checking reviews - abort"; return 1; }
+```
+
+Outcome:
 
 ```bash
 if [ -n "$REVIEW_ID" ]; then
-  # Review found -> Step 3
-elif [ $RC -ne 0 ]; then
-  # Headless failed + no review -> pipeline_stage_retry, then retry Step 2
+  # Review found -> Step 3 (review_process)
 else
-  # Headless succeeded but no review posted -> pipeline_format_escalation, report to user
+  JOB_STATUS=$(pipeline_state_read "$ISSUE" "$AREA" | jq -r '.reviewJob.status')
+  if [ "$JOB_STATUS" = "failed" ]; then
+    # Job failed + no review -> pipeline_stage_retry, set step=review_dispatch, re-enter 2a
+  else
+    # Headless succeeded but no review posted -> pipeline_format_escalation, report to user
+  fi
 fi
 ```
 
-### 3. Process review (`step: review`)
+### 3. Process review (`step: review_process`)
 
 Fetch review:
 
@@ -147,9 +181,23 @@ REVIEW_JSON=$(pipeline_fetch_review "$AREA" "$PR" "$REVIEW_ID")
 
 Update:
 - `.lastReviewId = REVIEW_ID`
-- `.stageRetries.review = 0`
+- `.stageRetries.review_dispatch = 0`
+- `.stageRetries.review_wait = 0`
+- `.stageRetries.review_process = 0`
 
-Parse the review summary table to extract severity counts (`CRITICAL`, `WARNING`, `SUGGESTION`).
+Parse using the helper:
+
+```bash
+REVIEW_BODY=$(printf '%s' "$REVIEW_JSON" | jq -r '.body')
+COUNTS=$(pipeline_parse_review_body "$REVIEW_BODY")
+RC=$?
+[ $RC -ne 0 ] && { pipeline_format_escalation "$ISSUE" "$AREA" "review_process"; return 1; }
+CRITICAL=$(printf '%s' "$COUNTS" | jq -r '.critical')
+WARNING=$(printf '%s' "$COUNTS" | jq -r '.warning')
+SUGGESTION=$(printf '%s' "$COUNTS" | jq -r '.suggestion')
+```
+
+If `pipeline_parse_review_body` fails, escalate immediately - do not attempt to continue with zero counts.
 
 Then decide:
 
@@ -197,15 +245,14 @@ LOCAL_HEAD=$(git -C "$WORKTREE_PATH" rev-parse HEAD 2>/dev/null || true)
 
 If `LOCAL_HEAD` is empty, the worktree is corrupt - escalate and abort.
 
-If `LOCAL_HEAD` differs from `$LAST_COMMIT_SHA` and the working tree is clean (`git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet`), a local commit exists (possibly unpushed). Push it and skip to 4d. If push fails, `pipeline_stage_retry` and retry the resolve step:
+Decision table based on `LOCAL_HEAD` vs `LAST_COMMIT_SHA` and working tree state:
 
-```bash
-pipeline_push_branch_safely "$WORKTREE_PATH"
-```
-
-If `LOCAL_HEAD` differs but the working tree is dirty, report to the user for manual resolution and **stop** (uncommitted changes from a previous session may exist). Do not proceed to remote check or resolve.
-
-Otherwise (LOCAL_HEAD matches LAST_COMMIT_SHA), check for dirty/staged state first. If `git -C "$WORKTREE_PATH" diff --quiet && git -C "$WORKTREE_PATH" diff --cached --quiet` fails, report to the user and **stop** (partial resolve from a previous session may exist). Do not proceed to remote check or resolve.
+| LOCAL_HEAD vs LAST_COMMIT_SHA | Working tree | Action |
+|---|---|---|
+| mismatch (LOCAL_HEAD != SHA) | clean | Push LOCAL_HEAD, skip to 4d |
+| mismatch (LOCAL_HEAD != SHA) | dirty | STOP - report uncommitted changes, do not push |
+| match | dirty/staged | STOP - report partial resolve from previous session |
+| match | clean | Continue with remote check -> 4a |
 
 Check the remote:
 
@@ -276,7 +323,7 @@ Update:
 
 Then:
 - `skipReview: true` -> update `.step = "merge"`, go to Step 6
-- `skipReview: false` -> update `.step = "review"`, go to Step 2 (auto re-review)
+- `skipReview: false` -> update `.step = "review_dispatch"`, go to Step 2a (auto re-review)
 
 ### 5. Round limit reached (`reviewResolveRound >= maxReviewResolveRounds`)
 
@@ -338,7 +385,7 @@ pipeline_cleanup "$ISSUE" "$AREA" "$BRANCH" "$PR"
 
 ## Constraints
 
-- **Do not end your turn between pipeline steps.** After each step completes, immediately proceed to the next step without outputting a progress summary to the user. Only report at major milestones (build complete with PR link, final merge success) or on error.
+- **Do not end your turn between pipeline steps.** After each step completes, immediately proceed to the next step without outputting a progress summary to the user. Only report at major milestones (build complete with PR link, final merge success) or on error. **Exception: Step 2a (`review_dispatch`).** After launching the background Bash call for `pipeline_run_review`, end your turn and wait for the task-notification. Do not sleep or poll. Resume from the task-notification by reading state, then continue with the outcome check in Step 2b (`review_wait`) and Step 3 (`review_process`).
 - **Auto-merge** is allowed when: (1) review has Critical=0 AND Warning=0, or (2) user explicitly approves in Step 5
 - **User approval required** when: review-resolve loop reaches `maxReviewResolveRounds` with Critical/Warning still present (Step 5)
 - Source edits in the pipeline session are allowed only during the resolve step (Step 4b), and only in the issue worktree
