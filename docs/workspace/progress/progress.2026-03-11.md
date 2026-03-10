@@ -5,6 +5,7 @@
 - [x] Archive + rotation for orchestrator - `orch_archive_batch`, `orch_archive_list`, `orch_archive_rotate` helper functions added to `orchestrate-helpers.sh`; SKILL.md Step 6 + recovery.md updated; batchId collision-resistance improved (#81, PR #127)
 - [x] Codex headless review 3 bugs + SKILL turn conflict - `--sandbox danger-full-access` → `--dangerously-bypass-approvals-and-sandbox`; codex stderr→log redirect (`> /dev/null 2>"$log"`); SKILL.md Required runtime shape + Step 2 turn-end + task-notification wait clarified; codex "stdout" note corrected to "stderr"; "Do not end turn" constraint got review carve-out (#128)
 - [x] dev-pipeline 안정화 Epic 1 - review 상태 3분할(`review_dispatch/review_wait/review_process`), `pipeline_run_review` 단일 진입점 강제, `reviewJob` 메타데이터 + 중복 dispatch 방지(`_pipeline_review_fail` early-return 보호 포함), `pipeline_parse_review_body` canonical schema, resolve 4-case 결정 테이블, state machine 전이 테이블, `pipeline_log_transition` + escalation 개선 + subprocess 로그, `tests/smoke-test.sh` 8 cases (#131, PR #130)
+- [x] dev-pipeline Python 마이그레이션 리뷰 피드백 수정 + 잔여 개선 - CLAUDECODE env leak `replace_env=True`, legacy step migration `"review"` -> `"review_dispatch"`, review state 필터링 (DISMISSED/PENDING 제외), area validation `paths.py` 중앙화, meta startedAt 보존, typed model 도입 (`state_read` -> `PipelineState`, `state_write` -> `PipelineState`), stale review job TTL recovery, `cmd_state` TypeError 수정, path builder `validate_area()` 적용, `check_review_exists` max id 선택; 128 tests (#129, #133, PR #134)
 
 ## Discoveries
 
