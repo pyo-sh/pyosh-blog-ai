@@ -1082,15 +1082,18 @@ orch_poll_cycle() {
           local merged_pr
           merged_pr=$(_orch_pr_list "$area" "$issue" merged "number" '.[0].number') || true
           if [ -n "$merged_pr" ] && [ "$merged_pr" != "null" ]; then
-            >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking failed - manual review recommended."
+            >&2 echo "[orchestrator] Abnormal exit for #${issue}: PR #${merged_pr} already merged but no terminal.json (process killed before exit trap). Marking completed."
             # Record a durable signal in batch state so operators can detect this edge case
             # without digging through logs. Visible in orch_print_summary output.
             local _now
             _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             orch_state_update "$area" \
               ".mergedWithoutTerminal = ((.mergedWithoutTerminal // []) + [{issue: ($issue | tonumber), pr: ($merged_pr | tonumber), detectedAt: \"$_now\"}])" || true
-            _orch_mark_failed_and_unblock "$area" "$issue"
-            orch_worktree_gc "$area" "$issue" "failed"
+            # PR is merged: treat as completed so dependents unblock correctly.
+            orch_status_set "$area" "$issue" "completed"
+            orch_state_update "$area" "del(.dispatched[\"$issue\"])"
+            orch_unblock "$area" "$issue" || true
+            orch_worktree_gc "$area" "$issue" "completed"
           else
             >&2 echo "[orchestrator] Abnormal exit for #${issue} - retrying"
             orch_state_update "$area" "del(.dispatched[\"$issue\"])"
@@ -1176,12 +1179,11 @@ orch_poll_cycle() {
         >&2 echo "[orchestrator] Dispatched #${issue} - PID $pid"
         dispatched_count=$((dispatched_count + 1))
       else
-        >&2 echo "[orchestrator] Failed to dispatch #${issue} - marking failed"
-        # Mark failed so the batch can reach a terminal state. orch_worktree_gc
-        # is intentionally skipped: if orch_dispatch refused due to an external
-        # worktree conflict the path must not be touched; if it failed for any
-        # other reason no worktree was created.
-        _orch_mark_failed_and_unblock "$area" "$issue"
+        # Transient launcher failure (process died immediately, state-update
+        # error, etc.). Leave the issue pending so the next poll cycle retries.
+        # orch_worktree_prepare now quarantines unconditionally, so there is no
+        # longer a persistent worktree-conflict case that would loop forever.
+        >&2 echo "[orchestrator] Failed to dispatch #${issue} - will retry next cycle"
       fi
     done
   fi
