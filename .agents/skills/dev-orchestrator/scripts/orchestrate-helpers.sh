@@ -68,7 +68,7 @@ orch_init() {
   mkdir -p "$ORCH_BASE/$area"
 
   local batch_id
-  batch_id="batch-$(date +%Y%m%d-%H%M%S)"
+  batch_id="batch-$(date +%Y%m%d-%H%M%S)-$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c4)"
 
   # Filter DAG: remove deps not in the batch to prevent permanent blocks.
   # External deps (closed issues, out-of-batch) are treated as already satisfied.
@@ -988,6 +988,13 @@ orch_archive_batch() {
   batch_id=$(jq -r '.batchId // empty' "$state_file")
   if [ -z "$batch_id" ]; then
     >&2 echo "[orchestrator] orch_archive_batch: batchId missing from state"
+    return 1
+  fi
+
+  local non_terminal
+  non_terminal=$(jq '[.status | to_entries[] | select(.value == "pending" or .value == "blocked" or .value == "dispatched")] | length' "$state_file")
+  if [ "${non_terminal:-0}" -gt 0 ]; then
+    >&2 echo "[orchestrator] orch_archive_batch: $non_terminal issue(s) still non-terminal — archive blocked until all issues complete"
     return 1
   fi
 
