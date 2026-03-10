@@ -9,6 +9,8 @@
 # 4) Merge runs through a single helper that acquires and releases the lock in one shell process.
 # 5) All transient artifacts are area-scoped to avoid client/server collisions.
 # 6) Resolve runs directly in the pipeline session, not as a headless sub-agent.
+# 7) Review dispatch always goes through pipeline_run_review. Never run codex exec review or
+#    claude -p for review directly in the pipeline session.
 
 _PIPELINE_HELPERS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 _PIPELINE_SEARCH_DIR="$_PIPELINE_HELPERS_DIR"
@@ -184,6 +186,53 @@ pipeline_state_delete() {
   local issue=$1
   local area=$2
   rm -f "$(pipeline_state_path "$issue" "$area")"
+}
+
+pipeline_log_transition() {
+  # Append a step transition to the state's transitionLog (non-fatal).
+  # Usage: pipeline_log_transition <issue> <area> <from_step> <to_step> <reason>
+  local issue=$1 area=$2 from_step=$3 to_step=$4 reason=${5:-}
+  local entry
+  printf '[pipeline:transition] %s -> %s (reason: %s) issue=#%s area=%s\n' \
+    "$from_step" "$to_step" "${reason:-(none)}" "$issue" "$area" >&2
+  entry="$(jq -n \
+    --arg from "$from_step" --arg to "$to_step" \
+    --arg reason "$reason" \
+    '{from:$from,to:$to,reason:$reason,ts:(now|todate)}')" || return 0
+  pipeline_state_update "$issue" "$area" \
+    '.transitionLog = ((.transitionLog // []) + [$entry])' \
+    --argjson entry "$entry" 2>/dev/null || true
+}
+
+pipeline_parse_review_body() {
+  # Parse review body. Returns JSON {critical:N, warning:N, suggestion:N}.
+  # Exits 1 (hard fail) if "## Review Summary" header is absent - indicates wrong format.
+  local body=$1
+  local critical=0 warning=0 suggestion=0 section=''
+
+  if ! printf '%s\n' "$body" | grep -q '^## Review Summary'; then
+    printf '[pipeline] parse error: review body missing "## Review Summary" - wrong format or empty review\n' >&2
+    return 1
+  fi
+
+  while IFS= read -r line; do
+    case "$line" in
+      '### Critical'*) section='critical' ;;
+      '### Warning'*) section='warning' ;;
+      '### Suggestion'*) section='suggestion' ;;
+      '### '*) section='' ;;
+    esac
+    if [[ "$line" =~ ^[0-9]+\. ]] && [ -n "$section" ]; then
+      case "$section" in
+        critical) critical=$((critical + 1)) ;;
+        warning)  warning=$((warning + 1))  ;;
+        suggestion) suggestion=$((suggestion + 1)) ;;
+      esac
+    fi
+  done <<< "$body"
+
+  jq -n --argjson c "$critical" --argjson w "$warning" --argjson s "$suggestion" \
+    '{critical:$c, warning:$w, suggestion:$s}'
 }
 
 pipeline_review_prompt() {
@@ -387,6 +436,8 @@ pipeline_run_headless_core() {
         --max-turns "$max_turns"
         "$prompt"
       )
+      printf '[pipeline:subprocess] start tool=%s stage=%s issue=#%s area=%s pr=#%s cwd=%s\n' \
+        "$tool" "$stage" "$issue" "$area" "$pr" "$skill_cwd" >&2
       (
         cd -- "$skill_cwd" || exit 3
         unset CLAUDECODE
@@ -409,14 +460,19 @@ pipeline_run_headless_core() {
       [ -n "$model" ] && cmd+=(--model "$model")
       # Disable codex sandbox - Claude Code's outer sandbox already isolates
       # the process. Nested sandbox causes getdents64 denial on re-review.
-      cmd+=(--sandbox danger-full-access)
+      # Note: codex exec review outputs progress + final review to stderr only;
+      # stdout is always empty. Redirect stderr -> log, discard stdout.
+      cmd+=(--dangerously-bypass-approvals-and-sandbox)
+      printf '[pipeline:subprocess] start tool=%s stage=%s issue=#%s area=%s pr=#%s cwd=%s\n' \
+        "$tool" "$stage" "$issue" "$area" "$pr" "$review_cwd" >&2
       (
         cd -- "$review_cwd" || exit 3
-        "${cmd[@]}" > "$log" 2> "$err"
+        "${cmd[@]}" > /dev/null 2>"$log"
       )
       ;;
   esac
   rc=$?
+  printf '[pipeline:subprocess] end tool=%s stage=%s issue=#%s rc=%s\n' "$tool" "$stage" "$issue" "$rc" >&2
 
   case "$rc" in
     0) status='success' ;;
@@ -455,28 +511,57 @@ pipeline_run_review() {
   local pr=$3
   local tool=${4:-claude}
   local model=${5:-}
-  local repo_dir worktree_dir prompt rc
+  local repo_dir worktree_dir prompt rc run_id current_state job_status
 
   _pipeline_validate_tool "$tool" || return 2
 
-  repo_dir="$(pipeline_repo_dir "$area")" || return 1
+  printf '[pipeline:review] dispatch issue=#%s area=%s pr=#%s tool=%s\n' \
+    "$issue" "$area" "$pr" "$tool" >&2
+
+  # Duplicate dispatch guard: check reviewJob.status before dispatching.
+  current_state="$(pipeline_state_read "$issue" "$area" 2>/dev/null || true)"
+  if [ -n "$current_state" ]; then
+    job_status="$(printf '%s' "$current_state" | jq -r '.reviewJob.status // "idle"')"
+    if [ "$job_status" = 'running' ]; then
+      printf '[pipeline] review job already running for issue #%s area=%s - duplicate dispatch prevented\n' \
+        "$issue" "$area" >&2
+      return 1
+    fi
+  fi
+
+  run_id="review-$(date +%Y%m%d-%H%M%S)-$$"
+
+  # Write reviewJob metadata before starting subprocess.
+  pipeline_state_update "$issue" "$area" \
+    '.reviewJob = {runId:$runId,status:"running",startedAt:(now|todate),finishedAt:null,tool:$tool,model:$model}' \
+    --arg runId "$run_id" --arg tool "$tool" --arg model "$model" 2>/dev/null || true
+
+  _pipeline_review_fail() {
+    pipeline_state_update "$issue" "$area" \
+      '.reviewJob.status = "failed" | .reviewJob.finishedAt = (now|todate)' 2>/dev/null || true
+    return 1
+  }
+
+  repo_dir="$(pipeline_repo_dir "$area")" || { _pipeline_review_fail; return 1; }
 
   case "$tool" in
     claude)
-      prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || return 1
+      prompt="$(pipeline_review_prompt "$issue" "$area" "$pr")" || { _pipeline_review_fail; return 1; }
       pipeline_run_headless_core \
         "$(pipeline_skill_cwd)" \
         "$prompt" \
         "$issue" "$area" review \
         "$repo_dir" '' "$pr" "$tool" "$model"
+      rc=$?
       ;;
     codex)
       worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area" 2>/dev/null || true)"
       if [ -z "$worktree_dir" ] || [ "$worktree_dir" = 'PATH_INVALID' ]; then
         printf '[pipeline] codex review requires worktree for issue #%s area=%s\n' "$issue" "$area" >&2
+        _pipeline_review_fail
         return 1
       fi
-      prompt="$(pipeline_codex_review_prompt "$issue" "$area" "$pr")" || return 1
+      prompt="$(pipeline_codex_review_prompt "$issue" "$area" "$pr")" || { _pipeline_review_fail; return 1; }
       pipeline_run_headless_core \
         "$(pipeline_skill_cwd)" \
         "$prompt" \
@@ -484,9 +569,23 @@ pipeline_run_review() {
         "$repo_dir" "$worktree_dir" "$pr" "$tool" "$model"
       rc=$?
       _pipeline_post_codex_review "$issue" "$area" "$pr" "$rc"
-      return $?
+      rc=$?
+      ;;
+    *)
+      rc=2
       ;;
   esac
+
+  # Update reviewJob status after subprocess returns.
+  if [ "$rc" -eq 0 ]; then
+    pipeline_state_update "$issue" "$area" \
+      '.reviewJob.status = "success" | .reviewJob.finishedAt = (now|todate)' 2>/dev/null || true
+  else
+    pipeline_state_update "$issue" "$area" \
+      '.reviewJob.status = "failed" | .reviewJob.finishedAt = (now|todate)' 2>/dev/null || true
+  fi
+
+  return "$rc"
 }
 
 pipeline_check_review_exists() {
@@ -610,17 +709,29 @@ pipeline_format_escalation() {
   state="$(pipeline_state_read "$issue" "$area")" || return 1
   printf '%s\n' "$state" | jq -r --arg stage "$stage" '
     [
-      "[pipeline] Stage \($stage) failed after \(.maxStageRetries // 3) recovery attempts.",
-      "Recovery log:",
+      "[pipeline] ESCALATION: stage \($stage) failed (max retries reached).",
+      "",
+      "Current state:",
+      "  step:         \(.step)",
+      "  PR:           #\(.pr // 0)",
+      "  branch:       \(.branch // "")",
+      "  round:        \(.reviewResolveRound // 0)/\(.maxReviewResolveRounds // 5)",
+      "  review job:   \(.reviewJob.status // "n/a") (runId: \(.reviewJob.runId // "n/a"))",
+      "",
+      "Last successful transition: \((.transitionLog // []) | last | "\(.from) -> \(.to)" // "none")",
+      "",
+      "Stage retry log:",
       ((.recoveryLog // [])
         | map(select(.stage == $stage) | "  [\(.timestamp)] \(.error) -> \(.action) -> \(.result)")
-        | .[]?),
+        | if length == 0 then ["  (none)"] else . end
+        | .[]),
       "",
-      "Worktree: \(.paths.worktreeDir // "")",
-      "Branch: \(.branch // "")",
-      "PR: #\(.pr // 0)",
+      "Worktree: \(.paths.worktreeDir // "N/A")",
+      "Repo:     \(.paths.repoDir // "N/A")",
       "",
-      "Action needed: fix manually, then resume with /dev-pipeline"
+      "Manual action:",
+      "  1. Inspect: git -C \(.paths.worktreeDir // "N/A") status",
+      "  2. Resume:  /dev-pipeline \(.area) #\(.issue)"
     ] | .[]'
 }
 
