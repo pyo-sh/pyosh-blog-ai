@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# pipeline-helpers.fixed.sh
+# pipeline-helpers.sh
 # Shell helpers for dev-pipeline.
 #
 # Design invariants:
-# 1) Claude headless sessions always start from MONOREPO_ROOT so .claude/skills resolve.
+# 1) Claude headless review sessions always start from MONOREPO_ROOT so .claude/skills resolve.
 # 2) gh commands always use explicit repo (-R owner/name), never implicit cwd.
 # 3) Feature-branch git operations always run in the issue worktree.
 # 4) Merge runs through a single helper that acquires and releases the lock in one shell process.
 # 5) All transient artifacts are area-scoped to avoid client/server collisions.
+# 6) Resolve runs directly in the pipeline session, not as a headless sub-agent.
 
 _PIPELINE_HELPERS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 _PIPELINE_SEARCH_DIR="$_PIPELINE_HELPERS_DIR"
@@ -89,27 +90,15 @@ pipeline_worktree_path() {
 }
 
 pipeline_resolve_worktree_path() {
-  # Canonical path:   .workspace/worktrees/<area>/issue-<N>
-  # Legacy path #1:   .workspace/worktrees/issue-<N>
-  # Legacy path #2:   <area>/.workspace/worktrees/issue-<N>
+  # Canonical path: .workspace/worktrees/<area>/issue-<N>
   local issue=$1
   local area=$2
-  local canonical legacy_root legacy_area
+  local canonical
 
   canonical="$(pipeline_worktree_path "$issue" "$area")"
-  legacy_root="$WORKTREE_DIR/issue-${issue}"
-  legacy_area="$MONOREPO_ROOT/$area/.workspace/worktrees/issue-${issue}"
 
   if [ -d "$canonical" ]; then
     printf '%s\n' "$canonical"
-    return 0
-  fi
-  if [ -d "$legacy_root" ]; then
-    printf '%s\n' "$legacy_root"
-    return 0
-  fi
-  if [ -d "$legacy_area" ]; then
-    printf '%s\n' "$legacy_area"
     return 0
   fi
 
@@ -214,39 +203,35 @@ Rules:
 PROMPT_REVIEW
 }
 
-pipeline_resolve_prompt() {
-  local issue=$1
-  local area=$2
-  local pr=$3
-  local repo repo_dir worktree_dir
+pipeline_fetch_review_comments() {
+  # Fetch inline review comments for a specific review.
+  # Returns JSON array of {path, line, side, body} objects.
+  # Returns: 0 = success (JSON on stdout), 1 = error
+  # Usage: pipeline_fetch_review_comments <area> <pr> <review_id>
+  local area=$1
+  local pr=$2
+  local review_id=$3
+  local repo _gh_err
 
   repo="$(pipeline_repo_name "$area")" || return 1
-  repo_dir="$(pipeline_repo_dir "$area")" || return 1
-  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area")" || return 1
-
-  cat <<PROMPT_RESOLVE
-/dev-resolve
-Target issue: #$issue
-Target PR: #$pr
-Target area: $area
-GitHub repo: $repo
-Repo dir on disk: $repo_dir
-Worktree dir for all source edits: $worktree_dir
-Session skill root: $MONOREPO_ROOT
-
-Rules:
-- Skills must resolve from $MONOREPO_ROOT. Do not launch or resolve skills from the worktree.
-- All source-file edits and feature-branch git commands must run in "$worktree_dir".
-- All repo-level gh commands must use either "gh ... -R $repo" or "$repo_dir" explicitly.
-- Fix only the reviewed items, then push and post the response comment.
-- After posting the response, exit immediately.
-PROMPT_RESOLVE
+  _gh_err="$(mktemp)"
+  (
+    set -o pipefail
+    gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}/comments" --paginate 2>"$_gh_err" \
+      | jq -s '[add // [] | .[] | {path: .path, line: (.original_line // .line), side: .side, body: .body}]'
+  ) || {
+    printf '[pipeline] error fetching review comments for PR #%s review %s in %s: %s\n' \
+      "$pr" "$review_id" "$repo" "$(cat "$_gh_err")" >&2
+    rm -f "$_gh_err"
+    return 1
+  }
+  rm -f "$_gh_err"
 }
 
 pipeline_run_headless_core() {
-  # Synchronous low-level runner.
+  # Synchronous low-level runner for headless review.
   # IMPORTANT: In Claude Code skills, the outer Bash tool call for this function
-  # should use run_in_background: true for long-running review/resolve steps.
+  # should use run_in_background: true for long-running review steps.
   #
   # Usage:
   #   pipeline_run_headless_core <skill_cwd> <prompt> <issue> <area> <stage> <repo_dir> <worktree_dir> <pr> [model]
@@ -273,11 +258,6 @@ pipeline_run_headless_core() {
     review)
       tools='Bash,Read,Skill'
       max_turns=15
-      timeout_sec=900
-      ;;
-    resolve)
-      tools='Bash,Read,Edit,Write,Grep,Glob,Skill'
-      max_turns=25
       timeout_sec=900
       ;;
     *)
@@ -392,23 +372,6 @@ pipeline_run_review() {
     "$repo_dir" '' "$pr" "$model"
 }
 
-pipeline_run_resolve() {
-  local issue=$1
-  local area=$2
-  local pr=$3
-  local model=${4:-}
-  local repo_dir worktree_dir prompt
-
-  repo_dir="$(pipeline_repo_dir "$area")" || return 1
-  worktree_dir="$(pipeline_resolve_worktree_path "$issue" "$area")" || return 1
-  prompt="$(pipeline_resolve_prompt "$issue" "$area" "$pr")" || return 1
-  pipeline_run_headless_core \
-    "$(pipeline_skill_cwd)" \
-    "$prompt" \
-    "$issue" "$area" resolve \
-    "$repo_dir" "$worktree_dir" "$pr" "$model"
-}
-
 pipeline_check_review_exists() {
   # Returns: 0 = found (review_id on stdout), 1 = not found, 2 = gh error
   local area=$1
@@ -418,11 +381,12 @@ pipeline_check_review_exists() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  review_id="$(gh api "repos/${repo}/pulls/${pr}/reviews" \
-    --jq "[.[]
-      | select(.id > ${last_review_id})
-      | select(.body | startswith(\"## Review Summary\"))
-    ] | last | .id // empty" 2>"$_gh_err")" || {
+  review_id="$(
+    set -o pipefail
+    gh api "repos/${repo}/pulls/${pr}/reviews" --paginate 2>"$_gh_err" \
+      | jq -s -r --argjson lastId "$last_review_id" \
+        '[add // [] | .[] | select(.id > $lastId) | select(.body | startswith("## Review Summary"))] | last | .id // empty'
+  )" || {
     printf '[pipeline] gh api error checking reviews for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
     return 2
@@ -437,14 +401,22 @@ pipeline_check_review_exists() {
 }
 
 pipeline_fetch_review() {
+  # Returns: 0 = success (JSON on stdout), 1 = error
   local area=$1
   local pr=$2
   local review_id=$3
-  local repo
+  local repo _gh_err
 
   repo="$(pipeline_repo_name "$area")" || return 1
+  _gh_err="$(mktemp)"
   gh api "repos/${repo}/pulls/${pr}/reviews/${review_id}" \
-    --jq '{state: .state, body: .body}'
+    --jq '{state: .state, body: .body}' 2>"$_gh_err" || {
+    printf '[pipeline] gh api error fetching review %s for PR #%s in %s: %s\n' \
+      "$review_id" "$pr" "$repo" "$(cat "$_gh_err")" >&2
+    rm -f "$_gh_err"
+    return 1
+  }
+  rm -f "$_gh_err"
 }
 
 pipeline_check_new_commits() {
@@ -456,8 +428,8 @@ pipeline_check_new_commits() {
 
   repo="$(pipeline_repo_name "$area")" || return 1
   _gh_err="$(mktemp)"
-  latest_sha="$(gh api "repos/${repo}/pulls/${pr}/commits" --jq '.[-1].sha' 2>"$_gh_err")" || {
-    printf '[pipeline] gh api error checking commits for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
+  latest_sha="$(gh pr view "$pr" -R "$repo" --json headRefOid --jq '.headRefOid' 2>"$_gh_err")" || {
+    printf '[pipeline] gh error checking head SHA for PR #%s in %s: %s\n' "$pr" "$repo" "$(cat "$_gh_err")" >&2
     rm -f "$_gh_err"
     return 2
   }
@@ -479,14 +451,14 @@ pipeline_stage_retry() {
   local state retries max
 
   state="$(pipeline_state_read "$issue" "$area")" || return 1
-  retries="$(printf '%s' "$state" | jq -r ".stageRetries.${stage} // 0")"
+  retries="$(printf '%s' "$state" | jq -r --arg s "$stage" '.stageRetries[$s] // 0')"
   max="$(printf '%s' "$state" | jq -r '.maxStageRetries // 3')"
 
   if [ "$retries" -ge "$max" ]; then
     return 1
   fi
 
-  pipeline_state_update "$issue" "$area" ".stageRetries.${stage} = $((retries + 1))"
+  pipeline_state_update "$issue" "$area" '.stageRetries[$s] = $n' --arg s "$stage" --argjson n "$((retries + 1))"
 }
 
 pipeline_recovery_log() {
@@ -527,7 +499,7 @@ pipeline_format_escalation() {
         | map(select(.stage == $stage) | "  [\(.timestamp)] \(.error) -> \(.action) -> \(.result)")
         | .[]?),
       "",
-      "Worktree: \(.worktree // .paths.worktreeDir // "")",
+      "Worktree: \(.paths.worktreeDir // "")",
       "Branch: \(.branch // "")",
       "PR: #\(.pr // 0)",
       "",
@@ -556,9 +528,33 @@ pipeline_acquire_merge_lock() {
     acquired_epoch="$(date -u -d "$acquired_ts" +%s 2>/dev/null || printf '0')"
     now_epoch="$(date -u +%s)"
 
+    local should_reclaim=false
+
     if [ "$acquired_epoch" -gt 0 ] && [ $((now_epoch - acquired_epoch)) -ge "$stale_after" ]; then
       printf '[pipeline] stale merge lock detected for area=%s issue=%s; reclaiming\n' "$area" "${holder_issue:-unknown}" >&2
+      should_reclaim=true
+    elif [ "$acquired_epoch" -eq 0 ]; then
+      # No valid timestamp: either being written right now, or crash residue.
+      # Use lock dir mtime to distinguish: if older than 30s, treat as crash residue.
+      local dir_mtime
+      dir_mtime="$(stat -c %Y "$lock_dir" 2>/dev/null || printf '%s' "$now_epoch")"
+      if [ $((now_epoch - dir_mtime)) -ge 30 ]; then
+        printf '[pipeline] incomplete merge lock (no timestamp after 30s) for area=%s; reclaiming\n' "$area" >&2
+        should_reclaim=true
+      fi
+    fi
+
+    if [ "$should_reclaim" = true ]; then
       rm -rf "$lock_dir"
+      mkdir "$lock_dir" 2>/dev/null || continue
+      printf '%s\n' "$issue" > "$lock_dir/issue"
+      date -u +%Y-%m-%dT%H:%M:%SZ > "$lock_dir/acquired"
+      # Fencing: verify ownership after brief pause to detect concurrent reclaim race
+      sleep 0.2
+      if [ "$(cat "$lock_dir/issue" 2>/dev/null)" = "$issue" ]; then
+        return 0
+      fi
+      # Another process reclaimed between our rm-rf and verify; retry
       continue
     fi
 
@@ -636,6 +632,10 @@ pipeline_merge_pr() {
     trap 'pipeline_release_merge_lock "$area" "$issue" >/dev/null 2>&1 || true' EXIT INT TERM
 
     if [ -n "$worktree_dir" ] && [ "$worktree_dir" != 'PATH_INVALID' ] && [ -d "$worktree_dir" ]; then
+      # Clean up stale merge/rebase state from a previous failed attempt.
+      git -C "$worktree_dir" merge --abort >/dev/null 2>&1 || true
+      git -C "$worktree_dir" rebase --abort >/dev/null 2>&1 || true
+
       git -C "$worktree_dir" fetch origin || exit 1
 
       if git -C "$worktree_dir" rebase origin/main; then
@@ -660,8 +660,12 @@ pipeline_merge_pr() {
       exit 1
     }
 
-    trap - EXIT INT TERM
-    pipeline_release_merge_lock "$area" "$issue"
+    if pipeline_release_merge_lock "$area" "$issue"; then
+      trap - EXIT INT TERM
+    else
+      # Explicit release failed; leave EXIT trap active so it retries on subshell exit.
+      printf '[pipeline] warning: explicit lock release failed for area=%s issue=#%s; EXIT trap will retry\n' "$area" "$issue" >&2
+    fi
   )
   merge_rc=$?
   trap - INT TERM
@@ -672,6 +676,7 @@ pipeline_cleanup() {
   local issue=$1
   local area=$2
   local branch=$3
+  local pr=${4:-}
   local repo_dir wt
 
   repo_dir="$(pipeline_repo_dir "$area")" || return 1
@@ -680,10 +685,12 @@ pipeline_cleanup() {
   rm -f \
     "$(pipeline_log_path "$issue" "$area" review)" \
     "$(pipeline_err_path "$issue" "$area" review)" \
-    "$(pipeline_log_path "$issue" "$area" resolve)" \
-    "$(pipeline_err_path "$issue" "$area" resolve)" \
-    "$(pipeline_headless_meta_path "$issue" "$area" review)" \
-    "$(pipeline_headless_meta_path "$issue" "$area" resolve)"
+    "$(pipeline_headless_meta_path "$issue" "$area" review)"
+
+  # Clean up stale message files from resolve step.
+  if [ -n "$pr" ]; then
+    rm -f "$(pipeline_message_path "$area" "$pr" response)"
+  fi
 
   if [ -n "$wt" ] && [ "$wt" != 'PATH_INVALID' ] && [ -d "$wt" ]; then
     git -C "$repo_dir" worktree remove "$wt" --force || true

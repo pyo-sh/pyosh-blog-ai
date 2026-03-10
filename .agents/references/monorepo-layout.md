@@ -27,12 +27,11 @@ Single source of truth for the pyosh-blog monorepo structure. All skills referen
 ## Worktree paths
 
 ```
-{root}/.workspace/worktrees/issue-{N}    # current convention
-{root}/{area}/.workspace/worktrees/issue-{N}  # legacy (check as fallback)
+{root}/.workspace/worktrees/{area}/issue-{N}
 ```
 
 - Worktrees live under the **monorepo root** `.workspace/`, not inside the area directory.
-- Legacy path existed when worktrees were created inside each area's `.workspace/`.
+- Area-scoped to avoid issue number collisions between `client` and `server`.
 
 ## Area-specific verify commands
 

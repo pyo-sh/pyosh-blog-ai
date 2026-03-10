@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# monorepo-helpers.fixed.sh
+# monorepo-helpers.sh
 # Shared monorepo root detection and area resolution.
 
 _MONOREPO_HELPERS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
