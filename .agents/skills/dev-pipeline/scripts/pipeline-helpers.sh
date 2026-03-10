@@ -540,7 +540,7 @@ pipeline_acquire_merge_lock() {
     acquired_epoch="$(date -u -d "$acquired_ts" +%s 2>/dev/null || printf '0')"
     now_epoch="$(date -u +%s)"
 
-    if [ "$acquired_epoch" -eq 0 ] || [ $((now_epoch - acquired_epoch)) -ge "$stale_after" ]; then
+    if [ "$acquired_epoch" -gt 0 ] && [ $((now_epoch - acquired_epoch)) -ge "$stale_after" ]; then
       printf '[pipeline] stale merge lock detected for area=%s issue=%s; reclaiming\n' "$area" "${holder_issue:-unknown}" >&2
       rm -rf "$lock_dir"
       mkdir "$lock_dir" 2>/dev/null || continue
@@ -651,12 +651,12 @@ pipeline_merge_pr() {
       exit 1
     }
 
-    pipeline_release_merge_lock "$area" "$issue" || {
-      sleep 1
-      pipeline_release_merge_lock "$area" "$issue" || \
-        printf '[pipeline] warning: merge succeeded but lock release failed after retry for area=%s issue=#%s\n' "$area" "$issue" >&2
-    }
-    trap - EXIT INT TERM
+    if pipeline_release_merge_lock "$area" "$issue"; then
+      trap - EXIT INT TERM
+    else
+      # Explicit release failed; leave EXIT trap active so it retries on subshell exit.
+      printf '[pipeline] warning: explicit lock release failed for area=%s issue=#%s; EXIT trap will retry\n' "$area" "$issue" >&2
+    fi
   )
   merge_rc=$?
   trap - INT TERM
