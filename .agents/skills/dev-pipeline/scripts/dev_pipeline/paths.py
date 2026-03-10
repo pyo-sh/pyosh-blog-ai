@@ -63,10 +63,12 @@ def pipeline_dir(monorepo_root: Path) -> Path:
 
 
 def pipeline_state_dir(area: str, monorepo_root: Path) -> Path:
+    validate_area(area)
     return pipeline_dir(monorepo_root) / area
 
 
 def pipeline_log_dir(area: str, monorepo_root: Path) -> Path:
+    validate_area(area)
     return pipeline_dir(monorepo_root) / "logs" / area
 
 
@@ -91,6 +93,7 @@ def pipeline_message_path(area: str, pr: int, kind: str, monorepo_root: Path) ->
 
 
 def pipeline_worktree_path(issue: int, area: str, monorepo_root: Path) -> Path:
+    validate_area(area)
     return monorepo_root / ".workspace" / "worktrees" / area / f"issue-{issue}"
 
 
@@ -101,7 +104,8 @@ def resolve_worktree_path(issue: int, area: str, monorepo_root: Path) -> Optiona
 
 
 def pipeline_init(area: str, monorepo_root: Path) -> None:
-    """Create all required directories."""
+    """Create all required directories. Validates area first."""
+    validate_area(area)
     pipeline_state_dir(area, monorepo_root).mkdir(parents=True, exist_ok=True)
     pipeline_log_dir(area, monorepo_root).mkdir(parents=True, exist_ok=True)
     (monorepo_root / ".workspace" / "messages").mkdir(parents=True, exist_ok=True)

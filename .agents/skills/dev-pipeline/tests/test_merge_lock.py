@@ -89,7 +89,7 @@ def test_timeout_raises(monorepo_root):
 
 def test_acquire_creates_state_dir(tmp_path):
     """acquire() should create state dir if it doesn't exist."""
-    lock = MergeLock("newarea", 1, tmp_path)
+    lock = MergeLock("server", 1, tmp_path)
     lock.acquire()
     assert lock.lock_dir.is_dir()
     lock.release()

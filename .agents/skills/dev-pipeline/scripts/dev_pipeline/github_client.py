@@ -60,7 +60,7 @@ def check_review_exists(area: str, pr: int, last_review_id: int = 0) -> Optional
     ]
     if not candidates:
         return None
-    return candidates[-1]["id"]
+    return max(candidates, key=lambda r: r["id"])["id"]
 
 
 def fetch_review(area: str, pr: int, review_id: int) -> dict:

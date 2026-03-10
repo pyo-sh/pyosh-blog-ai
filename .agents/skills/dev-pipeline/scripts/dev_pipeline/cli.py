@@ -44,8 +44,8 @@ def cmd_state(args) -> int:
     from .state_store import state_read
 
     try:
-        data = state_read(args.issue, args.area, monorepo_root)
-        print(json.dumps(data, indent=2))
+        state = state_read(args.issue, args.area, monorepo_root)
+        print(json.dumps(state.to_dict(), indent=2))
         return 0
     except FileNotFoundError:
         print(
