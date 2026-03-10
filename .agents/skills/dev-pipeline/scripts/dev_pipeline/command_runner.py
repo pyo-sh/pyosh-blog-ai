@@ -20,17 +20,25 @@ def run(
     env: Optional[Dict[str, str]] = None,
     timeout: Optional[int] = None,
     capture_output: bool = True,
+    replace_env: bool = False,
 ) -> RunResult:
-    """Run a subprocess and return a structured result."""
-    merged_env = None
+    """Run a subprocess and return a structured result.
+
+    When replace_env=True, env is used as-is (caller built the full environment).
+    When replace_env=False (default), env is merged on top of os.environ.
+    """
+    final_env = None
     if env is not None:
-        merged_env = {**os.environ, **env}
+        if replace_env:
+            final_env = dict(env)
+        else:
+            final_env = {**os.environ, **env}
 
     try:
         result = subprocess.run(
             cmd,
             cwd=cwd,
-            env=merged_env,
+            env=final_env,
             timeout=timeout,
             capture_output=capture_output,
             text=True,

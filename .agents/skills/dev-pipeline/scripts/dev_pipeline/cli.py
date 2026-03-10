@@ -3,6 +3,8 @@ import json
 import sys
 from pathlib import Path
 
+_AREA_CHOICES = ["client", "server", "workspace"]
+
 
 def _get_monorepo_root() -> Path:
     from .paths import find_monorepo_root
@@ -115,7 +117,7 @@ def main():
     # run
     p_run = sub.add_parser("run", help="Dispatch review for an issue")
     p_run.add_argument("--issue", type=int, required=True)
-    p_run.add_argument("--area", required=True)
+    p_run.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_run.add_argument("--pr", type=int, required=True)
     p_run.add_argument("--tool", default="claude", choices=["claude", "codex"])
     p_run.add_argument("--model", default="")
@@ -128,13 +130,13 @@ def main():
     # state
     p_state = sub.add_parser("state", help="Show pipeline state for an issue")
     p_state.add_argument("--issue", type=int, required=True)
-    p_state.add_argument("--area", required=True)
+    p_state.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_state.set_defaults(func=cmd_state)
 
     # merge
     p_merge = sub.add_parser("merge", help="Merge PR for an issue")
     p_merge.add_argument("--issue", type=int, required=True)
-    p_merge.add_argument("--area", required=True)
+    p_merge.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_merge.add_argument("--pr", type=int, required=True)
     p_merge.add_argument("--branch", required=True)
     p_merge.set_defaults(func=cmd_merge)
@@ -142,7 +144,7 @@ def main():
     # cleanup
     p_cleanup = sub.add_parser("cleanup", help="Cleanup after pipeline completes")
     p_cleanup.add_argument("--issue", type=int, required=True)
-    p_cleanup.add_argument("--area", required=True)
+    p_cleanup.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_cleanup.add_argument("--branch", required=True)
     p_cleanup.add_argument("--pr", type=int, default=0)
     p_cleanup.set_defaults(func=cmd_cleanup)
@@ -150,7 +152,7 @@ def main():
     # escalation
     p_esc = sub.add_parser("escalation", help="Format escalation message")
     p_esc.add_argument("--issue", type=int, required=True)
-    p_esc.add_argument("--area", required=True)
+    p_esc.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_esc.add_argument("--stage", required=True)
     p_esc.set_defaults(func=cmd_escalation)
 

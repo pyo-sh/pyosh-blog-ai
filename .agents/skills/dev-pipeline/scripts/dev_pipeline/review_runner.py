@@ -8,6 +8,8 @@ from typing import Optional
 
 from .command_runner import run
 from .paths import (
+    area_repo_dir,
+    area_repo_name,
     pipeline_err_path,
     pipeline_headless_meta_path,
     pipeline_log_path,
@@ -65,6 +67,17 @@ def _write_job_meta(
     model: str,
     exit_code: Optional[int] = None,
 ) -> None:
+    # Preserve startedAt from previous meta when transitioning from running to done
+    started_at = None
+    if status == "running":
+        started_at = _now_iso()
+    else:
+        try:
+            prev = json.loads(meta_path.read_text())
+            started_at = prev.get("startedAt")
+        except Exception:
+            pass
+
     data = {
         "status": status,
         "tool": tool,
@@ -79,7 +92,7 @@ def _write_job_meta(
         "log": str(log_path),
         "err": str(err_path),
         "model": model,
-        "startedAt": _now_iso() if status == "running" else None,
+        "startedAt": started_at,
         "finishedAt": _now_iso() if status != "running" else None,
         "exitCode": exit_code,
     }
@@ -98,9 +111,7 @@ def dispatch_review(
     model: str = "",
 ) -> int:
     """Dispatch a review subprocess. Returns exit code."""
-    from .github_client import _repo as _get_repo
-
-    repo = _get_repo(area)
+    repo = area_repo_name(area)
 
     # Duplicate dispatch guard
     try:
@@ -150,20 +161,6 @@ def dispatch_review(
     return rc
 
 
-_AREA_DIRS = {
-    "client": "client",
-    "server": "server",
-    "workspace": "",
-}
-
-
-def _area_repo_dir(area: str, monorepo_root: Path) -> str:
-    subdir = _AREA_DIRS.get(area, "")
-    if subdir:
-        return str(monorepo_root / subdir)
-    return str(monorepo_root)
-
-
 def _dispatch_claude(
     issue: int,
     area: str,
@@ -171,15 +168,13 @@ def _dispatch_claude(
     monorepo_root: Path,
     model: str = "",
 ) -> int:
-    from .github_client import _repo
-
-    repo = _repo(area)
+    repo = area_repo_name(area)
     pipeline_init(area, monorepo_root)
 
     log = pipeline_log_path(issue, area, "review", monorepo_root)
     err = pipeline_err_path(issue, area, "review", monorepo_root)
     meta = pipeline_headless_meta_path(issue, area, "review", monorepo_root)
-    repo_dir = _area_repo_dir(area, monorepo_root)
+    repo_dir = str(area_repo_dir(area, monorepo_root))
 
     prompt = _review_prompt(issue, area, pr, str(monorepo_root), repo, repo_dir)
 
@@ -231,7 +226,7 @@ def _dispatch_claude(
         f"issue=#{issue} area={area} pr=#{pr} cwd={monorepo_root}",
         file=sys.stderr,
     )
-    result = run(cmd, cwd=str(monorepo_root), env=clean_env, timeout=900, capture_output=True)
+    result = run(cmd, cwd=str(monorepo_root), env=clean_env, timeout=900, capture_output=True, replace_env=True)
     print(
         f"[review_runner:subprocess] end tool=claude stage=review "
         f"issue=#{issue} rc={result.rc}",
@@ -270,9 +265,9 @@ def _dispatch_codex(
     monorepo_root: Path,
     model: str = "",
 ) -> int:
-    from .github_client import _repo, get_pr_base_ref
+    from .github_client import get_pr_base_ref
 
-    repo = _repo(area)
+    repo = area_repo_name(area)
     pipeline_init(area, monorepo_root)
 
     worktree_dir = resolve_worktree_path(issue, area, monorepo_root)
@@ -284,7 +279,7 @@ def _dispatch_codex(
         )
         return 1
 
-    repo_dir = _area_repo_dir(area, monorepo_root)
+    repo_dir = str(area_repo_dir(area, monorepo_root))
     log = pipeline_log_path(issue, area, "review", monorepo_root)
     err = pipeline_err_path(issue, area, "review", monorepo_root)
     meta = pipeline_headless_meta_path(issue, area, "review", monorepo_root)

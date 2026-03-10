@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -127,6 +128,11 @@ class PipelineState:
         try:
             step = PipelineStep(step_raw)
         except ValueError:
+            print(
+                f"[models] WARNING: unknown step {step_raw!r} in state "
+                f"(issue={d.get('issue')}); defaulting to BUILD",
+                file=sys.stderr,
+            )
             step = PipelineStep.BUILD
 
         paths_raw = d.get("paths", {})

@@ -69,16 +69,10 @@ def merge_pr(
         rebase,
         rebase_abort,
     )
-    from .github_client import _repo, get_pr_state, merge_pr_squash
-    from .paths import resolve_worktree_path
+    from .github_client import get_pr_state, merge_pr_squash
+    from .paths import area_repo_dir, resolve_worktree_path
 
-    repo = _repo(area)
-    area_dirs = {
-        "client": str(monorepo_root / "client"),
-        "server": str(monorepo_root / "server"),
-        "workspace": str(monorepo_root),
-    }
-    repo_dir = area_dirs.get(area, str(monorepo_root))
+    repo_dir = str(area_repo_dir(area, monorepo_root))
     worktree_dir = resolve_worktree_path(issue, area, monorepo_root)
 
     lock = MergeLock(area, issue, monorepo_root)
@@ -126,6 +120,7 @@ def cleanup(
 ) -> None:
     """Remove artifacts, worktree, branch, and state file."""
     from .paths import (
+        area_repo_dir,
         pipeline_err_path,
         pipeline_headless_meta_path,
         pipeline_log_path,
@@ -135,12 +130,7 @@ def cleanup(
     from .git_ops import branch_delete, worktree_remove
     from .state_store import state_delete
 
-    area_dirs = {
-        "client": str(monorepo_root / "client"),
-        "server": str(monorepo_root / "server"),
-        "workspace": str(monorepo_root),
-    }
-    repo_dir = area_dirs.get(area, str(monorepo_root))
+    repo_dir = str(area_repo_dir(area, monorepo_root))
 
     for path in [
         pipeline_log_path(issue, area, "review", monorepo_root),
