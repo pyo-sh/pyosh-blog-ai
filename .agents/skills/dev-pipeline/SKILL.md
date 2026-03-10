@@ -106,7 +106,7 @@ Otherwise write job metadata and dispatch the background review:
 ```bash
 cd .agents/skills/dev-pipeline/scripts
 python -m dev_pipeline state-update --issue "$ISSUE" --area "$AREA" --step review_wait
-LOG=$(python -m dev_pipeline run --issue "$ISSUE" --area "$AREA" --pr "$PR" --tool "$TOOL")
+python -m dev_pipeline run --issue "$ISSUE" --area "$AREA" --pr "$PR" --tool "$TOOL"
 ```
 
 Tool defaults to `claude`.

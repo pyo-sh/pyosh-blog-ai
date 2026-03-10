@@ -76,7 +76,9 @@ cat > "$MSG_FILE" <<'EOF_REVIEW'
 {body}
 EOF_REVIEW
 
-gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" --comment
+ACTION="--comment"
+[ "$CRITICAL" -ge 1 ] && ACTION="--request-changes"
+gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" "$ACTION"
 rm -f "$MSG_FILE"
 ```
 

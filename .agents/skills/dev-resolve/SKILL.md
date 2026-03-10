@@ -47,10 +47,10 @@ Push from the worktree:
 git push
 ```
 
-Use an area-scoped response file to avoid collisions:
+Use a repo-scoped response file to avoid collisions:
 
 ```bash
-MSG_FILE="/workspace/.workspace/messages/manual-pr-${PR}-response.md"
+MSG_FILE="/workspace/.workspace/messages/${REPO##*/}-pr-${PR}-response.md"
 mkdir -p "$(dirname "$MSG_FILE")"
 cat > "$MSG_FILE" <<'EOF_RESPONSE'
 {body}
