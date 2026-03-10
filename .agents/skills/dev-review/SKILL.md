@@ -80,8 +80,6 @@ gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" --comment
 rm -f "$MSG_FILE"
 ```
 
-Use `--request-changes` when 1+ Critical exists.
-
 ## Constraints
 
 - Comments only

@@ -37,12 +37,6 @@ description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge 
 Only `review_dispatch -> review_wait` requires a turn break.
 All other transitions must happen within the same turn.
 
-## Required runtime shape
-
-For any long-running `python -m dev_pipeline run` Bash call, the Bash tool invocation itself must use **background mode**. The CLI command remains synchronous, but the outer tool call must not be foreground-blocked because the Bash-tool timeout can be shorter than Claude's internal timeout.
-
-After launching the background Bash call for review (step `review_dispatch`), **end your turn immediately and wait for the task-notification**. Do not sleep, poll, or output intermediate status. Resume processing only after you receive the completion notification. This is the only pipeline step where ending the turn between steps is correct - it is required to avoid forbidden sleep/poll behaviour while waiting for a long-running background process.
-
 ## Workflow
 
 ### 0. Initialize / resume
@@ -92,34 +86,7 @@ PR=$(gh pr list -R "$REPO" --head "$BRANCH" --json number --jq '.[0].number')
 LAST_COMMIT_SHA=$(git -C "$WORKTREE_PATH" rev-parse HEAD)
 ```
 
-Then write the full state:
-
-```json
-{
-  "version": 2,
-  "issue": 42,
-  "area": "client",
-  "pr": 129,
-  "branch": "feat/issue-42-add-auth",
-  "paths": {
-    "skillCwd": "/workspace",
-    "repoDir": "/workspace/client",
-    "worktreeDir": "/workspace/.workspace/worktrees/client/issue-42"
-  },
-  "step": "review_dispatch",
-  "lastReviewId": 0,
-  "lastCommitSha": "<sha>",
-  "skipReview": false,
-  "reviewResolveRound": 0,
-  "maxReviewResolveRounds": 5,
-  "stageRetries": { "build": 0, "review_dispatch": 0, "review_wait": 0, "review_process": 0, "resolve": 0, "merge": 0 },
-  "maxStageRetries": 3,
-  "reviewJob": { "runId": "", "status": "idle", "startedAt": null, "finishedAt": null, "tool": "", "model": "" },
-  "transitionLog": []
-}
-```
-
-After writing state, immediately proceed to Step 2a (review dispatch). Do not output a progress message to the user and do not end your turn between pipeline steps.
+Update the state file (same schema as the one-liner above) with the actual `pr`, `branch`, `lastCommitSha` values and `step: "review_dispatch"`. Immediately proceed to Step 2a.
 
 ### 2a. Review dispatch (`step: review_dispatch`)
 
@@ -142,14 +109,12 @@ python -m dev_pipeline state-update --issue "$ISSUE" --area "$AREA" --step revie
 LOG=$(python -m dev_pipeline run --issue "$ISSUE" --area "$AREA" --pr "$PR" --tool "$TOOL")
 ```
 
-Tool defaults to `claude`. When `TOOL=codex`, review runs via `codex exec review --base origin/main` from the worktree, and the CLI posts the output to GitHub automatically. Note: codex writes all output (progress + final review) to stderr; stdout is always empty. The CLI redirects stderr to the log file and discards stdout.
+Tool defaults to `claude`.
 
 Rules:
-- This Bash call itself must run in background mode.
-- For `claude`: never pass the worktree path as the process cwd.
-- For `codex`: the CLI runs from the worktree (needed for `--base origin/main` diff).
-- Always treat GitHub API as source of truth after exit.
-- **End turn immediately after dispatching.** Do not sleep, poll, or output intermediate status.
+- This Bash call must use **background mode** (Bash-tool timeout may be shorter than review timeout).
+- **End turn immediately after dispatching.** This is the only turn break in the pipeline. Resume only on task-notification. Do not sleep, poll, or output status.
+- After resume, treat GitHub API as source of truth.
 
 ### 2b. Review wait (`step: review_wait`)
 
@@ -366,34 +331,22 @@ Otherwise show the latest review summary and the round count, then ask the user:
 
 ### 6. Merge (`step: merge`)
 
-Recovery entry:
+Recovery entry - use `REPO_DIR` and `REPO` from Step 1 area mapping:
 
 ```bash
-case "$AREA" in
-  client)    REPO_DIR=/workspace/client  REPO=pyo-sh/pyosh-blog-fe ;;
-  server)    REPO_DIR=/workspace/server  REPO=pyo-sh/pyosh-blog-be ;;
-  workspace) REPO_DIR=/workspace         REPO=pyo-sh/pyosh-blog-ai ;;
-esac
 gh pr view "$PR" -R "$REPO" --json state --jq '.state'
 ```
 
-If already `MERGED`, go to Step 7. If `CLOSED`, stop and report (PR was closed without merging).
+If already `MERGED`, go to Step 7. If `CLOSED`, stop and report.
 
-Otherwise merge with the **single CLI call**:
+Otherwise merge with the **single CLI call** (handles lock, rebase, squash internally):
 
 ```bash
 cd .agents/skills/dev-pipeline/scripts
 python -m dev_pipeline merge --issue "$ISSUE" --area "$AREA" --pr "$PR" --branch "$BRANCH"
 ```
 
-Important:
-- Do **not** acquire the merge lock in one Bash call and release it in another.
-- Do **not** run `gh pr merge` from the issue worktree.
-- Feature-branch sync/rebase/push happens in the worktree.
-- `gh pr merge` runs from the canonical repo dir.
-- The CLI will use `git push --force-with-lease` automatically only when history diverged.
-
-On success:
+On success, fetch and prune:
 
 ```bash
 git -C "$REPO_DIR" fetch --prune
@@ -428,10 +381,8 @@ python -m dev_pipeline cleanup --issue "$ISSUE" --area "$AREA" --branch "$BRANCH
 
 ## Constraints
 
-- **Do not end your turn between pipeline steps.** After each step completes, immediately proceed to the next step without outputting a progress summary to the user. Only report at major milestones (build complete with PR link, final merge success) or on error. **Exception: Step 2a (`review_dispatch`).** After launching the background Bash call for `python -m dev_pipeline run`, end your turn and wait for the task-notification. Do not sleep or poll. Resume from the task-notification by reading state, then continue with the outcome check in Step 2b (`review_wait`) and Step 3 (`review_process`).
-- **Auto-merge** is allowed when: (1) review has Critical=0 AND Warning=0, or (2) user explicitly approves in Step 5
-- **User approval required** when: review-resolve loop reaches `maxReviewResolveRounds` with Critical/Warning still present (Step 5)
-- Source edits in the pipeline session are allowed only during the resolve step (Step 4b), and only in the issue worktree
-- Build-phase source edits happen only in `/dev-build`
-- Git metadata operations required for merge are allowed
-- On unrecoverable error: save state, then report with `cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step "<step>"`
+- **Do not end your turn between pipeline steps** except Step 2a (review dispatch). Report only at milestones (PR created, merge success) or errors.
+- **Auto-merge** when Critical=0 AND Warning=0, or user approves in Step 5.
+- **User approval required** when review-resolve loop reaches `maxReviewResolveRounds` with Critical/Warning (Step 5).
+- Source edits only in resolve step (4b), only in the issue worktree. Build edits happen in `/dev-build`.
+- On unrecoverable error: save state, then `python -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step "<step>"`.

@@ -44,22 +44,4 @@ Per-stage retry via `state_store.stage_retry()` (max 3). Log actions with `state
 
 ## State schema
 
-```json
-{
-  "version": 2,
-  "issue": 42, "area": "client", "pr": 99,
-  "branch": "feat/issue-42-add-auth",
-  "paths": {
-    "skillCwd": "/workspace",
-    "repoDir": "/workspace/client",
-    "worktreeDir": "/workspace/.workspace/worktrees/client/issue-42"
-  },
-  "step": "review", "lastReviewId": 0,
-  "lastCommitSha": "{SHA}", "skipReview": false,
-  "reviewResolveRound": 0, "maxReviewResolveRounds": 5,
-  "stageRetries": { "build": 0, "review": 0, "resolve": 0, "merge": 0 },
-  "maxStageRetries": 3,
-  "recoveryLog": [],
-  "createdAt": "...", "updatedAt": "..."
-}
-```
+See [python-migration-spec.md](python-migration-spec.md) for the canonical v2 schema.
