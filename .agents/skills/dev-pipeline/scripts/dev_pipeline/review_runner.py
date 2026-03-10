@@ -231,7 +231,7 @@ def _dispatch_claude(
         f"issue=#{issue} area={area} pr=#{pr} cwd={monorepo_root}",
         file=sys.stderr,
     )
-    result = run(cmd, cwd=str(monorepo_root), env=env_extra, timeout=900, capture_output=True)
+    result = run(cmd, cwd=str(monorepo_root), env=clean_env, timeout=900, capture_output=True)
     print(
         f"[review_runner:subprocess] end tool=claude stage=review "
         f"issue=#{issue} rc={result.rc}",

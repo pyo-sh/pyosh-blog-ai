@@ -101,9 +101,22 @@ def fetch_review_comments(area: str, pr: int, review_id: int) -> list:
         )
         return []
 
-    raw = json.loads(result.stdout) if result.stdout.strip() else []
-    if not isinstance(raw, list):
-        return []
+    raw = []
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+            if isinstance(parsed, list):
+                raw = parsed
+        except json.JSONDecodeError:
+            # --paginate may emit concatenated JSON arrays; collect all items
+            for line in result.stdout.strip().splitlines():
+                if line.strip():
+                    try:
+                        part = json.loads(line)
+                        if isinstance(part, list):
+                            raw.extend(part)
+                    except json.JSONDecodeError:
+                        pass
     return [
         {
             "path": c.get("path"),
