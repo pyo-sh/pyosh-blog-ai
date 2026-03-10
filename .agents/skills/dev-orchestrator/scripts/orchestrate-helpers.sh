@@ -458,18 +458,40 @@ _orch_worktree_repo_dir() {
   monorepo_area_dir "$area"
 }
 
+_orch_pipeline_state_is_live() {
+  # Usage: _orch_pipeline_state_is_live <area> <issue>
+  # Returns 0 if the pipeline state file exists AND was modified within the
+  # last 30 minutes (indicating a live or recently active /dev-pipeline run).
+  # Returns 1 if the file does not exist or is older than 30 minutes (stale).
+  #
+  # Stale state files are common after crashes or kills: dev-pipeline cleanup
+  # deletes the state file only on the success path (log step). Failed or
+  # interrupted runs leave the file behind.
+  local area=$1 issue=$2
+  local state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
+  [ -f "$state_file" ] || return 1
+  local mtime now elapsed
+  mtime=$(stat -c %Y "$state_file" 2>/dev/null) || return 1
+  now=$(date +%s)
+  elapsed=$(( now - mtime ))
+  [ "$elapsed" -lt 1800 ]
+}
+
 orch_worktree_quarantine() {
   # Usage: orch_worktree_quarantine <area> <issue>
   # Moves the issue worktree to a timestamped quarantine directory.
   #
-  # Git metadata is preserved: after the move, the main repo's
-  # .git/worktrees/{name}/gitdir backlink is updated to the new quarantine path
-  # so that git commands (log, status, diff) continue to work inside the
-  # quarantined directory. Pruning is intentionally deferred — calling
-  # git worktree prune immediately after mv would remove the worktree entry
-  # and make the checkout unusable for post-mortem inspection.
+  # Two git-metadata operations happen after the move:
+  #   1. The worktree entry in .git/worktrees/ is renamed to a quarantine-
+  #      scoped name. This frees the original registration so that a retry
+  #      can call `git worktree add` at the same path without getting
+  #      "already used by worktree" errors.
+  #   2. Both the entry's gitdir file and the worktree's .git file are
+  #      updated to reflect the new entry name and quarantine path, so that
+  #      git commands (log, status, diff) continue to work inside the
+  #      quarantined directory.
   local area=$1 issue=$2
-  local wt_path repo_dir quarantine_dir ts dest old_gitdir_path
+  local wt_path repo_dir quarantine_dir ts dest
   wt_path=$(orch_worktree_path "$area" "$issue")
   repo_dir=$(_orch_worktree_repo_dir "$area")
   quarantine_dir="$MONOREPO_ROOT/.workspace/worktrees/${area}/quarantine"
@@ -478,8 +500,14 @@ orch_worktree_quarantine() {
     return 0
   fi
 
-  # Record the pre-move gitdir path so we can update the backlink after mv.
-  old_gitdir_path="${wt_path}/.git"
+  # Read the worktree's .git file to find the entry directory before moving.
+  # Format: "gitdir: /path/to/.git/worktrees/{entry-name}"
+  local git_file="$wt_path/.git"
+  local entry_dir entry_name
+  if [ -f "$git_file" ]; then
+    entry_dir=$(sed 's/^gitdir: //' "$git_file")
+    entry_name=$(basename "$entry_dir")
+  fi
 
   ts=$(date +%Y%m%d-%H%M%S)
   dest="${quarantine_dir}/issue-${issue}-${ts}"
@@ -490,19 +518,18 @@ orch_worktree_quarantine() {
     return 1
   fi
 
-  # Update the gitdir backlink in the main repo's worktree entry so that
-  # git operations work inside the quarantine directory.
-  # .git/worktrees/{name}/gitdir holds the absolute path to the worktree's
-  # .git file. After mv that path is stale; point it to the new location.
-  local new_gitdir_path="${dest}/.git"
-  local gitdir_file
-  for gitdir_file in "${repo_dir}/.git/worktrees"/*/gitdir; do
-    [ -f "$gitdir_file" ] || continue
-    if [ "$(cat "$gitdir_file")" = "$old_gitdir_path" ]; then
-      printf '%s' "$new_gitdir_path" > "$gitdir_file"
-      break
+  # Rename the git worktree entry to a quarantine-scoped name.
+  # This frees the original entry name so `git worktree add` can reuse the path.
+  if [ -n "$entry_name" ] && [ -d "$repo_dir/.git/worktrees/$entry_name" ]; then
+    local new_entry_name="quarantine-${issue}-${ts}"
+    local new_entry_dir="$repo_dir/.git/worktrees/$new_entry_name"
+    if mv "$repo_dir/.git/worktrees/$entry_name" "$new_entry_dir" 2>/dev/null; then
+      # Update gitdir in the renamed entry to point to the quarantine .git file.
+      printf '%s' "${dest}/.git" > "$new_entry_dir/gitdir"
+      # Update the quarantine .git file to point back to the renamed entry.
+      printf 'gitdir: %s' "$new_entry_dir" > "$dest/.git"
     fi
-  done
+  fi
 
   >&2 echo "[orchestrator] Quarantined worktree for #${issue}: $dest"
   orch_disk_budget_gc "$area"
@@ -534,12 +561,11 @@ orch_worktree_remove() {
 orch_worktree_prepare() {
   # Usage: orch_worktree_prepare <area> <issue>
   # Ensures no stale worktree exists before dispatching a new attempt.
-  # If a stale worktree is found AND no active pipeline state exists for the
-  # issue, quarantines it. An existing pipeline state file signals that a
-  # standalone /dev-pipeline run already owns the worktree; in that case the
-  # worktree is left in place and dispatch is aborted to avoid disrupting
-  # the live run.
-  # Returns: 0 if ready to dispatch, 1 on conflict or error.
+  # If a stale worktree is found AND no LIVE pipeline owns it, quarantines it.
+  # Liveness is determined by _orch_pipeline_state_is_live (30 min TTL on the
+  # state file mtime). Stale state files left by crashed or killed pipelines
+  # are ignored so retries are not permanently blocked.
+  # Returns: 0 if ready to dispatch, 1 on live conflict or error.
   local area=$1 issue=$2
   local wt_path
   wt_path=$(orch_worktree_path "$area" "$issue")
@@ -550,10 +576,10 @@ orch_worktree_prepare() {
     return 0
   fi
 
-  # A pipeline state file signals an active /dev-pipeline run using this worktree.
-  # Do not quarantine — that would pull the checkout out from under a live run.
-  if [ -f "$PIPELINE_DIR/${area}/issue-${issue}.state.json" ]; then
-    >&2 echo "[orchestrator] orch_worktree_prepare: standalone pipeline active for #${issue} - cannot dispatch; worktree is owned by an active /dev-pipeline run"
+  # Refuse to quarantine if a LIVE standalone pipeline is using this worktree.
+  # A stale state file from a dead pipeline is ignored (returns 1 from is_live).
+  if _orch_pipeline_state_is_live "$area" "$issue"; then
+    >&2 echo "[orchestrator] orch_worktree_prepare: live pipeline detected for #${issue} (state file modified < 30 min ago) - cannot dispatch"
     return 1
   fi
 
@@ -593,7 +619,7 @@ orch_orphan_gc() {
   local state
   state=$(orch_state_read "$area") || return 0
 
-  local d base issue_num in_batch pipeline_state_file
+  local d base issue_num in_batch
   for d in "$wt_base"/issue-*/; do
     [ -d "$d" ] || continue
     base=$(basename "$d")
@@ -608,13 +634,12 @@ orch_orphan_gc() {
     in_batch=$(printf '%s' "$state" | jq -r --arg n "$issue_num" '.status[$n] // ""')
     if [ -n "$in_batch" ]; then continue; fi
 
-    # Skip if an active pipeline state file exists for this issue.
-    # This protects worktrees owned by independent /dev-pipeline runs that are
-    # not part of the current orchestrator batch.
-    pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue_num}.state.json"
-    if [ -f "$pipeline_state_file" ]; then continue; fi
+    # Skip if a LIVE pipeline state file exists for this issue.
+    # Liveness uses a 30 min TTL (same as orch_worktree_prepare) to avoid
+    # blocking on stale state files left by crashed/killed pipelines.
+    if _orch_pipeline_state_is_live "$area" "$issue_num"; then continue; fi
 
-    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch and no active pipeline) - quarantining"
+    >&2 echo "[orchestrator] Orphan worktree detected: ${d} (issue #${issue_num} not in batch, no live pipeline) - quarantining"
     orch_worktree_quarantine "$area" "$issue_num"
   done
 }
