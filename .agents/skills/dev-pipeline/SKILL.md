@@ -142,11 +142,11 @@ if Critical > 0 or Warning > 0:
 
 if Suggestion > 0 (but Critical = 0 and Warning = 0):
   if reviewResolveRound >= maxReviewResolveRounds (5):
-    if headless (non-interactive): auto-merge (suggestions are non-blocking)
+    if headless (non-interactive): update .step = "merge", auto-merge (suggestions are non-blocking)
     else: ask user: merge as-is / fix suggestions / abort
   else:
     AI decides:
-      a) suggestions are trivial or debatable -> auto-merge (Step 6)
+      a) suggestions are trivial or debatable -> update .step = "merge", auto-merge (Step 6)
       b) suggestions are valid and worth fixing -> update .reviewResolveRound += 1, resolve then re-review (Step 4, set skipReview = false)
       c) suggestions are valid but no re-review needed -> update .reviewResolveRound += 1, resolve then merge (Step 4, set skipReview = true)
 
@@ -190,7 +190,7 @@ RC=$?
 [ $RC -eq 2 ] && { echo "[pipeline] gh API error checking commits - abort"; return 1; }
 ```
 
-If found (`RC=0`), use `NEW_SHA` from stdout directly, update `.lastCommitSha`, show diff, and ask user (skip 4a-4c since context is lost).
+If found (`RC=0`), use `NEW_SHA` from stdout directly, update `.lastCommitSha` and `.stageRetries.resolve = 0`, show diff, and ask user (skip 4a-4c since context is lost).
 
 Otherwise resolve directly in this pipeline session:
 
@@ -269,7 +269,7 @@ Recovery entry:
 gh pr view "$PR" -R "$(pipeline_repo_name "$AREA")" --json state --jq '.state'
 ```
 
-If already `MERGED`, go to Step 7.
+If already `MERGED`, go to Step 7. If `CLOSED`, stop and report (PR was closed without merging).
 
 Otherwise merge with the **single helper**:
 
