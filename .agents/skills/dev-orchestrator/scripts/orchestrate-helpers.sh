@@ -372,7 +372,7 @@ orch_dispatch() {
 
   local start_time=""
   if [ -f "/proc/$pid/stat" ]; then
-    start_time=$(awk '{print $22}' "/proc/$pid/stat") || true
+    start_time=$(awk -F')' '{print $2}' "/proc/$pid/stat" | awk '{print $20}') || true
   fi
 
   if ! orch_process_alive "$pid"; then
