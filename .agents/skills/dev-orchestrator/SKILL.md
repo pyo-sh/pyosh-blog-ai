@@ -38,11 +38,14 @@ Store in state as `"agent": "codex:o3"` etc.
   worker.err      # stderr from headless process
   heartbeat       # epoch timestamp, updated every 60s
   pid             # wrapper PID (= PGID), transient
+.workspace/orchestrate/{area}/archive/{batchId}/                        # archived batch (batch.state.json + issues/ + gh-errors.log)
 ```
 
 `attemptId` format: `issue-{N}-a{M}` where M is the retry count (0-based).
 
 Each retry creates a new attempt directory. Previous attempt artifacts are preserved for debugging. Stale artifact confusion is eliminated because paths are unique per attempt.
+
+After batch completion, `orch_archive_batch` moves the active area content into `archive/{batchId}/`. Up to 5 archives are kept per area (rotation policy); older archives are deleted automatically.
 
 Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
 
@@ -124,10 +127,18 @@ orch_print_summary "$AREA"
 
 Show table: issue -> status -> PR URL. For failed issues, ask user to handle manually.
 
-Clean up:
+Archive the batch (preserves state, logs, and artifacts for audit):
 
 ```bash
-rm -rf .workspace/orchestrate/{area}/
+orch_archive_batch "$AREA"
+```
+
+This moves `.workspace/orchestrate/{area}/` content to `.workspace/orchestrate/{area}/archive/{batchId}/` and applies the rotation policy (keeps last 5 by default).
+
+To view previous batches:
+
+```bash
+orch_archive_list "$AREA"
 ```
 
 ### 7. Record progress
