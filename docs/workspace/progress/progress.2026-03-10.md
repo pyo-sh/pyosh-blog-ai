@@ -122,6 +122,40 @@ codex 리뷰(1차)에서 `orch_dispatch` 내 2개 Critical 이슈 발견, claude
 - pid-file 타임아웃 시 `setsid_bgpid=$!` 저장 + `kill -- -"$setsid_bgpid"` — 고아 백그라운드 프로세스 정리
 - `/proc/$pid/stat` field 22 파싱: `awk '{print $22}'` → `awk -F')' '{print $2}' | awk '{print $20}'` — comm 필드 공백 포함 시 field shift 방지
 
+## Pipeline auto-proceed + codex review bug fixes
+
+dev-pipeline이 build 후 review 단계로 자동 진행하지 않는 문제와 codex review 연동 버그 4건을 수정했다.
+
+### Bug 1 - pipeline이 build 후 멈춤
+
+`/dev-build` Skill 반환 후 에이전트가 턴을 종료하여 review 단계로 진행하지 않았다.
+state 파일도 작성되지 않아 복구도 불가능했다.
+
+- SKILL.md Step 1: `/dev-build` 호출 전 `step: "build"` state 파일 사전 작성 (복구 진입점 확보)
+- SKILL.md Step 1: `/dev-build` 반환 후 즉시 branch/PR/SHA 읽어 `step: "review"` 업데이트 지시
+- SKILL.md Constraints: "Do not end your turn between pipeline steps" 규칙 추가
+
+### Bug 2, 3 - codex `--base` + prompt 충돌 / config schema 오류
+
+- `codex exec review --base`와 `[PROMPT]` 인자가 상호 배타적 - prompt 인자 제거
+- `-c "history.save_history=false"` codex config schema 오류 - 해당 옵션 제거
+
+### Bug 4 - codex sandbox 중첩으로 re-review 실패
+
+Claude Code 외부 sandbox + codex workspace-write sandbox 중첩 시 `getdents64` 차단.
+codex 공식 문서 확인: `--sandbox danger-full-access`는 외부 환경이 이미 격리를 제공할 때 사용 가능.
+Claude Code sandbox가 이미 프로세스를 격리하므로 codex 내부 sandbox 비활성화.
+
+- `pipeline_run_headless_core` codex 경로에 `--sandbox danger-full-access` 추가
+
+### Bug 5 - `--output-last-message` 빈 파일
+
+codex가 RC=0으로 종료해도 `--output-last-message` 파일이 0 bytes.
+codex exec는 stdout에 최종 agent 메시지만 출력하는 것이 공식 규약.
+
+- `--output-last-message` 제거, stdout 리다이렉트(`> "$log"`)를 primary source로 사용
+- `_pipeline_post_codex_review`에서 `last_msg_file` 의존 제거, `$log` 직접 사용으로 단순화
+
 ## Headless review agent dispatch - Claude Code / Codex tool selection (#123, PR #124)
 
 `pipeline_run_headless_core`에 tool dispatch를 추가하여 Claude Code와 Codex CLI 중 선택하여

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-10 | Pipeline auto-proceed + codex review bug fixes - build 후 자동 진행 미작동(pre-build state + 턴 종료 금지), codex --base+prompt 충돌, config schema 오류, sandbox 중첩 getdents64 차단(danger-full-access), --output-last-message 빈 파일(stdout 직접 사용) | done |
 | 2026-03-10 | Orchestrator atomic state + process group termination - dispatched worker identity에 startTime 추가, flock 직렬화 + kill -- -pgid 기존 구현 확인, acceptance criteria 완료 (#80) | done |
 | 2026-03-10 | Headless review agent dispatch - Claude Code / Codex tool selection, `pipeline_run_headless_core` tool 파라미터 추가, codex exec review 연동, `--output-last-message` + 동적 base ref + codex review 포스팅 (#123, PR #124) | done |
 | 2026-03-10 | Attempt isolation - attemptId + artifact directory separation, attemptId format `issue-{N}-a{M}`, per-attempt directory `.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/`, previous attempt artifact preservation (#79) | done |
