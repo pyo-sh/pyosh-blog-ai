@@ -16,3 +16,10 @@ CLAUDE.local.md
 ## AI workspace (worktrees, pipeline state, locks)
 .workspace/
 .pnpm-store
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
