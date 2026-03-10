@@ -29,7 +29,7 @@ def test_dispatch_claude_removes_claudecode_from_env(tmp_path, monkeypatch):
 
     captured_env = {}
 
-    def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=True):
+    def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=True, replace_env=False):
         captured_env.update(env or {})
         return _make_result(rc=0, stdout="review output")
 
@@ -56,7 +56,7 @@ def test_dispatch_claude_pipeline_vars_in_env(tmp_path, monkeypatch):
 
     captured_env = {}
 
-    def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=True):
+    def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=True, replace_env=False):
         captured_env.update(env or {})
         return _make_result(rc=0, stdout="")
 

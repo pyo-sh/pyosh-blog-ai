@@ -65,12 +65,21 @@ def sample_state() -> dict:
 
 
 @pytest.fixture
+def sample_pipeline_state(sample_state):
+    """Return a typed PipelineState from the sample dict."""
+    from dev_pipeline.models import PipelineState
+    return PipelineState.from_dict(sample_state)
+
+
+@pytest.fixture
 def state_file(monorepo_root, sample_state):
     """Write sample_state to the expected state file location and return the path."""
+    from dev_pipeline.models import PipelineState
+    from dev_pipeline.state_store import state_write
+
     area = sample_state["area"]
     issue = sample_state["issue"]
+    state = PipelineState.from_dict(sample_state)
+    state_write(issue, area, monorepo_root, state)
     state_dir = monorepo_root / ".workspace" / "pipeline" / area
-    state_dir.mkdir(parents=True, exist_ok=True)
-    path = state_dir / f"issue-{issue}.state.json"
-    path.write_text(json.dumps(sample_state, indent=2))
-    return path
+    return state_dir / f"issue-{issue}.state.json"

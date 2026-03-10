@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from dev_pipeline.controller import format_escalation, list_pipelines
+from dev_pipeline.models import PipelineState
 from dev_pipeline.state_store import state_write
 
 
@@ -41,7 +42,7 @@ def test_format_escalation_transition_log_entry(monorepo_root, sample_state):
     sample_state["transitionLog"] = [
         {"from": "build", "to": "review_dispatch", "reason": "ok", "ts": "2024-01-01T00:00:00Z"}
     ]
-    state_write(42, "client", monorepo_root, sample_state)
+    state_write(42, "client", monorepo_root, PipelineState.from_dict(sample_state))
     msg = format_escalation(42, "client", "merge", monorepo_root)
     assert "build -> review_dispatch" in msg
 
@@ -63,7 +64,7 @@ def test_format_escalation_recovery_log_for_stage(monorepo_root, sample_state):
             "timestamp": "2024-01-01T00:01:00Z",
         },
     ]
-    state_write(42, "client", monorepo_root, sample_state)
+    state_write(42, "client", monorepo_root, PipelineState.from_dict(sample_state))
     msg = format_escalation(42, "client", "merge", monorepo_root)
     # Should show merge-stage recovery log
     assert "push failed" in msg
@@ -104,7 +105,7 @@ def test_list_pipelines_no_pipeline_dir(tmp_path):
 
 
 def test_list_pipelines_single(monorepo_root, sample_state):
-    state_write(42, "client", monorepo_root, sample_state)
+    state_write(42, "client", monorepo_root, PipelineState.from_dict(sample_state))
     result = list_pipelines(monorepo_root)
     assert len(result) == 1
     assert result[0]["issue"] == 42
@@ -114,14 +115,14 @@ def test_list_pipelines_single(monorepo_root, sample_state):
 
 
 def test_list_pipelines_multiple(monorepo_root, sample_state):
-    state_write(42, "client", monorepo_root, sample_state)
+    state_write(42, "client", monorepo_root, PipelineState.from_dict(sample_state))
     # Add a second state
     state2 = dict(sample_state)
     state2["issue"] = 55
     state2["area"] = "server"
     state2["pr"] = 200
     state2["step"] = "merge"
-    state_write(55, "server", monorepo_root, state2)
+    state_write(55, "server", monorepo_root, PipelineState.from_dict(state2))
     result = list_pipelines(monorepo_root)
     assert len(result) == 2
     issues = {r["issue"] for r in result}

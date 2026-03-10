@@ -1,4 +1,6 @@
+import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -38,6 +40,19 @@ class ReviewJob:
             "tool": self.tool,
             "model": self.model,
         }
+
+    def is_stale(self, timeout_secs: int = 1800) -> bool:
+        """Check if this running job has exceeded the stale timeout."""
+        if self.status != ReviewJobStatus.RUNNING:
+            return False
+        if not self.started_at:
+            return True  # Running with no start time is stale
+        try:
+            started = datetime.fromisoformat(self.started_at.replace("Z", "+00:00"))
+            elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+            return elapsed > timeout_secs
+        except (ValueError, TypeError):
+            return True  # Unparseable → treat as stale
 
     @classmethod
     def from_dict(cls, d: dict) -> "ReviewJob":
@@ -124,9 +139,18 @@ class PipelineState:
     @classmethod
     def from_dict(cls, d: dict) -> "PipelineState":
         step_raw = d.get("step", "build")
+        # Migration: old state files may use "review" as a single step name.
+        # Map it to review_dispatch so the pipeline resumes at the correct stage.
+        _STEP_MIGRATION = {"review": "review_dispatch"}
+        step_raw = _STEP_MIGRATION.get(step_raw, step_raw)
         try:
             step = PipelineStep(step_raw)
         except ValueError:
+            print(
+                f"[models] WARNING: unknown step {step_raw!r} in state "
+                f"(issue={d.get('issue')}); defaulting to BUILD",
+                file=sys.stderr,
+            )
             step = PipelineStep.BUILD
 
         paths_raw = d.get("paths", {})

@@ -3,18 +3,17 @@ import sys
 from typing import Optional
 
 from .command_runner import run
+from .paths import area_repo_name
+
+
+# Review states that represent a completed, actionable review.
+# Excludes PENDING (draft, not yet submitted) and DISMISSED (invalidated).
+_ACTIONABLE_REVIEW_STATES = {"COMMENTED", "CHANGES_REQUESTED", "APPROVED"}
 
 
 def _repo(area: str) -> str:
-    """Map area to GitHub repo."""
-    repos = {
-        "client": "pyo-sh/pyosh-blog-fe",
-        "server": "pyo-sh/pyosh-blog-be",
-        "workspace": "pyo-sh/pyosh-blog-ai",
-    }
-    if area not in repos:
-        raise ValueError(f"Unknown area: {area}")
-    return repos[area]
+    """Map area to GitHub repo. Delegates to paths.area_repo_name for validation."""
+    return area_repo_name(area)
 
 
 def check_review_exists(area: str, pr: int, last_review_id: int = 0) -> Optional[int]:
@@ -55,12 +54,13 @@ def check_review_exists(area: str, pr: int, last_review_id: int = 0) -> Optional
     candidates = [
         r for r in reviews
         if r.get("id", 0) > last_review_id
+        and r.get("state", "") in _ACTIONABLE_REVIEW_STATES
         and isinstance(r.get("body"), str)
         and r["body"].startswith("## Review Summary")
     ]
     if not candidates:
         return None
-    return candidates[-1]["id"]
+    return max(candidates, key=lambda r: r["id"])["id"]
 
 
 def fetch_review(area: str, pr: int, review_id: int) -> dict:
