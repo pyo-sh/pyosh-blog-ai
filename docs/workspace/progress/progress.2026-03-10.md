@@ -1,5 +1,46 @@
 # 2026-03-10 Progress
 
+## Pipeline direct resolve + auto-merge (PR #121, #120)
+
+headless `/dev-resolve` sub-agent를 제거하고 pipeline 세션에서 직접 resolve하도록 전환했다.
+review-resolve 자동 루프(최대 5라운드)와 severity 기반 auto-merge 로직을 추가했다.
+
+### 핵심 변경 - direct resolve
+
+- `pipeline_run_resolve()`, `pipeline_resolve_prompt()` 삭제
+- `pipeline_fetch_review_comments()` 신규 - inline review 코멘트 fetch (`gh api --paginate | jq -s`)
+- `pipeline_run_headless_core`에서 resolve stage 제거 (review only)
+- SKILL.md Step 4를 직접 resolve 워크플로우로 전면 재작성 (4a-4d sub-steps)
+- dev-resolve/SKILL.md에서 pipeline runtime contract 섹션 제거 (standalone skill로 유지)
+
+### 자동 review-resolve 루프
+
+- state에 `reviewResolveRound`, `maxReviewResolveRounds: 5` 추가
+- Critical/Warning: 자동 resolve → re-review (5라운드 후 사용자 확인)
+- Suggestion-only: AI 판단으로 auto-merge / resolve+re-review / resolve+merge
+- Clean review (0 findings): auto-merge
+- Headless(비대화형): Critical/Warning 라운드 초과 시 자동 escalation, Suggestion-only는 auto-merge
+
+### Merge lock 강화
+
+- Stale lock reclaim에 fencing 검증 추가 (sleep 0.2 + issue 재확인으로 TOCTOU race 방지)
+- No-timestamp stuck lock: lock dir mtime 기반 grace period(30s) reclaim
+- Conditional trap clear: lock release 성공 시에만 EXIT trap 해제
+
+### 기타 개선
+
+- `pipeline_check_review_exists`: `--paginate | jq -s` 페이지네이션 안전 처리
+- `pipeline_check_new_commits`: `gh pr view --json headRefOid`로 간소화
+- `pipeline_stage_retry`: `--arg`/`--argjson`으로 jq injection 방지
+- `pipeline_fetch_review`: stderr mktemp 격리 + 에러 핸들링
+- `pipeline_cleanup`: message 파일 정리 추가, resolve stage 로그 참조 제거
+- v1 state migration 로직 삭제, legacy worktree path fallback 삭제
+- `monorepo-layout.md`: worktree path를 area-scoped 규약으로 통일
+- recovery.md: resolve 복구 플로우 전면 재작성 (local HEAD 체크, dirty state 핸들링)
+- process-lifecycle.md: state schema v2, direct resolve 설명
+- pipeline-audit.md: 8개 원본 버그 + lock 강화 resolved 기록
+- orchestrate-helpers.sh: dispatch prompt에서 resolve subprocess 참조 제거
+
 ## Pipeline headless CLAUDECODE unset + audit fixes (PR #119)
 
 `pipeline_run_headless_core`의 CLAUDECODE 환경변수 미해제 버그를 수정하고,
