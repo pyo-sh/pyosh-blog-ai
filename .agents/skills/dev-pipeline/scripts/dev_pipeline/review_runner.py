@@ -417,6 +417,13 @@ def _dispatch_codex(
         msg_file.write_text(normalized)
         try:
             post_review_comment(area, pr, str(msg_file))
+        except Exception as e:
+            print(
+                f"[review_runner] failed to post codex review for "
+                f"issue #{issue} area={area} pr=#{pr}: {e}",
+                file=sys.stderr,
+            )
+            return 1
         finally:
             msg_file.unlink(missing_ok=True)
 
