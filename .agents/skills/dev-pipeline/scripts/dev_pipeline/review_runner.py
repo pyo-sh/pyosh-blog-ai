@@ -277,6 +277,46 @@ def _dispatch_claude(
     return result.rc
 
 
+def normalize_codex_output(raw: str) -> str | None:
+    """Normalize codex review output to match the pipeline review contract.
+
+    Returns:
+        Original string if it already starts with '## Review Summary'.
+        None if the input is empty or whitespace-only.
+        A fallback wrapper otherwise.
+    """
+    if not raw or not raw.strip():
+        return None
+
+    if raw.lstrip().startswith("## Review Summary"):
+        return raw
+
+    return f"""## Review Summary
+
+**Verdict**: Request changes - 1 Warning issue found.
+
+Codex output did not match the pipeline review contract, so it was normalized conservatively.
+
+### Critical
+
+None
+
+### Warning
+
+1. **Codex output normalization fallback**
+   The original Codex review output did not satisfy the required format.
+   Review the raw content below and triage manually.
+
+   ```text
+   {raw}
+   ```
+
+### Suggestion
+
+None
+"""
+
+
 def _dispatch_codex(
     issue: int,
     area: str,
@@ -369,8 +409,12 @@ def _dispatch_codex(
     if result.rc == 0 and log.exists() and log.stat().st_size > 0:
         from .github_client import post_review_comment
 
+        raw = log.read_text()
+        normalized = normalize_codex_output(raw)
+        if normalized is None:
+            return 1  # empty output -> treat as failure
         msg_file = pipeline_message_path(area, pr, "review", monorepo_root)
-        shutil.copy(str(log), str(msg_file))
+        msg_file.write_text(normalized)
         try:
             post_review_comment(area, pr, str(msg_file))
         finally:

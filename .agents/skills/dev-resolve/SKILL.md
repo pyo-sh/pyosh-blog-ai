@@ -39,11 +39,7 @@ Commit example:
 git commit -m "fix: address review comments (#${ISSUE})"
 ```
 
-### 4. Record progress
-
-Run `/dev-log` and include which comments were fixed or skipped.
-
-### 5. Push and post response
+### 4. Push and post response
 
 Push from the worktree:
 
@@ -54,7 +50,7 @@ git push
 Use an area-scoped response file to avoid collisions:
 
 ```bash
-MSG_FILE="${PIPELINE_MONOREPO_ROOT:-/workspace}/.workspace/messages/${PIPELINE_AREA:-manual}-pr-${PR}-response.md"
+MSG_FILE="/workspace/.workspace/messages/manual-pr-${PR}-response.md"
 mkdir -p "$(dirname "$MSG_FILE")"
 cat > "$MSG_FILE" <<'EOF_RESPONSE'
 {body}
@@ -64,6 +60,6 @@ gh pr comment "$PR" -R "$REPO" --body-file "$MSG_FILE"
 rm -f "$MSG_FILE"
 ```
 
-### 6. Notify user
+### 5. Notify user
 
 Summarize fixed and skipped counts. Advise re-review.

@@ -45,11 +45,7 @@ gh issue edit {N} --body "$BODY"
 
 Only check fully implemented items. Leave partial or future items unchecked.
 
-### 3. Record progress (required)
-
-Run `/dev-log` before pushing.
-
-### 4. Push & create PR
+### 3. Push & create PR
 
 ```bash
 git push -u origin {type}/issue-{N}-{desc}
@@ -64,13 +60,13 @@ rm .workspace/messages/pr-{N}-body.md
 
 → [pr-template.md](references/pr-template.md) (title format, `gh pr create` usage)
 
-### 5. Next step
+### 4. Next step
 
 If called from `/dev-pipeline` (check: the conversation prompt contains `/dev-pipeline`), skip this step and return control to the caller.
 
 Otherwise, instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration.
 
-### 6. Cleanup
+### 5. Cleanup
 
 ```bash
 cd {area}
