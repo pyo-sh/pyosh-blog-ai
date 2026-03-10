@@ -67,8 +67,10 @@ orch_init() {
 
   mkdir -p "$ORCH_BASE/$area"
 
-  local batch_id
-  batch_id="batch-$(date +%Y%m%d-%H%M%S)-$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c4)"
+  local batch_id nonce
+  # Use shell arithmetic to avoid SIGPIPE from tr|head under set -e -o pipefail.
+  nonce=$(printf '%04x' "$(( (RANDOM % 256) * 256 + (RANDOM % 256) ))")
+  batch_id="batch-$(date +%Y%m%d-%H%M%S)-${nonce}"
 
   # Filter DAG: remove deps not in the batch to prevent permanent blocks.
   # External deps (closed issues, out-of-batch) are treated as already satisfied.
@@ -1007,6 +1009,9 @@ orch_archive_batch() {
 
   mkdir -p "$archive_dir"
 
+  # Record high-precision creation time for deterministic rotation ordering.
+  date +%s%N > "$archive_dir/.archived-at" 2>/dev/null || date +%s > "$archive_dir/.archived-at"
+
   # Move all area-level files and directories except the archive directory itself.
   local item
   for item in "$area_dir"/*; do
@@ -1086,13 +1091,14 @@ orch_archive_rotate() {
     return 0
   fi
 
-  # Collect directories sorted oldest-first by name (batchId starts with YYYYMMDD-HHMMSS,
-  # so lexicographic order equals chronological order and is stable for same-second batches).
+  # Collect directories sorted oldest-first by .archived-at timestamp for deterministic rotation.
   local entries=()
   local d
   for d in "$archive_root"/*/; do
     [ -d "$d" ] || continue
-    entries+=("$(basename "$d") $d")
+    local ts
+    ts=$(cat "$d/.archived-at" 2>/dev/null || stat -c %Y "$d")
+    entries+=("$ts $d")
   done
 
   local total=${#entries[@]}
@@ -1102,7 +1108,7 @@ orch_archive_rotate() {
 
   local to_delete=$(( total - max_keep ))
   local sorted
-  sorted=$(printf '%s\n' "${entries[@]}" | sort)
+  sorted=$(printf '%s\n' "${entries[@]}" | sort -n)
 
   local deleted=0
   while IFS= read -r line; do
