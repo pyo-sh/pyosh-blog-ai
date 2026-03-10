@@ -1,5 +1,18 @@
 # 2026-03-10 Progress
 
+## Archive + rotation - orchestrator batch preservation (#81)
+
+batch 완료 후 상태/로그/artifact를 삭제 대신 archive로 이동하여 감사 추적과 원인 분석을 가능하게 했다.
+
+### 핵심 변경
+
+- `orch_archive_batch <area>`: batch 완료 후 `.workspace/orchestrate/{area}/` 컨텐츠를 `archive/{batchId}/`로 이동, rotation 자동 호출
+- `orch_archive_list <area>`: 저장된 archive 목록을 newest-first 테이블로 출력 (batchId, archivedAt, issue 수, status 요약)
+- `orch_archive_rotate <area> [max_keep]`: 기본 5개 유지, 초과 시 오래된 archive 자동 삭제
+- SKILL.md Step 6: `rm -rf .workspace/orchestrate/{area}/` 제거, `orch_archive_batch` + `orch_archive_list` 사용 지침으로 교체
+- SKILL.md State files: `archive/{batchId}/` 경로 및 rotation 정책 문서화
+- recovery.md stale state 처리: `rm -rf` → `orch_archive_batch` 교체
+
 ## Attempt isolation - attemptId + artifact directory separation (#79)
 
 attemptId를 `issue-{N}-a{M}` 포맷으로 변경하고, per-attempt 디렉토리 구조를 도입하여
