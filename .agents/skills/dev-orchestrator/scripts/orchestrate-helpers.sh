@@ -757,11 +757,13 @@ _ORCH_LABEL_CACHE=""
 _orch_ensure_labels() {
   # Internal: ensures orchestrator labels exist in the repo (idempotent).
   # Caches per-area to avoid repeated API calls within a single session.
+  # Uses bare gh (not orch_gh) intentionally: label creation is best-effort
+  # and should not affect provider health metrics or trigger circuit breaker.
   local area=$1
   local repo
   repo=$(monorepo_area_repo "$area")
 
-  if echo "$_ORCH_LABEL_CACHE" | grep -q "$repo"; then
+  if echo "$_ORCH_LABEL_CACHE" | grep -qF "$repo"; then
     return 0
   fi
 
@@ -775,6 +777,7 @@ orch_label_pr() {
   # Usage: orch_label_pr <area> <issue> <pr_number> <attempt_id>
   # Adds orchestrator identity labels to a PR.
   # Labels: orch, area:{area}, issue:{issue}, attempt:{attemptId}
+  # Uses bare gh (not orch_gh) intentionally: labeling is best-effort.
   local area=$1 issue=$2 pr_number=$3 attempt_id=$4
   local repo
   repo=$(monorepo_area_repo "$area")
