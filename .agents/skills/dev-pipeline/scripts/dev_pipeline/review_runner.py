@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,22 @@ from .state_store import recovery_log_append, state_read, state_update
 # Stale review job timeout (seconds). Jobs running longer than this are
 # considered stuck and eligible for reclaim.
 REVIEW_JOB_STALE_TIMEOUT_SECS = 1800  # 30 minutes
+
+# Claude-related env vars that trigger codex external-agent-config detection.
+# Stripped from the subprocess environment when dispatching codex.
+_CLAUDE_ENV_STRIP = frozenset({
+    "CLAUDECODE",
+    "CLAUDE_CODE_ENTRYPOINT",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR",
+})
+
+# Patterns that indicate SKILL.md / transcript contamination in codex output.
+_CONTAMINATION_PATTERNS = (
+    "SKILL.md",
+    "## AGENTS",
+    "# AGENTS.md",
+    "allow_implicit_invocation",
+)
 
 
 def _now_iso() -> str:
@@ -291,29 +308,161 @@ def _dispatch_claude(
     return result.rc
 
 
-def normalize_codex_output(raw: str) -> str | None:
-    """Extract review content from Codex transcript output.
+def _validate_codex_payload(payload: dict) -> Optional[str]:
+    """Validate a codex JSON output payload against the review schema.
 
-    Searches for the last '## Review Summary' occurrence in the raw transcript.
-    Codex may produce multi-turn output; we extract the final review block.
+    Returns None if valid, or an error description string if invalid.
+    """
+    if not isinstance(payload, dict):
+        return "payload is not a JSON object"
+    verdict = payload.get("verdict")
+    if verdict not in ("approve", "request_changes", "comment"):
+        return f"invalid verdict: {verdict!r}"
+    summary = payload.get("summary")
+    if not isinstance(summary, str):
+        return "summary missing or not a string"
+    if len(summary) > 2000:
+        return f"summary too long: {len(summary)} chars"
+    issues = payload.get("issues")
+    if not isinstance(issues, list):
+        return "issues missing or not an array"
+    if len(issues) > 50:
+        return f"too many issues: {len(issues)}"
+    valid_severities = {"P1", "P2", "P3"}
+    for i, item in enumerate(issues):
+        if not isinstance(item, dict):
+            return f"issues[{i}] is not an object"
+        if item.get("severity") not in valid_severities:
+            return f"issues[{i}].severity invalid: {item.get('severity')!r}"
+        if not isinstance(item.get("title"), str):
+            return f"issues[{i}].title missing or not a string"
+        if not isinstance(item.get("body"), str):
+            return f"issues[{i}].body missing or not a string"
+        if len(item.get("title", "")) > 200:
+            return f"issues[{i}].title too long"
+        if len(item.get("body", "")) > 2000:
+            return f"issues[{i}].body too long"
+    return None
+
+
+def _contamination_check(payload: dict) -> Optional[str]:
+    """Check payload fields for signs of SKILL.md or transcript contamination.
+
+    Returns None if clean, or a description of the contamination detected.
+    """
+    check_text = json.dumps(payload)
+    for pattern in _CONTAMINATION_PATTERNS:
+        if pattern in check_text:
+            return f"contamination pattern detected: {pattern!r}"
+    if len(payload.get("summary", "")) > 1500:
+        return "summary suspiciously long (possible transcript injection)"
+    return None
+
+
+def _render_codex_review(payload: dict) -> str:
+    """Render a validated codex JSON payload into a GitHub PR review markdown body.
+
+    Output is compatible with parse_review_body() and embeds machine-readable
+    metadata so count extraction does not rely on markdown parsing.
+    """
+    from .review_normalizer import _make_fingerprint
+
+    sev_map = {"P1": "critical", "P2": "warning", "P3": "suggestion"}
+    issues = payload.get("issues", [])
+    counts = {"critical": 0, "warning": 0, "suggestion": 0}
+    for item in issues:
+        sev = sev_map.get(item["severity"])
+        if sev:
+            counts[sev] += 1
+
+    lines = [
+        "## Review Summary",
+        "",
+        "| Severity | Count |",
+        "|----------|-------|",
+        f"| Critical | {counts['critical']} |",
+        f"| Warning | {counts['warning']} |",
+        f"| Suggestion | {counts['suggestion']} |",
+        "",
+        payload.get("summary", ""),
+        "",
+    ]
+
+    for sev_key, section_name in (("P1", "Critical"), ("P2", "Warning"), ("P3", "Suggestion")):
+        section_items = [it for it in issues if it.get("severity") == sev_key]
+        if not section_items:
+            continue
+        lines.append(f"### {section_name}")
+        for n, item in enumerate(section_items, 1):
+            path = item.get("path", "")
+            line_no = item.get("line")
+            location = ""
+            if path:
+                location = f"`{path}" + (f":{line_no}" if line_no else "") + "`"
+            title = item["title"]
+            prefix = f"{n}. {location + ' - ' if location else ''}{title}"
+            lines.append(prefix)
+            lines.append(item["body"])
+            lines.append("")
+
+    # Embed machine-readable metadata for reliable count extraction
+    meta_items = []
+    for item in issues:
+        sev = sev_map.get(item["severity"], "suggestion")
+        path = item.get("path", "")
+        title = item["title"]
+        fp = _make_fingerprint(sev, path, title)
+        meta_items.append({
+            "severity": sev,
+            "file": path,
+            "message": title,
+            "fingerprint": fp,
+            "raw": item["body"],
+        })
+    meta = {
+        "critical": counts["critical"],
+        "warning": counts["warning"],
+        "suggestion": counts["suggestion"],
+        "items": meta_items,
+    }
+    lines.append(
+        f"<!-- dev-pipeline-meta: {json.dumps(meta, separators=(',', ':'))} -->"
+    )
+    return "\n".join(lines) + "\n"
+
+
+def normalize_codex_output(raw: str) -> str | None:
+    """Extract review content from a raw Codex transcript. LOCAL ARTIFACT SALVAGE ONLY.
+
+    This function must NOT be used as the primary GitHub publish path.
+    The primary path is the structured JSON output produced by _dispatch_codex
+    via --output-schema / -o, validated by _validate_codex_payload and rendered
+    by _render_codex_review. Use this function only as a fallback for inspecting
+    local transcript artifacts.
+
+    Searches for the last '## Review Summary' that begins at a line start
+    (idx == 0 or preceded by a newline). This prevents false-positives from
+    occurrences inside backtick spans such as:
+        Posts a review beginning with `## Review Summary`.
 
     Returns:
-        The review body starting with '## Review Summary' if found.
-        None if the input is empty, whitespace-only, or contains no '## Review Summary'.
-
-    Callers must treat None as a parse failure and must NOT upload raw content
-    to GitHub. Save the raw transcript as a local artifact instead.
+        The review body starting with '## Review Summary' if found at line start.
+        None if the input is empty, whitespace-only, or no line-start match exists.
     """
     if not raw or not raw.strip():
         return None
 
     marker = "## Review Summary"
-    idx = raw.rfind(marker)
-    if idx == -1:
-        return None
+    idx = len(raw)
+    while True:
+        idx = raw.rfind(marker, 0, idx)
+        if idx == -1:
+            return None
+        # Only accept line-start matches; skip backtick-enclosed occurrences
+        if idx == 0 or raw[idx - 1] == '\n':
+            break
 
-    extracted = raw[idx:].rstrip() + "\n"
-    return extracted
+    return raw[idx:].rstrip() + "\n"
 
 
 def _dispatch_codex(
@@ -341,16 +490,10 @@ def _dispatch_codex(
     log = pipeline_log_path(issue, area, "review", monorepo_root)
     err = pipeline_err_path(issue, area, "review", monorepo_root)
     meta = pipeline_headless_meta_path(issue, area, "review", monorepo_root)
+    schema_path = Path(__file__).parent / "review_schema.json"
+    review_json_path = log.with_suffix(".json")
 
     base_ref = get_pr_base_ref(area, pr)
-
-    cmd = [
-        "codex", "exec", "review",
-        "--base", f"origin/{base_ref}",
-        "--dangerously-bypass-approvals-and-sandbox",
-    ]
-    if model:
-        cmd += ["--model", model]
 
     _write_job_meta(
         meta,
@@ -369,21 +512,41 @@ def _dispatch_codex(
         model=model,
     )
 
-    print(
-        f"[review_runner:subprocess] start tool=codex stage=review "
-        f"issue=#{issue} area={area} pr=#{pr} cwd={worktree_dir}",
-        file=sys.stderr,
-    )
-    result = run(cmd, cwd=str(worktree_dir), timeout=900, capture_output=True)
-    print(
-        f"[review_runner:subprocess] end tool=codex stage=review "
-        f"issue=#{issue} rc={result.rc}",
-        file=sys.stderr,
-    )
+    # Build isolated environment: strip Claude-related vars that trigger
+    # external-agent-config detection in codex, and use a dedicated CODEX_HOME
+    # to avoid user-profile skill discovery.
+    with tempfile.TemporaryDirectory(prefix="codex-home-") as tmp_codex_home:
+        clean_env = {k: v for k, v in os.environ.items() if k not in _CLAUDE_ENV_STRIP}
+        clean_env["CODEX_HOME"] = tmp_codex_home
 
-    # Codex writes review content to stderr; stdout is empty
+        cmd = [
+            "codex", "exec", "review",
+            "--base", f"origin/{base_ref}",
+            "--output-schema", str(schema_path),
+            "-o", str(review_json_path),
+            "--dangerously-bypass-approvals-and-sandbox",
+        ]
+        if model:
+            cmd += ["--model", model]
+
+        print(
+            f"[review_runner:subprocess] start tool=codex stage=review "
+            f"issue=#{issue} area={area} pr=#{pr} cwd={worktree_dir}",
+            file=sys.stderr,
+        )
+        result = run(
+            cmd, cwd=str(worktree_dir), env=clean_env,
+            timeout=900, capture_output=True, replace_env=True,
+        )
+        print(
+            f"[review_runner:subprocess] end tool=codex stage=review "
+            f"issue=#{issue} rc={result.rc}",
+            file=sys.stderr,
+        )
+
+    # Save transcript artifacts (stderr = progress log, stdout per codex convention)
     log.write_text(result.stderr)
-    err.write_text("")
+    err.write_text(result.stdout)
 
     status = "success" if result.rc == 0 else ("timeout" if result.timed_out else "error")
     _write_job_meta(
@@ -404,55 +567,60 @@ def _dispatch_codex(
         exit_code=result.rc,
     )
 
-    # Post codex review output to GitHub
-    if result.rc == 0:
-        from .github_client import post_review_comment
+    if result.rc != 0:
+        return result.rc
 
-        if not log.exists() or log.stat().st_size == 0:
-            print(
-                f"[review_runner] codex exited 0 but produced no output for "
-                f"issue #{issue} area={area} pr=#{pr}",
-                file=sys.stderr,
-            )
-            try:
-                state_update(issue, area, monorepo_root, {
-                    "reviewJob": {"status": "failed_parse", "finishedAt": _now_iso()}
-                })
-            except Exception:
-                pass
-            return 1
-
-        raw = log.read_text()
-        normalized = normalize_codex_output(raw)
-        if normalized is None:
-            # fail-closed: parse failed, do NOT upload raw transcript to GitHub.
-            # Raw output is already saved in the log artifact for local inspection.
-            print(
-                f"[review_runner] codex output missing '## Review Summary' for "
-                f"issue #{issue} area={area} pr=#{pr} - "
-                f"setting failed_parse, artifact saved at {log}",
-                file=sys.stderr,
-            )
-            try:
-                state_update(issue, area, monorepo_root, {
-                    "reviewJob": {"status": "failed_parse", "finishedAt": _now_iso()}
-                })
-            except Exception:
-                pass
-            return 1
-
-        msg_file = pipeline_message_path(area, pr, "review", monorepo_root)
-        msg_file.write_text(normalized)
+    # --- Structured output path ---
+    # All failures below are fail-closed: no GitHub post, local artifact only.
+    def _fail_parse(reason: str) -> int:
+        print(
+            f"[review_runner] codex structured output failed for "
+            f"issue #{issue} area={area} pr=#{pr}: {reason} - "
+            f"setting failed_parse, transcript artifact saved at {log}",
+            file=sys.stderr,
+        )
         try:
-            post_review_comment(area, pr, str(msg_file))
-        except Exception as e:
-            print(
-                f"[review_runner] failed to post codex review for "
-                f"issue #{issue} area={area} pr=#{pr}: {e}",
-                file=sys.stderr,
-            )
-            return 1
-        finally:
-            msg_file.unlink(missing_ok=True)
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": "failed_parse", "finishedAt": _now_iso()}
+            })
+        except Exception:
+            pass
+        return 1
 
-    return result.rc
+    if not review_json_path.exists():
+        return _fail_parse("output JSON file not created")
+
+    try:
+        payload = json.loads(review_json_path.read_text())
+    except json.JSONDecodeError as exc:
+        return _fail_parse(f"output JSON parse error: {exc}")
+    finally:
+        review_json_path.unlink(missing_ok=True)
+
+    validation_error = _validate_codex_payload(payload)
+    if validation_error:
+        return _fail_parse(f"schema validation failed: {validation_error}")
+
+    contamination = _contamination_check(payload)
+    if contamination:
+        return _fail_parse(f"contaminated output: {contamination}")
+
+    # Render structured payload into GitHub comment body and post
+    from .github_client import post_review_comment
+
+    rendered = _render_codex_review(payload)
+    msg_file = pipeline_message_path(area, pr, "review", monorepo_root)
+    msg_file.write_text(rendered)
+    try:
+        post_review_comment(area, pr, str(msg_file))
+    except Exception as e:
+        print(
+            f"[review_runner] failed to post codex review for "
+            f"issue #{issue} area={area} pr=#{pr}: {e}",
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        msg_file.unlink(missing_ok=True)
+
+    return 0
