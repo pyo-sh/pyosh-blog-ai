@@ -8,6 +8,8 @@
 # Key design decisions:
 #   - attempt isolation: each dispatch gets its own directory (issues/{N}/attempts/{attemptId}/)
 #   - attemptId: issue-{N}-a{M} format, unique per dispatch attempt
+#   - deterministic branch naming: orch/{area}/issue-{N}/{attemptId}
+#   - PR identity: branch-based lookup > label-based > body search fallback
 #   - setsid + PGID: process group based lifecycle management
 #   - flock: state file locking for correctness
 #   - provider health: circuit breaker for GitHub API failures
@@ -56,6 +58,15 @@ orch_terminal_path() {
   echo "$(orch_attempt_dir "$area" "$issue" "$attempt_id")/terminal.json"
 }
 
+orch_branch_name() {
+  # Deterministic branch name for orchestrator-dispatched issues.
+  # Format: orch/{area}/issue-{N}/{attemptId}
+  local area=$1
+  local issue=$2
+  local attempt_id=$3
+  echo "orch/${area}/issue-${issue}/${attempt_id}"
+}
+
 orch_init() {
   # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent]
   # Creates initial batch state file.
@@ -102,8 +113,8 @@ orch_init() {
     --argjson maxConcurrent "$max_concurrent" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
-      status: $status, dispatched: {}, agent: $agent,
-      maxConcurrent: $maxConcurrent,
+      status: $status, dispatched: {}, issueMetadata: {},
+      agent: $agent, maxConcurrent: $maxConcurrent,
       providers: {github: {status: "healthy", consecutiveFailures: 0,
                            lastError: null, lastCheckedAt: null}},
       orchestratorPid: 0, orchestratorPane: "", orchestratorStartedAt: "",
@@ -317,6 +328,10 @@ orch_dispatch() {
   attempt_dir=$(orch_attempt_dir "$area" "$issue" "$attempt_id")
   local pipeline_state_file="$PIPELINE_DIR/${area}/issue-${issue}.state.json"
 
+  # Deterministic branch name for PR identity lookup.
+  local branch_name
+  branch_name=$(orch_branch_name "$area" "$issue" "$attempt_id")
+
   # Each attempt gets its own directory. Previous attempt artifacts are preserved.
   # Remove stale terminal.json and pid to prevent cross-batch collision: same attemptId
   # (e.g., issue-5-a0) across different batches would share the directory, and
@@ -335,7 +350,7 @@ orch_dispatch() {
     review_agent_hint="Use model \"$model\" for the review subprocess (pass to pipeline_run_review)."
   fi
 
-  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${review_agent_hint:+ $review_agent_hint} Running headlessly - stop at ready-to-merge (build complete, review pass, resolve complete). Do not execute the merge step. Auto-re-review after resolve. After reaching ready-to-merge, exit."
+  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}. Use branch name \"${branch_name}\" for the worktree.${review_agent_hint:+ $review_agent_hint} Running headlessly - stop at ready-to-merge (build complete, review pass, resolve complete). Do not execute the merge step. Auto-re-review after resolve. After reaching ready-to-merge, exit."
 
   local wrapper_script="$_ORCH_HELPERS_DIR/orch-dispatch-wrapper.sh"
   local pid_file="$attempt_dir/pid"
@@ -395,12 +410,15 @@ orch_dispatch() {
   if ! orch_state_update "$area" \
     ".dispatched[\"$issue\"] = {
        pid: $pid, pgid: $pgid, startTime: \"$start_time\", attemptId: \"$attempt_id\",
-       attemptDir: \"$attempt_dir\", dispatchedAt: \"$now\", lastActivity: \"$now\",
+       attemptDir: \"$attempt_dir\", branch: \"$branch_name\",
+       dispatchedAt: \"$now\", lastActivity: \"$now\",
        lastCommitSha: null, lastCpuJiffies: \"0\",
        pipelineStarted: false, retryCount: $retry_count
      }
      | .status[\"$issue\"] = \"dispatched\"
-     | .everDispatched[\"$issue\"] = true"; then
+     | .everDispatched[\"$issue\"] = true
+     | .issueMetadata[\"$issue\"].branch = \"$branch_name\"
+     | .issueMetadata[\"$issue\"].attemptId = \"$attempt_id\""; then
     >&2 echo "[orchestrator] State recording failed for #${issue} - killing orphan PGID $pgid"
     orch_stop_process "$area" "$issue"
     return 1
@@ -680,20 +698,101 @@ orch_disk_budget_gc() {
 }
 
 # ──────────────────────────────────────────────
-# PR lookup helper
+# PR lookup helper (branch > label > body search)
 # ──────────────────────────────────────────────
+
+_orch_pr_branch() {
+  # Internal: returns the deterministic branch name for the issue.
+  # Looks up issueMetadata first (survives dispatch cleanup), then dispatched state.
+  local area=$1 issue=$2
+  local state_json
+  state_json=$(orch_state_read "$area") || return 1
+  local branch
+  branch=$(printf '%s' "$state_json" | jq -r ".issueMetadata[\"$issue\"].branch // empty")
+  if [ -z "$branch" ]; then
+    branch=$(printf '%s' "$state_json" | jq -r ".dispatched[\"$issue\"].branch // empty")
+  fi
+  echo "$branch"
+}
 
 _orch_pr_list() {
   # Usage: _orch_pr_list <area> <issue> <state> <json_fields> <jq_filter>
   # Finds PRs that close the given issue via orch_gh (provider health aware).
+  # Lookup order: branch-based (primary) > label-based > body search (fallback).
   local area=$1 issue=$2 state=$3 json_fields=$4 jq_filter=$5
   local repo
   repo=$(monorepo_area_repo "$area")
 
+  # 1. Branch-based lookup (primary - deterministic, no false positives)
+  local branch
+  branch=$(_orch_pr_branch "$area" "$issue") || true
+  if [ -n "$branch" ]; then
+    local result
+    result=$(orch_gh "$area" pr list -R "$repo" --head "$branch" \
+      --state "$state" --json "$json_fields" --jq "$jq_filter") || true
+    if [ -n "$result" ] && [ "$result" != "[]" ] && [ "$result" != "null" ]; then
+      echo "$result"
+      return 0
+    fi
+  fi
+
+  # 2. Label-based lookup (secondary - covers PRs created before branch naming)
+  local result
+  result=$(orch_gh "$area" pr list -R "$repo" \
+    --label "orch" --label "issue:${issue}" \
+    --state "$state" --json "$json_fields" --jq "$jq_filter") || true
+  if [ -n "$result" ] && [ "$result" != "[]" ] && [ "$result" != "null" ]; then
+    echo "$result"
+    return 0
+  fi
+
+  # 3. Body search fallback (auxiliary - for pre-migration PRs)
   orch_gh "$area" pr list \
     -R "$repo" \
     --search "\"Closes #${issue}\" OR \"Fixes #${issue}\" OR \"Resolves #${issue}\"" \
     --state "$state" --json "$json_fields" --jq "$jq_filter"
+}
+
+_ORCH_LABEL_CACHE=""
+_orch_ensure_labels() {
+  # Internal: ensures orchestrator labels exist in the repo (idempotent).
+  # Caches per-area to avoid repeated API calls within a single session.
+  # Uses bare gh (not orch_gh) intentionally: label creation is best-effort
+  # and should not affect provider health metrics or trigger circuit breaker.
+  local area=$1
+  local repo
+  repo=$(monorepo_area_repo "$area")
+
+  if echo "$_ORCH_LABEL_CACHE" | grep -qF "$repo"; then
+    return 0
+  fi
+
+  # Create labels if they don't exist (gh label create is idempotent with --force).
+  gh label create "orch" --description "Orchestrator-dispatched PR" --color "1D76DB" --force -R "$repo" 2>/dev/null || true
+  gh label create "area:${area}" --description "Area: ${area}" --color "0E8A16" --force -R "$repo" 2>/dev/null || true
+  _ORCH_LABEL_CACHE="$_ORCH_LABEL_CACHE $repo"
+}
+
+orch_label_pr() {
+  # Usage: orch_label_pr <area> <issue> <pr_number> <attempt_id>
+  # Adds orchestrator identity labels to a PR.
+  # Labels: orch, area:{area}, issue:{issue}, attempt:{attemptId}
+  # Uses bare gh (not orch_gh) intentionally: labeling is best-effort.
+  local area=$1 issue=$2 pr_number=$3 attempt_id=$4
+  local repo
+  repo=$(monorepo_area_repo "$area")
+
+  _orch_ensure_labels "$area"
+
+  # Create issue-specific and attempt-specific labels.
+  gh label create "issue:${issue}" --description "Issue #${issue}" --color "C5DEF5" --force -R "$repo" 2>/dev/null || true
+  gh label create "attempt:${attempt_id}" --description "Attempt: ${attempt_id}" --color "D4C5F9" --force -R "$repo" 2>/dev/null || true
+
+  # Apply all identity labels to the PR.
+  gh pr edit "$pr_number" -R "$repo" \
+    --add-label "orch,area:${area},issue:${issue},attempt:${attempt_id}" 2>/dev/null || {
+    >&2 echo "[orchestrator] WARNING: failed to label PR #${pr_number} for issue #${issue}"
+  }
 }
 
 # ──────────────────────────────────────────────
@@ -1063,6 +1162,20 @@ orch_poll_cycle() {
 
     case "$result" in
       completed|failed)
+        # Extract PR metadata from terminal.json before clearing dispatch state.
+        local attempt_id_c pr_number_c
+        attempt_id_c=$(echo "$state" | jq -r ".dispatched[\"$issue\"].attemptId // empty")
+        if [ -n "$attempt_id_c" ]; then
+          local terminal_file_c
+          terminal_file_c=$(orch_terminal_path "$area" "$issue" "$attempt_id_c")
+          if [ -f "$terminal_file_c" ]; then
+            pr_number_c=$(jq -r '.prNumber // empty' "$terminal_file_c") || true
+            if [ -n "$pr_number_c" ] && [ "$pr_number_c" != "null" ]; then
+              orch_state_update "$area" ".issueMetadata[\"$issue\"].pr = ($pr_number_c | tonumber)" || true
+              orch_label_pr "$area" "$issue" "$pr_number_c" "$attempt_id_c" || true
+            fi
+          fi
+        fi
         orch_status_set "$area" "$issue" "$result"
         orch_state_update "$area" "del(.dispatched[\"$issue\"])"
         >&2 echo "[orchestrator] Issue #${issue}: ${result}"
@@ -1087,8 +1200,13 @@ orch_poll_cycle() {
             # without digging through logs. Visible in orch_print_summary output.
             local _now
             _now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            local _attempt_id
+            _attempt_id=$(echo "$state" | jq -r ".dispatched[\"$issue\"].attemptId // empty")
             orch_state_update "$area" \
-              ".mergedWithoutTerminal = ((.mergedWithoutTerminal // []) + [{issue: ($issue | tonumber), pr: ($merged_pr | tonumber), detectedAt: \"$_now\"}])" || true
+              ".mergedWithoutTerminal = ((.mergedWithoutTerminal // []) + [{issue: ($issue | tonumber), pr: ($merged_pr | tonumber), detectedAt: \"$_now\"}])
+               | .issueMetadata[\"$issue\"].pr = ($merged_pr | tonumber)" || true
+            # Label the merged PR for identity tracking (best-effort).
+            [ -n "$_attempt_id" ] && orch_label_pr "$area" "$issue" "$merged_pr" "$_attempt_id" || true
             # PR is merged: treat as completed so dependents unblock correctly.
             orch_status_set "$area" "$issue" "completed"
             orch_state_update "$area" "del(.dispatched[\"$issue\"])"
@@ -1205,14 +1323,24 @@ orch_print_summary() {
   printf "%-8s %-20s %s\n" "Issue" "Status" "PR"
   echo "--------------------------------------------"
 
-  local issues
+  local issues repo
   issues=$(echo "$state" | jq -r '.issues[]')
+  repo=$(monorepo_area_repo "$area")
   for issue in $issues; do
     local status
     status=$(echo "$state" | jq -r ".status[\"$issue\"]")
     local pr_url=""
     if [ "$status" = "completed" ]; then
-      pr_url=$(_orch_pr_list "$area" "$issue" merged url '.[0].url') || true
+      # Try cached PR number from issueMetadata first (avoids API call).
+      local cached_pr
+      cached_pr=$(echo "$state" | jq -r ".issueMetadata[\"$issue\"].pr // empty")
+      if [ -n "$cached_pr" ] && [ "$cached_pr" != "null" ]; then
+        pr_url=$(orch_gh "$area" pr view "$cached_pr" -R "$repo" --json url --jq '.url') || true
+      fi
+      # Fallback to _orch_pr_list if metadata unavailable.
+      if [ -z "$pr_url" ]; then
+        pr_url=$(_orch_pr_list "$area" "$issue" merged url '.[0].url') || true
+      fi
     fi
     printf "%-8s %-20s %s\n" "#${issue}" "$status" "$pr_url"
   done
@@ -1226,6 +1354,238 @@ orch_print_summary() {
     echo "WARNING: ${mwt_count} issue(s) had PR merged but no terminal.json written (SIGKILL edge case)."
     echo "These are marked 'failed' but the PR was actually merged. Manual review recommended:"
     echo "$state" | jq -r '(.mergedWithoutTerminal // [])[] | "  Issue #\(.issue) - PR #\(.pr) - detected \(.detectedAt)"'
+  fi
+}
+
+# ──────────────────────────────────────────────
+# Doctor (state validation + diagnostics)
+# ──────────────────────────────────────────────
+
+orch_doctor() {
+  # Usage: orch_doctor <area>
+  # Validates state consistency and reports issues. Does not modify state.
+  # Returns: 0 = healthy, 1 = issues found.
+  local area=$1
+  local issues_found=0
+  local repo
+  repo=$(monorepo_area_repo "$area")
+  local area_dir
+  area_dir=$(monorepo_area_dir "$area")
+
+  echo "=== Orchestrator Doctor: ${area} ==="
+  echo ""
+
+  # 1. State file integrity
+  echo "--- State file ---"
+  local state_file
+  state_file=$(orch_state_path "$area")
+  if [ ! -f "$state_file" ]; then
+    echo "  [SKIP] No active batch state file"
+    echo "==============================="
+    return 0
+  fi
+
+  local state
+  if ! state=$(jq '.' "$state_file" 2>&1); then
+    echo "  [FAIL] State file is not valid JSON: $state"
+    return 1
+  fi
+  echo "  [OK] State file is valid JSON"
+
+  local batch_id
+  batch_id=$(echo "$state" | jq -r '.batchId // empty')
+  if [ -z "$batch_id" ]; then
+    echo "  [FAIL] Missing batchId"
+    issues_found=1
+  else
+    echo "  [OK] Batch: $batch_id"
+  fi
+
+  local issue_count
+  issue_count=$(echo "$state" | jq '.issues | length')
+  echo "  [OK] Issues in batch: $issue_count"
+
+  # Check required top-level keys.
+  local required_keys=("area" "batchId" "issues" "dag" "status" "dispatched" "agent")
+  for key in "${required_keys[@]}"; do
+    if echo "$state" | jq -e ".$key" > /dev/null 2>&1; then
+      :
+    else
+      echo "  [FAIL] Missing required key: $key"
+      issues_found=1
+    fi
+  done
+
+  # 2. Status consistency
+  echo ""
+  echo "--- Status consistency ---"
+  local all_issues
+  all_issues=$(echo "$state" | jq -r '.issues[]')
+  for issue in $all_issues; do
+    local status
+    status=$(echo "$state" | jq -r ".status[\"$issue\"] // empty")
+    if [ -z "$status" ]; then
+      echo "  [FAIL] Issue #${issue}: no status entry"
+      issues_found=1
+      continue
+    fi
+    case "$status" in
+      pending|blocked|dispatched|completed|failed|skipped_dep_failed) ;;
+      *)
+        echo "  [FAIL] Issue #${issue}: invalid status '${status}'"
+        issues_found=1
+        ;;
+    esac
+
+    # Dispatched issues must have dispatch state.
+    if [ "$status" = "dispatched" ]; then
+      local has_dispatch
+      has_dispatch=$(echo "$state" | jq -r ".dispatched[\"$issue\"] // empty")
+      if [ -z "$has_dispatch" ] || [ "$has_dispatch" = "null" ]; then
+        echo "  [FAIL] Issue #${issue}: status=dispatched but no dispatch entry"
+        issues_found=1
+      fi
+    fi
+  done
+  echo "  [OK] Checked $issue_count issue statuses"
+
+  # 3. Orphan process detection
+  echo ""
+  echo "--- Process health ---"
+  local dispatched_issues
+  dispatched_issues=$(echo "$state" | jq -r '.dispatched | keys[]')
+  for issue in $dispatched_issues; do
+    local pgid pid attempt_id_d
+    pgid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pgid // empty")
+    pid=$(echo "$state" | jq -r ".dispatched[\"$issue\"].pid // empty")
+    attempt_id_d=$(echo "$state" | jq -r ".dispatched[\"$issue\"].attemptId // empty")
+
+    if [ -n "$pgid" ] && orch_pgid_alive "$pgid"; then
+      echo "  [OK] Issue #${issue} ($attempt_id_d): process group $pgid alive"
+    elif [ -n "$pid" ] && orch_process_alive "$pid"; then
+      echo "  [WARN] Issue #${issue} ($attempt_id_d): PID $pid alive but PGID $pgid dead"
+      issues_found=1
+    else
+      echo "  [WARN] Issue #${issue} ($attempt_id_d): process dead (PGID=$pgid, PID=$pid)"
+      issues_found=1
+    fi
+  done
+  if [ -z "$dispatched_issues" ]; then
+    echo "  [OK] No dispatched issues"
+  fi
+
+  # 4. Stale lock detection
+  echo ""
+  echo "--- Lock files ---"
+  local lock_file="${state_file}.lock"
+  if [ -f "$lock_file" ]; then
+    local lock_holder
+    lock_holder=$(flock -n 9 && echo "free" || echo "held") 9<"$lock_file" 2>/dev/null
+    if [ "$lock_holder" = "held" ]; then
+      echo "  [WARN] State lock is held by another process"
+    else
+      echo "  [OK] State lock exists but is not held"
+    fi
+  else
+    echo "  [OK] No lock file"
+  fi
+
+  # 5. Worktree state
+  echo ""
+  echo "--- Worktrees ---"
+  for issue in $all_issues; do
+    local wt_path
+    wt_path=$(orch_worktree_path "$area" "$issue")
+    local status
+    status=$(echo "$state" | jq -r ".status[\"$issue\"] // empty")
+    local ever_dispatched
+    ever_dispatched=$(echo "$state" | jq -r ".everDispatched[\"$issue\"] // false")
+
+    if [ -d "$wt_path" ]; then
+      if [ "$status" = "completed" ] && [ "$ever_dispatched" = "true" ]; then
+        echo "  [WARN] Issue #${issue}: worktree exists but status=completed (orphan)"
+        issues_found=1
+      elif [ "$status" = "failed" ] && [ "$ever_dispatched" = "true" ]; then
+        echo "  [WARN] Issue #${issue}: worktree exists but status=failed (should be quarantined)"
+        issues_found=1
+      elif [ "$status" = "dispatched" ]; then
+        echo "  [OK] Issue #${issue}: worktree exists (dispatched)"
+      else
+        echo "  [INFO] Issue #${issue}: worktree exists (status=${status})"
+      fi
+    else
+      if [ "$status" = "dispatched" ]; then
+        echo "  [WARN] Issue #${issue}: no worktree but status=dispatched"
+        issues_found=1
+      fi
+    fi
+  done
+
+  # Check quarantine size.
+  local quarantine_dir="$MONOREPO_ROOT/.workspace/worktrees/${area}/quarantine"
+  if [ -d "$quarantine_dir" ]; then
+    local q_size
+    q_size=$(du -sm "$quarantine_dir" 2>/dev/null | awk '{print $1}') || q_size=0
+    local q_count
+    q_count=$(find "$quarantine_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    echo "  [INFO] Quarantine: ${q_count} entries, ${q_size}MB"
+    if [ "${q_size:-0}" -gt 500 ]; then
+      echo "  [WARN] Quarantine exceeds 500MB budget"
+      issues_found=1
+    fi
+  fi
+
+  # 6. PR/issue status mismatch (provider health aware)
+  echo ""
+  echo "--- PR/issue consistency ---"
+  local gh_health
+  gh_health=$(orch_provider_health_get "$area") || gh_health="unknown"
+  if [ "$gh_health" = "hard_fault" ] || [ "$gh_health" = "degraded" ]; then
+    echo "  [SKIP] GitHub provider ${gh_health} - skipping PR checks"
+  else
+    for issue in $all_issues; do
+      local status
+      status=$(echo "$state" | jq -r ".status[\"$issue\"] // empty")
+
+      # Check completed issues: PR should be merged.
+      if [ "$status" = "completed" ]; then
+        local pr_number
+        pr_number=$(echo "$state" | jq -r ".issueMetadata[\"$issue\"].pr // empty")
+        if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
+          local pr_state
+          pr_state=$(gh pr view "$pr_number" -R "$repo" --json state --jq '.state' 2>/dev/null) || true
+          if [ "$pr_state" = "MERGED" ]; then
+            echo "  [OK] Issue #${issue}: PR #${pr_number} merged"
+          elif [ -n "$pr_state" ]; then
+            echo "  [WARN] Issue #${issue}: status=completed but PR #${pr_number} state=${pr_state}"
+            issues_found=1
+          fi
+        fi
+      fi
+
+      # Check dispatched issues: branch should exist.
+      if [ "$status" = "dispatched" ]; then
+        local branch
+        branch=$(echo "$state" | jq -r ".dispatched[\"$issue\"].branch // empty")
+        if [ -n "$branch" ]; then
+          local branch_exists
+          branch_exists=$(git -C "$area_dir" ls-remote --heads origin "$branch" 2>/dev/null) || true
+          if [ -n "$branch_exists" ]; then
+            echo "  [OK] Issue #${issue}: branch $branch exists on remote"
+          fi
+        fi
+      fi
+    done
+  fi
+
+  echo ""
+  echo "=== Doctor complete ==="
+  if [ "$issues_found" -gt 0 ]; then
+    echo "Issues found. Review warnings above."
+    return 1
+  else
+    echo "All checks passed."
+    return 0
   fi
 }
 
