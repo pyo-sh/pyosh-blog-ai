@@ -617,33 +617,47 @@ def _dispatch_codex(
     if not review_json_path.exists():
         return _fail_parse("output JSON file not created")
 
+    # Basic JSON parse check before handing off to publisher
     try:
-        payload = json.loads(review_json_path.read_text())
+        json.loads(review_json_path.read_text())
     except json.JSONDecodeError as exc:
-        return _fail_parse(f"output JSON parse error: {exc}")
-    finally:
         review_json_path.unlink(missing_ok=True)
+        return _fail_parse(f"output JSON parse error: {exc}")
 
-    validation_error = _validate_codex_payload(payload)
-    if validation_error:
-        return _fail_parse(f"schema validation failed: {validation_error}")
+    # Move codex output to canonical artifact path
+    review_dir = monorepo_root / ".workspace" / "dev-review" / f"pr-{pr}"
+    review_dir.mkdir(parents=True, exist_ok=True)
+    canonical_json = review_dir / "review.json"
+    shutil.move(str(review_json_path), str(canonical_json))
 
-    # Render structured payload into GitHub comment body and post
-    from .github_client import post_review_comment
+    # Delegate validation, contamination check, rendering, and posting
+    # to the shared review publisher CLI.
+    import subprocess as _sp
 
-    rendered = _render_codex_review(payload)
-    msg_file = pipeline_message_path(area, pr, "review", monorepo_root)
-    msg_file.write_text(rendered)
-    try:
-        post_review_comment(area, pr, str(msg_file))
-    except Exception as e:
-        print(
-            f"[review_runner] failed to post codex review for "
-            f"issue #{issue} area={area} pr=#{pr}: {e}",
-            file=sys.stderr,
+    publisher = (
+        monorepo_root / ".agents" / "skills" / "dev-review"
+        / "scripts" / "review_publish.py"
+    )
+    pub_cmd = [
+        sys.executable, str(publisher),
+        "--input", str(canonical_json),
+        "--mode", "publish",
+        "--repo", repo,
+        "--pr", str(pr),
+        "--output-dir", str(review_dir),
+    ]
+    print(
+        f"[review_runner] invoking publisher for issue #{issue} "
+        f"area={area} pr=#{pr}",
+        file=sys.stderr,
+    )
+    pub_result = _sp.run(pub_cmd, capture_output=True, text=True)
+    if pub_result.stderr:
+        print(pub_result.stderr, end="", file=sys.stderr)
+
+    if pub_result.returncode != 0:
+        return _fail_parse(
+            f"publisher failed (rc={pub_result.returncode})"
         )
-        return 1
-    finally:
-        msg_file.unlink(missing_ok=True)
 
     return 0
