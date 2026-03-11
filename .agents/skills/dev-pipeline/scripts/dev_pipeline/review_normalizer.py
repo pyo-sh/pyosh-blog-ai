@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import re
@@ -27,13 +28,33 @@ class ParsedReview:
     items: List[ReviewItem] = field(default_factory=list)
 
 
-# Marker used in review body to embed machine-readable metadata
+# Markers used in review body to embed machine-readable metadata.
+# -b64 variant: base64-encoded JSON, immune to --> injection from model output.
+# Plain variant: kept for backward compatibility with older review bodies.
+_META_PREFIX_B64 = "<!-- dev-pipeline-meta-b64:"
 _META_PREFIX = "<!-- dev-pipeline-meta:"
 _META_SUFFIX = "-->"
 
 
 def _extract_meta(body: str) -> Optional[dict]:
-    """Extract embedded JSON metadata from review body, if present."""
+    """Extract embedded JSON metadata from review body, if present.
+
+    Tries the base64 format first (<!-- dev-pipeline-meta-b64: ... -->), then
+    falls back to the plain JSON format (<!-- dev-pipeline-meta: ... -->).
+    """
+    # Base64 format (preferred, immune to --> injection)
+    start = body.find(_META_PREFIX_B64)
+    if start != -1:
+        end = body.find(_META_SUFFIX, start)
+        if end != -1:
+            raw_b64 = body[start + len(_META_PREFIX_B64):end].strip()
+            try:
+                raw_json = base64.b64decode(raw_b64.encode()).decode()
+                return json.loads(raw_json)
+            except Exception:
+                pass  # fall through to plain format
+
+    # Plain JSON format (backward compatibility)
     start = body.find(_META_PREFIX)
     if start == -1:
         return None

@@ -33,15 +33,6 @@ _CLAUDE_ENV_STRIP = frozenset({
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR",
 })
 
-# Patterns that indicate SKILL.md / transcript contamination in codex output.
-_CONTAMINATION_PATTERNS = (
-    "SKILL.md",
-    "## AGENTS",
-    "# AGENTS.md",
-    "allow_implicit_invocation",
-)
-
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -345,26 +336,16 @@ def _validate_codex_payload(payload: dict) -> Optional[str]:
     return None
 
 
-def _contamination_check(payload: dict) -> Optional[str]:
-    """Check payload fields for signs of SKILL.md or transcript contamination.
-
-    Returns None if clean, or a description of the contamination detected.
-    """
-    check_text = json.dumps(payload)
-    for pattern in _CONTAMINATION_PATTERNS:
-        if pattern in check_text:
-            return f"contamination pattern detected: {pattern!r}"
-    if len(payload.get("summary", "")) > 1500:
-        return "summary suspiciously long (possible transcript injection)"
-    return None
-
-
 def _render_codex_review(payload: dict) -> str:
     """Render a validated codex JSON payload into a GitHub PR review markdown body.
 
     Output is compatible with parse_review_body() and embeds machine-readable
     metadata so count extraction does not rely on markdown parsing.
+
+    Metadata is base64-encoded inside the HTML comment to prevent --> injection
+    from model-generated body text from breaking the comment boundary.
     """
+    import base64
     from .review_normalizer import _make_fingerprint
 
     sev_map = {"P1": "critical", "P2": "warning", "P3": "suggestion"}
@@ -425,9 +406,10 @@ def _render_codex_review(payload: dict) -> str:
         "suggestion": counts["suggestion"],
         "items": meta_items,
     }
-    lines.append(
-        f"<!-- dev-pipeline-meta: {json.dumps(meta, separators=(',', ':'))} -->"
-    )
+    meta_b64 = base64.b64encode(
+        json.dumps(meta, separators=(',', ':')).encode()
+    ).decode()
+    lines.append(f"<!-- dev-pipeline-meta-b64: {meta_b64} -->")
     return "\n".join(lines) + "\n"
 
 
@@ -519,6 +501,29 @@ def _dispatch_codex(
         clean_env = {k: v for k, v in os.environ.items() if k not in _CLAUDE_ENV_STRIP}
         clean_env["CODEX_HOME"] = tmp_codex_home
 
+        # Warn if API key is absent: temp CODEX_HOME requires API key auth.
+        # File-backed auth.json is not seeded into the temp directory, so any
+        # auth mode that relies on a persistent auth.json will fail.
+        if "CODEX_API_KEY" not in clean_env:
+            print(
+                f"[review_runner] CODEX_API_KEY not set - temp CODEX_HOME requires "
+                f"API key auth; file-based auth.json will not be available for "
+                f"issue #{issue}",
+                file=sys.stderr,
+            )
+
+        # Write automation config.toml to force-disable repo-scoped skills that
+        # could be auto-invoked by generic prompts. This is the authoritative
+        # disable at the CODEX_HOME level - more reliable than openai.yaml inside
+        # the repo because it cannot be modified by the PR under review.
+        skill_md = str(monorepo_root / ".agents/skills/dev-review/SKILL.md")
+        config_toml = (
+            "[[skills.config]]\n"
+            f'path = "{skill_md}"\n'
+            "enabled = false\n"
+        )
+        Path(tmp_codex_home, "config.toml").write_text(config_toml)
+
         cmd = [
             "codex", "exec", "review",
             "--base", f"origin/{base_ref}",
@@ -579,6 +584,28 @@ def _dispatch_codex(
             f"setting failed_parse, transcript artifact saved at {log}",
             file=sys.stderr,
         )
+        # Update both headless meta and pipeline state so they stay consistent.
+        # Without this, meta would read "success" while state reads "failed_parse".
+        try:
+            _write_job_meta(
+                meta,
+                status="failed_parse",
+                issue=issue,
+                area=area,
+                stage="review",
+                pr=pr,
+                repo=repo,
+                repo_dir=repo_dir,
+                worktree_dir=str(worktree_dir),
+                skill_cwd=str(monorepo_root),
+                log_path=str(log),
+                err_path=str(err),
+                tool="codex",
+                model=model,
+                exit_code=result.rc,
+            )
+        except Exception:
+            pass
         try:
             state_update(issue, area, monorepo_root, {
                 "reviewJob": {"status": "failed_parse", "finishedAt": _now_iso()}
@@ -600,10 +627,6 @@ def _dispatch_codex(
     validation_error = _validate_codex_payload(payload)
     if validation_error:
         return _fail_parse(f"schema validation failed: {validation_error}")
-
-    contamination = _contamination_check(payload)
-    if contamination:
-        return _fail_parse(f"contaminated output: {contamination}")
 
     # Render structured payload into GitHub comment body and post
     from .github_client import post_review_comment
