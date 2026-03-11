@@ -12,18 +12,29 @@ def _get_monorepo_root() -> Path:
 
 
 def cmd_run(args) -> int:
-    """Dispatch review for an issue."""
+    """Dispatch review for an issue (acquires/releases lease automatically)."""
     monorepo_root = _get_monorepo_root()
     from .review_runner import dispatch_review
+    from .lease import lease_acquire, lease_release, LeaseConflictError
 
-    return dispatch_review(
-        issue=args.issue,
-        area=args.area,
-        pr=args.pr,
-        monorepo_root=monorepo_root,
-        tool=args.tool,
-        model=args.model or "",
-    )
+    owner = args.owner
+    try:
+        lease_acquire(args.issue, args.area, monorepo_root, owner=owner)
+    except LeaseConflictError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+    try:
+        return dispatch_review(
+            issue=args.issue,
+            area=args.area,
+            pr=args.pr,
+            monorepo_root=monorepo_root,
+            tool=args.tool,
+            model=args.model or "",
+        )
+    finally:
+        lease_release(args.issue, args.area, monorepo_root, owner=owner)
 
 
 def cmd_list(args) -> int:
@@ -70,9 +81,25 @@ def cmd_merge(args) -> int:
 def cmd_cleanup(args) -> int:
     monorepo_root = _get_monorepo_root()
     from .controller import cleanup
+    from .lease import lease_check_owner, LeaseConflictError
+
+    # Only the current lease owner (or a free slot) may clean up.
+    owner = args.owner
+    if not lease_check_owner(args.issue, args.area, monorepo_root, owner):
+        from .lease import lease_read
+        current = lease_read(args.issue, args.area, monorepo_root)
+        print(
+            f"[cleanup] issue #{args.issue} area={args.area} lease is held by "
+            f"'{current.get('owner')}', not '{owner}' — refusing cleanup",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
         cleanup(args.issue, args.area, args.branch, args.pr, monorepo_root)
+        # Release lease after successful cleanup
+        from .lease import lease_release
+        lease_release(args.issue, args.area, monorepo_root, owner=owner)
         return 0
     except Exception as e:
         print(str(e), file=sys.stderr)
@@ -228,10 +255,11 @@ def cmd_sync_state(args) -> int:
         except Exception as e:
             print(f"[sync-state] warning: could not fetch PR head SHA: {e}", file=sys.stderr)
 
-        # Sync latest review ID from GitHub
+        # Sync latest review ID from GitHub (bidirectional: fixes corrupt high values too).
+        # Pass last_review_id=0 to get the actual latest matching review unconditionally.
         try:
             review_id = check_review_exists(args.area, state.pr, 0)
-            if review_id is not None and review_id > state.last_review_id:
+            if review_id is not None and review_id != state.last_review_id:
                 updates["lastReviewId"] = review_id
                 print(f"[sync-state] lastReviewId: {state.last_review_id} -> {review_id}")
         except Exception as e:
@@ -323,6 +351,8 @@ def main():
     p_run.add_argument("--pr", type=int, required=True)
     p_run.add_argument("--tool", default="claude", choices=["claude", "codex"])
     p_run.add_argument("--model", default="")
+    p_run.add_argument("--owner", default="pipeline", choices=["manual", "pipeline", "orchestrator"],
+                       help="Lease owner for this dispatch (default: pipeline)")
     p_run.set_defaults(func=cmd_run)
 
     # list
@@ -349,6 +379,8 @@ def main():
     p_cleanup.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_cleanup.add_argument("--branch", required=True)
     p_cleanup.add_argument("--pr", type=int, default=0)
+    p_cleanup.add_argument("--owner", default="pipeline", choices=["manual", "pipeline", "orchestrator"],
+                           help="Lease owner asserting cleanup rights (default: pipeline)")
     p_cleanup.set_defaults(func=cmd_cleanup)
 
     # escalation

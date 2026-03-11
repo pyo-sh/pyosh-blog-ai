@@ -170,10 +170,24 @@ def dispatch_review(
         rc = 2
 
     try:
-        status = "success" if rc == 0 else "failed"
-        state_update(issue, area, monorepo_root, {
-            "reviewJob": {"status": status, "finishedAt": _now_iso()}
-        })
+        # Do not overwrite failed_parse with generic "failed":
+        # _dispatch_codex() may have already written failed_parse, which needs
+        # to survive so callers can route to a separate recovery path.
+        current_status = None
+        try:
+            current_status = state_read(issue, area, monorepo_root).review_job.status
+        except Exception:
+            pass
+
+        if current_status == ReviewJobStatus.FAILED_PARSE:
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"finishedAt": _now_iso()}
+            })
+        else:
+            status = "success" if rc == 0 else "failed"
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": status, "finishedAt": _now_iso()}
+            })
     except Exception:
         pass
 

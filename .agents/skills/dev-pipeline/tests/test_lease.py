@@ -106,3 +106,29 @@ def test_manual_orchestrator_conflict(monorepo_root):
     lease_acquire(42, "server", monorepo_root, owner="orchestrator", batch_id="batch-007")
     with pytest.raises(LeaseConflictError, match="orchestrator"):
         lease_acquire(42, "server", monorepo_root, owner="manual")
+
+
+def test_acquire_uses_excl_atomic_create(monorepo_root, tmp_path):
+    """Verify that O_EXCL-based acquire raises ConflictError, not silently overwrites.
+
+    Simulates two processes: first holds the lease, second tries to acquire with
+    a different owner. The conflict must be detected even when the file already exists.
+    """
+    # First process acquires
+    lease_acquire(10, "client", monorepo_root, owner="pipeline")
+    # Second process with different owner must conflict
+    with pytest.raises(LeaseConflictError):
+        lease_acquire(10, "client", monorepo_root, owner="orchestrator")
+    # The original owner must still hold the lease
+    data = lease_read(10, "client", monorepo_root)
+    assert data["owner"] == "pipeline"
+
+
+def test_acquire_same_owner_updates_timestamp(monorepo_root):
+    """Same owner re-acquiring overwrites (idempotent) without error."""
+    lease_acquire(42, "client", monorepo_root, owner="pipeline")
+    first = lease_read(42, "client", monorepo_root)
+    lease_acquire(42, "client", monorepo_root, owner="pipeline", batch_id="new-batch")
+    second = lease_read(42, "client", monorepo_root)
+    assert second["owner"] == "pipeline"
+    assert second["batchId"] == "new-batch"

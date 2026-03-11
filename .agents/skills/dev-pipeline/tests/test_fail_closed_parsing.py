@@ -170,6 +170,14 @@ class TestNormalizeCodexOutput:
         assert result is not None
         assert result.startswith("## Review Summary")
 
+    def test_extracting_last_summary_does_not_include_preceding_text(self):
+        """Content before the last ## Review Summary must be excluded from the result."""
+        raw = "transcript noise\nmore noise\n## Review Summary\n\n### Critical\n\n1. Bug\n\n### Warning\n\nNone\n\n### Suggestion\n\nNone\n"
+        result = normalize_codex_output(raw)
+        assert result is not None
+        assert "transcript noise" not in result
+        assert "more noise" not in result
+
     def test_none_means_do_not_upload(self):
         """Returning None is the signal to callers: do NOT upload to GitHub."""
         # This test documents the contract, not just behavior.

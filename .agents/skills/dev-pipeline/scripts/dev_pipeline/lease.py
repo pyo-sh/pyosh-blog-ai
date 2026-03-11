@@ -32,29 +32,20 @@ def lease_acquire(
     owner: str,
     batch_id: str = "",
 ) -> None:
-    """Acquire lease for an issue.
+    """Acquire lease for an issue atomically.
 
     owner: "manual" | "pipeline" | "orchestrator"
     batch_id: optional orchestrator batch identifier
 
     Raises LeaseConflictError if the issue is already held by a different owner.
+
+    Uses O_CREAT|O_EXCL for atomic creation so two concurrent processes cannot
+    both see "no lease" and both succeed. On collision, the loser reads the
+    existing owner and raises LeaseConflictError if it differs.
     """
     path = lease_path(issue, area, monorepo_root)
-    if path.exists():
-        try:
-            existing = json.loads(path.read_text())
-            existing_owner = existing.get("owner", "")
-            if existing_owner and existing_owner != owner:
-                raise LeaseConflictError(
-                    f"[lease] issue #{issue} area={area} is held by "
-                    f"'{existing_owner}' "
-                    f"(batchId={existing.get('batchId', '')!r}, "
-                    f"startedAt={existing.get('startedAt', '')})"
-                )
-        except (json.JSONDecodeError, OSError):
-            pass  # corrupted lease - overwrite
-
     path.parent.mkdir(parents=True, exist_ok=True)
+
     data = {
         "issue": issue,
         "area": area,
@@ -62,11 +53,38 @@ def lease_acquire(
         "batchId": batch_id,
         "startedAt": _now_iso(),
     }
+    encoded = (json.dumps(data, indent=2) + "\n").encode()
+
+    try:
+        # Atomic: succeeds only if the file does not yet exist.
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        try:
+            os.write(fd, encoded)
+        finally:
+            os.close(fd)
+        return  # lease acquired
+    except FileExistsError:
+        pass
+
+    # File already exists — check owner.
+    try:
+        existing = json.loads(path.read_text())
+        existing_owner = existing.get("owner", "")
+        if existing_owner and existing_owner != owner:
+            raise LeaseConflictError(
+                f"[lease] issue #{issue} area={area} is held by "
+                f"'{existing_owner}' "
+                f"(batchId={existing.get('batchId', '')!r}, "
+                f"startedAt={existing.get('startedAt', '')})"
+            )
+    except (json.JSONDecodeError, OSError):
+        pass  # corrupted lease - fall through to overwrite
+
+    # Same owner re-acquiring (idempotent) or corrupted file: overwrite.
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".tmp.")
     try:
         with os.fdopen(fd, "w") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
+            f.write(encoded.decode())
         os.replace(tmp, str(path))
     except Exception:
         try:
