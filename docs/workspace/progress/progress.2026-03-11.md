@@ -58,6 +58,26 @@
 - **Issue**: Pending dispatch loop left issues `pending` forever when `orch_worktree_prepare` failed (pre-round-9); after round-9 quarantine is unconditional, transient launcher failures should retry rather than mark failed
 - **Resolution**: Pending dispatch loop reverted to "log and retry next cycle" - transient errors resolve on the next poll; persistent failures surface via stall detection and retry exhaustion
 
+- [x] dev-pipeline 신뢰 경계 재설계 - fail-closed 리뷰 파싱(`normalize_codex_output()` raw transcript GitHub 업로드 금지, `FAILED_PARSE` 상태 보존), 40-char SHA 강제 검증(`state_update()`), atomic issue lease(`O_CREAT|O_EXCL`, `acquired` bool 반환, `acquired=False+rc=3` no-release 보장), `sync-state` self-healing(GitHub PR head SHA + 최신 review ID 기반 state 재구성), review fingerprint + 수렴 감지(`_normalize_message()`, `_extract_file()` path:line 지원, `classify_review_items()`, `is_no_progress()`), 이중 형식 리뷰 본문(`<!-- dev-pipeline-meta: {...} -->`), SKILL.md skill-creator 최적화(Invariant 8 lease, Step 0 sync-state, Step 2b failed_parse, SHA note); 5 test suites 155 assertions (#139, PR #139)
+
+## Discoveries
+
+- `O_CREAT|O_EXCL` 조합이 Python 표준 라이브러리에서 atomic lease 구현의 유일한 정상 방법: `path.exists()` + `path.write_text()` 패턴은 TOCTOU race condition을 가짐
+- `lease_acquire()` bool 반환(True=신규 획득, False=동일 owner 재확인)이 release 조건 결정에 필수: `rc=3`(중복 실행 감지) 분기와 `rc=0`(crash 복구) 분기를 단일 조건 `if acquired or rc != 3`으로 통합
+- `normalize_codex_output()` `rfind("## Review Summary")` 패턴이 `find()` 보다 안전: Codex transcript에서 동일 헤더가 여러 번 나올 경우 최신 Review만 추출
+- fingerprint 안정성에는 2단계 정규화 필요: `_normalize_message()`(bold/italic/code/line 번호 제거) + `_extract_file()` path:line 처리 - 한 쪽만 없으면 파일이 달라도 동일 fingerprint 생성
+
+## Issues & Resolutions
+
+- **Issue**: `finally: lease_release()` 무조건 실행 시 `acquired=False`(동일 owner 재확인) + `rc=3`(active runner) 조합에서 현재 실행 중인 프로세스의 lease를 제거
+- **Resolution**: `lease_acquire()` bool 반환 도입 + `if acquired or rc != 3` 조건으로 release 허용 여부 결정
+
+- **Issue**: `sync-state`에서 `lastReviewId`를 GitHub API에서 가져온 값으로 무조건 덮어쓰면 `None` 반환 시 0으로 고정 - 기존 상태값보다 낮아지는 high watermark 손상
+- **Resolution**: `actual_max = review_id or 0` + 현재 상태값과 비교해 큰 쪽만 적용 (단방향 증가 보장)
+
+- **Issue**: `_extract_file()` regex가 `` `path/to/file.py:265` `` 형식에서 빈 문자열 반환 - 파일이 달라도 fingerprint가 동일해짐
+- **Resolution**: regex에 `(?::\d+)?` suffix 추가로 path:line 형식에서 파일 경로만 추출
+
 ## Next Steps
 
 

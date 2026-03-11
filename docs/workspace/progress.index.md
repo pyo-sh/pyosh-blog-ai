@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-11 | dev-pipeline 신뢰 경계 재설계 - fail-closed 파싱(`FAILED_PARSE` + raw transcript 업로드 금지), 40-char SHA 강제, atomic issue lease(`O_CREAT|O_EXCL`, `acquired` bool), `sync-state` self-healing, review fingerprint + 수렴 감지, 이중 형식 리뷰 본문, SKILL.md skill-creator 최적화; 5 test suites (#139, PR #139) | done |
 | 2026-03-11 | Worker worktree isolation + GC for orchestrator - `orch_worktree_quarantine` (git metadata preservation + name collision), `orch_orphan_gc` (current-batch + `everDispatched` guard), `orch_disk_budget_gc` (500 MB ceiling), `everDispatched[N]` batch flag, `abnormal_exit`+merged PR→`completed` fix; SKILL.md lifecycle section; 11라운드 Codex 리뷰 (#82, PR #137) | done |
 | 2026-03-11 | dev-pipeline shell 잔재 제거 + dev-resolve 정리 + review template 준수 - `pipeline-helpers.sh`/`smoke-test.sh` 삭제, CLI 5개 추가(init/state-update/stage-retry/check-review/check-commits), SKILL.md shell→Python CLI 재작성, codex `normalize_codex_output()` blockquote 방식; 133 tests (#129, #133, PR #136) | done |
 | 2026-03-11 | dev-pipeline Python 마이그레이션 리뷰 피드백 수정 - CLAUDECODE env, step migration, review state filter, area validation, typed model, stale recovery, cmd_state fix, path validation, max review id; 128 tests (#129, #133, PR #134) | done |
