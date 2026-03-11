@@ -24,11 +24,14 @@ def cmd_run(args) -> int:
         print(str(e), file=sys.stderr)
         return 1
 
-    # Only release the lease if this call actually created it (acquired=True).
-    # If acquired=False, a concurrent process of the same owner holds the lease;
-    # releasing here would drop their lease mid-run.
+    # Release condition: acquired=True (we created the lease), OR acquired=False
+    # AND rc != 3 (we are a resume/retry — the original holder crashed, not still running).
+    # rc=3 means dispatch_review() found another active process and bailed out;
+    # in that case we must NOT release since the active process still holds the lease.
+    # rc=None means dispatch_review() raised an exception — we are done, release.
+    rc = None
     try:
-        return dispatch_review(
+        rc = dispatch_review(
             issue=args.issue,
             area=args.area,
             pr=args.pr,
@@ -36,8 +39,9 @@ def cmd_run(args) -> int:
             tool=args.tool,
             model=args.model or "",
         )
+        return rc
     finally:
-        if acquired:
+        if acquired or rc != 3:
             lease_release(args.issue, args.area, monorepo_root, owner=owner)
 
 
@@ -259,13 +263,16 @@ def cmd_sync_state(args) -> int:
         except Exception as e:
             print(f"[sync-state] warning: could not fetch PR head SHA: {e}", file=sys.stderr)
 
-        # Sync latest review ID from GitHub (bidirectional: fixes corrupt high values too).
-        # Pass last_review_id=0 to get the actual latest matching review unconditionally.
+        # Sync latest review ID from GitHub (bidirectional).
+        # Pass last_review_id=0 to get the actual max matching review ID.
+        # When None (no actionable reviews), treat actual_max=0 so a corrupt
+        # high watermark (e.g., 9999) is reset and future reviews are not skipped.
         try:
             review_id = check_review_exists(args.area, state.pr, 0)
-            if review_id is not None and review_id != state.last_review_id:
-                updates["lastReviewId"] = review_id
-                print(f"[sync-state] lastReviewId: {state.last_review_id} -> {review_id}")
+            actual_max = review_id if review_id is not None else 0
+            if actual_max != state.last_review_id:
+                updates["lastReviewId"] = actual_max
+                print(f"[sync-state] lastReviewId: {state.last_review_id} -> {actual_max}")
         except Exception as e:
             print(f"[sync-state] warning: could not fetch review ID: {e}", file=sys.stderr)
 

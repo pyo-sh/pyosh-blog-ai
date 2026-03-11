@@ -152,29 +152,52 @@ def test_acquire_returns_false_on_same_owner_reacquire(monorepo_root):
     assert result is False
 
 
-def test_release_only_when_acquired(monorepo_root):
-    """Simulate two processes: second must not release first's lease.
+def test_acquired_false_rc3_does_not_release(monorepo_root):
+    """acquired=False + rc=3 (active runner detected): must NOT release.
 
-    Process 1 acquires (True) and runs long.
-    Process 2 confirms same owner (False) and exits without releasing.
-    Process 1's lease must still exist after process 2 exits.
+    Process 1 acquired and is still running (simulated by rc=3 from duplicate guard).
+    Process 2 same owner gets acquired=False and rc=3; must leave the lease intact.
     """
-    # Process 1 acquires
     acquired1 = lease_acquire(10, "client", monorepo_root, owner="pipeline")
     assert acquired1 is True
 
-    # Process 2 same owner — gets False
     acquired2 = lease_acquire(10, "client", monorepo_root, owner="pipeline")
     assert acquired2 is False
 
-    # Process 2 respects acquired=False and does NOT release
-    if acquired2:
+    rc2 = 3  # dispatch_review duplicate guard: another process is active
+    if acquired2 or rc2 != 3:
         lease_release(10, "client", monorepo_root, owner="pipeline")
 
-    # Process 1's lease must still be intact
     data = lease_read(10, "client", monorepo_root)
     assert data is not None, (
-        "REGRESSION: second process with acquired=False must not release the lease. "
-        "First process's lease was removed, leaving the issue unprotected mid-run."
+        "REGRESSION: acquired=False + rc=3 must not release. "
+        "Active first process's lease was removed mid-run."
     )
     assert data["owner"] == "pipeline"
+
+
+def test_resume_after_crash_releases_lease(monorepo_root):
+    """acquired=False + rc=0 (resume after crash): MUST release.
+
+    Process 1 crashed — lease file remains but no active runner.
+    Process 2 (resume/retry) gets acquired=False, runs successfully (rc=0),
+    and must release the lease when done so the next owner can proceed.
+
+    REGRESSION: if acquired=False always blocked release, a resume after a
+    crash left the lease behind forever, permanently blocking other owners.
+    """
+    # Simulate crashed process 1: lease exists but process is gone
+    lease_acquire(10, "client", monorepo_root, owner="manual")
+
+    # Process 2 (resume) same owner — gets False
+    acquired2 = lease_acquire(10, "client", monorepo_root, owner="manual")
+    assert acquired2 is False
+
+    rc2 = 0  # dispatch completed successfully
+    if acquired2 or rc2 != 3:
+        lease_release(10, "client", monorepo_root, owner="manual")
+
+    assert lease_read(10, "client", monorepo_root) is None, (
+        "REGRESSION: resume after crash (acquired=False, rc=0) must release. "
+        "Lease was left behind, blocking the next owner permanently."
+    )
