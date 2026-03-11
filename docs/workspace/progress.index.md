@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-12 | PR identity metadata + doctor command (#84) - `orch_branch_name()` deterministic branch naming, `_orch_pr_list()` branch>label>body fallback chain, `orch_label_pr()` identity labels, `orch_doctor()` 6-check diagnostics, `issueMetadata` durable PR tracking (PR #145) | done |
 | 2026-03-12 | dispatch_codex structured output (#142) + contract-driven review publisher (#144) - `review_publish.py` CLI(schema 검증+contamination 검사+markdown 렌더링), `review_schema.json` canonical schema, SKILL.md JSON-first flow 전면 개편, codex path publisher 위임, 스킬 최적화(109→42줄), 2라운드 리뷰 resolve; 36 tests (PR #143) | done |
 | 2026-03-11 | Worker auto-merge 중단 + merge eligibility contract - dispatch prompt "auto-approve merge" 제거, `orch-dispatch-wrapper.sh` EXIT trap에 4-way eligibility check(`checksPass`/`noConflict`/`noBlockingLabels`/`shaMatch`) + `terminal.json` `mergeEligible`/`mergeEligibilityChecks` 추가, `state-detection.md` 스키마 업데이트 (#83, PR #141) | done |
 | 2026-03-11 | dev-pipeline 신뢰 경계 재설계 - fail-closed 파싱(`FAILED_PARSE` + raw transcript 업로드 금지), 40-char SHA 강제, atomic issue lease(`O_CREAT|O_EXCL`, `acquired` bool), `sync-state` self-healing, review fingerprint + 수렴 감지, 이중 형식 리뷰 본문, SKILL.md skill-creator 최적화; 5 test suites (#139, PR #139) | done |

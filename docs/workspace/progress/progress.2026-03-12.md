@@ -9,6 +9,14 @@
   - SKILL.md JSON-first flow 전면 개편, `gh pr review` 직접 호출 금지
   - codex 경로: inline render+post 제거 → publisher CLI 위임
   - 36 regression tests
+- [x] PR identity metadata + doctor command (#84, PR #145)
+  - `orch_branch_name()`: deterministic branch naming `orch/{area}/issue-{N}/{attemptId}`
+  - `_orch_pr_list()` 재작성: branch-based (primary) > label-based > body search (fallback)
+  - `orch_label_pr()` + `_orch_ensure_labels()`: PR identity labels (`orch`, `area:{area}`, `issue:{N}`, `attempt:{attemptId}`)
+  - `orch_doctor()`: state file integrity, status consistency, process health, stale lock, worktree state, PR/issue mismatch
+  - `issueMetadata` in batch state: branch/pr/attemptId durable across dispatch cleanup
+  - `orch_dispatch()` prompt에 branch name 전달, `orch_poll_cycle()` completion handler에 PR labeling 추가
+  - `orch_print_summary()` cached PR from issueMetadata 우선 사용
 - [x] Review resolve 2라운드 - dead code 제거(~100줄), schema cross-reference, `import subprocess` module-level, unused import 제거, INFO severity count table 추가
 - [x] dev-review 스킬 최적화 - SKILL.md 109줄→42줄(-61%), 구 `review-template.md` 삭제, 토큰 절감 ~72%
 
