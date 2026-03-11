@@ -14,6 +14,7 @@ description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge 
 5. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees`).
 6. **Resolve runs directly in the pipeline session**, not as a headless sub-agent.
 7. **Review dispatch always goes through `python -m dev_pipeline run`**. Never run `codex exec review` or `claude -p` for review directly in the pipeline session.
+8. **`run` and `cleanup` manage the issue lease internally.** Pass `--owner manual` for interactive sessions; `--owner pipeline` (default) for automated runs. Never manually call `acquire-lease` / `release-lease` unless implementing a custom wrapper.
 
 > Python CLI: `cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline <cmd>`
 > Canonical worktree path: `.workspace/worktrees/{area}/issue-{N}`
@@ -50,6 +51,15 @@ STATE_FILE="/workspace/.workspace/pipeline/${AREA}/issue-${ISSUE}.state.json"
 ```
 
 If state exists, read it and resume from `.step`. Do not recompute paths ad hoc; derive them from the area and issue number using the canonical patterns.
+
+On resume after a crash or manual intervention, reconcile state with GitHub/git before proceeding:
+
+```bash
+cd .agents/skills/dev-pipeline/scripts
+python -m dev_pipeline sync-state --issue "$ISSUE" --area "$AREA"
+```
+
+`sync-state` overwrites `lastCommitSha` from the PR head SHA and `lastReviewId` from the latest actionable review (resets to 0 if none found, clearing stale high watermarks that would skip future reviews).
 
 ### 1. Build (`step: build`)
 
@@ -106,7 +116,7 @@ Otherwise write job metadata and dispatch the background review:
 ```bash
 cd .agents/skills/dev-pipeline/scripts
 python -m dev_pipeline state-update --issue "$ISSUE" --area "$AREA" --step review_wait
-python -m dev_pipeline run --issue "$ISSUE" --area "$AREA" --pr "$PR" ${TOOL:+--tool "$TOOL"}
+python -m dev_pipeline run --issue "$ISSUE" --area "$AREA" --pr "$PR" ${TOOL:+--tool "$TOOL"} ${OWNER:+--owner "$OWNER"}
 ```
 
 Tool defaults to `claude`.
@@ -139,6 +149,18 @@ else
     cd .agents/skills/dev-pipeline/scripts
     python -m dev_pipeline stage-retry --issue "$ISSUE" --area "$AREA" --stage review_dispatch
     python -m dev_pipeline state-update --issue "$ISSUE" --area "$AREA" --step review_dispatch
+  elif [ "$JOB_STATUS" = "failed_parse" ]; then
+    # Parse failure: raw transcript was NOT posted to GitHub (fail-closed).
+    # Artifact is saved in the pipeline log. Retry with fallback tool (claude) if
+    # original was codex, otherwise escalate.
+    if [ "${TOOL:-claude}" = "codex" ]; then
+      TOOL=claude
+      cd .agents/skills/dev-pipeline/scripts
+      python -m dev_pipeline stage-retry --issue "$ISSUE" --area "$AREA" --stage review_dispatch
+      python -m dev_pipeline state-update --issue "$ISSUE" --area "$AREA" --step review_dispatch
+    else
+      cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step review_wait
+    fi
   else
     # Headless succeeded but no review posted -> escalation, report to user
     cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step review_wait
@@ -300,7 +322,7 @@ Get the new commit SHA. Use local git as the primary source (avoids GitHub API p
 NEW_SHA=$(git -C "$WORKTREE_PATH" rev-parse HEAD)
 ```
 
-Update state:
+Update state (`git rev-parse HEAD` always returns a full 40-char SHA as required):
 
 ```bash
 cd .agents/skills/dev-pipeline/scripts
@@ -373,7 +395,7 @@ Run `/dev-log` first, then clean up:
 
 ```bash
 cd .agents/skills/dev-pipeline/scripts
-python -m dev_pipeline cleanup --issue "$ISSUE" --area "$AREA" --branch "$BRANCH" --pr "$PR"
+python -m dev_pipeline cleanup --issue "$ISSUE" --area "$AREA" --branch "$BRANCH" --pr "$PR" ${OWNER:+--owner "$OWNER"}
 ```
 
 `cleanup` deletes the state file as its last action. Only call it after `/dev-log` succeeds.
