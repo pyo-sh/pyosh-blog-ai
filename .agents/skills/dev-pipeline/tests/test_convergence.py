@@ -127,6 +127,48 @@ class TestFingerprint:
         assert fp1 == fp2
 
 
+from dev_pipeline.review_normalizer import _extract_file
+
+
+class TestExtractFile:
+    def test_bare_backtick_path(self):
+        assert _extract_file("Bug in `src/foo.ts`") == "src/foo.ts"
+
+    def test_backtick_path_with_line_reference(self):
+        """path:line format must return only the file path, not the line number.
+
+        REGRESSION: `.agents/.../cli.py:265` yielded file="" because the regex
+        required the backtick to close immediately after the extension.
+        Two findings with identical messages but different files would then share
+        the same fingerprint and be mis-tagged as repeated across files.
+        """
+        result = _extract_file("`.agents/skills/dev-pipeline/scripts/dev_pipeline/cli.py:265`")
+        assert result == ".agents/skills/dev-pipeline/scripts/dev_pipeline/cli.py"
+
+    def test_backtick_path_line_not_in_result(self):
+        """Line number must be excluded from the returned file path."""
+        result = _extract_file("`src/handler.ts:42`")
+        assert result == "src/handler.ts"
+        assert ":42" not in result
+
+    def test_different_files_different_fingerprint_with_line_ref(self):
+        """Cross-file findings must hash differently even with identical messages.
+
+        REGRESSION: if _extract_file() returns "" for path:line format, two findings
+        in different files with the same wording get identical fingerprints and the
+        convergence classifier treats them as the same issue.
+        """
+        fp1 = _make_fingerprint("critical", _extract_file("`src/foo.ts:10`"), "Missing check")
+        fp2 = _make_fingerprint("critical", _extract_file("`src/bar.ts:10`"), "Missing check")
+        assert fp1 != fp2
+
+    def test_in_prose_pattern(self):
+        assert _extract_file("Missing check in src/utils.ts line 5") == "src/utils.ts"
+
+    def test_no_file_returns_empty(self):
+        assert _extract_file("This finding has no file reference") == ""
+
+
 class TestParseReviewBodyFull:
     def test_returns_parsed_review(self):
         result = parse_review_body_full(REVIEW_WITH_ISSUES)

@@ -78,9 +78,15 @@ def _make_fingerprint(severity: str, file: str, message: str) -> str:
 
 
 def _extract_file(text: str) -> str:
-    """Extract a file path from item text (looks for backtick-quoted paths or 'in src/...')."""
-    # backtick path: `src/foo.ts`
-    m = re.search(r"`([^`]+\.[a-zA-Z]{1,10})`", text)
+    """Extract a file path from item text.
+
+    Handles:
+    - Bare backtick path: `src/foo.ts`
+    - Backtick path with line reference: `src/foo.ts:265`  (line excluded from result)
+    - Prose 'in src/...' pattern
+    """
+    # backtick path, optionally followed by :line before the closing backtick
+    m = re.search(r"`([^`]+\.[a-zA-Z]{1,10})(?::\d+)?`", text)
     if m:
         return m.group(1)
     # "in src/..." pattern
