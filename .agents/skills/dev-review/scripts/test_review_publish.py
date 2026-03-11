@@ -236,6 +236,7 @@ class TestRenderMarkdown:
         assert "| [CRITICAL] | 1 |" in md
         assert "| [WARNING] | 0 |" in md
         assert "| [SUGGESTION] | 0 |" in md
+        assert "| [INFO] | 0 |" in md
 
     def test_critical_section(self):
         md = render_markdown(VALID_PAYLOAD)
@@ -247,6 +248,19 @@ class TestRenderMarkdown:
         md = render_markdown(APPROVE_PAYLOAD)
         assert "### Critical" not in md
         assert "| [CRITICAL] | 0 |" in md
+        assert "| [INFO] | 0 |" in md
+
+    def test_info_severity_counted(self):
+        payload = {
+            "verdict": "comment",
+            "summary": "ok",
+            "issues": [
+                {"severity": "info", "title": "FYI", "body": "Just a note."},
+            ],
+        }
+        md = render_markdown(payload)
+        assert "| [INFO] | 1 |" in md
+        assert "### Info" in md
 
     def test_p0_and_p1_merged_in_critical(self):
         payload = {

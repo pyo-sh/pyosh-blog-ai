@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -14,7 +15,6 @@ from .paths import (
     pipeline_err_path,
     pipeline_headless_meta_path,
     pipeline_log_path,
-    pipeline_message_path,
     pipeline_init,
     resolve_worktree_path,
 )
@@ -299,128 +299,13 @@ def _dispatch_claude(
     return result.rc
 
 
-def _validate_codex_payload(payload: dict) -> Optional[str]:
-    """Validate a codex JSON output payload against the review schema.
-
-    Returns None if valid, or an error description string if invalid.
-    """
-    if not isinstance(payload, dict):
-        return "payload is not a JSON object"
-    verdict = payload.get("verdict")
-    if verdict not in ("approve", "request_changes", "comment"):
-        return f"invalid verdict: {verdict!r}"
-    summary = payload.get("summary")
-    if not isinstance(summary, str):
-        return "summary missing or not a string"
-    if len(summary) > 2000:
-        return f"summary too long: {len(summary)} chars"
-    issues = payload.get("issues")
-    if not isinstance(issues, list):
-        return "issues missing or not an array"
-    if len(issues) > 50:
-        return f"too many issues: {len(issues)}"
-    valid_severities = {"P1", "P2", "P3"}
-    for i, item in enumerate(issues):
-        if not isinstance(item, dict):
-            return f"issues[{i}] is not an object"
-        if item.get("severity") not in valid_severities:
-            return f"issues[{i}].severity invalid: {item.get('severity')!r}"
-        if not isinstance(item.get("title"), str):
-            return f"issues[{i}].title missing or not a string"
-        if not isinstance(item.get("body"), str):
-            return f"issues[{i}].body missing or not a string"
-        if len(item.get("title", "")) > 200:
-            return f"issues[{i}].title too long"
-        if len(item.get("body", "")) > 2000:
-            return f"issues[{i}].body too long"
-    return None
-
-
-def _render_codex_review(payload: dict) -> str:
-    """Render a validated codex JSON payload into a GitHub PR review markdown body.
-
-    Output is compatible with parse_review_body() and embeds machine-readable
-    metadata so count extraction does not rely on markdown parsing.
-
-    Metadata is base64-encoded inside the HTML comment to prevent --> injection
-    from model-generated body text from breaking the comment boundary.
-    """
-    import base64
-    from .review_normalizer import _make_fingerprint
-
-    sev_map = {"P1": "critical", "P2": "warning", "P3": "suggestion"}
-    issues = payload.get("issues", [])
-    counts = {"critical": 0, "warning": 0, "suggestion": 0}
-    for item in issues:
-        sev = sev_map.get(item["severity"])
-        if sev:
-            counts[sev] += 1
-
-    lines = [
-        "## Review Summary",
-        "",
-        "| Severity | Count |",
-        "|----------|-------|",
-        f"| Critical | {counts['critical']} |",
-        f"| Warning | {counts['warning']} |",
-        f"| Suggestion | {counts['suggestion']} |",
-        "",
-        payload.get("summary", ""),
-        "",
-    ]
-
-    for sev_key, section_name in (("P1", "Critical"), ("P2", "Warning"), ("P3", "Suggestion")):
-        section_items = [it for it in issues if it.get("severity") == sev_key]
-        if not section_items:
-            continue
-        lines.append(f"### {section_name}")
-        for n, item in enumerate(section_items, 1):
-            path = item.get("path", "")
-            line_no = item.get("line")
-            location = ""
-            if path:
-                location = f"`{path}" + (f":{line_no}" if line_no else "") + "`"
-            title = item["title"]
-            prefix = f"{n}. {location + ' - ' if location else ''}{title}"
-            lines.append(prefix)
-            lines.append(item["body"])
-            lines.append("")
-
-    # Embed machine-readable metadata for reliable count extraction
-    meta_items = []
-    for item in issues:
-        sev = sev_map.get(item["severity"], "suggestion")
-        path = item.get("path", "")
-        title = item["title"]
-        fp = _make_fingerprint(sev, path, title)
-        meta_items.append({
-            "severity": sev,
-            "file": path,
-            "message": title,
-            "fingerprint": fp,
-            "raw": item["body"],
-        })
-    meta = {
-        "critical": counts["critical"],
-        "warning": counts["warning"],
-        "suggestion": counts["suggestion"],
-        "items": meta_items,
-    }
-    meta_b64 = base64.b64encode(
-        json.dumps(meta, separators=(',', ':')).encode()
-    ).decode()
-    lines.append(f"<!-- dev-pipeline-meta-b64: {meta_b64} -->")
-    return "\n".join(lines) + "\n"
-
-
 def normalize_codex_output(raw: str) -> str | None:
     """Extract review content from a raw Codex transcript. LOCAL ARTIFACT SALVAGE ONLY.
 
     This function must NOT be used as the primary GitHub publish path.
-    The primary path is the structured JSON output produced by _dispatch_codex
-    via --output-schema / -o, validated by _validate_codex_payload and rendered
-    by _render_codex_review. Use this function only as a fallback for inspecting
-    local transcript artifacts.
+    The primary path is: codex structured JSON output -> review_publish.py
+    (schema validation + contamination check + markdown rendering + gh publish).
+    Use this function only as a fallback for inspecting local transcript artifacts.
 
     Searches for the last '## Review Summary' that begins at a line start
     (idx == 0 or preceded by a newline). This prevents false-positives from
@@ -632,8 +517,6 @@ def _dispatch_codex(
 
     # Delegate validation, contamination check, rendering, and posting
     # to the shared review publisher CLI.
-    import subprocess as _sp
-
     publisher = (
         monorepo_root / ".agents" / "skills" / "dev-review"
         / "scripts" / "review_publish.py"
@@ -651,7 +534,7 @@ def _dispatch_codex(
         f"area={area} pr=#{pr}",
         file=sys.stderr,
     )
-    pub_result = _sp.run(pub_cmd, capture_output=True, text=True)
+    pub_result = subprocess.run(pub_cmd, capture_output=True, text=True)
     if pub_result.stderr:
         print(pub_result.stderr, end="", file=sys.stderr)
 

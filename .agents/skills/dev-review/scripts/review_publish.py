@@ -156,7 +156,7 @@ def render_markdown(payload: dict) -> str:
     """Render validated review JSON into GitHub PR review markdown."""
     issues = payload.get("issues", [])
 
-    counts = {"CRITICAL": 0, "WARNING": 0, "SUGGESTION": 0}
+    counts = {"CRITICAL": 0, "WARNING": 0, "SUGGESTION": 0, "INFO": 0}
     for item in issues:
         tag = _SEV_TO_TAG.get(item["severity"], "SUGGESTION")
         if tag in counts:
@@ -170,6 +170,7 @@ def render_markdown(payload: dict) -> str:
         f"| [CRITICAL] | {counts['CRITICAL']} |",
         f"| [WARNING] | {counts['WARNING']} |",
         f"| [SUGGESTION] | {counts['SUGGESTION']} |",
+        f"| [INFO] | {counts['INFO']} |",
         "",
         payload.get("summary", ""),
         "",

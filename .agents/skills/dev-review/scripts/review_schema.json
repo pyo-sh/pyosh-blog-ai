@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "Canonical review JSON contract. Shared by dev-review skill and dev-pipeline.",
+  "description": "Canonical review JSON contract. Shared by dev-review skill and dev-pipeline. The codex-specific subset (P1/P2/P3 only, no suggested_fix) lives at dev-pipeline/scripts/dev_pipeline/review_schema.json.",
   "type": "object",
   "required": ["verdict", "summary", "issues"],
   "additionalProperties": false,

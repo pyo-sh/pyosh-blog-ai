@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "Codex structured review output schema. Used with codex exec --output-schema.",
+  "description": "Codex structured review output schema. Used with codex exec --output-schema. This is intentionally a restricted subset of the canonical schema at dev-review/scripts/review_schema.json (which adds P0, info, and suggested_fix). Codex output passes through review_publish.py for final validation.",
   "type": "object",
   "required": ["verdict", "summary", "issues"],
   "additionalProperties": false,
