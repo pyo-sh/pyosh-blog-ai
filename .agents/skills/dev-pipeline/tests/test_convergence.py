@@ -95,6 +95,37 @@ class TestFingerprint:
         fp2 = _make_fingerprint("critical", "src/foo.ts", "null  pointer")
         assert fp1 == fp2
 
+    def test_bold_markdown_stripped(self):
+        """**Finding** and Finding produce the same fingerprint.
+
+        REGRESSION: review items like '**Missing validation** in src/api.ts'
+        would hash differently if the bold markers were included.
+        """
+        fp1 = _make_fingerprint("critical", "src/api.ts", "**Missing validation** in src/api.ts")
+        fp2 = _make_fingerprint("critical", "src/api.ts", "Missing validation in src/api.ts")
+        assert fp1 == fp2
+
+    def test_line_number_stripped(self):
+        """Same finding at different line numbers must produce the same fingerprint.
+
+        REGRESSION: 'Missing validation line 24' and 'Missing validation line 31'
+        would hash differently, causing repeated findings to be classified as new.
+        """
+        fp1 = _make_fingerprint("critical", "src/api.ts", "Missing validation line 24")
+        fp2 = _make_fingerprint("critical", "src/api.ts", "Missing validation line 31")
+        assert fp1 == fp2
+
+    def test_line_range_stripped(self):
+        fp1 = _make_fingerprint("warning", "src/foo.ts", "Unused import lines 10-20")
+        fp2 = _make_fingerprint("warning", "src/foo.ts", "Unused import lines 15-25")
+        assert fp1 == fp2
+
+    def test_inline_code_stripped(self):
+        """Inline code spans removed; file info is in the separate file field."""
+        fp1 = _make_fingerprint("critical", "src/api.ts", "Missing validation in `src/api.ts`")
+        fp2 = _make_fingerprint("critical", "src/api.ts", "Missing validation in")
+        assert fp1 == fp2
+
 
 class TestParseReviewBodyFull:
     def test_returns_parsed_review(self):

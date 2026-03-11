@@ -132,3 +132,49 @@ def test_acquire_same_owner_updates_timestamp(monorepo_root):
     second = lease_read(42, "client", monorepo_root)
     assert second["owner"] == "pipeline"
     assert second["batchId"] == "new-batch"
+
+
+def test_acquire_returns_true_on_new_acquisition(monorepo_root):
+    """lease_acquire() returns True when it creates a new lease."""
+    result = lease_acquire(42, "client", monorepo_root, owner="pipeline")
+    assert result is True
+
+
+def test_acquire_returns_false_on_same_owner_reacquire(monorepo_root):
+    """lease_acquire() returns False when confirming an existing same-owner lease.
+
+    CRITICAL: callers must only call lease_release() when acquired=True.
+    If acquired=False, releasing would drop the lease of a concurrent same-owner
+    process that is still running, re-opening the issue to other owners mid-run.
+    """
+    lease_acquire(42, "client", monorepo_root, owner="pipeline")  # first: True
+    result = lease_acquire(42, "client", monorepo_root, owner="pipeline")  # second: False
+    assert result is False
+
+
+def test_release_only_when_acquired(monorepo_root):
+    """Simulate two processes: second must not release first's lease.
+
+    Process 1 acquires (True) and runs long.
+    Process 2 confirms same owner (False) and exits without releasing.
+    Process 1's lease must still exist after process 2 exits.
+    """
+    # Process 1 acquires
+    acquired1 = lease_acquire(10, "client", monorepo_root, owner="pipeline")
+    assert acquired1 is True
+
+    # Process 2 same owner — gets False
+    acquired2 = lease_acquire(10, "client", monorepo_root, owner="pipeline")
+    assert acquired2 is False
+
+    # Process 2 respects acquired=False and does NOT release
+    if acquired2:
+        lease_release(10, "client", monorepo_root, owner="pipeline")
+
+    # Process 1's lease must still be intact
+    data = lease_read(10, "client", monorepo_root)
+    assert data is not None, (
+        "REGRESSION: second process with acquired=False must not release the lease. "
+        "First process's lease was removed, leaving the issue unprotected mid-run."
+    )
+    assert data["owner"] == "pipeline"

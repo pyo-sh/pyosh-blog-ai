@@ -19,11 +19,14 @@ def cmd_run(args) -> int:
 
     owner = args.owner
     try:
-        lease_acquire(args.issue, args.area, monorepo_root, owner=owner)
+        acquired = lease_acquire(args.issue, args.area, monorepo_root, owner=owner)
     except LeaseConflictError as e:
         print(str(e), file=sys.stderr)
         return 1
 
+    # Only release the lease if this call actually created it (acquired=True).
+    # If acquired=False, a concurrent process of the same owner holds the lease;
+    # releasing here would drop their lease mid-run.
     try:
         return dispatch_review(
             issue=args.issue,
@@ -34,7 +37,8 @@ def cmd_run(args) -> int:
             model=args.model or "",
         )
     finally:
-        lease_release(args.issue, args.area, monorepo_root, owner=owner)
+        if acquired:
+            lease_release(args.issue, args.area, monorepo_root, owner=owner)
 
 
 def cmd_list(args) -> int:

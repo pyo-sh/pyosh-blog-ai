@@ -31,11 +31,16 @@ def lease_acquire(
     monorepo_root: Path,
     owner: str,
     batch_id: str = "",
-) -> None:
+) -> bool:
     """Acquire lease for an issue atomically.
 
     owner: "manual" | "pipeline" | "orchestrator"
     batch_id: optional orchestrator batch identifier
+
+    Returns True if this call newly created the lease, False if the caller's
+    owner already held it (confirmed, not re-created). Callers must only call
+    lease_release() when this returns True — releasing on False would remove
+    a lease held by a concurrent process of the same owner.
 
     Raises LeaseConflictError if the issue is already held by a different owner.
 
@@ -62,7 +67,7 @@ def lease_acquire(
             os.write(fd, encoded)
         finally:
             os.close(fd)
-        return  # lease acquired
+        return True  # newly acquired
     except FileExistsError:
         pass
 
@@ -80,7 +85,7 @@ def lease_acquire(
     except (json.JSONDecodeError, OSError):
         pass  # corrupted lease - fall through to overwrite
 
-    # Same owner re-acquiring (idempotent) or corrupted file: overwrite.
+    # Same owner re-acquiring or corrupted file: overwrite.
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".tmp.")
     try:
         with os.fdopen(fd, "w") as f:
@@ -92,6 +97,8 @@ def lease_acquire(
         except OSError:
             pass
         raise
+
+    return False  # confirmed existing owner, not newly acquired
 
 
 def lease_release(issue: int, area: str, monorepo_root: Path, owner: str) -> None:

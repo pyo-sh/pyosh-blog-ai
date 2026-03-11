@@ -47,9 +47,33 @@ def _extract_meta(body: str) -> Optional[dict]:
         return None
 
 
+def _normalize_message(text: str) -> str:
+    """Strip volatile formatting from a review item message before fingerprinting.
+
+    Removes:
+    - Markdown bold/italic (**text**, *text*)
+    - Inline code spans (`code`) — file path already extracted separately
+    - Line number references (line 24, lines 10-20)
+    - Leading/trailing whitespace; collapses internal whitespace
+    """
+    # Remove bold/italic markers
+    text = re.sub(r'\*+([^*]*)\*+', r'\1', text)
+    # Remove inline code spans entirely (file info is in the separate `file` field)
+    text = re.sub(r'`[^`]*`', '', text)
+    # Remove line number references
+    text = re.sub(r'\blines?\s+\d+(?:[-\u2013]\d+)?', '', text, flags=re.IGNORECASE)
+    # Collapse whitespace
+    return re.sub(r'\s+', ' ', text).strip().lower()
+
+
 def _make_fingerprint(severity: str, file: str, message: str) -> str:
-    """Return a short fingerprint for a review item."""
-    normalized = f"{severity}:{file}:{re.sub(r'\s+', ' ', message).strip().lower()}"
+    """Return a short fingerprint for a review item.
+
+    Normalizes message before hashing so that minor formatting changes
+    (bold, line numbers, file path duplication) do not produce different
+    fingerprints for the same logical finding.
+    """
+    normalized = f"{severity}:{file}:{_normalize_message(message)}"
     return hashlib.sha1(normalized.encode()).hexdigest()[:16]
 
 
