@@ -47,6 +47,51 @@ Each retry creates a new attempt directory. Previous attempt artifacts are prese
 
 After batch completion, `orch_archive_batch` moves the active area content into `archive/{batchId}/`. Up to 5 archives are kept per area (rotation policy); older archives are deleted automatically.
 
+## PR identity
+
+PRs created by the orchestrator are identified by deterministic branch names and labels.
+
+### Branch naming
+
+```
+orch/{area}/issue-{N}/{attemptId}
+```
+
+Example: `orch/workspace/issue-84/issue-84-a0`
+
+The branch name is passed to the pipeline prompt and stored in `dispatched[issue].branch` and `issueMetadata[issue].branch`.
+
+### Labels
+
+When a PR is detected (via `terminal.json`), the orchestrator applies identity labels:
+
+| Label | Purpose |
+|-------|---------|
+| `orch` | Marks PR as orchestrator-dispatched |
+| `area:{area}` | Area scope (e.g., `area:workspace`) |
+| `issue:{N}` | Issue number (e.g., `issue:84`) |
+| `attempt:{attemptId}` | Attempt identifier (e.g., `attempt:issue-84-a0`) |
+
+### PR lookup order
+
+`_orch_pr_list` searches in this order:
+
+1. **Branch-based** (primary) - deterministic, no false positives
+2. **Label-based** (secondary) - covers PRs created before branch naming
+3. **Body search** (fallback) - for pre-migration PRs
+
+### Issue metadata
+
+`issueMetadata[issue]` in batch state stores durable PR identity that survives dispatch cleanup:
+
+```json
+{
+  "issueMetadata": {
+    "84": { "branch": "orch/workspace/issue-84/issue-84-a0", "attemptId": "issue-84-a0", "pr": 145 }
+  }
+}
+```
+
 Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
 
 State file updates use `flock` for mutual exclusion.
@@ -164,6 +209,27 @@ Each dispatched worker runs inside a dedicated worktree at `.workspace/worktrees
 - **Disk budget** - `orch_disk_budget_gc` enforces a 500 MB ceiling on the quarantine directory, removing the oldest entries when exceeded.
 
 Quarantine path: `.workspace/worktrees/{area}/quarantine/issue-{N}-{timestamp}/`
+
+## Doctor
+
+Run `orch_doctor` to validate state consistency and diagnose issues:
+
+```bash
+orch_doctor "$AREA"
+```
+
+Checks performed:
+
+| Check | Description |
+|-------|-------------|
+| State file integrity | JSON validity, required keys, batchId presence |
+| Status consistency | Valid status values, dispatched/status agreement |
+| Process health | PGID/PID liveness for dispatched issues |
+| Lock files | Stale flock detection |
+| Worktree state | Orphan worktrees, missing worktrees, quarantine budget |
+| PR/issue consistency | PR state vs issue status mismatch (provider health aware) |
+
+Returns 0 if healthy, 1 if issues found. Does not modify state - read-only diagnostic.
 
 ## References
 
