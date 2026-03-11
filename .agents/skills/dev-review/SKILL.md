@@ -1,89 +1,46 @@
 ---
 name: dev-review
-description: PR code review skill. Runs in a separate session from the code author. Posts a GitHub PR Review that begins with `## Review Summary`. Works correctly when the Claude session starts from monorepo root and the target repo is provided via environment variables.
+description: PR code review skill. Outputs structured review JSON then publishes via review_publish.py. Runs in a separate session from the code author, invoked from monorepo root with target repo via environment variables.
 ---
 
-# Dev-Review
+# Dev-review
 
-Comments only. Never modify code.
+Read-only review. Never modify code.
 
-## Runtime contract when invoked by dev-pipeline
+## Environment
 
-The parent pipeline may launch this skill from monorepo root. In that case use these environment variables if present:
-
-- `PIPELINE_AREA`
-- `PIPELINE_REPO`
-- `PIPELINE_REPO_DIR`
-- `PIPELINE_PR`
-- `PIPELINE_MONOREPO_ROOT`
-
-Do not assume the current cwd is the repo checkout.
-
-Recommended command style:
+Use these env vars when present (pipeline sets them). Do not assume cwd is the repo checkout.
 
 ```bash
 REPO="${PIPELINE_REPO:-pyo-sh/pyosh-blog-fe}"
 REPO_DIR="${PIPELINE_REPO_DIR:-/workspace/client}"
 PR="${PIPELINE_PR:?PIPELINE_PR is required}"
-
-gh pr diff "$PR" -R "$REPO"
-gh pr view "$PR" -R "$REPO" --json number,title,state,body
+MONOREPO="${PIPELINE_MONOREPO_ROOT:-/workspace}"
 ```
 
 ## Steps
 
-### 1. Read PR
-
-Use `gh pr diff` and `gh pr view` with explicit `-R`.
-
-### 2. Analyze code
-
-Review the diff first. Read specific files under `REPO_DIR` only when diff context is insufficient.
-
-### 3. Classify and submit
-
-The review body **must start with `## Review Summary`**.
-
-#### Required review body format
-
-```markdown
-## Review Summary
-
-| Severity | Count |
-|----------|-------|
-| [CRITICAL] | N |
-| [WARNING] | N |
-| [SUGGESTION] | N |
-
-### Critical
-1. `file:line` - description
-
-### Warning
-1. `file:line` - description
-
-### Suggestion
-1. `file:line` - description
-```
-
-Use `--request-changes` when Critical >= 1, `--comment` otherwise.
-
-Write the temporary message file with an area-scoped name to avoid cross-repo collisions:
+1. **Read PR** with explicit `-R`: `gh pr diff "$PR" -R "$REPO"` and `gh pr view "$PR" -R "$REPO" --json number,title,state,body`
+2. **Analyze**: Review diff first. Read files under `REPO_DIR` only when diff context is insufficient.
+3. **Write review JSON** to `${MONOREPO}/.workspace/dev-review/pr-${PR}/review.json` conforming to `scripts/review_schema.json`.
+4. **Publish** via `review_publish.py`. Never post reviews directly.
 
 ```bash
-MSG_FILE="${PIPELINE_MONOREPO_ROOT:-/workspace}/.workspace/messages/${PIPELINE_AREA:-manual}-pr-${PR}-review.md"
-mkdir -p "$(dirname "$MSG_FILE")"
-cat > "$MSG_FILE" <<'EOF_REVIEW'
-{body}
-EOF_REVIEW
-
-ACTION="--comment"
-[ "$CRITICAL" -ge 1 ] && ACTION="--request-changes"
-gh pr review "$PR" -R "$REPO" --body-file "$MSG_FILE" "$ACTION"
-rm -f "$MSG_FILE"
+REVIEW_DIR="${MONOREPO}/.workspace/dev-review/pr-${PR}"
+python3 "${MONOREPO}/.agents/skills/dev-review/scripts/review_publish.py" \
+  --input "${REVIEW_DIR}/review.json" \
+  --mode "${REVIEW_MODE:-dry-run}" \
+  --repo "$REPO" --pr "$PR" --output-dir "$REVIEW_DIR"
 ```
 
-## Constraints
+5. **Report** artifact path and publisher exit status, then exit.
 
-- Comments only
-- Never modify code
-- Do not inspect unrelated code outside the diff unless absolutely necessary
+## Verdict rules
+
+- `request_changes`: any P0 or P1 issue exists
+- `comment`: only P2/P3/info issues
+- `approve`: no issues found
+
+## Prohibited
+
+Never call `gh pr comment`, `gh pr review`, or `gh api` for posting. All publishing goes through `review_publish.py`.

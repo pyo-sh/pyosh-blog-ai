@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Canonical review JSON contract. Shared by dev-review skill and dev-pipeline. The codex-specific subset (P1/P2/P3 only, no suggested_fix) lives at dev-pipeline/scripts/dev_pipeline/review_schema.json.",
+  "type": "object",
+  "required": ["verdict", "summary", "issues"],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "request_changes", "comment"],
+      "description": "approve when no issues, request_changes when P0/P1 found, comment otherwise."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Short prose summary of the review findings."
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 50,
+      "description": "List of review findings. Empty array for clean reviews.",
+      "items": {
+        "type": "object",
+        "required": ["severity", "title", "body"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2", "P3", "info"],
+            "description": "P0=Critical (immediate), P1=Critical (must fix), P2=Warning (should fix), P3=Suggestion (optional), info=Informational."
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Relative file path where the issue was found. Omit if not file-specific."
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Line number within path. Omit if not applicable."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "One-line issue title."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Explanation, evidence, and suggested fix."
+          },
+          "suggested_fix": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Optional code suggestion or fix description."
+          }
+        }
+      }
+    }
+  }
+}

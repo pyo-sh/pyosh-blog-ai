@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Codex structured review output schema. Used with codex exec --output-schema. This is intentionally a restricted subset of the canonical schema at dev-review/scripts/review_schema.json (which adds P0, info, and suggested_fix). Codex output passes through review_publish.py for final validation.",
+  "type": "object",
+  "required": ["verdict", "summary", "issues"],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "request_changes", "comment"],
+      "description": "approve when no issues, request_changes when P1/P2 found, comment otherwise."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Short prose summary of the review findings."
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 50,
+      "description": "List of review findings. Empty array for clean reviews.",
+      "items": {
+        "type": "object",
+        "required": ["severity", "title", "body"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["P1", "P2", "P3"],
+            "description": "P1=Critical (must fix), P2=Warning (should fix), P3=Suggestion (optional)."
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Relative file path where the issue was found. Omit if not file-specific."
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Line number within path. Omit if not applicable."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "One-line issue title."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Explanation, evidence, and suggested fix."
+          }
+        }
+      }
+    }
+  }
+}
