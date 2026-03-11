@@ -2,13 +2,13 @@
 
 ## Overview
 
-Worktree isolation + lock-based merge to prevent conflicts when parallel agents modify `docs/` simultaneously.
+Worktree isolation + context-aware merge to prevent conflicts when parallel agents modify `docs/` simultaneously.
 
-Two modes based on context:
+Three modes based on context:
 
 ```
-Standalone:  [detect] [create worktree] [write docs] [commit] [LOCK] [rebase+merge] [UNLOCK] [cleanup]
-In worktree: [detect] ................ [write docs] [commit] ......................................
+Standalone:        [detect] [create worktree] [write docs] [commit] [LOCK] [rebase+merge] [UNLOCK] [cleanup]
+Root repo worktree:[detect] ................ [write docs] [commit] [push to PR branch] .................
 ```
 
 ## Constants
@@ -26,25 +26,26 @@ LOCK_INTERVAL=5   # seconds
 
 ## Phase 0: Detect context
 
-Check if the current working directory is already inside a worktree under `.workspace/worktrees/`.
+Check if the current working directory is a root repo worktree under `.workspace/worktrees/`.
 
 ```bash
 CWD="$(pwd)"
 if [[ "$CWD" == "$ROOT_REPO/.workspace/worktrees/"* ]]; then
-  IN_WORKTREE=true
+  IN_ROOT_WORKTREE=true
   WORKTREE_PATH="$CWD"
-  echo "In existing worktree: $WORKTREE_PATH"
-  echo "Skipping Phase 1, 5, 6 - records will be committed in this worktree"
+  BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
+  echo "In root repo worktree: $WORKTREE_PATH (branch: $BRANCH_NAME)"
+  echo "Will push docs commit to PR branch after Phase 4. Skipping Phase 1, 5, 6."
 else
-  IN_WORKTREE=false
-  echo "Not in worktree - using full standalone flow"
+  IN_ROOT_WORKTREE=false
+  echo "Not in root repo worktree - using full standalone flow"
 fi
 ```
 
-- **`IN_WORKTREE=true`**: Use current path as `$WORKTREE_PATH`. Skip Phase 1 (create), Phase 5 (lock merge), Phase 6 (cleanup). The parent task owns the worktree lifecycle.
-- **`IN_WORKTREE=false`**: Follow the full flow below.
+- **`IN_ROOT_WORKTREE=true`**: Use current path as `$WORKTREE_PATH`. After Phase 4, push docs commit to the existing PR branch (Phase 4.5). Skip Phase 1 (create), Phase 5 (lock merge), Phase 6 (cleanup).
+- **`IN_ROOT_WORKTREE=false`**: Follow the full standalone flow below.
 
-## Phase 1: Create worktree (skip if `IN_WORKTREE=true`)
+## Phase 1: Create worktree (skip if `IN_ROOT_WORKTREE=true`)
 
 ```bash
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -69,7 +70,17 @@ git commit -m "docs: {type} - {summary}"
 - `{type}`: progress, findings, or decision
 - Multiple types at once: `docs: progress + findings - {summary}`
 
-## Phase 5: Lock → Merge → Unlock (skip if `IN_WORKTREE=true`)
+## Phase 4.5: Push to PR branch (only if `IN_ROOT_WORKTREE=true`)
+
+```bash
+cd "$WORKTREE_PATH"
+git push origin "$BRANCH_NAME"
+echo "Docs commit pushed to PR branch: $BRANCH_NAME"
+```
+
+Done. The docs commit is now part of the existing PR. Skip Phase 5 and 6.
+
+## Phase 5: Lock → Merge → Unlock (skip if `IN_ROOT_WORKTREE=true`)
 
 ### Acquire Lock
 
@@ -125,7 +136,7 @@ echo "Lock released. Merge successful."
 
 **Important**: Always execute `rmdir "$LOCK_FILE"` when exiting Phase 5 regardless of path.
 
-## Phase 6: Cleanup (skip if `IN_WORKTREE=true`)
+## Phase 6: Cleanup (skip if `IN_ROOT_WORKTREE=true`)
 
 ### On Success
 
