@@ -27,10 +27,17 @@ the orchestrator receives `abnormal_exit` (see completion detection below).
   "issue": 78,
   "status": "completed",
   "prNumber": 123,
-  "merged": true,
+  "merged": false,
   "headSha": "abc1234def5678",
+  "mergeEligible": true,
+  "mergeEligibilityChecks": {
+    "checksPass": true,
+    "noConflict": true,
+    "noBlockingLabels": true,
+    "shaMatch": true
+  },
   "finishedAt": "2026-03-08T12:34:56Z",
-  "reason": "pipeline completed at step=log"
+  "reason": "pipeline completed at step=resolve"
 }
 ```
 
@@ -41,10 +48,29 @@ the orchestrator receives `abnormal_exit` (see completion detection below).
 | `issue` | integer | GitHub issue number |
 | `status` | `"completed"` \| `"failed"` | Pipeline exit status |
 | `prNumber` | integer \| null | PR number if pipeline created one |
-| `merged` | boolean | `true` if pipeline reached `log`/`done` step |
+| `merged` | boolean | `true` if pipeline reached `log`/`done` step (always `false` for orchestrator-dispatched workers) |
 | `headSha` | string \| null | Last commit SHA on the PR branch if known |
+| `mergeEligible` | boolean \| null | `true` if all eligibility checks pass, `false` if any fail, `null` if checks could not be run |
+| `mergeEligibilityChecks` | object | Per-condition results (see below) |
 | `finishedAt` | ISO-8601 UTC | When the wrapper exit trap ran |
 | `reason` | string | Human-readable exit summary |
+
+### Merge eligibility
+
+Workers dispatched by the orchestrator stop at ready-to-merge (build, review pass, resolve complete) and do not execute the merge step. The orchestrator (Stage 2) is responsible for merge decisions.
+
+`mergeEligibilityChecks` fields:
+
+| Check | Type | Condition |
+|-------|------|-----------|
+| `checksPass` | boolean \| null | No failed or cancelled required CI checks on the PR |
+| `noConflict` | boolean \| null | PR `mergeable` state is `MERGEABLE` (not `CONFLICTING`) |
+| `noBlockingLabels` | boolean \| null | PR has none of: `needs-human`, `manual-review`, `blocked` |
+| `shaMatch` | boolean \| null | PR head commit SHA matches the attempt's `lastCommitSha` (guards against unexpected force-pushes) |
+
+`null` means the check could not be evaluated (API error or pr number unknown). The orchestrator must treat `null` as indeterminate - neither eligible nor ineligible - and may re-check via the GitHub API before acting.
+
+`mergeEligible` is `true` only when all four checks are explicitly `true`. Any `false` or `null` leaves it `false` or `null` respectively.
 
 **Attempt isolation**: Each attempt writes to its own directory (`issues/{N}/attempts/{attemptId}/`). Previous attempt artifacts are preserved. Within a batch, directory separation prevents stale collision across retries. Across batches, `orch_dispatch` removes `terminal.json` before launching the wrapper (same attemptId may reoccur across batches since batchId is not part of the format). The `attemptId` field in terminal.json provides an additional validation layer.
 

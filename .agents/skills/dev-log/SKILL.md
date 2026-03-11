@@ -9,7 +9,7 @@ Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md
 
 > Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
 
-**Core strategy**: detect context → (worktree isolation if needed) → scan indices → write records → commit → (lock merge if needed) → cleanup
+**Core strategy**: detect context → (worktree isolation if needed) → scan indices → write records → commit → (push to PR branch **or** lock merge) → cleanup
 
 ## Directory Structure
 
@@ -49,13 +49,13 @@ docs/{client|server|workspace}/
 
 ### Phase 0: Detect context
 
-Determine if already running inside a worktree.
+Determine the execution context.
 → Commands: [worktree-merge.md § Phase 0](references/worktree-merge.md)
 
-- **In worktree** (`IN_WORKTREE=true`): use current worktree path. Skip Phase 1, 5, 6.
+- **Root repo worktree** (`IN_ROOT_WORKTREE=true`): CWD is under `$ROOT_REPO/.workspace/worktrees/`. Skip Phase 1, 5, 6. After Phase 4, push docs commit to the existing PR branch (Phase 4.5).
 - **Not in worktree**: follow the full flow (Phase 1 through 6).
 
-### Phase 1: Create worktree (skip if `IN_WORKTREE=true`)
+### Phase 1: Create worktree (skip if `IN_ROOT_WORKTREE=true`)
 
 Timestamp-based worktree + branch. All file operations happen inside the worktree.
 → Commands: [worktree-merge.md § Phase 1](references/worktree-merge.md)
@@ -76,13 +76,19 @@ Timestamp-based worktree + branch. All file operations happen inside the worktre
 `git add docs/` → `git commit -m "docs: {type} - {summary}"`
 → Commands: [worktree-merge.md § Phase 4](references/worktree-merge.md)
 
-### Phase 5: Lock → Merge → Unlock (skip if `IN_WORKTREE=true`)
+### Phase 4.5: Push to PR branch (only if `IN_ROOT_WORKTREE=true`)
+
+`git push origin <current-branch>` — docs commit is appended to the existing PR branch.
+No lock, no merge, no cleanup needed. Done.
+→ Commands: [worktree-merge.md § Phase 4.5](references/worktree-merge.md)
+
+### Phase 5: Lock → Merge → Unlock (skip if `IN_ROOT_WORKTREE=true`)
 
 Acquire lock → rebase → fast-forward merge → release lock. Wait up to 60s if another agent holds the lock.
 On conflict/failure: always release lock, keep worktree intact.
 → Commands: [worktree-merge.md § Phase 5](references/worktree-merge.md)
 
-### Phase 6: Cleanup (skip if `IN_WORKTREE=true`)
+### Phase 6: Cleanup (skip if `IN_ROOT_WORKTREE=true`)
 
 On success: remove worktree + delete branch. On failure: keep worktree for manual retry.
 → Commands: [worktree-merge.md § Phase 6](references/worktree-merge.md)

@@ -80,6 +80,66 @@ trap '
     [ $_rc -eq 0 ] && _reason="pipeline completed at step=${_step:-unknown}"
   fi
 
+  # Check merge eligibility: runs when completed with a known PR.
+  # Conditions: required checks pass, no conflict, no blocking labels.
+  # Blocking labels: needs-human, manual-review, blocked.
+  _merge_eligible=""
+  _eligibility_checks='{"checksPass":null,"noConflict":null,"noBlockingLabels":null}'
+  if [ "$_status" = "completed" ] && [ "$_pr_number" != "null" ] && command -v jq >/dev/null 2>&1 && command -v gh >/dev/null 2>&1; then
+    _area_name=""
+    [ -f "$PIPELINE_STATE_FILE" ] && _area_name=$(jq -r ".area // empty" "$PIPELINE_STATE_FILE" 2>/dev/null) || true
+    _elig_repo=""
+    case "$_area_name" in
+      client)    _elig_repo="pyo-sh/pyosh-blog-fe" ;;
+      server)    _elig_repo="pyo-sh/pyosh-blog-be" ;;
+      workspace) _elig_repo="pyo-sh/pyosh-blog-ai" ;;
+    esac
+    if [ -n "$_elig_repo" ]; then
+      # Required checks: no failed or cancelled runs
+      _checks_failing=$(gh pr checks "$_pr_number" -R "$_elig_repo" \
+        --json name,state \
+        --jq '[.[] | select(.state == "fail" or .state == "cancelled")] | length' \
+        2>/dev/null) || _checks_failing=""
+      _checks_pass="null"
+      [ "$_checks_failing" = "0" ] && _checks_pass="true"
+      [ -n "$_checks_failing" ] && [ "$_checks_failing" != "0" ] && _checks_pass="false"
+
+      # No conflict: PR must be MERGEABLE
+      _mergeable=$(gh pr view "$_pr_number" -R "$_elig_repo" \
+        --json mergeable --jq '.mergeable' 2>/dev/null) || _mergeable=""
+      _no_conflict="null"
+      [ "$_mergeable" = "MERGEABLE" ] && _no_conflict="true"
+      [ "$_mergeable" = "CONFLICTING" ] && _no_conflict="false"
+
+      # No blocking labels
+      _blocking=$(gh pr view "$_pr_number" -R "$_elig_repo" --json labels \
+        --jq '[.labels[].name | select(. == "needs-human" or . == "manual-review" or . == "blocked")] | length' \
+        2>/dev/null) || _blocking=""
+      _no_blocking="null"
+      [ "$_blocking" = "0" ] && _no_blocking="true"
+      [ -n "$_blocking" ] && [ "$_blocking" != "0" ] && _no_blocking="false"
+
+      # PR head SHA matches current attempt (guard against unexpected force-pushes)
+      _pr_head=$(gh pr view "$_pr_number" -R "$_elig_repo" \
+        --json headRefOid --jq '.headRefOid' 2>/dev/null) || _pr_head=""
+      _sha_match="null"
+      if [ -n "$_pr_head" ] && [ -n "$_head_sha" ]; then
+        [ "$_pr_head" = "$_head_sha" ] && _sha_match="true"
+        [ "$_pr_head" != "$_head_sha" ] && _sha_match="false"
+      fi
+
+      _eligibility_checks="{\"checksPass\":${_checks_pass:-null},\"noConflict\":${_no_conflict:-null},\"noBlockingLabels\":${_no_blocking:-null},\"shaMatch\":${_sha_match:-null}}"
+
+      # Eligible only when all four checks are explicitly true
+      if [ "$_checks_pass" = "true" ] && [ "$_no_conflict" = "true" ] && [ "$_no_blocking" = "true" ] && [ "$_sha_match" = "true" ]; then
+        _merge_eligible="true"
+      elif [ "$_checks_pass" = "false" ] || [ "$_no_conflict" = "false" ] || [ "$_no_blocking" = "false" ] || [ "$_sha_match" = "false" ]; then
+        _merge_eligible="false"
+      fi
+      # If any check returned null (API error), _merge_eligible stays "" (becomes null in JSON)
+    fi
+  fi
+
   _finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   # Write terminal.json; fall back to minimal printf if jq unavailable.
@@ -93,11 +153,15 @@ trap '
       --argjson prNumber "$_pr_number" \
       --argjson merged "$_merged" \
       --arg headSha "$_head_sha" \
+      --arg mergeEligible "$_merge_eligible" \
+      --arg eligChecks "$_eligibility_checks" \
       --arg finishedAt "$_finished_at" \
       --arg reason "$_reason" \
       "{schemaVersion:1, attemptId:\$attemptId, issue:\$issue,
         status:\$status, prNumber:\$prNumber, merged:\$merged,
         headSha:(if \$headSha == \"\" then null else \$headSha end),
+        mergeEligible:(if \$mergeEligible == \"true\" then true elif \$mergeEligible == \"false\" then false else null end),
+        mergeEligibilityChecks:(\$eligChecks | fromjson),
         finishedAt:\$finishedAt, reason:\$reason}" \
       > "$TERMINAL_FILE" 2>/dev/null || \
     printf "{\"schemaVersion\":1,\"attemptId\":\"%s\",\"issue\":%s,\"status\":\"%s\",\"finishedAt\":\"%s\"}\n" \
