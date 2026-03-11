@@ -53,7 +53,16 @@ def state_write(issue: int, area: str, monorepo_root: Path, state: PipelineState
 
 
 def state_update(issue: int, area: str, monorepo_root: Path, updates: dict) -> None:
-    """Shallow-merge updates into state dict, set updatedAt."""
+    """Shallow-merge updates into state dict, set updatedAt.
+
+    Raises ValueError if lastCommitSha is not a full 40-char hex SHA.
+    """
+    if "lastCommitSha" in updates and updates["lastCommitSha"]:
+        sha = updates["lastCommitSha"]
+        if len(sha) != 40 or not all(c in "0123456789abcdefABCDEF" for c in sha):
+            raise ValueError(
+                f"[state_store] lastCommitSha must be a full 40-char hex SHA, got: {sha!r}"
+            )
     data = _read_raw(issue, area, monorepo_root)
     # Deep merge for nested dicts
     for k, v in updates.items():

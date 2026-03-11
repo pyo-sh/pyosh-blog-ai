@@ -170,10 +170,24 @@ def dispatch_review(
         rc = 2
 
     try:
-        status = "success" if rc == 0 else "failed"
-        state_update(issue, area, monorepo_root, {
-            "reviewJob": {"status": status, "finishedAt": _now_iso()}
-        })
+        # Do not overwrite failed_parse with generic "failed":
+        # _dispatch_codex() may have already written failed_parse, which needs
+        # to survive so callers can route to a separate recovery path.
+        current_status = None
+        try:
+            current_status = state_read(issue, area, monorepo_root).review_job.status
+        except Exception:
+            pass
+
+        if current_status == ReviewJobStatus.FAILED_PARSE:
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"finishedAt": _now_iso()}
+            })
+        else:
+            status = "success" if rc == 0 else "failed"
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": status, "finishedAt": _now_iso()}
+            })
     except Exception:
         pass
 
@@ -278,43 +292,28 @@ def _dispatch_claude(
 
 
 def normalize_codex_output(raw: str) -> str | None:
-    """Normalize codex review output to match the pipeline review contract.
+    """Extract review content from Codex transcript output.
+
+    Searches for the last '## Review Summary' occurrence in the raw transcript.
+    Codex may produce multi-turn output; we extract the final review block.
 
     Returns:
-        Original string if it already starts with '## Review Summary'.
-        None if the input is empty or whitespace-only.
-        A fallback wrapper otherwise.
+        The review body starting with '## Review Summary' if found.
+        None if the input is empty, whitespace-only, or contains no '## Review Summary'.
+
+    Callers must treat None as a parse failure and must NOT upload raw content
+    to GitHub. Save the raw transcript as a local artifact instead.
     """
     if not raw or not raw.strip():
         return None
 
-    if raw.lstrip().startswith("## Review Summary"):
-        return raw.lstrip()
+    marker = "## Review Summary"
+    idx = raw.rfind(marker)
+    if idx == -1:
+        return None
 
-    quoted = "\n".join(f"   > {line}" for line in raw.splitlines())
-
-    return f"""## Review Summary
-
-**Verdict**: Request changes - 1 Warning issue found.
-
-Codex output did not match the pipeline review contract, so it was normalized conservatively.
-
-### Critical
-
-None
-
-### Warning
-
-1. **Codex output normalization fallback**
-   The original Codex review output did not satisfy the required format.
-   Review the raw content below and triage manually.
-
-{quoted}
-
-### Suggestion
-
-None
-"""
+    extracted = raw[idx:].rstrip() + "\n"
+    return extracted
 
 
 def _dispatch_codex(
@@ -415,12 +414,33 @@ def _dispatch_codex(
                 f"issue #{issue} area={area} pr=#{pr}",
                 file=sys.stderr,
             )
+            try:
+                state_update(issue, area, monorepo_root, {
+                    "reviewJob": {"status": "failed_parse", "finishedAt": _now_iso()}
+                })
+            except Exception:
+                pass
             return 1
 
         raw = log.read_text()
         normalized = normalize_codex_output(raw)
         if normalized is None:
-            return 1  # empty output -> treat as failure
+            # fail-closed: parse failed, do NOT upload raw transcript to GitHub.
+            # Raw output is already saved in the log artifact for local inspection.
+            print(
+                f"[review_runner] codex output missing '## Review Summary' for "
+                f"issue #{issue} area={area} pr=#{pr} - "
+                f"setting failed_parse, artifact saved at {log}",
+                file=sys.stderr,
+            )
+            try:
+                state_update(issue, area, monorepo_root, {
+                    "reviewJob": {"status": "failed_parse", "finishedAt": _now_iso()}
+                })
+            except Exception:
+                pass
+            return 1
+
         msg_file = pipeline_message_path(area, pr, "review", monorepo_root)
         msg_file.write_text(normalized)
         try:

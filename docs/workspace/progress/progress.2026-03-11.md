@@ -40,6 +40,24 @@
 - **Issue**: codex 출력이 비어있어도 `log.stat().st_size > 0` guard가 normalization 블록 전체를 건너뛰어 정상 종료
 - **Resolution**: `rc==0` 진입 후 빈 로그를 early return 1로 처리, normalization은 항상 실행
 
+- [x] Worker worktree isolation + GC for orchestrator - `orch_worktree_quarantine` (git metadata preservation + name collision protection), `orch_worktree_remove`, `orch_worktree_prepare` (unconditional quarantine for batch recovery), `orch_worktree_gc`, `orch_orphan_gc` (current-batch terminal-status only + `everDispatched` guard), `orch_disk_budget_gc` (500 MB ceiling); `everDispatched[N]` batch-scoped flag in `orch_dispatch`; `abnormal_exit` + merged PR → `completed` fix; SKILL.md worktree lifecycle section; 11라운드 Codex 리뷰 (#82, PR #137)
+
+## Discoveries
+
+- Git `git worktree add` fails "already used by worktree" if `.git/worktrees/{name}` entry still exists after moving the directory - must rename the entry dir AND update both gitdir pointers to free the registration
+- Second-resolution quarantine timestamps can collide during fast retries on the same poll cycle - counter suffix loop needed until path is unused
+- `everDispatched[N]` (set in `orch_dispatch` state update) is the correct batch-scoped discriminator for orphan GC: it prevents GCing `skipped_dep_failed` worktrees without persisting across batch boundaries
+- `orch_worktree_prepare` unconditional quarantine is the right policy: batch recovery from crashed runs requires it, and concurrent manual + orchestrator sessions for the same issue are unsupported by design
+- `abnormal_exit` + already-merged PR should map to `completed` (not `failed`) to unblock dependents correctly
+
+## Issues & Resolutions
+
+- **Issue**: 6 rounds of codex review identified evolving false-positive quarantine scenarios (manual /dev-build sessions, cross-batch `issues/{N}/` persistence, `skipped_dep_failed` without dispatch, stale worktrees after batch crash)
+- **Resolution**: Final design uses `everDispatched[N]` (batch-scoped, set atomically in `orch_dispatch`) for `orch_orphan_gc` + unconditional quarantine in `orch_worktree_prepare` (trusting the orchestrator owns dispatch decisions)
+
+- **Issue**: Pending dispatch loop left issues `pending` forever when `orch_worktree_prepare` failed (pre-round-9); after round-9 quarantine is unconditional, transient launcher failures should retry rather than mark failed
+- **Resolution**: Pending dispatch loop reverted to "log and retry next cycle" - transient errors resolve on the next poll; persistent failures surface via stall detection and retry exhaustion
+
 ## Next Steps
 
 
@@ -48,3 +66,6 @@
 - Related PR: #127 (feat/issue-81-archive-rotation) merged into main
 - Archive path: `.workspace/orchestrate/{area}/archive/{batchId}/`
 - Default rotation: keeps 5 most recent batches (`max_keep=5`)
+- Related PR: #137 (feat/issue-82-worker-worktree-gc) merged into main
+- Quarantine path: `.workspace/worktrees/{area}/quarantine/issue-{N}-{timestamp}/`
+- `everDispatched` field is new in batch.state.json schema (v1 compat: defaults to `{}` via `// false`)

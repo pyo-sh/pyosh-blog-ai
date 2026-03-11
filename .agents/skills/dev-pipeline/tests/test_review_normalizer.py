@@ -153,23 +153,26 @@ def test_dataclass_fields():
 
 
 def test_normalize_valid_codex_output():
-    """Valid codex output starting with '## Review Summary' passes through."""
+    """Valid codex output containing '## Review Summary' extracts from that marker."""
     result = normalize_codex_output(VALID_REVIEW)
-    assert result == VALID_REVIEW
+    assert result is not None
+    assert result.startswith("## Review Summary")
     counts = parse_review_body(result)
     assert counts.critical == 2
 
 
 def test_normalize_invalid_codex_output():
-    """Non-empty output without '## Review Summary' gets wrapped."""
+    """Non-empty output without '## Review Summary' returns None (fail-closed).
+
+    CHANGED: previously this wrapped raw output and uploaded to GitHub.
+    Now it returns None - callers must NOT upload to GitHub.
+    """
     raw = "Some codex output that doesn't match the template.\nLine two."
     result = normalize_codex_output(raw)
-    assert result is not None
-    assert result.startswith("## Review Summary")
-    counts = parse_review_body(result)
-    assert counts.warning == 1
-    assert counts.critical == 0
-    assert counts.suggestion == 0
+    assert result is None, (
+        "normalize_codex_output must return None when '## Review Summary' is absent. "
+        "Raw transcript must never be uploaded to GitHub."
+    )
 
 
 def test_normalize_empty_codex_output():
