@@ -217,6 +217,30 @@ def post_pr_comment(area: str, pr: int, body_file: str) -> None:
         )
 
 
+def get_pr_head_sha(area: str, pr: int) -> str:
+    """Return the current head SHA for a PR (full 40-char). Raises RuntimeError on error."""
+    repo = _repo(area)
+    result = run(
+        [
+            "gh", "pr", "view", str(pr),
+            "-R", repo,
+            "--json", "headRefOid",
+            "--jq", ".headRefOid",
+        ],
+        timeout=30,
+    )
+    if result.rc != 0:
+        raise RuntimeError(
+            f"[github_client] gh error fetching head SHA for PR #{pr}: {result.stderr}"
+        )
+    sha = result.stdout.strip()
+    if not sha or sha == "null":
+        raise RuntimeError(
+            f"[github_client] empty headRefOid for PR #{pr}"
+        )
+    return sha
+
+
 def get_pr_base_ref(area: str, pr: int) -> str:
     """Returns the base branch name for the PR (defaults to 'main' on error)."""
     repo = _repo(area)

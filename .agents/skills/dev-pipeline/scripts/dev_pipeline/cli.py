@@ -202,6 +202,98 @@ def cmd_check_review(args) -> int:
         return 2
 
 
+def cmd_sync_state(args) -> int:
+    """Sync state fields from GitHub/git (resume self-healing)."""
+    monorepo_root = _get_monorepo_root()
+    from .state_store import state_exists, state_update, state_read
+    from .github_client import check_review_exists, get_pr_head_sha
+
+    if not state_exists(args.issue, args.area, monorepo_root):
+        print(
+            f"No state found for issue #{args.issue} area={args.area}",
+            file=sys.stderr,
+        )
+        return 1
+
+    state = state_read(args.issue, args.area, monorepo_root)
+    updates = {}
+
+    if state.pr:
+        # Sync PR head SHA from GitHub
+        try:
+            sha = get_pr_head_sha(args.area, state.pr)
+            if sha and sha != state.last_commit_sha:
+                updates["lastCommitSha"] = sha
+                print(f"[sync-state] lastCommitSha: {state.last_commit_sha!r} -> {sha!r}")
+        except Exception as e:
+            print(f"[sync-state] warning: could not fetch PR head SHA: {e}", file=sys.stderr)
+
+        # Sync latest review ID from GitHub
+        try:
+            review_id = check_review_exists(args.area, state.pr, 0)
+            if review_id is not None and review_id > state.last_review_id:
+                updates["lastReviewId"] = review_id
+                print(f"[sync-state] lastReviewId: {state.last_review_id} -> {review_id}")
+        except Exception as e:
+            print(f"[sync-state] warning: could not fetch review ID: {e}", file=sys.stderr)
+
+    if updates:
+        try:
+            state_update(args.issue, args.area, monorepo_root, updates)
+        except Exception as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        print(f"[sync-state] updated {list(updates.keys())}")
+    else:
+        print("[sync-state] no updates needed")
+
+    return 0
+
+
+def cmd_acquire_lease(args) -> int:
+    """Acquire issue lease before pipeline operations."""
+    monorepo_root = _get_monorepo_root()
+    from .lease import lease_acquire, LeaseConflictError
+
+    try:
+        lease_acquire(
+            args.issue, args.area, monorepo_root,
+            owner=args.owner,
+            batch_id=args.batch_id or "",
+        )
+        return 0
+    except LeaseConflictError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+
+def cmd_release_lease(args) -> int:
+    """Release issue lease after pipeline operations."""
+    monorepo_root = _get_monorepo_root()
+    from .lease import lease_release
+
+    lease_release(args.issue, args.area, monorepo_root, owner=args.owner)
+    return 0
+
+
+def cmd_check_lease(args) -> int:
+    """Print current lease owner. Exit 0 if held by expected owner or free, 1 if conflict."""
+    monorepo_root = _get_monorepo_root()
+    from .lease import lease_read
+
+    current = lease_read(args.issue, args.area, monorepo_root)
+    if current is None:
+        print("(no lease)")
+        return 0
+    print(json.dumps(current, indent=2))
+    if args.expected_owner and current.get("owner") != args.expected_owner:
+        return 1
+    return 0
+
+
 def cmd_check_commits(args) -> int:
     """Check GitHub for new commits on a PR."""
     from .github_client import check_new_commits
@@ -314,6 +406,34 @@ def main():
     p_cc.add_argument("--pr", type=int, required=True)
     p_cc.add_argument("--last-commit-sha", required=True)
     p_cc.set_defaults(func=cmd_check_commits)
+
+    # sync-state
+    p_ss = sub.add_parser("sync-state", help="Sync state from GitHub/git (resume self-healing)")
+    p_ss.add_argument("--issue", type=int, required=True)
+    p_ss.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_ss.set_defaults(func=cmd_sync_state)
+
+    # acquire-lease
+    p_al = sub.add_parser("acquire-lease", help="Acquire issue lease before pipeline operations")
+    p_al.add_argument("--issue", type=int, required=True)
+    p_al.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_al.add_argument("--owner", required=True, choices=["manual", "pipeline", "orchestrator"])
+    p_al.add_argument("--batch-id", default="")
+    p_al.set_defaults(func=cmd_acquire_lease)
+
+    # release-lease
+    p_rl = sub.add_parser("release-lease", help="Release issue lease after pipeline operations")
+    p_rl.add_argument("--issue", type=int, required=True)
+    p_rl.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_rl.add_argument("--owner", required=True, choices=["manual", "pipeline", "orchestrator"])
+    p_rl.set_defaults(func=cmd_release_lease)
+
+    # check-lease
+    p_cl = sub.add_parser("check-lease", help="Print current lease owner for an issue")
+    p_cl.add_argument("--issue", type=int, required=True)
+    p_cl.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_cl.add_argument("--expected-owner", default="")
+    p_cl.set_defaults(func=cmd_check_lease)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
