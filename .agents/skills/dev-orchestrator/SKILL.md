@@ -147,7 +147,7 @@ Run `/dev-log` to record batch completion.
 
 ## Constraints
 
-- **Never merge PRs** - merging is handled by each `/dev-pipeline` instance
+- **Never merge PRs** - workers stop at ready-to-merge; merge gate is the orchestrator's responsibility (Stage 2)
 - **Never modify code** - code changes happen only inside dispatched processes
 - **Max concurrency** controlled by `maxConcurrent` (default: 4)
 - Always use `-R <owner/repo>` or `cd {area_dir}` for `gh` commands - never run from the wrong repo

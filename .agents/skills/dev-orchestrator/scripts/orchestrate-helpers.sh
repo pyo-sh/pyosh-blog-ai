@@ -335,7 +335,7 @@ orch_dispatch() {
     review_agent_hint="Use model \"$model\" for the review subprocess (pass to pipeline_run_review)."
   fi
 
-  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${review_agent_hint:+ $review_agent_hint} Running headlessly - auto-approve merge when review passes (no critical issues). Auto-re-review after resolve. After completing all steps, exit."
+  local prompt="/dev-pipeline ${area} #${issue}. Repo: ${repo}.${review_agent_hint:+ $review_agent_hint} Running headlessly - stop at ready-to-merge (build complete, review pass, resolve complete). Do not execute the merge step. Auto-re-review after resolve. After reaching ready-to-merge, exit."
 
   local wrapper_script="$_ORCH_HELPERS_DIR/orch-dispatch-wrapper.sh"
   local pid_file="$attempt_dir/pid"
