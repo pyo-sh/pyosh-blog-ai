@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-11 | Worker auto-merge 중단 + merge eligibility contract - dispatch prompt "auto-approve merge" 제거, `orch-dispatch-wrapper.sh` EXIT trap에 4-way eligibility check(`checksPass`/`noConflict`/`noBlockingLabels`/`shaMatch`) + `terminal.json` `mergeEligible`/`mergeEligibilityChecks` 추가, `state-detection.md` 스키마 업데이트 (#83, PR #141) | done |
 | 2026-03-11 | dev-pipeline 신뢰 경계 재설계 - fail-closed 파싱(`FAILED_PARSE` + raw transcript 업로드 금지), 40-char SHA 강제, atomic issue lease(`O_CREAT|O_EXCL`, `acquired` bool), `sync-state` self-healing, review fingerprint + 수렴 감지, 이중 형식 리뷰 본문, SKILL.md skill-creator 최적화; 5 test suites (#139, PR #139) | done |
 | 2026-03-11 | Worker worktree isolation + GC for orchestrator - `orch_worktree_quarantine` (git metadata preservation + name collision), `orch_orphan_gc` (current-batch + `everDispatched` guard), `orch_disk_budget_gc` (500 MB ceiling), `everDispatched[N]` batch flag, `abnormal_exit`+merged PR→`completed` fix; SKILL.md lifecycle section; 11라운드 Codex 리뷰 (#82, PR #137) | done |
 | 2026-03-11 | dev-pipeline shell 잔재 제거 + dev-resolve 정리 + review template 준수 - `pipeline-helpers.sh`/`smoke-test.sh` 삭제, CLI 5개 추가(init/state-update/stage-retry/check-review/check-commits), SKILL.md shell→Python CLI 재작성, codex `normalize_codex_output()` blockquote 방식; 133 tests (#129, #133, PR #136) | done |

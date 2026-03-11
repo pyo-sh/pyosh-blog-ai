@@ -78,8 +78,15 @@
 - **Issue**: `_extract_file()` regex가 `` `path/to/file.py:265` `` 형식에서 빈 문자열 반환 - 파일이 달라도 fingerprint가 동일해짐
 - **Resolution**: regex에 `(?::\d+)?` suffix 추가로 path:line 형식에서 파일 경로만 추출
 
+- [x] Worker auto-merge 중단 + merge eligibility contract 구현 (#83, PR #141)
+  - `orchestrate-helpers.sh` dispatch prompt에서 "auto-approve merge" 지시 제거; "stop at ready-to-merge, do not execute the merge step"으로 교체
+  - `orch-dispatch-wrapper.sh` EXIT trap에 4-way eligibility check 추가 (`checksPass`, `noConflict`, `noBlockingLabels`, `shaMatch`) + `terminal.json`에 `mergeEligible`/`mergeEligibilityChecks` 기록
+  - `state-detection.md` 스키마 업데이트 + merge eligibility contract 문서화
+  - `SKILL.md` constraint 업데이트: workers stop at ready-to-merge; merge gate is Stage 2
+
 ## Next Steps
 
+- [ ] Stage 2: Controller merge gate 구현 - orchestrator가 `mergeEligible`을 읽어 실제 merge 실행
 
 ## Notes
 
