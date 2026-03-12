@@ -69,6 +69,7 @@ When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling 
 |---|---|
 | `review` | review_process (`data.reviewId`) |
 | `retry` | review_dispatch (`data.tool` if present) |
+| `pending` | review_wait (re-call after brief wait; review job still running) |
 | `escalate` | Stop, report `data.reason` |
 
 Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.

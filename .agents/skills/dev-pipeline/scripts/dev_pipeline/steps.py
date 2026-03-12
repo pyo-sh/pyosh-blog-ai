@@ -254,7 +254,15 @@ def step_review_wait(issue: int, area: str, monorepo_root: Path) -> StepResult:
             message=f"[step:review_wait] escalate: {job.status.value}",
         )
 
-    # Other status (success but no review posted, running but stale, etc.)
+    # Review job still in progress - caller should poll again
+    if job.status == ReviewJobStatus.RUNNING:
+        return StepResult(
+            action="pending",
+            data={"reason": "review job still running"},
+            message="[step:review_wait] pending: review job still running",
+        )
+
+    # Other status (success but no review posted, etc.)
     return StepResult(
         action="escalate",
         data={"reason": f"job status={job.status.value} but no review on GitHub"},
@@ -338,8 +346,9 @@ def step_review_process(
             action="suggestion_only",
             data={
                 "counts": counts_dict,
-                "round": round_num,
+                "round": round_num + 1,
                 "reviewId": review_id,
+                "reviewBody": body,
             },
         )
 

@@ -217,7 +217,7 @@ def parse_review_body_full(body: str) -> ParsedReview:
             current_item_lines = []
             current_severity = None
             section = None
-        elif section and re.match(r"^\d+\.", stripped):
+        elif section and re.match(r"^\d+\.", stripped) and not line.startswith((" ", "\t")):
             _flush_item()
             current_item_lines = [line]
             current_severity = section

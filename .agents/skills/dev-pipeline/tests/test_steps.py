@@ -286,6 +286,18 @@ class TestReviewWait:
         result = step_review_wait(42, "workspace", monorepo_root)
         assert result.action == "escalate"
 
+    def test_running_job_returns_pending(self, monorepo_root, monkeypatch):
+        """Bug 1 fix: job status=running returns pending instead of escalate."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_WAIT,
+            review_job=ReviewJob(status=ReviewJobStatus.RUNNING, tool="claude"),
+        )
+        monkeypatch.setattr(f"{S}.check_review_exists", lambda *a, **kw: None)
+
+        result = step_review_wait(42, "workspace", monorepo_root)
+        assert result.action == "pending"
+
 
 # ---------------------------------------------------------------------------
 # review process
@@ -365,6 +377,39 @@ class TestReviewProcess:
 
         result = step_review_process(42, "workspace", monorepo_root, review_id=100)
         assert result.action == "suggestion_only"
+
+    def test_suggestion_only_round_incremented(self, monorepo_root, monkeypatch):
+        """Bug 2 fix: suggestion_only returns round_num + 1, not round_num."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+            review_resolve_round=1,
+        )
+        monkeypatch.setattr(
+            f"{S}.fetch_review",
+            lambda *a, **kw: {"state": "COMMENTED", "body": "..."},
+        )
+        monkeypatch.setattr(f"{S}.parse_review_body", lambda b: ReviewCounts(0, 0, 2))
+
+        result = step_review_process(42, "workspace", monorepo_root, review_id=100)
+        assert result.action == "suggestion_only"
+        assert result.data["round"] == 2
+
+    def test_suggestion_only_includes_review_body(self, monorepo_root, monkeypatch):
+        """Bug 4 fix: suggestion_only data includes reviewBody for AI decision."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+        )
+        monkeypatch.setattr(
+            f"{S}.fetch_review",
+            lambda *a, **kw: {"state": "COMMENTED", "body": "review body content"},
+        )
+        monkeypatch.setattr(f"{S}.parse_review_body", lambda b: ReviewCounts(0, 0, 1))
+
+        result = step_review_process(42, "workspace", monorepo_root, review_id=100)
+        assert result.action == "suggestion_only"
+        assert result.data["reviewBody"] == "review body content"
 
     def test_suggestion_at_round_limit_is_clean(self, monorepo_root, monkeypatch):
         _write_state(
