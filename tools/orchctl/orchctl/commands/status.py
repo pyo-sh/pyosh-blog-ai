@@ -14,24 +14,24 @@ def cmd_status(ctx: click.Context, as_json: bool) -> None:
     """Show issue counts and active attempt summary."""
     db_path = ctx.obj.get("db_path")
     conn = get_db(db_path)
-    if current_version(conn) == 0:
-        conn.close()
-        raise click.ClickException("Database not initialised — run `orchctl init` first.")
+    try:
+        if current_version(conn) == 0:
+            raise click.ClickException("Database not initialised — run `orchctl init` first.")
 
-    issue_counts: dict[str, int] = {}
-    for row in conn.execute(
-        "SELECT state, COUNT(*) AS cnt FROM issues GROUP BY state"
-    ):
-        issue_counts[row["state"]] = row["cnt"]
-
-    active_attempts = [
-        dict(row)
+        issue_counts: dict[str, int] = {}
         for row in conn.execute(
-            "SELECT attempt_id, status, started_at FROM attempts WHERE status = 'running'"
-        )
-    ]
+            "SELECT state, COUNT(*) AS cnt FROM issues GROUP BY state"
+        ):
+            issue_counts[row["state"]] = row["cnt"]
 
-    conn.close()
+        active_attempts = [
+            dict(row)
+            for row in conn.execute(
+                "SELECT attempt_id, status, started_at FROM attempts WHERE status = 'running'"
+            )
+        ]
+    finally:
+        conn.close()
 
     data = {
         "issues": issue_counts,
