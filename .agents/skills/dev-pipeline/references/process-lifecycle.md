@@ -60,7 +60,7 @@ stderr emits human-readable log messages.
 
 ### Two patterns
 
-1. **Single call** (fully automated): `review-dispatch`, `review-wait`, `review-process`, `suggestion-decide`, `merge`
+1. **Single call** (fully automated): `review-dispatch`, `review-wait`, `review-process`, `suggestion-decide`, `merge`, `cleanup-wt`
    - Python handles the entire logic, returns action for next step routing
 2. **Two-phase** (AI skill invocation required): `build`, `resolve`, `log`
    - `--phase setup`: preparation before AI skill (fetch, state init, review fetch)

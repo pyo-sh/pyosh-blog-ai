@@ -8,6 +8,7 @@ description: Manage progress/, findings/, and decisions/ records in the pyosh-bl
 Record-only skill. All commits target the `docs` branch. Merge to `main` via `/dev-archive`.
 
 > CLI: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log <cmd>`
+> Prepend the PYTHONPATH above to every `python3 -m dev_log` call below.
 > `MONOREPO_ROOT`: headless → `$PIPELINE_MONOREPO_ROOT` / interactive → `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 > Area definitions: [monorepo-layout.md](../../references/monorepo-layout.md) | Templates: [templates.md](references/templates.md)
 
@@ -23,11 +24,11 @@ Record-only skill. All commits target the `docs` branch. Merge to `main` via `/d
 
 ### Phase 1: Ensure docs branch
 
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log ensure-branch --root "$ROOT_REPO"` - creates `docs` from `origin/main` if not exists.
+`python3 -m dev_log ensure-branch --root "$ROOT_REPO"` - creates `docs` from `origin/main` if not exists.
 
 ### Phase 2: Create worktree
 
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log create-worktree --root "$ROOT_REPO"` - returns `worktreePath`, `branch`. Worktree branches from `docs`.
+`python3 -m dev_log create-worktree --root "$ROOT_REPO"` - returns `worktreePath`, `branch`. Worktree branches from `docs`.
 
 ### Phase 3: Check context
 
@@ -35,9 +36,9 @@ Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside wor
 
 ### Phase 4: Write records (inside worktree)
 
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log next-seq --dir "$DOCS_DIR/findings" --type findings`
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log next-seq --dir "$DOCS_DIR/decisions" --type decision`
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log check-progress --dir "$DOCS_DIR"`
+`python3 -m dev_log next-seq --dir "$DOCS_DIR/findings" --type findings`
+`python3 -m dev_log next-seq --dir "$DOCS_DIR/decisions" --type decision`
+`python3 -m dev_log check-progress --dir "$DOCS_DIR"`
 
 - **Findings**: create `findings/findings.NNN-topic.md` + update `findings.index.md`
 - **Decision**: create `decisions/decision-NNN-topic.md` (draft) + update `decisions.index.md`
@@ -46,17 +47,17 @@ Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside wor
 
 ### Phase 5: Commit
 
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log commit --worktree "$WT" --message "docs: {type} - {summary}"`
+`python3 -m dev_log commit --worktree "$WT" --message "docs: {type} - {summary}"`
 
 ### Phase 6: Merge to docs
 
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log merge-to-docs --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
+`python3 -m dev_log merge-to-docs --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
 
 Acquires lock, fetches `origin/docs`, rebases, pushes to `origin docs`, releases lock. Lock always released on failure.
 
 ### Phase 7: Cleanup
 
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log cleanup --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
+`python3 -m dev_log cleanup --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
 
 ## Index update rules
 

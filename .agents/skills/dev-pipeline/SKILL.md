@@ -8,6 +8,7 @@ description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge 
 Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 
 > CLI: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline <cmd>`
+> Prepend the PYTHONPATH above to every `python3 -m dev_pipeline` call below.
 > `MONOREPO_ROOT`: headless → `$PIPELINE_MONOREPO_ROOT` / interactive → `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 > Worktree: `.workspace/worktrees/{area}/issue-{N}` | State: `.workspace/pipeline/{area}/issue-{N}.state.json`
 
@@ -47,27 +48,27 @@ Only `review_dispatch -> review_wait` requires a turn break. All other transitio
 ## Workflow
 
 ### 0. Initialize / resume
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline init --area "$AREA" --issue "$ISSUE"`
-If state exists, resume from `.step`. On crash: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline sync-state --issue "$ISSUE" --area "$AREA"`
+`python3 -m dev_pipeline init --area "$AREA" --issue "$ISSUE"`
+If state exists, resume from `.step`. On crash: `python3 -m dev_pipeline sync-state --issue "$ISSUE" --area "$AREA"`
 
 ### 1. build
-Pre: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase setup`
+Pre: `python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase setup`
 Act: `/dev-build root #$ISSUE`
-Post: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase finalize` -> review_dispatch
+Post: `python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase finalize` -> review_dispatch
 
 ### 2a. review_dispatch
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step review-dispatch --issue $ISSUE --area $AREA [--tool $TOOL] [--model $MODEL]`
+`python3 -m dev_pipeline step review-dispatch --issue $ISSUE --area $AREA [--tool $TOOL] [--model $MODEL]`
 
 | action | Next |
 |---|---|
 | `found` | review_process (`data.reviewId`) |
-| `dispatch` | Bash tool with `run_in_background: true`: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL [--model $MODEL]` -> **end turn** |
+| `dispatch` | Bash tool with `run_in_background: true`: `python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL [--model $MODEL]` -> **end turn** |
 | `error` | Stop, report |
 
 When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling Step 3.
 
 ### 2b. review_wait (call unconditionally on any task-notification)
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
+`python3 -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
 
 | action | Next |
 |---|---|
@@ -79,7 +80,7 @@ When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling 
 Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 
 ### 3. review_process
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step review-process --issue $ISSUE --area $AREA --review-id $REVIEW_ID`
+`python3 -m dev_pipeline step review-process --issue $ISSUE --area $AREA --review-id $REVIEW_ID`
 
 | action | Next |
 |---|---|
@@ -96,7 +97,7 @@ Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 - Otherwise -> `merge`
 
 ### 3b. suggestion_decide
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step suggestion-decide --issue $ISSUE --area $AREA --decision $DECISION`
+`python3 -m dev_pipeline step suggestion-decide --issue $ISSUE --area $AREA --decision $DECISION`
 
 `$DECISION` is one of: `merge`, `resolve-skip`, `resolve-review` (from the rules above).
 
@@ -107,10 +108,10 @@ Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 | `error` | Stop, report |
 
 ### 4. resolve
-Pre: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase setup`
+Pre: `python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase setup`
 `data`: `reviewBody`, `comments` (JSON array), `worktreePath`
 Act: Fix code in worktree. `[CRITICAL]`/`[WARNING]`: must fix. `[SUGGESTION]`: fix if valid.
-Post: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase finalize`
+Post: `python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase finalize`
 
 | action | Next |
 |---|---|
@@ -118,7 +119,7 @@ Post: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m 
 | `merge` | merge |
 
 ### 5. merge
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step merge --issue $ISSUE --area $AREA`
+`python3 -m dev_pipeline step merge --issue $ISSUE --area $AREA`
 
 | action | Next |
 |---|---|
@@ -127,16 +128,16 @@ Post: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m 
 | `closed` / `escalate` | Stop, report |
 
 ### 5.5. cleanup-wt
-`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step cleanup-wt --issue $ISSUE --area $AREA`
+`python3 -m dev_pipeline step cleanup-wt --issue $ISSUE --area $AREA`
 
 | action | Next |
 |---|---|
 | `continue` | log |
 
 ### 6. log + state cleanup
-Pre: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase setup`
+Pre: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase setup`
 Act: `/dev-log` (standalone - docs go to docs branch via dev-log skill)
-Post: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize`
+Post: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize`
 
 | action | Next |
 |---|---|
@@ -148,7 +149,7 @@ Post: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m 
 - **Auto-merge** when Critical=0 AND Warning=0, or user approves.
 - **User approval required** when round limit reached with Critical/Warning.
 - Source edits only in resolve step, only in the issue worktree.
-- On error: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step "$STEP"`
+- On error: `python3 -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step "$STEP"`
 
 ## References
 
