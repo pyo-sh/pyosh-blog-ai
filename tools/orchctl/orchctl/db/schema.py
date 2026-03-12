@@ -76,4 +76,14 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        2,
+        """
+        ALTER TABLE leases ADD COLUMN heartbeat_at TEXT;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_active_unique
+        ON attempts(issue_id)
+        WHERE status = 'running';
+        """,
+    ),
 ]

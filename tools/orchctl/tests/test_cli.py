@@ -67,10 +67,77 @@ def test_doctor_json_healthy(runner, db_path):
     assert data["findings"] == []
 
 
-def test_reconcile_stub(runner, db_path):
+def test_reconcile_requires_area(runner, db_path):
+    runner.invoke(cli, ["--db", db_path, "init"])
     result = runner.invoke(cli, ["--db", db_path, "reconcile"])
+    assert result.exit_code != 0
+
+
+def test_reconcile_no_pending_issues(runner, db_path):
+    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
     assert result.exit_code == 0, result.output
-    assert "not yet implemented" in result.output
+    assert "no pending issues" in result.output
+
+
+def test_reconcile_skips_when_lease_held(runner, db_path):
+    from orchctl.db.connection import get_db
+
+    runner.invoke(cli, ["--db", db_path, "init"])
+    conn = get_db(db_path)
+    # Use PID 1 (init) — guaranteed alive so cleanup_stale won't evict it
+    conn.execute(
+        "INSERT INTO leases (area, holder_pid, acquired_at, heartbeat_at, expires_at) "
+        "VALUES ('client', 1, datetime('now'), datetime('now'), datetime('now', '+1 hour'))"
+    )
+    conn.commit()
+    conn.close()
+
+    result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code == 0, result.output
+    assert "lease held by another process" in result.output
+
+
+def test_reconcile_dispatches_pending_issues(runner, db_path):
+    from orchctl.db.connection import get_db
+
+    runner.invoke(cli, ["--db", db_path, "init"])
+    conn = get_db(db_path)
+    conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 10, 'pending')")
+    conn.commit()
+    conn.close()
+
+    result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code == 0, result.output
+    assert "issue #10 ready to dispatch" in result.output
+
+
+def test_reconcile_skips_issue_with_active_attempt(runner, db_path):
+    from orchctl.db.connection import get_db
+
+    runner.invoke(cli, ["--db", db_path, "init"])
+    conn = get_db(db_path)
+    conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 20, 'pending')")
+    conn.commit()
+    issue_id = conn.execute(
+        "SELECT id FROM issues WHERE area='client' AND number=20"
+    ).fetchone()["id"]
+    conn.execute(
+        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a-active', ?, 'running')",
+        (issue_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code == 0, result.output
+    assert "already has an active attempt" in result.output
+
+
+def test_reconcile_requires_init(runner, db_path):
+    result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code != 0
+    assert "not initialised" in result.output
 
 
 def test_status_requires_init(runner, db_path):
