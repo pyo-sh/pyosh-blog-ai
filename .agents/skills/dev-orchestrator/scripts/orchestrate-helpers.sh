@@ -935,8 +935,12 @@ orch_set_terminal() {
 
   orch_status_set "$area" "$issue" "$status"
 
-  # Remove claim label on any terminal transition.
-  orch_issue_remove_label "$area" "$issue" "claimed-by-orch"
+  # Remove claim label only when the issue was actually dispatched (i.e. has the label).
+  # Skipping the API call for never-dispatched issues (blocked, cycle-isolated, etc.)
+  # avoids consuming GitHub API rate limit for no-op removes in large batches.
+  local was_dispatched
+  was_dispatched=$(orch_state_read "$area" | jq -r ".dispatched | has(\"$issue\")" 2>/dev/null) || was_dispatched="false"
+  [ "$was_dispatched" = "true" ] && orch_issue_remove_label "$area" "$issue" "claimed-by-orch"
 
   # Add status-specific issue label and comment.
   case "$status" in
