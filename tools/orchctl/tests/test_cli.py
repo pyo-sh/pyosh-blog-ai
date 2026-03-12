@@ -140,6 +140,21 @@ def test_reconcile_requires_init(runner, db_path):
     assert "not initialised" in result.output
 
 
+def test_reconcile_rejects_outdated_schema(runner, db_path):
+    from orchctl.db.connection import get_db
+
+    runner.invoke(cli, ["--db", db_path, "init"])
+    conn = get_db(db_path)
+    # Backdate schema_version to simulate a pre-migration database
+    conn.execute("UPDATE schema_version SET version = 1")
+    conn.commit()
+    conn.close()
+
+    result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code != 0
+    assert "out of date" in result.output
+
+
 def test_status_requires_init(runner, db_path):
     result = runner.invoke(cli, ["--db", db_path, "status"])
     assert result.exit_code != 0

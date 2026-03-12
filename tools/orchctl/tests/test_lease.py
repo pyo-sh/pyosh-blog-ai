@@ -95,7 +95,7 @@ def test_release_on_nonexistent_lease(conn):
 def test_cleanup_removes_expired_lease(conn):
     conn.execute(
         "INSERT INTO leases (area, holder_pid, acquired_at, heartbeat_at, expires_at) "
-        "VALUES ('client', 1, '2020-01-01T00:00:00', '2020-01-01T00:00:00', '2020-01-01T00:01:00')"
+        "VALUES ('client', 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2020-01-01 00:01:00')"
     )
     conn.commit()
     removed = cleanup_stale(conn)

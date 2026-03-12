@@ -79,7 +79,17 @@ MIGRATIONS: list[tuple[int, str]] = [
     (
         2,
         """
-        ALTER TABLE leases ADD COLUMN heartbeat_at TEXT;
+        CREATE TABLE IF NOT EXISTS _leases_new (
+            area         TEXT    PRIMARY KEY,
+            holder_pid   INTEGER NOT NULL,
+            acquired_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+            heartbeat_at TEXT,
+            expires_at   TEXT    NOT NULL
+        );
+        INSERT OR IGNORE INTO _leases_new (area, holder_pid, acquired_at, expires_at)
+            SELECT area, holder_pid, acquired_at, expires_at FROM leases;
+        DROP TABLE leases;
+        ALTER TABLE _leases_new RENAME TO leases;
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_active_unique
         ON attempts(issue_id)
@@ -87,3 +97,5 @@ MIGRATIONS: list[tuple[int, str]] = [
         """,
     ),
 ]
+
+LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)

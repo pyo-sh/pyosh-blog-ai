@@ -4,7 +4,8 @@ import os
 
 import click
 
-from ..db import acquire, cleanup_stale, current_version, get_db, has_active_attempt, release
+from ..db import acquire, cleanup_stale, current_version, get_db, has_active_attempt, release, renew
+from ..db.schema import LATEST_VERSION
 
 
 @click.command("reconcile")
@@ -20,8 +21,14 @@ def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
     db_path = ctx.obj.get("db_path")
     conn = get_db(db_path)
     try:
-        if current_version(conn) == 0:
+        ver = current_version(conn)
+        if ver == 0:
             raise click.ClickException("Database not initialised — run `orchctl init` first.")
+        if ver < LATEST_VERSION:
+            raise click.ClickException(
+                f"Database schema is out of date (v{ver} < v{LATEST_VERSION}) "
+                "— run `orchctl init` to migrate."
+            )
 
         pid = os.getpid()
         if not acquire(conn, area, pid):
@@ -29,14 +36,14 @@ def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
             return
 
         try:
-            _run_pass(conn, area, dry_run)
+            _run_pass(conn, area, pid, dry_run)
         finally:
             release(conn, area, pid)
     finally:
         conn.close()
 
 
-def _run_pass(conn, area: str, dry_run: bool) -> None:
+def _run_pass(conn, area: str, pid: int, dry_run: bool) -> None:
     """Execute one reconciliation pass under the area lease."""
     cleanup_stale(conn)
 
@@ -50,6 +57,7 @@ def _run_pass(conn, area: str, dry_run: bool) -> None:
         return
 
     for issue in pending:
+        renew(conn, area, pid)
         issue_id = issue["id"]
         number = issue["number"]
         if has_active_attempt(conn, issue_id):
