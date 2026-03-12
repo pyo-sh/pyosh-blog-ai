@@ -67,6 +67,8 @@ Post: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase fin
 | `retry` | review_dispatch (`data.tool` if present) |
 | `escalate` | Stop, report `data.reason` |
 
+Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
+
 ### 3. review_process
 `python -m dev_pipeline step review-process --issue $ISSUE --area $AREA --review-id $REVIEW_ID`
 
@@ -74,7 +76,7 @@ Post: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase fin
 |---|---|
 | `clean` | merge |
 | `resolve` | resolve |
-| `round_limit` | Ask user: continue / merge as-is / abort |
+| `round_limit` | Interactive: ask user (continue / merge as-is / abort). Headless: `escalate` for Critical/Warning; auto-merge for suggestion-only |
 | `suggestion_only` | AI decides (see below) |
 | `escalate` | Stop, report |
 
