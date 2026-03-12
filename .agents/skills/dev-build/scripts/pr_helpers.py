@@ -13,7 +13,8 @@ def cmd_create(args):
         ["gh", "pr", "create", "-R", args.repo, "--title", args.title, "--body-file", args.body_file],
         capture_output=True, text=True, check=True, cwd=args.worktree,
     )
-    url = result.stdout.strip()
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    url = lines[-1].strip()
     number = int(url.rstrip("/").split("/")[-1])
     json.dump({"number": number, "url": url}, sys.stdout)
 

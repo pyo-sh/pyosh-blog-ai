@@ -25,17 +25,13 @@ def main():
     branch = f"{args.type}/issue-{args.issue}-{args.desc}"
     wt_path = root / ".workspace" / "worktrees" / args.area / f"issue-{args.issue}"
 
-    # 1. fetch + rebase (fallback to merge)
-    subprocess.run(["git", "-C", str(repo_dir), "fetch", "origin"], check=True)
-    r = subprocess.run(["git", "-C", str(repo_dir), "rebase", "origin/main"])
-    if r.returncode != 0:
-        subprocess.run(["git", "-C", str(repo_dir), "rebase", "--abort"], check=False)
-        subprocess.run(["git", "-C", str(repo_dir), "merge", "origin/main"], check=True)
+    # 1. fetch and fast-forward local main
+    subprocess.run(["git", "-C", str(repo_dir), "fetch", "origin", "main"], check=True)
 
-    # 2. worktree add
+    # 2. worktree add from origin/main (avoids stale local main)
     wt_path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
-        ["git", "-C", str(repo_dir), "worktree", "add", "-b", branch, str(wt_path), "main"],
+        ["git", "-C", str(repo_dir), "worktree", "add", "-b", branch, str(wt_path), "origin/main"],
         check=True,
     )
 
