@@ -7,7 +7,7 @@ Resume from state file on crash/disconnect. Jump to the `step` field - each step
 Step functions perform entry validation internally. Recovery procedure:
 
 1. Read `.step` from the state file
-2. `python -m dev_pipeline sync-state --issue N --area A` (syncs latest SHA and review ID from GitHub/git)
+2. `python3 -m dev_pipeline sync-state --issue N --area A` (syncs latest SHA and review ID from GitHub/git)
 3. Run the corresponding step command - the step function internally:
    - Checks worktree existence and state
    - Compares LOCAL_HEAD vs state SHA

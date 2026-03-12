@@ -27,6 +27,7 @@ from dev_pipeline.steps import (
     step_review_dispatch,
     step_review_wait,
     step_review_process,
+    step_suggestion_decide,
     step_resolve_setup,
     step_resolve_finalize,
     step_merge,
@@ -414,6 +415,82 @@ class TestReviewProcess:
 
 
 # ---------------------------------------------------------------------------
+# suggestion decide (fix #2 + #3)
+# ---------------------------------------------------------------------------
+
+class TestSuggestionDecide:
+    def test_merge(self, monorepo_root):
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+            review_resolve_round=2,
+        )
+
+        result = step_suggestion_decide(42, "workspace", monorepo_root, decision="merge")
+        assert result.action == "merge"
+        assert result.data["round"] == 3
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.step == PipelineStep.MERGE
+        assert state.review_resolve_round == 3
+
+    def test_resolve_skip(self, monorepo_root):
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+            review_resolve_round=1,
+        )
+
+        result = step_suggestion_decide(42, "workspace", monorepo_root, decision="resolve-skip")
+        assert result.action == "resolve"
+        assert result.data["round"] == 2
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.step == PipelineStep.RESOLVE
+        assert state.skip_review is True
+        assert state.review_resolve_round == 2
+
+    def test_resolve_review(self, monorepo_root):
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+            review_resolve_round=0,
+        )
+
+        result = step_suggestion_decide(42, "workspace", monorepo_root, decision="resolve-review")
+        assert result.action == "resolve"
+        assert result.data["round"] == 1
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.step == PipelineStep.RESOLVE
+        assert state.skip_review is False
+        assert state.review_resolve_round == 1
+
+    def test_invalid_decision(self, monorepo_root):
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+        )
+
+        result = step_suggestion_decide(42, "workspace", monorepo_root, decision="invalid")
+        assert result.action == "error"
+
+    def test_round_counter_increments(self, monorepo_root):
+        """Fix #3: round counter increments on suggestion_only path."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_PROCESS,
+            review_resolve_round=3,
+        )
+
+        result = step_suggestion_decide(42, "workspace", monorepo_root, decision="resolve-skip")
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.review_resolve_round == 4
+        assert result.data["round"] == 4
+
+
+# ---------------------------------------------------------------------------
 # resolve setup
 # ---------------------------------------------------------------------------
 
@@ -508,6 +585,7 @@ class TestResolveFinalize:
 
         monkeypatch.setattr(f"{S}.add_all", lambda wt: True)
         monkeypatch.setattr(f"{S}.has_staged_changes", lambda wt: False)
+        monkeypatch.setattr(f"{S}.rev_parse_head", lambda wt: "a" * 40)
 
         result = step_resolve_finalize(42, "workspace", monorepo_root)
         assert result.action == "merge"
@@ -524,9 +602,30 @@ class TestResolveFinalize:
 
         monkeypatch.setattr(f"{S}.add_all", lambda wt: True)
         monkeypatch.setattr(f"{S}.has_staged_changes", lambda wt: False)
+        monkeypatch.setattr(f"{S}.rev_parse_head", lambda wt: "a" * 40)
 
         result = step_resolve_finalize(42, "workspace", monorepo_root)
         assert result.action == "re_review"
+
+    def test_ai_committed_directly_updates_sha(self, monorepo_root, monkeypatch):
+        """Fix #1: AI commits before finalize -> SHA updated even with no staged changes."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.RESOLVE,
+            skip_review=False,
+            last_commit_sha="a" * 40,
+        )
+
+        monkeypatch.setattr(f"{S}.add_all", lambda wt: True)
+        monkeypatch.setattr(f"{S}.has_staged_changes", lambda wt: False)
+        # HEAD differs from state - AI committed directly
+        monkeypatch.setattr(f"{S}.rev_parse_head", lambda wt: "b" * 40)
+
+        result = step_resolve_finalize(42, "workspace", monorepo_root)
+        assert result.action == "re_review"
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.last_commit_sha == "b" * 40
 
 
 # ---------------------------------------------------------------------------
