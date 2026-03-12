@@ -237,6 +237,24 @@ class TestResolveBlockedIssue:
         result = resolve_blocked_issue(deps, DependencyType.HARD.value)
         assert result == IssueState.BLOCKED_FAILED_DEP.value
 
+    def test_needs_human_dep_hard_returns_blocked_failed_dep(self):
+        """needs-human is a non-success terminal state; hard dep should fail."""
+        deps = ["needs-human"]
+        result = resolve_blocked_issue(deps, DependencyType.HARD.value)
+        assert result == IssueState.BLOCKED_FAILED_DEP.value
+
+    def test_needs_human_dep_soft_returns_pending(self):
+        """Soft dep: even needs-human terminal state allows dependent to proceed."""
+        deps = ["needs-human"]
+        result = resolve_blocked_issue(deps, DependencyType.SOFT.value)
+        assert result == IssueState.PENDING.value
+
+    def test_blocked_failed_dep_hard_returns_blocked_failed_dep(self):
+        """blocked-failed-dependency is non-success; hard dep should fail."""
+        deps = ["blocked-failed-dependency"]
+        result = resolve_blocked_issue(deps, DependencyType.HARD.value)
+        assert result == IssueState.BLOCKED_FAILED_DEP.value
+
     def test_non_terminal_dep_returns_blocked(self):
         """If deps are still running, issue stays blocked."""
         deps = ["completed", "dispatched"]
@@ -536,5 +554,17 @@ class TestLeaseConflicts:
         # New PID should be able to take over
         result = try_acquire_lease(conn, "client", holder_pid=1001)
         assert result is True
+        row = conn.execute("SELECT holder_pid FROM leases WHERE area = ?", ("client",)).fetchone()
+        assert row["holder_pid"] == 1001
+
+    def test_holder_can_renew_ttl(self, conn):
+        """Holder re-acquires with long TTL; another PID still cannot steal it."""
+        try_acquire_lease(conn, "client", holder_pid=1001, ttl_seconds=60)
+        # Renew with extended TTL
+        renewed = try_acquire_lease(conn, "client", holder_pid=1001, ttl_seconds=300)
+        assert renewed is True
+        # A different PID cannot take over the live lease
+        stolen = try_acquire_lease(conn, "client", holder_pid=1002, ttl_seconds=300)
+        assert stolen is False
         row = conn.execute("SELECT holder_pid FROM leases WHERE area = ?", ("client",)).fetchone()
         assert row["holder_pid"] == 1001

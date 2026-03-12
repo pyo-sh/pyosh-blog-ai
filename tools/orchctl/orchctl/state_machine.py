@@ -71,17 +71,17 @@ def resolve_blocked_issue(
     if not dep_states:
         return IssueState.PENDING.value
 
-    has_failure = any(
-        s in (IssueState.FAILED_TERMINAL.value, IssueState.CANCELLED.value)
-        for s in dep_states
-    )
-    all_done = all(s in [s.value for s in TERMINAL_ISSUE_STATES] for s in dep_states)
+    terminal_values = {st.value for st in TERMINAL_ISSUE_STATES}
+    all_done = all(s in terminal_values for s in dep_states)
 
     if not all_done:
         return IssueState.BLOCKED.value  # deps still running
 
-    if has_failure and dependency_type == DependencyType.HARD.value:
-        return IssueState.BLOCKED_FAILED_DEP.value
+    # For hard deps, any terminal state other than 'completed' is a failure.
+    if dependency_type == DependencyType.HARD.value:
+        has_failure = any(s != IssueState.COMPLETED.value for s in dep_states)
+        if has_failure:
+            return IssueState.BLOCKED_FAILED_DEP.value
 
     return IssueState.PENDING.value
 
@@ -92,19 +92,28 @@ def try_acquire_lease(
     holder_pid: int,
     ttl_seconds: int = 60,
 ) -> bool:
-    """Attempt to acquire the area lease. Returns True on success, False if held.
+    """Attempt to acquire or renew the area lease. Returns True on success, False if held.
 
-    Uses INSERT OR IGNORE so only one writer wins per area.
-    Clears expired leases before attempting acquisition.
+    Expired leases are cleared first so a new holder can take over. An existing
+    holder can renew its own lease (resets expires_at). A different PID cannot
+    acquire while a valid lease is held.
     """
+    # Clear any expired lease to allow a new holder to acquire.
     conn.execute(
         "DELETE FROM leases WHERE area = ? AND expires_at < datetime('now')",
         (area,),
     )
     conn.execute(
         """
-        INSERT OR IGNORE INTO leases (area, holder_pid, acquired_at, expires_at)
+        INSERT INTO leases (area, holder_pid, acquired_at, expires_at)
         VALUES (?, ?, datetime('now'), datetime('now', ? || ' seconds'))
+        ON CONFLICT(area) DO UPDATE SET
+            expires_at = excluded.expires_at,
+            acquired_at = CASE
+                WHEN holder_pid = excluded.holder_pid THEN acquired_at
+                ELSE excluded.acquired_at
+            END
+        WHERE holder_pid = excluded.holder_pid
         """,
         (area, holder_pid, str(ttl_seconds)),
     )

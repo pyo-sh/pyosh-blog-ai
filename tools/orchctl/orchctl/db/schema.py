@@ -144,6 +144,9 @@ MIGRATIONS: list[tuple[int, str]] = [
         -- Recreate attempts with new status vocabulary.
         -- Old statuses: running, success, failure, cancelled
         -- New statuses: created, running, completed, failed, timed-out
+        -- Note: old 'cancelled' is mapped to 'failed' because the new vocabulary
+        -- does not distinguish cancellation from failure at the attempt level.
+        -- Downstream code must not rely on distinguishing these for pre-v2 rows.
         CREATE TABLE attempts_v2 (
             attempt_id      TEXT    PRIMARY KEY,
             issue_id        INTEGER NOT NULL REFERENCES issues(id),
