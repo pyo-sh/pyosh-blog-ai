@@ -37,6 +37,25 @@
 - **리뷰**: 5라운드 - `_current_version` 공개 API 승격, heartbeats FK 인덱스, `check_same_thread=False` 제거, `run_migrations()` hardcoded constant 수정, try/finally 패턴, 탐지 테스트 추가
 - PR #167 5라운드 리뷰 resolve 완료
 
+## dev-pipeline 4개 버그 수정 (#170, PR #171)
+
+- **배경**: PR #167 (issue #85) 파이프라인 5라운드 실행 중 실증 확인된 4개 버그를 handoff 문서로 인수받아 수정
+- **Bug 1 (Critical) - review-wait pending 분기 누락**:
+  - task-notification 도착 시 `claude -p` 프로세스는 아직 RUNNING → GitHub에 review 없음 → 최하단 fallthrough `escalate`
+  - `_FAILED_STATUSES` 체크 이후 `RUNNING` 분기를 추가하여 `action="pending"` 반환, SKILL.md 테이블에 `pending` 행 추가
+  - 결과: 매 리뷰 라운드마다 수동 개입 필요하던 문제 해소, 파이프라인 자동화 복원
+- **Bug 2 (Medium) - suggestion_only round 카운터 미증가**:
+  - `suggestion_only` 경로에서 `round_num` 그대로 반환하여 실제 회차와 불일치 (2회차→1 반환, 5회차→4 반환)
+  - `"round": round_num` → `"round": round_num + 1` 수정 (state 업데이트는 `suggestion_decide`에서 유지)
+- **Bug 3 (Medium) - review_normalizer 들여쓰기 오파싱**:
+  - `stripped` 기준 `^\d+\.` 매칭으로 들여쓰인 번호 하위 목록을 최상위 항목으로 카운트
+  - 원본 `line`으로 들여쓰기 체크 (`not line.startswith((" ", "\t"))`) 조건 추가
+- **Bug 4 (Low) - suggestion_only data에 reviewBody 없음**:
+  - AI 결정에 리뷰 내용이 필요하지만 counts만 반환하여 `resolve --phase setup` 우회 필요
+  - suggestion_only data에 `"reviewBody": body` 추가
+- **회귀 테스트**: 4개 신규 테스트 추가 (264 → 268 passed)
+- 1라운드 리뷰, 클린 통과, PR #171 머지 완료
+
 ## dev-log detect-context area 검증 (#164, PR #166)
 
 - **문제**: `detect-context`가 `.workspace/worktrees/` 하위 경로만으로 `inRootWorktree: true` 판단하여 client/server worktree에서 false positive 발생. dev-log가 client/server PR branch에 docs를 혼입할 위험
