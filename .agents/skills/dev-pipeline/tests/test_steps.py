@@ -31,6 +31,7 @@ from dev_pipeline.steps import (
     step_resolve_setup,
     step_resolve_finalize,
     step_merge,
+    step_cleanup_wt,
     step_log_finalize,
 )
 
@@ -693,7 +694,7 @@ class TestStepMerge:
         assert result.action == "merged"
 
         state = state_read(42, "workspace", monorepo_root)
-        assert state.step == PipelineStep.LOG
+        assert state.step == PipelineStep.CLEANUP_WT
 
     def test_already_merged(self, monorepo_root, monkeypatch):
         _write_state(
@@ -702,9 +703,13 @@ class TestStepMerge:
         )
 
         monkeypatch.setattr(f"{S}.get_pr_state", lambda *a: "MERGED")
+        monkeypatch.setattr(f"{S}.fetch_prune", lambda *a: None)
 
         result = step_merge(42, "workspace", monorepo_root)
         assert result.action == "already_merged"
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.step == PipelineStep.CLEANUP_WT
 
     def test_closed(self, monorepo_root, monkeypatch):
         _write_state(
@@ -739,15 +744,29 @@ class TestStepMerge:
 # log finalize
 # ---------------------------------------------------------------------------
 
+class TestStepCleanupWt:
+    def test_continue(self, monorepo_root, monkeypatch):
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.CLEANUP_WT,
+            branch="feat/issue-42",
+        )
+
+        monkeypatch.setattr(f"{S}.cleanup_worktree", lambda *a, **kw: None)
+
+        result = step_cleanup_wt(42, "workspace", monorepo_root)
+        assert result.action == "continue"
+
+        state = state_read(42, "workspace", monorepo_root)
+        assert state.step == PipelineStep.LOG
+
+
 class TestLogFinalize:
     def test_done(self, monorepo_root, monkeypatch):
         _write_state(
             monorepo_root, 42, "workspace",
             step=PipelineStep.LOG,
-            branch="feat/issue-42",
         )
-
-        monkeypatch.setattr(f"{S}.cleanup", lambda *a, **kw: None)
 
         result = step_log_finalize(42, "workspace", monorepo_root)
         assert result.action == "done"
