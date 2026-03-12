@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-12 | dev-review + dev-issue SKILL.md 표준화 (#152) - 표준 섹션 순서(Invariants → Environment → Workflow → Constraints) 적용, dev-review `Prohibited`/`Steps` → `Invariants`/`Workflow`, dev-issue `Constraints` → `Invariants` 승격 + Title rules/Labels → `Constraints` 하위 이동 (PR #156) | done |
 | 2026-03-12 | dev-review 자동 게시 + dev-log standalone squash merge 충돌 수정 (#148) - REVIEW_MODE 기본값 publish, `_is_pr_author` verdict 하강, dev-log Phase 0 worktree 컨텍스트 감지; codex `--output-schema` 제거(v0.114.0) → claude 폴백 확인 (PR #149) | done |
 | 2026-03-12 | PR identity metadata + doctor command (#84) - `orch_branch_name()` deterministic branch naming, `_orch_pr_list()` branch>label>body fallback chain, `orch_label_pr()` identity labels, `orch_doctor()` 6-check diagnostics, `issueMetadata` durable PR tracking (PR #145) | done |
 | 2026-03-12 | dispatch_codex structured output (#142) + contract-driven review publisher (#144) - `review_publish.py` CLI(schema 검증+contamination 검사+markdown 렌더링), `review_schema.json` canonical schema, SKILL.md JSON-first flow 전면 개편, codex path publisher 위임, 스킬 최적화(109→42줄), 2라운드 리뷰 resolve; 36 tests (PR #143) | done |
