@@ -13,11 +13,8 @@ def create_worktree(root: str) -> dict:
     return {"worktreePath": wt_path, "branch": branch}
 
 
-def cleanup_worktree(worktree: str, branch: str) -> dict:
+def cleanup_worktree(worktree: str, branch: str, root: str) -> dict:
     """Remove worktree and delete branch."""
-    wt = Path(worktree)
-    # .workspace/worktrees/dev-log-TIMESTAMP -> root is 3 levels up
-    root = str(wt.parent.parent.parent)
     worktree_remove(root, worktree)
     branch_delete(root, branch)
     return {"removed": True}

@@ -8,7 +8,7 @@ def detect_context(cwd: str | None = None) -> dict:
     # Check if under .workspace/worktrees/
     for parent in path.parents:
         worktrees_dir = parent / ".workspace" / "worktrees"
-        if worktrees_dir.exists() and str(path).startswith(str(worktrees_dir)):
+        if worktrees_dir.exists() and path.is_relative_to(worktrees_dir):
             root_repo = parent
             branch = _get_branch(str(path))
             return {

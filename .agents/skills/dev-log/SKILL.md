@@ -61,7 +61,7 @@ Acquires lock, fetches, rebases, fast-forward merges, releases lock. Lock always
 
 ### Phase 6: Cleanup (skip if in worktree)
 
-`python3 -m dev_log cleanup --worktree "$WT" --branch "$BRANCH"`
+`python3 -m dev_log cleanup --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
 
 ## Index update rules
 

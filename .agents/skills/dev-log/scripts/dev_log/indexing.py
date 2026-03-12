@@ -7,7 +7,7 @@ def next_sequence(docs_dir: str, record_type: str) -> dict:
     """Scan directory for NNN-prefixed files, return max+1."""
     d = Path(docs_dir)
     prefix = "findings" if record_type == "findings" else "decision"
-    pattern = re.compile(rf"^{prefix}[-.]?(\d{{3}})")
+    pattern = re.compile(rf"^{prefix}[-.]?(\d{{3,}})")
 
     max_seq = 0
     if d.exists():

@@ -48,6 +48,7 @@ def main():
     p = sub.add_parser("cleanup")
     p.add_argument("--worktree", required=True)
     p.add_argument("--branch", required=True)
+    p.add_argument("--root", required=True)
 
     args = parser.parse_args()
 
@@ -97,7 +98,7 @@ def main():
         elif args.command == "cleanup":
             from .worktree import cleanup_worktree
 
-            _output(cleanup_worktree(args.worktree, args.branch))
+            _output(cleanup_worktree(args.worktree, args.branch, args.root))
 
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)

@@ -17,7 +17,7 @@ def test_create_worktree_naming(mock_add):
 @patch("dev_log.worktree.worktree_remove")
 def test_cleanup_worktree(mock_remove, mock_delete):
     wt = "/root/.workspace/worktrees/dev-log-20260312-120000"
-    result = cleanup_worktree(wt, "dev-log/20260312-120000")
+    result = cleanup_worktree(wt, "dev-log/20260312-120000", "/root")
     assert result == {"removed": True}
     mock_remove.assert_called_once_with("/root", wt)
     mock_delete.assert_called_once_with("/root", "dev-log/20260312-120000")
