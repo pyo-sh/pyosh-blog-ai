@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | orchctl CLI skeleton + SQLite schema (#85) - `tools/orchctl/` Python 패키지, Click CLI(init/status/doctor/reconcile), WAL+FK SQLite schema v1(issues/attempts/heartbeats/leases/config), 마이그레이션 러너, 16 tests, 5라운드 리뷰 (PR #167) | done |
 | 2026-03-13 | dev-pipeline log → merge 순서 변경 (#164) - 상태 머신 `log → merge → done` 재배치로 `lock_merge` 발산 원천 차단 + detect-context area 검증 추가 (PR #165, #166) | done |
 | 2026-03-12 | dev-log Python CLI + SKILL.md thin contract (#153) - dev_log Python 패키지 8모듈, SKILL.md 108→71줄(-34%), 참조 3파일 삭제, AI 컨텍스트 537→211줄(-61%), 22 tests, 4라운드 리뷰 (PR #159) | done |
 | 2026-03-12 | dev-pipeline SKILL.md thin contract 재작성 (#151) - 409→125줄(-69%), bash 블록 26→0, step 서브커맨드+action 테이블 기반 thin contract, #152 표준 섹션 구조 적용, 참조 파일 정리(process-lifecycle step subcommands 추가, recovery v3 간소화, pipeline-audit 삭제) (PR #158) | done |
