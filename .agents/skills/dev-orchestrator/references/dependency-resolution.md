@@ -1,10 +1,32 @@
-# Dependency Resolution
+# Dependency resolution
 
 How the orchestrator builds a DAG from GitHub issue bodies and validates it.
 
-## Issue Body Convention
+## Issue body formats
 
-Issues declare dependencies in a `### Dependencies` section:
+### Fenced orchestrator block (preferred)
+
+Use a fenced code block tagged `orchestrator`. Parser priority: fenced block > `### Dependencies` section > no deps.
+
+```orchestrator
+hard: #12, #15
+soft: #20
+cross-area: server/#30
+cross-area soft: client/#5
+```
+
+| Line prefix | Meaning |
+|-------------|---------|
+| `hard: #N, #M` | In-batch hard dependencies (default). Must complete before downstream dispatches. Failure blocks downstream. |
+| `soft: #N` | In-batch soft dependencies. Downstream proceeds even if dep fails. |
+| `cross-area: area/#N` | Cross-area hard dep (different repo). Downstream -> `blocked-external`. |
+| `cross-area soft: area/#N` | Cross-area soft dep. Treated as always satisfied. |
+
+Multiple issue numbers may appear on one line, comma- or space-separated.
+
+### Legacy `### Dependencies` section (fallback)
+
+Issues without a fenced block fall back to the `### Dependencies` section. All deps parsed here are treated as **hard**.
 
 ```markdown
 ### Dependencies
@@ -23,9 +45,7 @@ Or for no dependencies:
 
 Accepted "no dependency" markers: `없음`, `none`, `N/A`, `no dependencies` (case-insensitive).
 
-## Parsing
-
-`parse-dependencies.sh` fetches the issue body via `gh issue view {N} --json body` and extracts the `### Dependencies` section. It matches any of:
+### Parsed patterns (legacy section)
 
 | Pattern | Example |
 |---------|---------|
@@ -36,72 +56,148 @@ Accepted "no dependency" markers: `없음`, `none`, `N/A`, `no dependencies` (ca
 
 Output: space-separated issue numbers (sorted, deduplicated), or empty string.
 
-## DAG Construction
+## Parsing utilities
+
+### `--parse-typed <issue> [area_dir]`
+
+Returns JSON with type annotations:
+
+```json
+{
+  "hard": [12, 15],
+  "soft": [20],
+  "crossArea": [
+    {"area": "server", "issue": 30, "type": "hard"},
+    {"area": "client", "issue": 5, "type": "soft"}
+  ]
+}
+```
+
+### Default mode `<issue> [area_dir]`
+
+Returns space-separated in-batch dep numbers (legacy, all treated as hard).
+
+## DAG construction
 
 ```bash
-declare -A dag  # dag[N]="dep1 dep2"
+declare -A dag
 
 for N in $ISSUES; do
-  DEPS=$(bash scripts/parse-dependencies.sh "$N" "$AREA_DIR")
-  dag[$N]="$DEPS"
+  TYPED=$(bash scripts/parse-dependencies.sh --parse-typed "$N" "$AREA_DIR")
+  HARD_DEPS=$(echo "$TYPED" | jq -r '.hard[]')
+  SOFT_DEPS=$(echo "$TYPED" | jq -r '.soft[]')
+  dag[$N]="$HARD_DEPS $SOFT_DEPS"
 done
 ```
 
 Convert to JSON for `orch_init`:
 
 ```bash
-# Build dag_json: {"N": [dep1, dep2], ...}
-dag_json="{"
-for N in $ISSUES; do
-  DEPS=$(bash scripts/parse-dependencies.sh "$N" "$AREA_DIR")
-  deps_arr=$(echo "$DEPS" | tr ' ' '\n' | grep -E '^[0-9]+$' | jq -R 'tonumber' | jq -sc '.')
-  dag_json="${dag_json}\"${N}\": ${deps_arr},"
-done
-dag_json="${dag_json%,}}"  # trim trailing comma
+# Build dag_json, dep_types_json, cross_area_deps_json from --parse-typed output.
+# Filter each dep list to in-batch issues only.
+# issues_json must be assigned BEFORE the loop (used inside for in-batch filtering).
 
 issues_json=$(echo "$ISSUES" | tr ' ' '\n' | jq -R 'tonumber' | jq -sc '.')
+
+dag_json="{"
+dep_types_json="{"
+cross_area_deps_json="{"
+for N in $ISSUES; do
+  TYPED=$(bash scripts/parse-dependencies.sh --parse-typed "$N" "$AREA_DIR")
+
+  # In-batch deps (hard + soft combined, filtered to batch)
+  ALL_DEPS=$(echo "$TYPED" | jq --argjson issues_arr "$issues_json" \
+    '[(.hard + .soft)[] | select(. as $d | $issues_arr | any(. == $d))]')
+  dag_json="${dag_json}\"${N}\": ${ALL_DEPS},"
+
+  # Dep types for in-batch deps only
+  TYPES=$(echo "$TYPED" | jq --argjson issues_arr "$issues_json" \
+    '([.hard[] | select(. as $d | $issues_arr | any(. == $d)) | {key: tostring, value: "hard"}] +
+      [.soft[] | select(. as $d | $issues_arr | any(. == $d)) | {key: tostring, value: "soft"}]) |
+     from_entries')
+  dep_types_json="${dep_types_json}\"${N}\": ${TYPES},"
+
+  # Cross-area deps
+  CROSS=$(echo "$TYPED" | jq '.crossArea')
+  cross_area_deps_json="${cross_area_deps_json}\"${N}\": ${CROSS},"
+done
+dag_json="${dag_json%,}}"
+dep_types_json="${dep_types_json%,}}"
+cross_area_deps_json="${cross_area_deps_json%,}}"
+
+orch_init "$AREA" "$AGENT" "$issues_json" "$dag_json" 4 "$dep_types_json" "$cross_area_deps_json"
 ```
 
-## Cycle Detection
+## Dependency semantics
 
-Run Kahn's algorithm via `parse-dependencies.sh --check-cycles`:
+### Hard dependency (default)
+
+| Dep status | Downstream action |
+|------------|------------------|
+| `completed` | Satisfied; unblock downstream |
+| Any terminal non-completed | `blocked-failed-dependency` (terminal; downstream not dispatched) |
+
+Terminal non-completed statuses: `failed`, `skipped_dep_failed`, `blocked-failed-dependency`, `blocked-external`, `cycle-isolated`.
+
+### Soft dependency
+
+| Dep status | Downstream action |
+|------------|------------------|
+| `completed` | Satisfied |
+| Any failure status | Also satisfied (proceeds to `pending`) |
+
+### Cross-area dependency
+
+Deps in a different area repo cannot be tracked by the orchestrator.
+
+| Cross-area dep type | Downstream action |
+|--------------------|------------------|
+| `hard` | `blocked-external` (terminal; requires manual intervention) |
+| `soft` | Treated as always satisfied |
+
+## Cycle detection and SCC isolation
+
+Run `--find-sccs` to identify cycle participants:
 
 ```bash
-bash scripts/parse-dependencies.sh --check-cycles "$issues_json" "$dag_json"
-rc=$?
-if [ $rc -eq 1 ]; then
-  echo "ERROR: Circular dependency detected. Aborting." >&2
-  exit 1
-fi
+scc_json=$(bash scripts/parse-dependencies.sh --find-sccs "$issues_json" "$dag_json")
+# {"hasCycle": true, "sccNodes": [12, 15]}
 ```
 
-## Initial Status Assignment
+`orch_init` calls `--find-sccs` internally. Issues in cycles get `cycle-isolated` status (terminal). Non-cycle issues proceed normally - the whole batch is not aborted.
 
-After DAG construction, assign initial status to each issue:
+The `--check-cycles` mode (backward compat) still exits 1 on any cycle; prefer `--find-sccs` for new code.
 
-| Condition | Initial Status |
+## Initial status assignment
+
+After DAG construction, `orch_init` assigns initial status:
+
+| Condition | Initial status |
 |-----------|---------------|
-| `dag[N]` is empty | `pending` |
-| `dag[N]` has one or more deps | `blocked` |
+| Issue in SCC cycle | `cycle-isolated` |
+| Has in-batch deps (hard or soft) | `blocked` |
+| No in-batch deps, has cross-area hard deps | `blocked-external` |
+| No deps (or only soft cross-area) | `pending` |
 
-Issues already in `.workspace/pipeline/{area}/issue-N.state.json` → skip (already running).
+Issues already in `.workspace/pipeline/{area}/issue-N.state.json` -> skip (already running).
 
-## Dependency satisfaction and failed dependency propagation
+## Dependency satisfaction and unblocking
 
-An issue transitions from `blocked` when all its dependencies reach a terminal state:
+`orch_unblock()` is called on every completion event. For each `blocked` issue:
 
-| All deps | Transition |
-|----------|------------|
-| All `completed` | `blocked` -> `pending` (ready to dispatch) |
-| All resolved, >= 1 `failed` or `skipped_dep_failed` | `blocked` -> `skipped_dep_failed` |
+1. Any dep still non-terminal -> remain `blocked`
+2. All deps terminal, >= 1 hard dep failed -> `blocked-failed-dependency`
+3. All deps terminal, no hard failures -> check cross-area hard deps:
+   - Has cross-area hard deps -> `blocked-external`
+   - No cross-area hard deps -> `pending`
 
-`skipped_dep_failed` is a terminal state. The issue is NOT dispatched, but it still
-triggers `orch_unblock` for downstream issues (propagating the skip).
+Soft dep failures are ignored (treated as satisfied).
 
-`orch_unblock()` in `orchestrate-helpers.sh` automates this check on each completion event.
+`skipped_dep_failed` is a legacy terminal status kept for backward compat with existing state files. It is equivalent to `blocked-failed-dependency`.
 
-## Edge Cases
+## Edge cases
 
-- **Issue not in batch**: If a dependency references an issue not in the current batch, `orch_init` auto-filters it out (only in-batch dependencies are stored in the DAG). A warning is logged but the issue proceeds as if that dependency doesn't exist.
-- **Self-dependency**: `dag[N]` containing N itself → caught by cycle detection.
-- **Empty `### Dependencies` section**: Treated as no dependencies → `pending`.
+- **Issue not in batch**: Out-of-batch deps are filtered from the DAG. A warning is logged; the issue proceeds as if that dependency doesn't exist.
+- **Self-dependency**: `dag[N]` containing N itself -> caught by SCC detection -> `cycle-isolated`.
+- **Empty `### Dependencies` section**: Treated as no dependencies -> `pending`.
+- **Mixed in-batch + cross-area hard**: Issue is `blocked` initially; after in-batch deps resolve, becomes `blocked-external` if all in-batch satisfied.

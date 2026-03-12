@@ -195,15 +195,23 @@ pending
                    +-(stall + dead + exhausted)-----> failed
 
 blocked
-  +-(all deps completed)--------------------> pending
-  +-(all deps resolved, >= 1 failed)--------> skipped_dep_failed
+  +-(all deps resolved, no hard failure, no cross-area hard)-> pending
+  +-(all deps resolved, >= 1 hard dep failed)----------------> blocked-failed-dependency
+  +-(all deps resolved, no hard failure, cross-area hard)----> blocked-external
 
-completed  --(triggers orch_unblock)
-failed     --(triggers orch_unblock, may produce skipped_dep_failed)
-skipped_dep_failed --(triggers orch_unblock for downstream)
+cycle-isolated  (set at orch_init; issue participates in a dependency cycle)
+
+completed       --(triggers orch_unblock)
+failed          --(triggers orch_unblock; hard dep -> blocked-failed-dependency, soft dep OK)
+skipped_dep_failed (legacy) --(triggers orch_unblock for downstream; equivalent to blocked-failed-dependency)
+blocked-failed-dependency   --(triggers orch_unblock for downstream)
+blocked-external            --(terminal; cross-area hard dep; requires manual intervention)
+cycle-isolated              --(terminal; issue is in a dependency cycle)
 ```
 
-Terminal states: `completed`, `failed`, `skipped_dep_failed`.
+Terminal states: `completed`, `failed`, `skipped_dep_failed` (legacy), `blocked-failed-dependency`, `blocked-external`, `cycle-isolated`.
+
+Non-terminal (active) states: `pending`, `blocked`, `dispatched`.
 
 ## Provider health
 

@@ -68,13 +68,25 @@ orch_branch_name() {
 }
 
 orch_init() {
-  # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent]
+  # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent] [dep_types_json] [cross_area_deps_json]
   # Creates initial batch state file.
+  #
+  # dep_types_json (optional): {"issue_n": {"dep_m": "hard"|"soft"}}
+  #   Dep type per issue->dep pair. Defaults to "hard" when absent.
+  #
+  # cross_area_deps_json (optional): {"issue_n": [{"area":A,"issue":N,"type":"hard"|"soft"},...]}
+  #   Cross-area deps that the orchestrator cannot track automatically.
+  #   Hard cross-area deps set status to blocked-external.
+  #   Soft cross-area deps are treated as always satisfied.
+  #
+  # Cycle detection: SCCs are isolated (cycle-isolated status) instead of aborting.
   local area=$1
   local agent=$2
   local issues_json=$3  # JSON array e.g. '[1,2,3]'
   local dag_json=$4     # JSON object e.g. '{"3":[1,2]}'
   local max_concurrent=${5:-4}
+  local dep_types_json="${6:-{}}"
+  local cross_area_deps_json="${7:-{}}"
 
   mkdir -p "$ORCH_BASE/$area"
 
@@ -85,6 +97,7 @@ orch_init() {
 
   # Filter DAG: remove deps not in the batch to prevent permanent blocks.
   # External deps (closed issues, out-of-batch) are treated as already satisfied.
+  # Cross-area deps are handled separately via cross_area_deps_json.
   local filtered_dag
   filtered_dag=$(jq -n \
     --argjson issues "$issues_json" \
@@ -93,26 +106,53 @@ orch_init() {
      | map(.value |= map(select(. as $d | $issues | any(. == $d))))
      | from_entries')
 
-  # Build initial status: pending for issues with no deps, blocked otherwise
+  # SCC isolation: detect cycle nodes and mark them cycle-isolated instead of aborting.
+  local scc_json scc_nodes
+  scc_json=$(bash "$_ORCH_HELPERS_DIR/parse-dependencies.sh" \
+    --find-sccs "$issues_json" "$filtered_dag" 2>/dev/null) \
+    || scc_json='{"hasCycle":false,"sccNodes":[]}'
+  scc_nodes=$(echo "$scc_json" | jq '.sccNodes // []')
+  local has_cycle
+  has_cycle=$(echo "$scc_json" | jq -r '.hasCycle // false')
+  if [ "$has_cycle" = "true" ]; then
+    local cycle_count
+    cycle_count=$(echo "$scc_nodes" | jq 'length')
+    >&2 echo "[orchestrator] WARNING: Cycle detected — isolating ${cycle_count} issue(s): $(echo "$scc_nodes" | jq -r '.[]' | tr '\n' ' ')"
+    >&2 echo "[orchestrator] Non-cycle issues will proceed normally."
+  fi
+
+  # Build initial status per issue:
+  #   cycle-isolated   — issue is in an SCC cycle
+  #   blocked          — has in-batch deps (hard or soft; wait for them to finish)
+  #   blocked-external — no in-batch deps but has cross-area hard deps (can't track externally)
+  #   pending          — no blocking deps
   local status_json
   status_json=$(jq -n \
     --argjson issues "$issues_json" \
     --argjson dag "$filtered_dag" \
+    --argjson cross_area_deps "$cross_area_deps_json" \
+    --argjson scc_nodes "$scc_nodes" \
     'reduce $issues[] as $n ({};
        . + {($n|tostring):
-         (if ($dag[($n|tostring)] // []) | length > 0
-          then "blocked" else "pending" end)})')
+         (if ($scc_nodes | any(. == $n)) then "cycle-isolated"
+          elif (($dag[($n|tostring)] // []) | length > 0) then "blocked"
+          elif (($cross_area_deps[($n|tostring)] // [])
+                | map(select(.type == "hard")) | length > 0) then "blocked-external"
+          else "pending" end)})')
 
   jq -n \
     --arg area "$area" \
     --arg batchId "$batch_id" \
     --argjson issues "$issues_json" \
     --argjson dag "$filtered_dag" \
+    --argjson dagTypes "$dep_types_json" \
+    --argjson crossAreaDeps "$cross_area_deps_json" \
     --argjson status "$status_json" \
     --arg agent "$agent" \
     --argjson maxConcurrent "$max_concurrent" \
     --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{area: $area, batchId: $batchId, issues: $issues, dag: $dag,
+      dagTypes: $dagTypes, crossAreaDeps: $crossAreaDeps,
       status: $status, dispatched: {}, issueMetadata: {},
       agent: $agent, maxConcurrent: $maxConcurrent,
       providers: {github: {status: "healthy", consecutiveFailures: 0,
@@ -171,7 +211,8 @@ orch_state_update() {
 
 orch_status_set() {
   # Usage: orch_status_set <area> <issue> <status>
-  # Valid statuses: pending | blocked | dispatched | completed | failed | skipped_dep_failed
+  # Valid statuses: pending | blocked | dispatched | completed | failed |
+  #   skipped_dep_failed (legacy) | blocked-failed-dependency | blocked-external | cycle-isolated
   local area=$1
   local issue=$2
   local status=$3
@@ -1063,19 +1104,33 @@ orch_detect_stall() {
 
 orch_unblock() {
   # Usage: orch_unblock <area> <completed_issue>
-  # Finds issues that were blocked only by completed_issue and updates status:
-  #   - All deps completed -> pending (ready to dispatch)
-  #   - All deps resolved but >= 1 failed -> skipped_dep_failed (not dispatched)
-  # stdout: space-separated list of newly-unblocked issue numbers
+  # Finds issues blocked by completed_issue and updates their status.
+  #
+  # Dep type semantics (from dagTypes in state):
+  #   hard (default): dep must complete; failure -> blocked-failed-dependency
+  #   soft:           dep failure is OK; downstream proceeds to pending
+  #
+  # After all in-batch deps resolve, cross-area hard deps are checked:
+  #   blocked-external — has cross-area hard deps (orchestrator cannot track them)
+  #   pending          — no blocking deps remain
+  #
+  # Terminal dep statuses (won't make further progress):
+  #   completed | failed | skipped_dep_failed | blocked-failed-dependency |
+  #   blocked-external | cycle-isolated
+  #
+  # stdout: space-separated list of issues that transitioned out of blocked.
+  #   Includes pending, blocked-failed-dependency, and blocked-external.
+  #   Callers must filter on status==pending before dispatching.
   local area=$1
   local done_issue=$2
 
   local state
   state=$(orch_state_read "$area")
 
-  local dag
+  local dag dag_types cross_area_deps all_issues
   dag=$(echo "$state" | jq -r '.dag')
-  local all_issues
+  dag_types=$(echo "$state" | jq -r '.dagTypes // {}')
+  cross_area_deps=$(echo "$state" | jq -r '.crossAreaDeps // {}')
   all_issues=$(echo "$state" | jq -r '.issues[]')
 
   local unblocked=""
@@ -1088,23 +1143,45 @@ orch_unblock() {
     deps=$(echo "$dag" | jq -r ".[\"$n\"] // [] | .[]")
 
     local still_blocked=0
-    local has_failed_dep=0
+    local has_hard_failed_dep=0
     for dep in $deps; do
       local dep_status
       dep_status=$(echo "$state" | jq -r ".status[\"$dep\"]")
-      if [ "$dep_status" = "failed" ] || [ "$dep_status" = "skipped_dep_failed" ]; then
-        has_failed_dep=1
-      elif [ "$dep_status" != "completed" ]; then
-        still_blocked=1
-        break
-      fi
+      case "$dep_status" in
+        completed)
+          # Hard or soft dep completed successfully — always satisfied.
+          ;;
+        failed|skipped_dep_failed|blocked-failed-dependency|blocked-external|cycle-isolated)
+          # Dep is terminal but did not complete successfully.
+          # Check dep type: hard failure propagates, soft failure is OK.
+          local dep_type
+          dep_type=$(echo "$dag_types" | jq -r ".[\"$n\"][\"$dep\"] // \"hard\"")
+          if [ "$dep_type" = "hard" ]; then
+            has_hard_failed_dep=1
+          fi
+          # soft dep failure: treated as satisfied, no action needed
+          ;;
+        *)
+          # Dep is not yet terminal (pending/blocked/dispatched etc.).
+          still_blocked=1
+          break
+          ;;
+      esac
     done
 
     if [ "$still_blocked" -eq 0 ]; then
-      if [ "$has_failed_dep" -eq 1 ]; then
-        orch_status_set "$area" "$n" "skipped_dep_failed"
+      if [ "$has_hard_failed_dep" -eq 1 ]; then
+        orch_status_set "$area" "$n" "blocked-failed-dependency"
       else
-        orch_status_set "$area" "$n" "pending"
+        # All in-batch deps satisfied; check for cross-area hard deps.
+        local has_cross_area_hard
+        has_cross_area_hard=$(echo "$cross_area_deps" | \
+          jq -r ".[\"$n\"] // [] | map(select(.type == \"hard\")) | length > 0")
+        if [ "$has_cross_area_hard" = "true" ]; then
+          orch_status_set "$area" "$n" "blocked-external"
+        else
+          orch_status_set "$area" "$n" "pending"
+        fi
       fi
       unblocked="$unblocked $n"
     fi
@@ -1430,7 +1507,8 @@ orch_doctor() {
       continue
     fi
     case "$status" in
-      pending|blocked|dispatched|completed|failed|skipped_dep_failed) ;;
+      pending|blocked|dispatched|completed|failed|\
+      skipped_dep_failed|blocked-failed-dependency|blocked-external|cycle-isolated) ;;
       *)
         echo "  [FAIL] Issue #${issue}: invalid status '${status}'"
         issues_found=1
