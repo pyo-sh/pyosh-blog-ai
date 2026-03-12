@@ -66,6 +66,9 @@ case "$event" in
   UserPromptSubmit)
     task=$(printf '%s' "$input" | jq -r '
       .prompt // "" |
+      gsub("\\u001b\\[[0-9;?]*[A-Za-z]"; "") |
+      gsub("\\u001b][^\u0007]*\u0007"; "") |
+      gsub("\\u001b."; "") |
       gsub("\n"; " ") | gsub("  +"; " ") |
       gsub("[[:cntrl:]]"; "") |
       ltrimstr(" ") | rtrimstr(" ") |
@@ -111,6 +114,9 @@ case "$event" in
           TaskUpdate:   .taskId
         } | .[$tn] // "" |
         tostring |
+        gsub("\\u001b\\[[0-9;?]*[A-Za-z]"; "") |
+        gsub("\\u001b][^\u0007]*\u0007"; "") |
+        gsub("\\u001b."; "") |
         gsub("\n"; " ") | gsub("  +"; " ") |
         gsub("[[:cntrl:]]"; "") |
         ltrimstr(" ") | rtrimstr(" ")
