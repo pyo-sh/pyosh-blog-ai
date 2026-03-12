@@ -4,7 +4,7 @@ import argparse, json, subprocess, sys
 
 
 def cmd_push(args):
-    subprocess.run(["git", "-C", args.worktree, "push", "-u", "origin", args.branch], check=True)
+    subprocess.run(["git", "-C", args.worktree, "push", "-u", "origin", args.branch], check=True, capture_output=True)
     json.dump({"pushed": True, "branch": args.branch}, sys.stdout)
 
 

@@ -11,8 +11,8 @@ def main():
     args = p.parse_args()
 
     subprocess.run(["git", "-C", args.repo_dir, "worktree", "remove", args.worktree], check=True)
-    subprocess.run(["git", "-C", args.repo_dir, "branch", "-d", args.branch], check=False)
-    json.dump({"removed": True}, sys.stdout)
+    result = subprocess.run(["git", "-C", args.repo_dir, "branch", "-d", args.branch], check=False)
+    json.dump({"removed": True, "branch_deleted": result.returncode == 0}, sys.stdout)
 
 
 if __name__ == "__main__":
