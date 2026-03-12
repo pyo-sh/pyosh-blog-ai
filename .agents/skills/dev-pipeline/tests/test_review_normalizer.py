@@ -149,6 +149,22 @@ def test_dataclass_fields():
     assert counts.suggestion == 3
 
 
+def test_indented_sub_list_not_counted_as_new_item():
+    """Bug 3 fix: indented numbered sub-list items must not be counted as top-level items."""
+    body = """## Review Summary
+
+### Suggestion
+
+1. doctor.py - Connection not closed properly
+   1. schema_ver == 0 raises an unhandled error
+   2. If _check_orphan fails, connection leaks
+2. test_cli.py - No tests for the new CLI commands
+
+"""
+    counts = parse_review_body(body)
+    assert counts.suggestion == 2
+
+
 # --- normalize_codex_output tests ---
 
 
