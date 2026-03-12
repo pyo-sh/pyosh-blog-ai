@@ -56,6 +56,28 @@
 - **회귀 테스트**: 4개 신규 테스트 추가 (264 → 268 passed)
 - 1라운드 리뷰, 클린 통과, PR #171 머지 완료
 
+## orchctl core state machine Python 이전 + 기본 테스트 (#86, PR #172)
+
+- **목적**: issue lifecycle과 attempt tracking의 핵심 상태 전이 로직을 Python으로 이전하고, 기본 테스트 작성 (Stage 2)
+- **구현**: `tools/orchctl/` 2개 모듈 + schema migration v2
+  - `models.py`: `IssueState`/`AttemptStatus`/`DependencyType` str enums, `ISSUE_TRANSITIONS`/`ATTEMPT_TRANSITIONS` frozenset 맵, `TERMINAL_*` 집합
+  - `state_machine.py`: `InvalidTransitionError`/`StaleStateError` 예외 클래스, `transition_issue`/`transition_attempt`(pure), `resolve_blocked_issue`(dep 타입별 분기), `try_acquire_lease`(DELETE + INSERT ON CONFLICT DO UPDATE WHERE), `release_lease`, `can_dispatch`, `apply_issue_transition`/`apply_attempt_transition`(optimistic-lock predicate)
+  - `db/schema.py` migration v2: `issues` 상태 어휘 확장(pending/dispatched/completed/failed-terminal/needs-human/blocked-external/cancelled/blocked/blocked-failed-dependency), `attempts` 상태 어휘 교체(created/running/completed/failed/timed-out), 데이터 마이그레이션(running→dispatched, done→completed 등), `idx_issues_state` 인덱스 추가
+- **테스트**: `tests/test_state_machine.py` 신규 - 93 tests pass 전체 (90 state machine)
+  - issue/attempt 전이 유효성(모든 edge), 잘못된 전이 거부, `StaleStateError` vs `InvalidTransitionError` 구분
+  - `resolve_blocked_issue`: soft/hard dep, NEEDS_HUMAN/BLOCKED_FAILED_DEP 포함 모든 terminal state
+  - `apply_*_transition` DB-backed optimistic-lock, 누락 row ValueError
+  - `can_dispatch` 상태별 eligibility, 중복 dispatch 방지
+  - Reconcile idempotency (3회 반복 안정), golden-path integration (register→dispatch→complete→unblock)
+  - Lease conflict: acquire/renew/release/expire/다중 area 독립성
+- **리뷰 주요 수정 (5라운드)**:
+  - R1: `has_failure` NEEDS_HUMAN 누락(hard dep → 모든 non-completed terminal을 failure로 처리), `INSERT OR IGNORE` → renewal 지원 upsert
+  - R2: `apply_*_transition` non-atomic SELECT+UPDATE → `WHERE ... AND state=?` predicate + rowcount 체크, `idx_issues_state` 인덱스 추가
+  - R3: terminal state comment에 deferred retry path 명시(retry_budget 컬럼 예약), UPSERT CASE ELSE dead branch 제거
+  - R4: `StaleStateError` 신규 예외 클래스(optimistic-lock race용), `conn` fixture `return` → `yield` + `conn.close()` teardown
+  - R5: suggestion_only (1-line doc) → auto-merge
+- PR #172 5라운드 리뷰 resolve 완료, squash merge
+
 ## dev-log detect-context area 검증 (#164, PR #166)
 
 - **문제**: `detect-context`가 `.workspace/worktrees/` 하위 경로만으로 `inRootWorktree: true` 판단하여 client/server worktree에서 false positive 발생. dev-log가 client/server PR branch에 docs를 혼입할 위험
