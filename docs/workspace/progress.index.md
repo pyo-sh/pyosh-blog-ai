@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | hard/soft dependency + cross-area policy (#90) - fenced orchestrator 블록 파서, `--parse-typed`/`--find-sccs` 모드, SCC cycle 격리, `blocked-failed-dependency`/`blocked-external`/`cycle-isolated` 신규 상태, 25 tests (PR #176) | done |
 | 2026-03-13 | agent-tracker sidecar v2 + immediate cutover (#109) - schema_version/session_name/tmux_server 필드 추가, socket-hash/session/pane 3레벨 namespace로 변경, v1 flat 파일 자동 정리, source precedence 문서화 (PR #175) | done |
 | 2026-03-13 | agent-tracker Bash safety hotfix (#108) - @tsv 필드 밀림(RS=\x1e+base64), dead orchestrator [DEAD] 표시, 토큰 0/0 unknown, done 체크 무조건화, pane_id guard, stale/fault/dead 분리 (PR #174) | done |
 | 2026-03-13 | orchctl leader lease + dispatch idempotency (#87) - schema migration v3 (heartbeat_at + unique partial index), db/lease.py 신규(acquire/renew/release/cleanup_stale/has_active_attempt), reconcile version guard + per-issue renew, 41 new tests, 8라운드 리뷰 (PR #173) | done |

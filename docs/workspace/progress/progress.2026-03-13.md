@@ -1,5 +1,20 @@
 # Progress 2026-03-13
 
+## Hard/soft dependency + cross-area policy (#90, PR #176)
+
+- **목적**: dev-orchestrator Stage 2 - dependency 유형을 hard/soft로 구분하고 cross-area 및 SCC cycle 격리 정책 정의
+- **구현**:
+  - `parse-dependencies.sh`: `--parse-typed` 모드 신규 (fenced orchestrator 블록 우선 파싱, `### Dependencies` fallback) - JSON 반환 `{hard:[...], soft:[...], crossArea:[...]}`
+  - `parse-dependencies.sh`: `--find-sccs` 모드 신규 - BFS 기반 정확한 SCC cycle 노드 검출 (downstream 의존 노드 미포함)
+  - `orchestrate-helpers.sh`: `orch_init` SCC 격리(`cycle-isolated` 상태 부여, 배치 전체 abort 대신), `dagTypes`/`crossAreaDeps` 상태 필드 추가, cross-area hard dep -> `blocked-external` 초기화
+  - `orchestrate-helpers.sh`: `orch_unblock` dep-type-aware 분기 - hard dep 실패 -> `blocked-failed-dependency`, soft dep 실패 -> `pending`, cross-area hard dep -> `blocked-external`
+  - 신규 terminal 상태: `blocked-failed-dependency`, `blocked-external`, `cycle-isolated` (`orch_doctor` 검증 포함)
+  - `orch_init` 선택적 파라미터 6번/7번으로 backward compat 유지 (`skipped_dep_failed` legacy 유지)
+- **Fenced block 형식**: ````orchestrator` 블록 - `hard:`, `soft:`, `cross-area:`, `cross-area soft:` 라인
+- **테스트**: `test-dep-policy.sh` 25개 - mock `gh`로 실제 `--parse-typed` 호출, `orch_unblock` 통합 6케이스, `--find-sccs` cycle 격리 검증
+- **리뷰 수정**: doc 예제 `issues_json` 루프 전 선언 오류 수정, test 1 inline jq → 실제 스크립트 호출, 테스트 5-7 `orch_unblock` 통합 테스트로 교체
+- 2라운드 리뷰, PR #176 머지 완료
+
 ## orchctl leader lease + dispatch idempotency (#87, PR #173)
 
 - **목적**: 다중 프로세스 환경에서 reconcile 루프 중복 실행 방지 및 attempt 중복 dispatch 차단
