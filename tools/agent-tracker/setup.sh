@@ -155,6 +155,18 @@ printf 'Restart Claude Code sessions for hooks to take effect.\n'
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SIDECAR_DIR="$REPO_ROOT/.workspace/agent-tracker"
 mkdir -p "$SIDECAR_DIR"
-printf 'Sidecar directory: %s\n' "$SIDECAR_DIR"
+printf 'Sidecar directory (v2 namespace): %s/{socket-hash}/{session}/{pane}.json\n' "$SIDECAR_DIR"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Migrate: remove v1 flat sidecar files (*.json directly under sidecar dir)
+# v2 uses subdirs, so flat files are stale remnants from the old schema
+# ─────────────────────────────────────────────────────────────────────────────
+v1_files=("$SIDECAR_DIR"/*.json)
+if [[ -f "${v1_files[0]:-}" ]]; then
+  printf 'Removing v1 flat sidecar files...\n'
+  for f in "${v1_files[@]}"; do
+    [[ -f "$f" ]] && rm -f "$f" && printf '  removed: %s\n' "$(basename "$f")"
+  done
+fi
 
 printf '\nDone.\n'
