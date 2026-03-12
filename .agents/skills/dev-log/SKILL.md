@@ -22,7 +22,7 @@ Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md
 
 ### Phase 0: Detect context
 
-`python3 -m dev_log detect-context [--cwd "$WT"]`
+`python3 -m dev_log detect-context` (uses cwd; pass `--cwd "$WT"` if a worktree path is known)
 
 - `inRootWorktree: true` - skip Phase 1, 5, 6. Push to PR branch after Phase 4.
 - `inRootWorktree: false` - full standalone flow (Phase 1-6).
