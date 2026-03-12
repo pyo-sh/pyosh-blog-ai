@@ -14,7 +14,7 @@ def _check_diff(root: str) -> dict:
     """Check if docs branch has commits ahead of main."""
     run(["git", "-C", root, "fetch", "origin", "main", "docs"])
     result = run(
-        ["git", "-C", root, "log", "main..origin/docs", "--oneline"],
+        ["git", "-C", root, "log", "origin/main..origin/docs", "--oneline"],
         check=False,
     )
     lines = [l for l in result.stdout.strip().splitlines() if l]

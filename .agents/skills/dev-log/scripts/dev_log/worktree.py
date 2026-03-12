@@ -18,7 +18,6 @@ def ensure_docs_branch(root: str) -> dict:
         fetch(root, ref="docs")
         return {"created": False}
     create_branch_from(root, "docs", "origin/main")
-    from .git_ops import push
     from .command_runner import run
 
     run(["git", "-C", root, "push", "origin", "docs"])
