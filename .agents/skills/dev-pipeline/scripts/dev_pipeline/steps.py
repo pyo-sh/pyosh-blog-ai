@@ -534,7 +534,8 @@ def step_resolve_finalize(issue: int, area: str, monorepo_root: Path) -> StepRes
 
     if has_staged_changes(str(wt)):
         commit(str(wt), f"fix: address review comments (#{issue})")
-        push_safely(str(wt))
+
+    push_safely(str(wt))  # always push — ensures remote is in sync even if AI committed directly
 
     # Always read current HEAD - AI may have committed directly before finalize
     new_sha = rev_parse_head(str(wt))
