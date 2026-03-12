@@ -46,6 +46,25 @@ def push(worktree: str) -> str:
     return branch
 
 
+def push_to_docs(worktree: str) -> None:
+    """Push the worktree HEAD to the remote docs branch."""
+    run(["git", "-C", worktree, "push", "origin", "HEAD:docs"])
+
+
+def branch_exists_remote(repo_dir: str, branch: str) -> bool:
+    """Check if a branch exists on the remote."""
+    result = run(
+        ["git", "-C", repo_dir, "ls-remote", "--heads", "origin", branch],
+        check=False,
+    )
+    return bool(result.stdout.strip())
+
+
+def create_branch_from(repo_dir: str, branch: str, base: str) -> None:
+    """Create a local branch from a given base ref."""
+    run(["git", "-C", repo_dir, "branch", branch, base])
+
+
 def current_branch(repo_dir: str) -> str:
     return run(
         ["git", "-C", repo_dir, "rev-parse", "--abbrev-ref", "HEAD"]

@@ -12,9 +12,9 @@ def main():
     parser = argparse.ArgumentParser(prog="dev_log")
     sub = parser.add_subparsers(dest="command")
 
-    # detect-context
-    p = sub.add_parser("detect-context")
-    p.add_argument("--cwd", default=None)
+    # ensure-branch
+    p = sub.add_parser("ensure-branch")
+    p.add_argument("--root", required=True)
 
     # create-worktree
     p = sub.add_parser("create-worktree")
@@ -35,12 +35,8 @@ def main():
     p.add_argument("--worktree", required=True)
     p.add_argument("--message", required=True)
 
-    # push
-    p = sub.add_parser("push")
-    p.add_argument("--worktree", required=True)
-
-    # lock-merge
-    p = sub.add_parser("lock-merge")
+    # merge-to-docs
+    p = sub.add_parser("merge-to-docs")
     p.add_argument("--worktree", required=True)
     p.add_argument("--branch", required=True)
     p.add_argument("--root", required=True)
@@ -58,10 +54,10 @@ def main():
         sys.exit(1)
 
     try:
-        if args.command == "detect-context":
-            from .context import detect_context
+        if args.command == "ensure-branch":
+            from .worktree import ensure_docs_branch
 
-            _output(detect_context(args.cwd))
+            _output(ensure_docs_branch(args.root))
 
         elif args.command == "create-worktree":
             from .worktree import create_worktree
@@ -85,16 +81,10 @@ def main():
             sha = commit(args.worktree, args.message)
             _output({"sha": sha})
 
-        elif args.command == "push":
-            from .git_ops import push
+        elif args.command == "merge-to-docs":
+            from .merge import merge_to_docs
 
-            branch = push(args.worktree)
-            _output({"branch": branch})
-
-        elif args.command == "lock-merge":
-            from .merge import lock_merge
-
-            _output(lock_merge(args.worktree, args.branch, args.root))
+            _output(merge_to_docs(args.worktree, args.branch, args.root))
 
         elif args.command == "cleanup":
             from .worktree import cleanup_worktree
