@@ -215,6 +215,22 @@ _VERDICT_TO_ACTION = {
 }
 
 
+def _is_pr_author(repo: str, pr: int) -> bool:
+    """Return True if the current gh-authenticated user is the PR author."""
+    try:
+        me = subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        author = subprocess.run(
+            ["gh", "pr", "view", str(pr), "-R", repo, "--json", "author", "--jq", ".author.login"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return bool(me and author and me == author)
+    except subprocess.CalledProcessError:
+        return False
+
+
 def publish_to_github(repo: str, pr: int, body: str, verdict: str) -> int:
     """Post review to GitHub via gh CLI. Returns exit code."""
     action = _VERDICT_TO_ACTION[verdict]
@@ -301,7 +317,15 @@ def main(argv: list[str] | None = None) -> int:
         print(rendered)
         return 0
 
-    rc = publish_to_github(args.repo, args.pr, rendered, payload["verdict"])
+    effective_verdict = payload["verdict"]
+    if effective_verdict != "comment" and _is_pr_author(args.repo, args.pr):
+        print(
+            f"reviewer is PR author - downgrading verdict from {effective_verdict!r} to 'comment'",
+            file=sys.stderr,
+        )
+        effective_verdict = "comment"
+
+    rc = publish_to_github(args.repo, args.pr, rendered, effective_verdict)
     if rc == 0:
         print(f"published review to {args.repo}#{args.pr}", file=sys.stderr)
     return rc
