@@ -194,4 +194,17 @@ MIGRATIONS: list[tuple[int, str]] = [
         CREATE INDEX idx_issues_state ON issues(state);
         """,
     ),
+    (
+        3,
+        """
+        -- v3: add heartbeat_at to leases; unique partial index on active attempts
+        ALTER TABLE leases ADD COLUMN heartbeat_at TEXT;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_active_unique
+        ON attempts(issue_id)
+        WHERE status = 'running';
+        """,
+    ),
 ]
+
+LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
