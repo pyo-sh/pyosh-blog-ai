@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orchctl"
+version = "0.1.0"
+description = "Orchestrator controller CLI for pyosh-blog"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+]
+
+[project.scripts]
+orchctl = "orchctl.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["orchctl*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
