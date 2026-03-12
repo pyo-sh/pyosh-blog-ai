@@ -50,6 +50,14 @@
   - `references/pipeline-audit.md` 삭제 (모든 항목 해결 완료)
 
 
+- [x] dev-log Python CLI + SKILL.md thin contract (#153, PR #159)
+  - Self-contained `dev_log` Python CLI package (8 modules: cli, command_runner, context, git_ops, indexing, merge, worktree)
+  - SKILL.md 108줄 → 71줄(-34%), 참조 파일 3개 삭제(worktree-merge.md, indexing-strategy.md, examples.md), templates.md 유지
+  - AI 컨텍스트 로딩: 537줄 → 211줄(-61% 토큰 감소)
+  - 주요 CLI 서브커맨드: detect-context, create-worktree, next-seq, check-progress, commit, push, lock-merge, cleanup
+  - lock_merge main branch guard, `Path.is_relative_to` 정확한 경로 포함 검사, `\d{3,}` 시퀀스 >= 1000 지원
+  - 22 tests (context 4, indexing 7, merge 6, worktree 2, git_ops 3), 4라운드 리뷰 통과
+
 ## Discoveries
 - `gh pr edit --body-file` 실패: GitHub Projects Classic deprecation 에러 발생 시 GraphQL `updatePullRequest` mutation으로 우회
 

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-12 | dev-log Python CLI + SKILL.md thin contract (#153) - dev_log Python 패키지 8모듈, SKILL.md 108→71줄(-34%), 참조 3파일 삭제, AI 컨텍스트 537→211줄(-61%), 22 tests, 4라운드 리뷰 (PR #159) | done |
 | 2026-03-12 | dev-pipeline SKILL.md thin contract 재작성 (#151) - 409→125줄(-69%), bash 블록 26→0, step 서브커맨드+action 테이블 기반 thin contract, #152 표준 섹션 구조 적용, 참조 파일 정리(process-lifecycle step subcommands 추가, recovery v3 간소화, pipeline-audit 삭제) (PR #158) | done |
 | 2026-03-12 | dev-pipeline Python CLI step subcommand + bug fixes (#150) - `steps.py` 9개 step 함수 + `StepResult` 라우팅 데이터클래스, `step` CLI 서브커맨드, codex `--output-schema` → `--output-last-message` (v0.114.0), 전체 `failed_*` 상태 codex→claude 폴백, `init --issue` 상태 파일 생성; 37 new tests, 258 total (PR #157) | done |
 | 2026-03-12 | dev-review + dev-issue SKILL.md 표준화 (#152) - 표준 섹션 순서(Invariants → Environment → Workflow → Constraints) 적용, dev-review `Prohibited`/`Steps` → `Invariants`/`Workflow`, dev-issue `Constraints` → `Invariants` 승격 + Title rules/Labels → `Constraints` 하위 이동 (PR #156) | done |
