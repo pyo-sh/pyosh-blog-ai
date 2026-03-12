@@ -10,15 +10,21 @@ description: >
 
 Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
 
+## Invariants
+
+1. Never modify/delete `pending` or `deferred` decision files.
+2. Always get user approval before creating Issues.
+3. Always use `--repo` flag for `gh` commands.
+
 ## Workflow
 
-### 1. Determine Source & Area
+### 1. Determine source & area
 
 Use argument if provided. Otherwise ask the user:
 - **Source**: decisions / plans / direct request
 - **Area**: client / server / workspace
 
-### 2. Gather Content
+### 2. Gather content
 
 **decisions/**: Read `docs/{area}/decisions/*.md`. Extract `> **Status**: {status}`.
 
@@ -32,39 +38,20 @@ Use argument if provided. Otherwise ask the user:
 
 **direct request**: Use the user's description as Issue content.
 
-### 3. Format Issue
+### 3. Format issue
 
 1. Read the target repo's `.github/ISSUE_TEMPLATE/*.yml` to get available types, fields, and labels.
 2. Select the matching template (bug / feature / refactor) based on content.
 3. Compose the Issue body following the template's field structure.
 
-#### Title rules
-
-- **No type prefix** in Issue titles. Do not prepend `feat:`, `fix:`, `refactor:`, etc.
-- Type is conveyed through GitHub labels, not the title.
-- Good: `Admin 댓글 관리 페이지`
-- Bad: `feat: Admin 댓글 관리 페이지`
-
-#### Labels
-
-Labels are GitHub labels defined in each repo's `.github/labels.json`.
-
-| Category | Labels |
-|----------|--------|
-| Type | `feat`, `bug`, `refactor`, `docs`, `test`, `chore` |
-| Priority | `priority:0` ~ `priority:4` |
-| Status | `fixed`, `duplicate`, `attention`, `question` |
-
-Always apply **type + priority** labels when creating an Issue.
-
-### 4. Create Issues
+### 4. Create issues
 
 1. Check existing: `gh issue list --state open --repo {repo} --json number,title,labels`
 2. Present draft to user for approval.
 3. Group related items into a single Issue when appropriate.
 4. Create with `--repo` flag and apply `--label` for type + priority.
 
-### 5. Clean Up (docs sources only)
+### 5. Clean up (docs sources only)
 
 **decisions/**: Delete converted + accepted/rejected files → update `decisions.index.md`.
 **plans/**: Delete converted files → update `plans.index.md` if it exists.
@@ -75,6 +62,21 @@ Output: Issue number, URL, labels, and cleaned-up file list.
 
 ## Constraints
 
-- Never modify/delete `pending` or `deferred` decision files
-- Always get user approval before creating Issues
-- Always use `--repo` flag for `gh` commands
+### Title rules
+
+- **No type prefix** in Issue titles. Do not prepend `feat:`, `fix:`, `refactor:`, etc.
+- Type is conveyed through GitHub labels, not the title.
+- Good: `Admin 댓글 관리 페이지`
+- Bad: `feat: Admin 댓글 관리 페이지`
+
+### Labels
+
+Labels are GitHub labels defined in each repo's `.github/labels.json`.
+
+| Category | Labels |
+|----------|--------|
+| Type | `feat`, `bug`, `refactor`, `docs`, `test`, `chore` |
+| Priority | `priority:0` ~ `priority:4` |
+| Status | `fixed`, `duplicate`, `attention`, `question` |
+
+Always apply **type + priority** labels when creating an Issue.

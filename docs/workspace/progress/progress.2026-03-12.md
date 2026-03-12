@@ -32,6 +32,7 @@
   - `dev-review`: `## Prohibited` → `## Invariants`로 이동, `## Steps` → `## Workflow` 이름 변경, `## Verdict rules` → `## Constraints` 하위로 이동
   - `dev-issue`: `## Constraints` 3줄 → `## Invariants`로 승격, Title rules/Labels → `## Constraints` 하위로 이동, 섹션 순서 재배치
 
+
 ## Discoveries
 - `gh pr edit --body-file` 실패: GitHub Projects Classic deprecation 에러 발생 시 GraphQL `updatePullRequest` mutation으로 우회
 
