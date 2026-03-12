@@ -21,6 +21,10 @@ class ReviewJobStatus(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     FAILED_PARSE = "failed_parse"
+    FAILED_AUTH = "failed_auth"
+    FAILED_PUBLISH = "failed_publish"
+    FAILED_POSTCONDITION = "failed_postcondition"
+    FAILED_DISPATCH = "failed_dispatch"
 
 
 @dataclass

@@ -33,9 +33,55 @@ _CLAUDE_ENV_STRIP = frozenset({
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR",
 })
 
+# All terminal statuses that carry explicit failure information.
+# dispatch_review() preserves these when they are set by the dispatch function,
+# rather than overwriting them with the generic "failed" or "success".
+_EXPLICIT_FAILURE_STATUSES = frozenset({
+    ReviewJobStatus.FAILED_PARSE,
+    ReviewJobStatus.FAILED_AUTH,
+    ReviewJobStatus.FAILED_PUBLISH,
+    ReviewJobStatus.FAILED_POSTCONDITION,
+    ReviewJobStatus.FAILED_DISPATCH,
+})
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _detect_codex_auth(env: dict) -> tuple[str, Optional[Path]]:
+    """Detect Codex auth mode. Returns (mode, auth_json_path).
+
+    mode is one of: "session", "api", "missing".
+    auth_json_path is the path to the auth.json file if mode="session" and
+    the file exists in the real CODEX_HOME (may be None for keyring-backed auth).
+
+    Detection order:
+    1. Run `codex login status` - if exit 0, session-auth is valid.
+    2. If CODEX_API_KEY is present, use API key auth.
+    3. Otherwise, auth is missing.
+    """
+    try:
+        proc = subprocess.run(
+            ["codex", "login", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
+        )
+        if proc.returncode == 0:
+            # Session-auth is valid. Try to locate file-backed auth.json so the
+            # caller can seed it into the isolated CODEX_HOME if needed.
+            real_codex_home = Path(env.get("CODEX_HOME") or os.path.expanduser("~/.codex"))
+            auth_json = real_codex_home / "auth.json"
+            return ("session", auth_json if auth_json.exists() else None)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    if env.get("CODEX_API_KEY"):
+        return ("api", None)
+
+    return ("missing", None)
 
 
 def _review_prompt(
@@ -127,20 +173,26 @@ def dispatch_review(
     """Dispatch a review subprocess. Returns exit code."""
     repo = area_repo_name(area)
 
-    # Duplicate dispatch guard with stale detection
+    # Read last_review_id before dispatch so the post-condition can require
+    # a review newer than any previously seen on the PR.  Default to 0 when
+    # no state file exists (first dispatch).
+    last_review_id = 0
     try:
-        state = state_read(issue, area, monorepo_root)
-        if state.review_job.status == ReviewJobStatus.RUNNING:
-            if state.review_job.is_stale(REVIEW_JOB_STALE_TIMEOUT_SECS):
+        pre_state = state_read(issue, area, monorepo_root)
+        last_review_id = pre_state.last_review_id
+
+        # Duplicate dispatch guard with stale detection
+        if pre_state.review_job.status == ReviewJobStatus.RUNNING:
+            if pre_state.review_job.is_stale(REVIEW_JOB_STALE_TIMEOUT_SECS):
                 print(
                     f"[review_runner] stale review job detected for issue #{issue} "
-                    f"area={area} (startedAt={state.review_job.started_at}) - reclaiming",
+                    f"area={area} (startedAt={pre_state.review_job.started_at}) - reclaiming",
                     file=sys.stderr,
                 )
                 recovery_log_append(
                     issue, area, monorepo_root,
                     "review_dispatch",
-                    f"stale review job (runId={state.review_job.run_id})",
+                    f"stale review job (runId={pre_state.review_job.run_id})",
                     "reclaim",
                     "proceeding with new dispatch",
                 )
@@ -171,9 +223,9 @@ def dispatch_review(
         pass
 
     if tool == "claude":
-        rc = _dispatch_claude(issue, area, pr, monorepo_root, model)
+        rc = _dispatch_claude(issue, area, pr, monorepo_root, model, last_review_id=last_review_id)
     elif tool == "codex":
-        rc = _dispatch_codex(issue, area, pr, monorepo_root, model)
+        rc = _dispatch_codex(issue, area, pr, monorepo_root, model, last_review_id=last_review_id)
     else:
         print(f"[review_runner] unknown tool: {tool}", file=sys.stderr)
         rc = 2
@@ -188,7 +240,9 @@ def dispatch_review(
         except Exception:
             pass
 
-        if current_status == ReviewJobStatus.FAILED_PARSE:
+        if current_status in _EXPLICIT_FAILURE_STATUSES:
+            # Preserve the explicit failure status set by the dispatch function.
+            # Only update finishedAt so the status is not overwritten.
             state_update(issue, area, monorepo_root, {
                 "reviewJob": {"finishedAt": _now_iso()}
             })
@@ -209,6 +263,7 @@ def _dispatch_claude(
     pr: int,
     monorepo_root: Path,
     model: str = "",
+    last_review_id: int = 0,
 ) -> int:
     repo = area_repo_name(area)
     pipeline_init(area, monorepo_root)
@@ -278,10 +333,74 @@ def _dispatch_claude(
     log.write_text(result.stdout)
     err.write_text(result.stderr)
 
-    status = "success" if result.rc == 0 else ("timeout" if result.timed_out else "error")
+    if result.rc != 0:
+        status = "timeout" if result.timed_out else "error"
+        _write_job_meta(
+            meta,
+            status=status,
+            issue=issue,
+            area=area,
+            stage="review",
+            pr=pr,
+            repo=repo,
+            repo_dir=repo_dir,
+            worktree_dir="",
+            skill_cwd=str(monorepo_root),
+            log_path=str(log),
+            err_path=str(err),
+            tool="claude",
+            model=model,
+            exit_code=result.rc,
+        )
+        return result.rc
+
+    # Post-condition: verify the review was actually posted to GitHub.
+    # Claude subprocess returning rc=0 does not guarantee a review was published.
+    from .github_client import check_review_exists
+
+    def _fail_postcondition_claude(reason: str) -> int:
+        print(
+            f"[review_runner] claude post-condition failed for "
+            f"issue #{issue} area={area} pr=#{pr}: {reason}",
+            file=sys.stderr,
+        )
+        _write_job_meta(
+            meta,
+            status="failed_postcondition",
+            issue=issue,
+            area=area,
+            stage="review",
+            pr=pr,
+            repo=repo,
+            repo_dir=repo_dir,
+            worktree_dir="",
+            skill_cwd=str(monorepo_root),
+            log_path=str(log),
+            err_path=str(err),
+            tool="claude",
+            model=model,
+            exit_code=result.rc,
+        )
+        try:
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": "failed_postcondition", "finishedAt": _now_iso()}
+            })
+        except Exception:
+            pass
+        return 1
+
+    try:
+        review_id = check_review_exists(area, pr, last_review_id)
+        if review_id is None:
+            return _fail_postcondition_claude(
+                f"no actionable review newer than id={last_review_id} found on GitHub after subprocess success"
+            )
+    except Exception as exc:
+        return _fail_postcondition_claude(f"check_review_exists raised: {exc}")
+
     _write_job_meta(
         meta,
-        status=status,
+        status="success",
         issue=issue,
         area=area,
         stage="review",
@@ -296,8 +415,13 @@ def _dispatch_claude(
         model=model,
         exit_code=result.rc,
     )
-
-    return result.rc
+    try:
+        state_update(issue, area, monorepo_root, {
+            "reviewJob": {"status": "success", "finishedAt": _now_iso()}
+        })
+    except Exception:
+        pass
+    return 0
 
 
 def normalize_codex_output(raw: str) -> str | None:
@@ -339,6 +463,7 @@ def _dispatch_codex(
     pr: int,
     monorepo_root: Path,
     model: str = "",
+    last_review_id: int = 0,
 ) -> int:
     from .github_client import get_pr_base_ref
 
@@ -380,23 +505,58 @@ def _dispatch_codex(
         model=model,
     )
 
-    # Build isolated environment: strip Claude-related vars that trigger
-    # external-agent-config detection in codex, and use a dedicated CODEX_HOME
-    # to avoid user-profile skill discovery.
+    # Auth preflight: session-auth takes priority over API key.
+    # codex login status is the authoritative check - it returns exit 0 when
+    # any valid auth mode (ChatGPT session or API key) is active.
+    base_env = {k: v for k, v in os.environ.items() if k not in _CLAUDE_ENV_STRIP}
+    auth_mode, auth_json_src = _detect_codex_auth(base_env)
+
+    if auth_mode == "missing":
+        reason = "no valid Codex auth: codex login status returned non-zero and CODEX_API_KEY is not set"
+        print(
+            f"[review_runner] {reason} for issue #{issue} area={area}",
+            file=sys.stderr,
+        )
+        _write_job_meta(
+            meta,
+            status="failed_auth",
+            issue=issue,
+            area=area,
+            stage="review",
+            pr=pr,
+            repo=repo,
+            repo_dir=repo_dir,
+            worktree_dir=str(worktree_dir),
+            skill_cwd=str(monorepo_root),
+            log_path=str(log),
+            err_path=str(err),
+            tool="codex",
+            model=model,
+            exit_code=None,
+        )
+        try:
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": "failed_auth", "finishedAt": _now_iso()}
+            })
+        except Exception:
+            pass
+        return 1
+
+    print(
+        f"[review_runner] codex auth mode={auth_mode} for issue #{issue} area={area}",
+        file=sys.stderr,
+    )
+
+    # Build isolated environment using a dedicated CODEX_HOME to avoid
+    # user-profile skill discovery. For session-auth with file-backed auth.json,
+    # seed the temp dir so the session remains accessible.
     with tempfile.TemporaryDirectory(prefix="codex-home-") as tmp_codex_home:
-        clean_env = {k: v for k, v in os.environ.items() if k not in _CLAUDE_ENV_STRIP}
+        clean_env = dict(base_env)
         clean_env["CODEX_HOME"] = tmp_codex_home
 
-        # Warn if API key is absent: temp CODEX_HOME requires API key auth.
-        # File-backed auth.json is not seeded into the temp directory, so any
-        # auth mode that relies on a persistent auth.json will fail.
-        if "CODEX_API_KEY" not in clean_env:
-            print(
-                f"[review_runner] CODEX_API_KEY not set - temp CODEX_HOME requires "
-                f"API key auth; file-based auth.json will not be available for "
-                f"issue #{issue}",
-                file=sys.stderr,
-            )
+        if auth_mode == "session" and auth_json_src is not None:
+            # Seed auth.json so session-auth survives the isolated CODEX_HOME.
+            shutil.copy2(str(auth_json_src), str(Path(tmp_codex_home) / "auth.json"))
 
         # Write automation config.toml to force-disable repo-scoped skills that
         # could be auto-invoked by generic prompts. This is the authoritative
@@ -540,8 +700,93 @@ def _dispatch_codex(
         print(pub_result.stderr, end="", file=sys.stderr)
 
     if pub_result.returncode != 0:
-        return _fail_parse(
-            f"publisher failed (rc={pub_result.returncode})"
+        reason = f"publisher failed (rc={pub_result.returncode})"
+        print(
+            f"[review_runner] codex publish failed for "
+            f"issue #{issue} area={area} pr=#{pr}: {reason} - "
+            f"setting failed_publish",
+            file=sys.stderr,
         )
+        try:
+            _write_job_meta(
+                meta,
+                status="failed_publish",
+                issue=issue,
+                area=area,
+                stage="review",
+                pr=pr,
+                repo=repo,
+                repo_dir=repo_dir,
+                worktree_dir=str(worktree_dir),
+                skill_cwd=str(monorepo_root),
+                log_path=str(log),
+                err_path=str(err),
+                tool="codex",
+                model=model,
+                exit_code=result.rc,
+            )
+        except Exception:
+            pass
+        try:
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": "failed_publish", "finishedAt": _now_iso()}
+            })
+        except Exception:
+            pass
+        return 1
 
+    # Post-condition: verify the review was actually posted to GitHub.
+    # Publisher returning rc=0 does not guarantee the API call succeeded
+    # and the review is now visible on GitHub.
+    from .github_client import check_review_exists
+
+    def _fail_postcondition_codex(reason: str) -> int:
+        print(
+            f"[review_runner] codex post-condition failed for "
+            f"issue #{issue} area={area} pr=#{pr}: {reason}",
+            file=sys.stderr,
+        )
+        try:
+            _write_job_meta(
+                meta,
+                status="failed_postcondition",
+                issue=issue,
+                area=area,
+                stage="review",
+                pr=pr,
+                repo=repo,
+                repo_dir=repo_dir,
+                worktree_dir=str(worktree_dir),
+                skill_cwd=str(monorepo_root),
+                log_path=str(log),
+                err_path=str(err),
+                tool="codex",
+                model=model,
+                exit_code=result.rc,
+            )
+        except Exception:
+            pass
+        try:
+            state_update(issue, area, monorepo_root, {
+                "reviewJob": {"status": "failed_postcondition", "finishedAt": _now_iso()}
+            })
+        except Exception:
+            pass
+        return 1
+
+    try:
+        review_id = check_review_exists(area, pr, last_review_id)
+        if review_id is None:
+            return _fail_postcondition_codex(
+                f"no actionable review newer than id={last_review_id} found on GitHub after publisher success"
+            )
+    except Exception as exc:
+        return _fail_postcondition_codex(f"check_review_exists raised: {exc}")
+
+    try:
+        state_update(issue, area, monorepo_root, {
+            "reviewJob": {"status": "success", "finishedAt": _now_iso()}
+        })
+    except Exception:
+        pass
     return 0

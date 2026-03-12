@@ -124,7 +124,10 @@ class TestDispatchReviewStaleRecovery:
         def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=True, replace_env=False):
             return self._make_result(rc=0, stdout="review output")
 
-        with patch("dev_pipeline.review_runner.run", side_effect=fake_run):
+        with (
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.check_review_exists", return_value=12345),
+        ):
             from dev_pipeline import review_runner
             rc = review_runner.dispatch_review(
                 issue=1, area="client", pr=10, monorepo_root=tmp_path
@@ -156,7 +159,10 @@ class TestDispatchReviewStaleRecovery:
         def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=True, replace_env=False):
             return self._make_result(rc=0, stdout="review output")
 
-        with patch("dev_pipeline.review_runner.run", side_effect=fake_run):
+        with (
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.check_review_exists", return_value=12345),
+        ):
             from dev_pipeline import review_runner
             rc = review_runner.dispatch_review(
                 issue=1, area="client", pr=10, monorepo_root=tmp_path
