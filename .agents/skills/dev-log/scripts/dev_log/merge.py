@@ -1,7 +1,7 @@
 import time
 from pathlib import Path
 
-from .git_ops import fetch, merge_ff_only, rebase, rebase_abort, rev_parse_head
+from .git_ops import current_branch, fetch, merge_ff_only, rebase, rebase_abort, rev_parse_head
 
 LOCK_TIMEOUT = 60  # seconds
 LOCK_INTERVAL = 5  # seconds
@@ -34,6 +34,12 @@ def lock_merge(worktree: str, branch: str, root: str) -> dict:
     """Acquire lock, fetch+rebase, ff-merge to main, release lock."""
     root_path = Path(root)
     lock_path = root_path / ".workspace" / "dev-log.lock"
+
+    branch_head = current_branch(root)
+    if branch_head != "main":
+        raise RuntimeError(
+            f"Root repo HEAD is '{branch_head}', expected 'main'"
+        )
 
     acquire_lock(lock_path)
     try:

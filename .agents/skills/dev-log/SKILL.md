@@ -38,6 +38,7 @@ Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside wor
 ### Phase 3: Write records (inside worktree)
 
 `python3 -m dev_log next-seq --dir "$DOCS_DIR/findings" --type findings`
+`python3 -m dev_log next-seq --dir "$DOCS_DIR/decisions" --type decision`
 `python3 -m dev_log check-progress --dir "$DOCS_DIR"`
 
 - **Findings**: create `findings/findings.NNN-topic.md` + update `findings.index.md`

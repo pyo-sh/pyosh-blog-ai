@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+import traceback
 
 
 def _output(data: dict) -> None:
@@ -101,5 +102,6 @@ def main():
             _output(cleanup_worktree(args.worktree, args.branch, args.root))
 
     except Exception as e:
+        traceback.print_exc()
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
