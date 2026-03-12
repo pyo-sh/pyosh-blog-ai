@@ -3,106 +3,69 @@ name: dev-log
 description: Manage progress/, findings/, and decisions/ records in the pyosh-blog monorepo. Use when (1) recording progress after task completion, (2) documenting technical research as findings, (3) writing architecture/tech decisions, (4) user requests "/dev-log", "record this", "write progress", etc. Parallel-agent safe (worktree isolation + lock merge).
 ---
 
-# Dev-Log
+# Dev-log
 
 Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md`.
 
-> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
+> CLI: `cd .agents/skills/dev-log/scripts && python3 -m dev_log <cmd>`
+> Area definitions: [monorepo-layout.md](../../references/monorepo-layout.md) | Templates: [templates.md](references/templates.md)
 
-**Core strategy**: detect context → (worktree isolation if needed) → scan indices → write records → commit → (push to PR branch **or** lock merge) → cleanup
-
-## Directory Structure
-
-```
-docs/{client|server|workspace}/
-├── progress.index.md
-├── findings.index.md
-├── decisions.index.md
-├── progress/
-│   └── progress.YYYY-MM-DD.md
-├── findings/
-│   └── findings.NNN-topic.md
-└── decisions/
-    └── decision-NNN-topic.md
-```
-
-### Area Selection
+## Area selection
 
 | Area | When to use |
 |------|-------------|
 | `client` | Next.js frontend changes |
 | `server` | Fastify API server changes |
-| `workspace` | Root repo (tools/, docs/, skills/, CLAUDE.md), Docker/tmux 환경 설정 |
+| `workspace` | Root repo (tools, docs, skills, CLAUDE.md), Docker/tmux config |
 
-## File Naming
-
-| Type | Format | ID/Date |
-|------|--------|---------|
-| Progress | `progress.YYYY-MM-DD.md` | ISO 8601 |
-| Findings | `findings.NNN-topic.md` | 3-digit seq, kebab-case |
-| Decision | `decision-NNN-topic.md` | 3-digit seq, kebab-case |
-
-## Workflow (parallel-safe)
-
-> Use **worktree isolation** to prevent file conflicts when running parallel agents.
-> Detailed git commands: [worktree-merge.md](references/worktree-merge.md)
+## Workflow
 
 ### Phase 0: Detect context
 
-If the current conversation context contains an active worktree path (e.g. from a preceding `/dev-build` or pipeline step), change to that directory before executing the rest of Phase 0.
+`python3 -m dev_log detect-context` (uses cwd; pass `--cwd "$WT"` if a worktree path is known)
 
-Determine the execution context.
-→ Commands: [worktree-merge.md § Phase 0](references/worktree-merge.md)
+- `inRootWorktree: true` - skip Phase 1, 5, 6. Push to PR branch after Phase 4.
+- `inRootWorktree: false` - full standalone flow (Phase 1-6).
 
-- **Root repo worktree** (`IN_ROOT_WORKTREE=true`): CWD is under `$ROOT_REPO/.workspace/worktrees/`. Skip Phase 1, 5, 6. After Phase 4, push docs commit to the existing PR branch (Phase 4.5).
-- **Not in worktree**: follow the full flow (Phase 1 through 6).
+### Phase 1: Create worktree (skip if in worktree)
 
-### Phase 1: Create worktree (skip if `IN_ROOT_WORKTREE=true`)
+`python3 -m dev_log create-worktree --root "$ROOT_REPO"` - returns `worktreePath`, `branch`.
 
-Timestamp-based worktree + branch. All file operations happen inside the worktree.
-→ Commands: [worktree-merge.md § Phase 1](references/worktree-merge.md)
+### Phase 2: Check context
 
-### Phase 2: Check context before recording
-- Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside the worktree
-- Selectively read relevant sub-files only (do not read all)
+Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside worktree. Selectively read relevant sub-files only.
 
 ### Phase 3: Write records (inside worktree)
-- **Technical research**: Create `findings/findings.NNN-topic.md` + update `findings.index.md`
-- **Architecture decision**: Create `decisions/decision-NNN-topic.md` (draft) + update `decisions.index.md`
-- **Task completion**: Create/update `progress/progress.YYYY-MM-DD.md` + update `progress.index.md`
-- Create missing folders/files as needed ([templates.md](references/templates.md))
-- Include related GitHub Issue numbers (e.g., `#123`)
 
-### Phase 4: Commit (inside worktree)
+`python3 -m dev_log next-seq --dir "$DOCS_DIR/findings" --type findings`
+`python3 -m dev_log next-seq --dir "$DOCS_DIR/decisions" --type decision`
+`python3 -m dev_log check-progress --dir "$DOCS_DIR"`
 
-`git add docs/` → `git commit -m "docs: {type} - {summary}"`
-→ Commands: [worktree-merge.md § Phase 4](references/worktree-merge.md)
+- **Findings**: create `findings/findings.NNN-topic.md` + update `findings.index.md`
+- **Decision**: create `decisions/decision-NNN-topic.md` (draft) + update `decisions.index.md`
+- **Progress**: create/update `progress/progress.YYYY-MM-DD.md` + update `progress.index.md`
+- Include related GitHub Issue numbers
 
-### Phase 4.5: Push to PR branch (only if `IN_ROOT_WORKTREE=true`)
+### Phase 4: Commit
 
-`git push origin <current-branch>` — docs commit is appended to the existing PR branch.
-No lock, no merge, no cleanup needed. Done.
-→ Commands: [worktree-merge.md § Phase 4.5](references/worktree-merge.md)
+`python3 -m dev_log commit --worktree "$WT" --message "docs: {type} - {summary}"`
 
-### Phase 5: Lock → Merge → Unlock (skip if `IN_ROOT_WORKTREE=true`)
+### Phase 4.5: Push to PR branch (only if in worktree)
 
-Acquire lock → rebase → fast-forward merge → release lock. Wait up to 60s if another agent holds the lock.
-On conflict/failure: always release lock, keep worktree intact.
-→ Commands: [worktree-merge.md § Phase 5](references/worktree-merge.md)
+`python3 -m dev_log push --worktree "$WT"` - done, skip Phase 5/6.
 
-### Phase 6: Cleanup (skip if `IN_ROOT_WORKTREE=true`)
+### Phase 5: Lock merge (skip if in worktree)
 
-On success: remove worktree + delete branch. On failure: keep worktree for manual retry.
-→ Commands: [worktree-merge.md § Phase 6](references/worktree-merge.md)
+`python3 -m dev_log lock-merge --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
 
-### Index Update Rules
-- NNN sequence: scan directory → max sequence + 1
-- progress.index.md: add new entries at **top**
-- Details: [indexing-strategy.md](references/indexing-strategy.md)
+Acquires lock, fetches, rebases, fast-forward merges, releases lock. Lock always released on failure.
 
-## References
+### Phase 6: Cleanup (skip if in worktree)
 
-- [File templates](references/templates.md) — findings, progress, decision file formats
-- [Indexing strategy](references/indexing-strategy.md) — index update rules, sequence collision prevention
-- [Worktree merge strategy](references/worktree-merge.md) — git commands, lock mechanism, error handling
-- [Workflow examples](references/examples.md) — scenario-based workflows (including parallel scenarios)
+`python3 -m dev_log cleanup --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
+
+## Index update rules
+
+- NNN sequence: `next-seq` scans directory, returns max+1
+- `progress.index.md`: add new entries at **top**
+- `findings.index.md` / `decisions.index.md`: maintain sorted order by sequence
