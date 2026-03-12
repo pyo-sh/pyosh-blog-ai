@@ -29,7 +29,7 @@ MONOREPO="${PIPELINE_MONOREPO_ROOT:-/workspace}"
 REVIEW_DIR="${MONOREPO}/.workspace/dev-review/pr-${PR}"
 python3 "${MONOREPO}/.agents/skills/dev-review/scripts/review_publish.py" \
   --input "${REVIEW_DIR}/review.json" \
-  --mode "${REVIEW_MODE:-dry-run}" \
+  --mode "${REVIEW_MODE:-publish}" \
   --repo "$REPO" --pr "$PR" --output-dir "$REVIEW_DIR"
 ```
 

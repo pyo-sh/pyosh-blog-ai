@@ -49,6 +49,8 @@ docs/{client|server|workspace}/
 
 ### Phase 0: Detect context
 
+If the current conversation context contains an active worktree path (e.g. from a preceding `/dev-build` or pipeline step), change to that directory before executing the rest of Phase 0.
+
 Determine the execution context.
 → Commands: [worktree-merge.md § Phase 0](references/worktree-merge.md)
 
