@@ -31,6 +31,22 @@
 - **테스트**: 41개 신규 (test_lease.py 17개 + test_cli.py 업데이트), v2 vocabulary 적용(`state='pending'`, `status='completed'`/`'failed'`)
 - **리뷰 8라운드**: migration 멱등성, cleanup_stale TOCTOU, version guard, datetime format, commit 책임 분리, schema vocabulary 호환
 
+## dev-pipeline/dev-log 파이프라인 안정성 버그 10건 수정 (#177, PR #178)
+
+- **범위**: dev-pipeline 실행 중 실증 확인된 10개 버그 - issue #87, #109 파이프라인에서 각각 수동 개입 필요
+- **Bug A (High)** - dev-log rebase 오류: `worktree.py:create_worktree()`의 `base="docs"` (로컬 브랜치)가 `origin/docs`와 gap이 생겨 checkout 거부. `base="origin/docs"`로 변경하여 fetch된 remote ref에서 직접 분기
+- **Bug B (High)** - `failed_postcondition` 폴백 부재: `step_review_wait`에서 `FAILED_POSTCONDITION` 전용 분기가 없어 무조건 escalate. `_FAILED_STATUSES` 체크 앞에 전용 retry 블록 추가. 단, Bug D(dispatch reset)와의 상호작용으로 `"review_postcondition"` 전용 stage key 사용하여 무한 루프 방지
+- **Bug C (Medium)** - merge conflict 진단 부족: `git_ops.py`에 `get_conflict_files()` 헬퍼 추가, `controller.py`에 `MergeConflictError` 클래스 도입, `step_merge()` retry/escalate data에 `errorKind` + `conflictFiles` 포함
+- **Bug D (Medium)** - `stageRetries` 라운드 간 이월: `step_review_dispatch()`에서 `review_wait` 전이 시 `stageRetries["review_dispatch"]`를 0으로 리셋. `state_update`의 deep merge 특성 활용하여 다른 stage 카운터 유지
+- **Bug E (Medium)** - `round_limit` 복구 경로 없음: `models.py`에 `round_limit_reached_at` 필드 추가, `step_review_process()`에서 round_limit 반환 시 state에 타임스탬프 기록
+- **Bug F+G (Medium/Low)** - dispatch cwd 누락 + review-wait 의무 미명시: SKILL.md Step 2a dispatch 명령에 `cd .agents/skills/dev-pipeline/scripts &&` 추가, Step 2b 헤더를 `(call unconditionally on any task-notification)`으로 변경
+- **Bug H (Low)** - approve verdict 시 publish 미호출: dev-review SKILL.md Invariants에 "All verdicts publish" 규칙을 Invariant 3으로 추가
+- **Bug I (Medium)** - `pr_helpers.py` `--head` 미지정: `gh pr create -R {repo}` 호출 시 브랜치 자동 감지 실패. `cmd_create()`에 optional `--head` 인자 추가
+- **Bug J (Low)** - `gh` CLI 버전 미갱신: `tools/docker/.bash_aliases` `dev-update()`에 `[2/5] GitHub CLI (gh)` 업그레이드 단계 추가, 전체 단계 [N/5]로 갱신
+- **파이프라인 실행 중 추가 발견**: `step_resolve_finalize()`가 staged changes 없을 때 push를 건너뛰어 remote가 구버전을 보는 문제. `push_safely()`를 if 블록 밖으로 이동하여 항상 push 보장
+- **3라운드 리뷰**: round 1 - B/D 상호작용 infinite loop Critical 발견 및 수정, round 2 - 이미 수정된 커밋 기준 (push 타이밍 버그로 구버전 리뷰), round 3 - clean 통과
+- PR #178 squash merge 완료
+
 ## dev-pipeline: log → merge 순서 변경 (#164, PR #165)
 
 - **문제**: dev-pipeline 상태 머신이 `merge → log → done` 순서로 실행되어, dev-log가 standalone 모드의 `lock_merge`로 local main에 커밋하지만 push하지 않음. 다음 PR squash merge 시 origin/main과 발산하여 `ff-only` 실패 100% 재현
