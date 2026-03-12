@@ -103,12 +103,21 @@ def test_cleanup_removes_expired_lease(conn):
     assert conn.execute("SELECT 1 FROM leases WHERE area = 'client'").fetchone() is None
 
 
+def _dead_pid() -> int:
+    """Fork a child that exits immediately; return its now-dead PID."""
+    pid = os.fork()
+    if pid == 0:
+        os._exit(0)
+    os.waitpid(pid, 0)
+    return pid
+
+
 def test_cleanup_removes_dead_pid_lease(conn):
-    # PID 1 may be alive on some systems; use a definitely-dead PID instead
-    # by using a very high PID that cannot exist
+    dead = _dead_pid()
     conn.execute(
         "INSERT INTO leases (area, holder_pid, acquired_at, heartbeat_at, expires_at) "
-        "VALUES ('server', 2147483647, datetime('now'), datetime('now'), datetime('now', '+1 hour'))"
+        "VALUES ('server', ?, datetime('now'), datetime('now'), datetime('now', '+1 hour'))",
+        (dead,),
     )
     conn.commit()
     removed = cleanup_stale(conn)

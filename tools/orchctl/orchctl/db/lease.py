@@ -89,25 +89,33 @@ def release(conn: sqlite3.Connection, area: str, pid: int) -> bool:
 def cleanup_stale(conn: sqlite3.Connection) -> int:
     """Delete leases that are expired or whose holder PID is no longer alive.
 
+    Expired leases are deleted atomically in SQL to avoid TOCTOU races.
+    Dead-PID leases are deleted with a precise predicate (area + holder_pid +
+    expires_at) so that a concurrent insert of a fresh lease for the same area
+    is not accidentally evicted.
+
     Returns the number of leases removed.
     """
+    # Atomic expiry check — no Python snapshot involved
+    expired = conn.execute(
+        "DELETE FROM leases WHERE expires_at < datetime('now')"
+    ).rowcount
+
+    # Dead-PID check requires Python; use a precise predicate to avoid evicting
+    # a freshly inserted lease that happens to share the same area key
     rows = conn.execute(
         "SELECT area, holder_pid, expires_at FROM leases"
     ).fetchall()
-    now = _utcnow()
-    stale = [
-        r["area"]
-        for r in rows
-        if r["expires_at"] < now or not _pid_alive(r["holder_pid"])
-    ]
-    if not stale:
-        return 0
-    placeholders = ",".join("?" * len(stale))
-    cursor = conn.execute(
-        f"DELETE FROM leases WHERE area IN ({placeholders})", stale
-    )
+    dead = 0
+    for r in rows:
+        if not _pid_alive(r["holder_pid"]):
+            dead += conn.execute(
+                "DELETE FROM leases WHERE area = ? AND holder_pid = ? AND expires_at = ?",
+                (r["area"], r["holder_pid"], r["expires_at"]),
+            ).rowcount
+
     conn.commit()
-    return cursor.rowcount
+    return expired + dead
 
 
 def has_active_attempt(conn: sqlite3.Connection, issue_id: int) -> bool:
