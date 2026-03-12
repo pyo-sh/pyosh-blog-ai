@@ -235,8 +235,10 @@ def step_review_wait(issue: int, area: str, monorepo_root: Path) -> StepResult:
     # No review found - branch on job status
 
     # failed_postcondition: AI ran but didn't post review. Retry once regardless of tool.
+    # Uses a dedicated "review_postcondition" key so the Bug D dispatch reset
+    # (which clears "review_dispatch" counter) does not interfere with this budget.
     if job.status == ReviewJobStatus.FAILED_POSTCONDITION:
-        can_retry = stage_retry(issue, area, monorepo_root, "review_dispatch")
+        can_retry = stage_retry(issue, area, monorepo_root, "review_postcondition")
         if can_retry:
             state_update(issue, area, monorepo_root, {"step": "review_dispatch"})
             return StepResult(
