@@ -134,6 +134,24 @@ def test_reconcile_skips_issue_with_active_attempt(runner, db_path):
     assert "already has an active attempt" in result.output
 
 
+def test_reconcile_aborts_on_lost_lease(runner, db_path):
+    """If the lease is revoked between acquire and renew, _run_pass should abort."""
+    from unittest.mock import patch
+    from orchctl.db.connection import get_db
+
+    runner.invoke(cli, ["--db", db_path, "init"])
+    conn = get_db(db_path)
+    conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 30, 'pending')")
+    conn.commit()
+    conn.close()
+
+    with patch("orchctl.commands.reconcile.renew", return_value=False):
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+
+    assert result.exit_code == 0
+    assert "lease lost mid-pass" in result.output
+
+
 def test_reconcile_requires_init(runner, db_path):
     result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
     assert result.exit_code != 0

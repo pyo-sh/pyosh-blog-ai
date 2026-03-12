@@ -55,7 +55,9 @@ def _run_pass(conn, area: str, pid: int, dry_run: bool) -> None:
         return
 
     for issue in pending:
-        renew(conn, area, pid)
+        if not renew(conn, area, pid):
+            click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
+            return
         issue_id = issue["id"]
         number = issue["number"]
         if has_active_attempt(conn, issue_id):

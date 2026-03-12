@@ -16,6 +16,13 @@ def _expires(ttl: int) -> str:
 
 
 def _pid_alive(pid: int) -> bool:
+    """Return True if pid is a live process.
+
+    Known limitation: if the original leaseholder crashes and the OS recycles
+    its PID before the lease TTL expires, this function returns True for the
+    unrelated new process.  The lease will persist until TTL elapses rather
+    than being evicted immediately.  This is acceptable given the short TTL.
+    """
     try:
         os.kill(pid, 0)
         return True
@@ -46,6 +53,7 @@ def acquire(conn: sqlite3.Connection, area: str, pid: int, ttl: int = 60) -> boo
         conn.commit()
         return True
     except sqlite3.IntegrityError:
+        conn.rollback()  # discard the aborted implicit transaction
         row = conn.execute(
             "SELECT holder_pid FROM leases WHERE area = ?", (area,)
         ).fetchone()
