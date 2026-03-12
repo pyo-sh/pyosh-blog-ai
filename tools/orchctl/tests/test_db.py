@@ -49,7 +49,14 @@ def test_idempotent_migration(tmp_db):
     conn1.close()
     conn2, v2 = init_db(tmp_db)
     conn2.close()
-    assert v1 == v2 == 2
+    assert v1 == v2 == 3
+
+
+def test_leases_has_heartbeat_at_column(tmp_db):
+    conn, _ = init_db(tmp_db)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(leases)")}
+    conn.close()
+    assert "heartbeat_at" in cols
 
 
 def test_issue_crud(tmp_db):
