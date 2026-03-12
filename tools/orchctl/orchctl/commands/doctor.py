@@ -39,6 +39,7 @@ def cmd_doctor(ctx: click.Context, as_json: bool) -> None:
     conn = get_db(db_path)
     schema_ver = current_version(conn)
     if schema_ver == 0:
+        conn.close()
         raise click.ClickException("Database not initialised — run `orchctl init` first.")
     orphan_attempts = _check_orphan_attempts(conn)
     stale_leases = _check_stale_leases(conn)

@@ -1,13 +1,12 @@
 """Tests for database initialization and schema migrations."""
 
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from orchctl.db.connection import init_db
-from orchctl.db.schema import SCHEMA_VERSION
+from orchctl.db.migrate import current_version
 
 
 @pytest.fixture
@@ -18,7 +17,7 @@ def tmp_db(tmp_path: Path):
 def test_init_creates_db(tmp_db):
     conn, version = init_db(tmp_db)
     assert tmp_db.exists()
-    assert version == SCHEMA_VERSION
+    assert version == current_version(conn)
     conn.close()
 
 
@@ -50,7 +49,7 @@ def test_idempotent_migration(tmp_db):
     conn1.close()
     conn2, v2 = init_db(tmp_db)
     conn2.close()
-    assert v1 == v2 == SCHEMA_VERSION
+    assert v1 == v2 == 1
 
 
 def test_issue_crud(tmp_db):

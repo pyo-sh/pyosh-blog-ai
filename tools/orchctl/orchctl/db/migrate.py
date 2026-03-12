@@ -2,10 +2,10 @@
 
 import sqlite3
 
-from .schema import MIGRATIONS, SCHEMA_VERSION
+from .schema import MIGRATIONS
 
 
-def _current_version(conn: sqlite3.Connection) -> int:
+def current_version(conn: sqlite3.Connection) -> int:
     row = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
     ).fetchone()
@@ -16,8 +16,8 @@ def _current_version(conn: sqlite3.Connection) -> int:
 
 
 def run_migrations(conn: sqlite3.Connection) -> int:
-    """Apply pending migrations. Returns the new schema version."""
-    current = _current_version(conn)
+    """Apply pending migrations. Returns the schema version after all migrations."""
+    current = current_version(conn)
     pending = [(v, sql) for v, sql in MIGRATIONS if v > current]
     if not pending:
         return current
@@ -32,4 +32,4 @@ def run_migrations(conn: sqlite3.Connection) -> int:
         conn.execute("INSERT INTO schema_version (id, version) VALUES (1, ?)", (version,))
         conn.commit()
 
-    return SCHEMA_VERSION
+    return current_version(conn)

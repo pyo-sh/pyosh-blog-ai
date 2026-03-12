@@ -1,7 +1,5 @@
 """SQLite schema definitions."""
 
-SCHEMA_VERSION = 1
-
 # Each entry: (version, sql)
 MIGRATIONS: list[tuple[int, str]] = [
     (
