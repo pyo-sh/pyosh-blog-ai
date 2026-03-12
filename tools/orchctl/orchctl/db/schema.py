@@ -76,4 +76,117 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        2,
+        """
+        -- Recreate issues with full state vocabulary.
+        -- Old states: pending, running, done, failed, blocked
+        -- New states: pending, dispatched, completed, failed-terminal,
+        --             needs-human, blocked-external, cancelled,
+        --             blocked, blocked-failed-dependency
+        CREATE TABLE issues_v2 (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            area            TEXT    NOT NULL,
+            number          INTEGER NOT NULL,
+            state           TEXT    NOT NULL DEFAULT 'pending'
+                                    CHECK(state IN (
+                                        'pending',
+                                        'dispatched',
+                                        'completed',
+                                        'failed-terminal',
+                                        'needs-human',
+                                        'blocked-external',
+                                        'cancelled',
+                                        'blocked',
+                                        'blocked-failed-dependency'
+                                    )),
+            dependency_type TEXT    NOT NULL DEFAULT 'none'
+                                    CHECK(dependency_type IN ('none','soft','hard')),
+            retry_budget    INTEGER NOT NULL DEFAULT 3,
+            failure_class   TEXT,
+            escalation      TEXT,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE (area, number)
+        );
+
+        INSERT INTO issues_v2 (id, area, number, state, dependency_type,
+                               retry_budget, failure_class, escalation,
+                               created_at, updated_at)
+        SELECT
+            id,
+            area,
+            number,
+            CASE state
+                WHEN 'running' THEN 'dispatched'
+                WHEN 'done'    THEN 'completed'
+                WHEN 'failed'  THEN 'failed-terminal'
+                ELSE state
+            END,
+            dependency_type,
+            retry_budget,
+            failure_class,
+            escalation,
+            created_at,
+            updated_at
+        FROM issues;
+
+        DROP TRIGGER IF EXISTS issues_updated_at;
+        DROP TABLE issues;
+        ALTER TABLE issues_v2 RENAME TO issues;
+
+        CREATE TRIGGER issues_updated_at
+        AFTER UPDATE ON issues
+        BEGIN
+            UPDATE issues SET updated_at = datetime('now') WHERE id = NEW.id;
+        END;
+
+        -- Recreate attempts with new status vocabulary.
+        -- Old statuses: running, success, failure, cancelled
+        -- New statuses: created, running, completed, failed, timed-out
+        CREATE TABLE attempts_v2 (
+            attempt_id      TEXT    PRIMARY KEY,
+            issue_id        INTEGER NOT NULL REFERENCES issues(id),
+            pid             INTEGER,
+            pgid            INTEGER,
+            started_at      TEXT,
+            finished_at     TEXT,
+            status          TEXT    NOT NULL DEFAULT 'created'
+                                    CHECK(status IN (
+                                        'created',
+                                        'running',
+                                        'completed',
+                                        'failed',
+                                        'timed-out'
+                                    )),
+            terminal_json   TEXT,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        INSERT INTO attempts_v2 (attempt_id, issue_id, pid, pgid,
+                                  started_at, finished_at, status,
+                                  terminal_json, created_at)
+        SELECT
+            attempt_id,
+            issue_id,
+            pid,
+            pgid,
+            started_at,
+            finished_at,
+            CASE status
+                WHEN 'success'   THEN 'completed'
+                WHEN 'failure'   THEN 'failed'
+                WHEN 'cancelled' THEN 'failed'
+                ELSE status
+            END,
+            terminal_json,
+            created_at
+        FROM attempts;
+
+        DROP TABLE attempts;
+        ALTER TABLE attempts_v2 RENAME TO attempts;
+
+        CREATE INDEX idx_attempts_issue_id ON attempts(issue_id);
+        """,
+    ),
 ]

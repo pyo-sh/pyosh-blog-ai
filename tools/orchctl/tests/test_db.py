@@ -49,7 +49,7 @@ def test_idempotent_migration(tmp_db):
     conn1.close()
     conn2, v2 = init_db(tmp_db)
     conn2.close()
-    assert v1 == v2 == 1
+    assert v1 == v2 == 2
 
 
 def test_issue_crud(tmp_db):
