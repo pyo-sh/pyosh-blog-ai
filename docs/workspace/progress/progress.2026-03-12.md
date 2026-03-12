@@ -40,6 +40,15 @@
   - Bug fix #3: `init --issue N`이 초기 상태 파일 생성 (기존: 디렉토리만 생성)
   - 37 new tests (`test_steps.py`), 258 total passing, 0 regressions
 
+- [x] dev-pipeline SKILL.md thin contract 재작성 + 참조 파일 정리 (#151, PR #158)
+  - `SKILL.md` 409줄 → 125줄(-69%), bash 코드 블록 26개 → 0개, `step` 서브커맨드 + action 테이블로 대체
+  - #152 표준 섹션 구조 적용: Invariants → State machine → Workflow → Constraints → References
+  - `suggestion_only` 규칙 우선순위 명확화 ("first matching rule wins"), headless `round_limit` 동작 문서화
+  - `references/process-lifecycle.md`: Step subcommands 섹션 추가 (호출 패턴, 출력 계약, two-phase 패턴)
+  - `references/recovery.md`: v3 recovery strategy로 간소화 (step 함수 내부 검증 + recovery action 매핑)
+  - `references/python-migration-spec.md`: `steps.py`, `test_steps.py`, `test_review_postcondition.py` 패키지 레이아웃 추가
+  - `references/pipeline-audit.md` 삭제 (모든 항목 해결 완료)
+
 
 ## Discoveries
 - `gh pr edit --body-file` 실패: GitHub Projects Classic deprecation 에러 발생 시 GraphQL `updatePullRequest` mutation으로 우회
