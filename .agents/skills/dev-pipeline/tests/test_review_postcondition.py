@@ -153,8 +153,8 @@ class TestCodexPostCondition:
         review_json = '{"verdict":"comment","summary":"ok","issues":[]}'
 
         def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
-            if "-o" in cmd:
-                out_path = cmd[cmd.index("-o") + 1]
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
                 Path(out_path).write_text(review_json)
             return _make_run_result(rc=0, stderr="codex ok")
 
@@ -182,8 +182,8 @@ class TestCodexPostCondition:
         review_json = '{"verdict":"comment","summary":"ok","issues":[]}'
 
         def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
-            if "-o" in cmd:
-                out_path = cmd[cmd.index("-o") + 1]
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
                 Path(out_path).write_text(review_json)
             return _make_run_result(rc=0, stderr="codex ok")
 
@@ -213,8 +213,8 @@ class TestCodexPostCondition:
         review_json = '{"verdict":"comment","summary":"ok","issues":[]}'
 
         def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
-            if "-o" in cmd:
-                out_path = cmd[cmd.index("-o") + 1]
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
                 Path(out_path).write_text(review_json)
             return _make_run_result(rc=0, stderr="codex ok")
 

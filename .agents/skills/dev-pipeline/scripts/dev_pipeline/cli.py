@@ -143,12 +143,26 @@ def cmd_parse_review(args) -> int:
 
 
 def cmd_init(args) -> int:
-    """Create pipeline directories for an area."""
+    """Create pipeline directories for an area. Optionally create initial state file."""
     monorepo_root = _get_monorepo_root()
-    from .paths import pipeline_init
+    from .paths import pipeline_init, area_repo_dir, pipeline_worktree_path
+    from .state_store import state_exists, state_write
+    from .models import PipelineState, PipelineStep, Paths
 
     try:
         pipeline_init(args.area, monorepo_root)
+        if args.issue is not None and not state_exists(args.issue, args.area, monorepo_root):
+            state = PipelineState(
+                issue=args.issue,
+                area=args.area,
+                step=PipelineStep.BUILD,
+                paths=Paths(
+                    skill_cwd=str(monorepo_root),
+                    repo_dir=str(area_repo_dir(args.area, monorepo_root)),
+                    worktree_dir=str(pipeline_worktree_path(args.issue, args.area, monorepo_root)),
+                ),
+            )
+            state_write(args.issue, args.area, monorepo_root, state)
         return 0
     except Exception as e:
         print(str(e), file=sys.stderr)
@@ -333,6 +347,58 @@ def cmd_check_lease(args) -> int:
     return 0
 
 
+def cmd_step(args) -> int:
+    """Execute a pipeline step and output action:data: routing result."""
+    monorepo_root = _get_monorepo_root()
+    from .steps import (
+        step_build_setup,
+        step_build_finalize,
+        step_review_dispatch,
+        step_review_wait,
+        step_review_process,
+        step_resolve_setup,
+        step_resolve_finalize,
+        step_merge,
+        step_log_finalize,
+    )
+
+    name = args.name
+    phase = getattr(args, "phase", None)
+
+    dispatch = {
+        ("build", "setup"): lambda: step_build_setup(args.issue, args.area, monorepo_root),
+        ("build", "finalize"): lambda: step_build_finalize(args.issue, args.area, monorepo_root),
+        ("review-dispatch", None): lambda: step_review_dispatch(
+            args.issue, args.area, monorepo_root, tool=args.tool,
+        ),
+        ("review-wait", None): lambda: step_review_wait(args.issue, args.area, monorepo_root),
+        ("review-process", None): lambda: step_review_process(
+            args.issue, args.area, monorepo_root, review_id=args.review_id,
+        ),
+        ("resolve", "setup"): lambda: step_resolve_setup(args.issue, args.area, monorepo_root),
+        ("resolve", "finalize"): lambda: step_resolve_finalize(args.issue, args.area, monorepo_root),
+        ("merge", None): lambda: step_merge(args.issue, args.area, monorepo_root),
+        ("log", "finalize"): lambda: step_log_finalize(args.issue, args.area, monorepo_root),
+    }
+    fn = dispatch.get((name, phase))
+    if fn is None:
+        print(f"Unknown step/phase: {name}/{phase}", file=sys.stderr)
+        return 2
+
+    try:
+        result = fn()
+        print(f"action:{result.action}")
+        print(f"data:{json.dumps(result.data)}")
+        if result.message:
+            print(result.message, file=sys.stderr)
+        return 0
+    except Exception as e:
+        print("action:error")
+        print(f"data:{json.dumps({'error': str(e)})}")
+        print(f"[step:{name}] {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_check_commits(args) -> int:
     """Check GitHub for new commits on a PR."""
     from .github_client import check_new_commits
@@ -411,6 +477,8 @@ def main():
     # init
     p_init = sub.add_parser("init", help="Create pipeline directories for an area")
     p_init.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_init.add_argument("--issue", type=int, default=None,
+                        help="Create initial state file for this issue")
     p_init.set_defaults(func=cmd_init)
 
     # state-update
@@ -470,6 +538,20 @@ def main():
     p_rl.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_rl.add_argument("--owner", required=True, choices=["manual", "pipeline", "orchestrator"])
     p_rl.set_defaults(func=cmd_release_lease)
+
+    # step
+    _STEP_CHOICES = [
+        "build", "review-dispatch", "review-wait", "review-process",
+        "resolve", "merge", "log",
+    ]
+    p_step = sub.add_parser("step", help="Execute a pipeline step")
+    p_step.add_argument("name", choices=_STEP_CHOICES)
+    p_step.add_argument("--issue", type=int, required=True)
+    p_step.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_step.add_argument("--phase", choices=["setup", "finalize"])
+    p_step.add_argument("--review-id", type=int, default=0)
+    p_step.add_argument("--tool", default="claude")
+    p_step.set_defaults(func=cmd_step)
 
     # check-lease
     p_cl = sub.add_parser("check-lease", help="Print current lease owner for an issue")

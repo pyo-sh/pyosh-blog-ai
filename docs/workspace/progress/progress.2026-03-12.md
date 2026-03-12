@@ -26,6 +26,13 @@
   - `dev-log/SKILL.md`: Phase 0에 worktree 컨텍스트 감지 지시 추가 - 선행 `/dev-build` 컨텍스트에 worktree 경로가 있으면 이동 후 Phase 0 실행 → `IN_ROOT_WORKTREE=true` → Phase 4.5 → squash merge 충돌 방지
   - codex 0.114.0 `--output-schema` 플래그 제거로 codex review 실패 → claude 폴백으로 자동 전환 확인
 
+- [x] dev-review + dev-issue SKILL.md 표준화 (#152, PR #156)
+  - 6개 dev-* 스킬의 SKILL.md 섹션 구조 통일 - 첫 2개 스킬(dev-review, dev-issue) 적용
+  - 표준 섹션 순서: Invariants → Environment → Workflow → Constraints
+  - `dev-review`: `## Prohibited` → `## Invariants`로 이동, `## Steps` → `## Workflow` 이름 변경, `## Verdict rules` → `## Constraints` 하위로 이동
+  - `dev-issue`: `## Constraints` 3줄 → `## Invariants`로 승격, Title rules/Labels → `## Constraints` 하위로 이동, 섹션 순서 재배치
+
+
 ## Discoveries
 - `gh pr edit --body-file` 실패: GitHub Projects Classic deprecation 에러 발생 시 GraphQL `updatePullRequest` mutation으로 우회
 

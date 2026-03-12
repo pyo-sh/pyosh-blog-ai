@@ -573,8 +573,7 @@ def _dispatch_codex(
         cmd = [
             "codex", "exec", "review",
             "--base", f"origin/{base_ref}",
-            "--output-schema", str(schema_path),
-            "-o", str(review_json_path),
+            "--output-last-message", str(review_json_path),
             "--dangerously-bypass-approvals-and-sandbox",
         ]
         if model:
