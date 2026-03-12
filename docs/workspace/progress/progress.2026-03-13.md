@@ -1,5 +1,21 @@
 # Progress 2026-03-13
 
+## orchctl leader lease + dispatch idempotency (#87, PR #173)
+
+- **목적**: 다중 프로세스 환경에서 reconcile 루프 중복 실행 방지 및 attempt 중복 dispatch 차단
+- **schema migration v3**:
+  - `ALTER TABLE leases ADD COLUMN heartbeat_at TEXT` (simple ALTER TABLE - atomic, no intermediate state)
+  - `CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_active_unique ON attempts(issue_id) WHERE status = 'running'` (partial unique index)
+  - migration 번호 v3으로 변경 - PR #172(issue #85 follow-up)가 main에 먼저 merge되어 v2 충돌 발생, origin/main 합병 후 재번호화
+- **`orchctl/db/lease.py` 신규 모듈**: `acquire` / `renew` / `release` / `cleanup_stale` / `has_active_attempt`
+  - `_utcnow()`: SQLite `datetime()` 출력과 일치하도록 `"%Y-%m-%d %H:%M:%S"` 공백 구분자 사용 (ISO T-format 아님)
+  - `_pid_alive()`: `PermissionError` → alive(프로세스 존재, signal 권한 없음), `ProcessLookupError` → dead
+  - `acquire()`: `cleanup_stale()` 후 `conn.commit()` 호출 - IntegrityError rollback이 cleanup 삭제를 되돌리지 않도록
+  - `cleanup_stale()`: commit 미포함 - caller 책임. expiry는 atomic SQL DELETE, dead-PID는 `(area, holder_pid, expires_at)` 정밀 predicate
+- **reconcile 커맨드**: area 리스 취득 후 진입, version guard(스키마 버전 미달 시 ClickException), 이슈별 renew, 리스 분실 시 abort
+- **테스트**: 41개 신규 (test_lease.py 17개 + test_cli.py 업데이트), v2 vocabulary 적용(`state='pending'`, `status='completed'`/`'failed'`)
+- **리뷰 8라운드**: migration 멱등성, cleanup_stale TOCTOU, version guard, datetime format, commit 책임 분리, schema vocabulary 호환
+
 ## dev-pipeline: log → merge 순서 변경 (#164, PR #165)
 
 - **문제**: dev-pipeline 상태 머신이 `merge → log → done` 순서로 실행되어, dev-log가 standalone 모드의 `lock_merge`로 local main에 커밋하지만 push하지 않음. 다음 PR squash merge 시 origin/main과 발산하여 `ff-only` 실패 100% 재현
