@@ -2,15 +2,29 @@
 
 Resume from state file on crash/disconnect. Jump to the `step` field - each step self-validates on entry.
 
-## Step self-validation
+## Recovery strategy (v3)
 
-| step | Entry validation |
-|------|-----------------|
-| `build` | If `.branch` exists: `gh pr list --head {branch}`. PR open -> `review`. Merged -> `log`. None -> re-run `/dev-build`. If no state file or no `.branch`: start fresh. |
-| `review` | `github_client.check_review_exists()` / CLI `check-review`. Found -> process review (count severities, auto-decide based on round count). Not found -> run headless. |
-| `resolve` | Check local `git rev-parse HEAD` vs `lastCommitSha`. Mismatch + clean -> push and skip to 4d. Mismatch + dirty -> stop, report to user. Match + dirty -> stop, report to user. Match + clean -> `github_client.check_new_commits()` / CLI `check-commits`. Found -> update `.lastCommitSha` + reset `.stageRetries.resolve`, show diff, ask user (context lost). Not found -> resolve directly in pipeline session. |
-| `merge` | `gh pr view --json state`. MERGED -> `log`. CLOSED -> stop, report. OPEN -> merge. |
-| `log` | Re-run `/dev-log` (idempotent). Delete state file after. |
+Step functions perform entry validation internally. Recovery procedure:
+
+1. Read `.step` from the state file
+2. `python -m dev_pipeline sync-state --issue N --area A` (syncs latest SHA and review ID from GitHub/git)
+3. Run the corresponding step command - the step function internally:
+   - Checks worktree existence and state
+   - Compares LOCAL_HEAD vs state SHA
+   - Verifies working tree clean/dirty status
+   - Returns `action: recovery` on inconsistency (reports to user)
+
+### Recovery action mapping
+
+| Step function | Recovery situation | action |
+|---|---|---|
+| `resolve --phase setup` | HEAD != state SHA + clean | `recovery` (prior commit detected) |
+| `resolve --phase setup` | HEAD != state SHA + dirty | `recovery` (uncommitted changes) |
+| `resolve --phase setup` | HEAD == state SHA + dirty | `recovery` (partial fix) |
+| `resolve --phase setup` | Remote has new commits | `recovery` (external change) |
+| `build --phase setup` | Rebase failure | merge_no_edit fallback |
+| `merge` | Merge failure | `retry` (stage_retry handled internally) |
+| `merge` | Retries exhausted | `escalate` |
 
 ## Self-healing on failure
 
