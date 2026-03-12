@@ -95,6 +95,9 @@ Convert to JSON for `orch_init`:
 ```bash
 # Build dag_json, dep_types_json, cross_area_deps_json from --parse-typed output.
 # Filter each dep list to in-batch issues only.
+# issues_json must be assigned BEFORE the loop (used inside for in-batch filtering).
+
+issues_json=$(echo "$ISSUES" | tr ' ' '\n' | jq -R 'tonumber' | jq -sc '.')
 
 dag_json="{"
 dep_types_json="{"
@@ -121,8 +124,6 @@ done
 dag_json="${dag_json%,}}"
 dep_types_json="${dep_types_json%,}}"
 cross_area_deps_json="${cross_area_deps_json%,}}"
-
-issues_json=$(echo "$ISSUES" | tr ' ' '\n' | jq -R 'tonumber' | jq -sc '.')
 
 orch_init "$AREA" "$AGENT" "$issues_json" "$dag_json" 4 "$dep_types_json" "$cross_area_deps_json"
 ```

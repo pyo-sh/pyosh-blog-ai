@@ -1118,7 +1118,9 @@ orch_unblock() {
   #   completed | failed | skipped_dep_failed | blocked-failed-dependency |
   #   blocked-external | cycle-isolated
   #
-  # stdout: space-separated list of newly-unblocked issue numbers
+  # stdout: space-separated list of issues that transitioned out of blocked.
+  #   Includes pending, blocked-failed-dependency, and blocked-external.
+  #   Callers must filter on status==pending before dispatching.
   local area=$1
   local done_issue=$2
 
