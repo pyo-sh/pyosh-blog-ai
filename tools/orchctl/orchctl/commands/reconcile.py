@@ -1,6 +1,7 @@
 """orchctl reconcile — gated reconciliation pass."""
 
 import os
+import sqlite3
 
 import click
 
@@ -43,7 +44,7 @@ def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
         conn.close()
 
 
-def _run_pass(conn, area: str, pid: int, dry_run: bool) -> None:
+def _run_pass(conn: sqlite3.Connection, area: str, pid: int, dry_run: bool) -> None:
     """Execute one reconciliation pass under the area lease."""
     pending = conn.execute(
         "SELECT id, number FROM issues WHERE area = ? AND state = 'pending'",

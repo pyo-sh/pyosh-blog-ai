@@ -94,6 +94,9 @@ def cleanup_stale(conn: sqlite3.Connection) -> int:
     expires_at) so that a concurrent insert of a fresh lease for the same area
     is not accidentally evicted.
 
+    **Always calls conn.commit()** before returning.  Callers that have other
+    pending writes on the same connection will have those writes committed too.
+
     Returns the number of leases removed.
     """
     # Atomic expiry check — no Python snapshot involved
