@@ -5,61 +5,62 @@ description: Respond to PR review comments. Reads review feedback, applies fixes
 
 # Dev-Resolve
 
-Fix reviewed items, record the work, push, and request re-review.
+Read PR review -> fix code -> push -> post response.
+
+> Scripts: `.agents/skills/dev-resolve/scripts/`
+
+## Invariants
+
+1. All edits in issue worktree only, never canonical repo.
+2. `[CRITICAL]`/`[WARNING]`: must fix.
+3. `[SUGGESTION]`: fix if valid, skip with reason.
+4. Commit message: `fix: address review comments (#{ISSUE})`.
+
+## Environment
+
+`REPO`, `PR`, `ISSUE`, `WORKTREE_DIR` from pipeline env vars or user input.
 
 ## Workflow
 
 ### 1. Read review
 
-Use the repo explicitly:
-
-```bash
-gh pr view "$PR" -R "$REPO" --json number,title,state,body,reviews
-gh api "repos/${REPO}/pulls/${PR}/reviews"
+```
+python3 scripts/review_reader.py --repo "$REPO" --pr "$PR" [--review-id $REVIEW_ID]
 ```
 
-### 2. Classify and plan
+Output JSON: `{ "title", "state", "reviewBody", "comments" }`.
 
-- `[CRITICAL]` / `[WARNING]` -> fix
-- `[SUGGESTION]` -> fix if valid, otherwise skip with a reason
+### 2. Classify and plan (AI judgment)
 
-### 3. Fix code in the worktree
+Parse severity labels (`[CRITICAL]`, `[WARNING]`, `[SUGGESTION]`).
+Plan fix strategy per item.
 
-All source edits and feature-branch git commands must run inside the issue worktree:
+### 3. Fix code (AI judgment)
 
-```bash
-cd "$WORKTREE_DIR"
-```
+All edits in `$WORKTREE_DIR` using Read/Edit/Write tools. Never edit files in the canonical repo dir.
 
-Never edit files in the canonical repo dir.
-
-Commit example:
+### 4. Commit and push
 
 ```bash
-git commit -m "fix: address review comments (#${ISSUE})"
+git -C "$WORKTREE_DIR" add -A
+git -C "$WORKTREE_DIR" commit -m "fix: address review comments (#$ISSUE)"
+git -C "$WORKTREE_DIR" push
 ```
 
-### 4. Push and post response
+### 5. Post response
 
-Push from the worktree:
+Write response per [response-template.md](references/response-template.md).
+Response file: `.workspace/messages/${REPO##*/}-pr-${PR}-response.md`
 
-```bash
-git push
+```
+python3 scripts/response_poster.py --repo "$REPO" --pr "$PR" --body-file <path> --cleanup
 ```
 
-Use a repo-scoped response file to avoid collisions:
-
-```bash
-MSG_FILE="/workspace/.workspace/messages/${REPO##*/}-pr-${PR}-response.md"
-mkdir -p "$(dirname "$MSG_FILE")"
-cat > "$MSG_FILE" <<'EOF_RESPONSE'
-{body}
-EOF_RESPONSE
-
-gh pr comment "$PR" -R "$REPO" --body-file "$MSG_FILE"
-rm -f "$MSG_FILE"
-```
-
-### 5. Notify user
+### 6. Notify user
 
 Summarize fixed and skipped counts. Advise re-review.
+
+## Constraints
+
+- Use `-R "$REPO"` for all `gh` commands.
+- Scripts run from skill base directory (`.agents/skills/dev-resolve/`).
