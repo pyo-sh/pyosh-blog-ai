@@ -135,9 +135,11 @@ Present list to user for confirmation before proceeding.
 
 ### 3. Build dependency DAG
 
-Parse `### Dependencies` section from each issue body via `parse-dependencies.sh`. Build DAG: `dag[N]="dep1 dep2"`. Run cycle detection - abort if cycle found. See [dependency-resolution.md](references/dependency-resolution.md).
+Parse each issue body with `--parse-typed` to get typed deps (fenced block preferred, `### Dependencies` fallback). Build `dag`, `dep_types`, and `cross_area_deps` structures. See [dependency-resolution.md](references/dependency-resolution.md).
 
-Write initial state via `orch_init`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), `providers` (GitHub circuit breaker), timestamps.
+Cycle detection runs inside `orch_init` (SCC isolation - cycle issues get `cycle-isolated`, batch continues). Do NOT pre-abort on cycles.
+
+Write initial state via `orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent] [dep_types_json] [cross_area_deps_json]`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `dagTypes{}`, `crossAreaDeps{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), `providers` (GitHub circuit breaker), timestamps.
 
 ### 4. Enter poll cycle (dispatch + monitor)
 
