@@ -367,12 +367,12 @@ def step_suggestion_decide(
 
     if decision == "merge":
         state_update(issue, area, monorepo_root, {
-            "step": "merge",
+            "step": "log",
             "reviewResolveRound": round_num + 1,
         })
         log_transition(
             issue, area, monorepo_root,
-            "review_process", "merge", "suggestion_only -> merge",
+            "review_process", "log", "suggestion_only -> log (skip resolve)",
         )
         return StepResult(action="merge", data={"round": round_num + 1})
 
@@ -513,8 +513,8 @@ def step_resolve_finalize(issue: int, area: str, monorepo_root: Path) -> StepRes
         state_update(issue, area, monorepo_root, {"lastCommitSha": new_sha})
 
     if state.skip_review:
-        state_update(issue, area, monorepo_root, {"step": "merge"})
-        log_transition(issue, area, monorepo_root, "resolve", "merge", "skipReview=true")
+        state_update(issue, area, monorepo_root, {"step": "log"})
+        log_transition(issue, area, monorepo_root, "resolve", "log", "skipReview=true")
         return StepResult(action="merge", data={"sha": new_sha or ""})
     else:
         state_update(issue, area, monorepo_root, {"step": "review_dispatch"})
@@ -526,11 +526,45 @@ def step_resolve_finalize(issue: int, area: str, monorepo_root: Path) -> StepRes
 
 
 # ---------------------------------------------------------------------------
-# 6. merge
+# 5. log (setup + finalize) — runs BEFORE merge
+# ---------------------------------------------------------------------------
+
+def step_log_setup(issue: int, area: str, monorepo_root: Path) -> StepResult:
+    """Provide worktree path for /dev-log execution."""
+    wt = pipeline_worktree_path(issue, area, monorepo_root)
+    if not wt.exists():
+        return StepResult(action="escalate", data={"reason": "worktree not found"})
+    return StepResult(
+        action="ready",
+        data={"worktreePath": str(wt)},
+        message=f"[step:log:setup] worktree={wt}",
+    )
+
+
+def step_log_finalize(issue: int, area: str, monorepo_root: Path) -> StepResult:
+    """Push dev-log commit and transition to merge."""
+    wt = pipeline_worktree_path(issue, area, monorepo_root)
+
+    # Push any dev-log commits to the PR branch
+    if wt.exists():
+        if not push_safely(str(wt)):
+            return StepResult(action="escalate", data={"reason": "dev-log push failed"})
+        new_sha = rev_parse_head(str(wt))
+        if new_sha:
+            state_update(issue, area, monorepo_root, {"lastCommitSha": new_sha})
+
+    state_update(issue, area, monorepo_root, {"step": "merge"})
+    log_transition(issue, area, monorepo_root, "log", "merge", "dev-log complete")
+
+    return StepResult(action="merge", data={})
+
+
+# ---------------------------------------------------------------------------
+# 6. merge + cleanup
 # ---------------------------------------------------------------------------
 
 def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
-    """Check PR state, merge, fetch/prune."""
+    """Check PR state, merge, cleanup."""
     state = state_read(issue, area, monorepo_root)
     pr = state.pr
     branch = state.branch
@@ -542,7 +576,9 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
         return StepResult(action="escalate", data={"reason": f"get_pr_state failed: {e}"})
 
     if pr_state == "MERGED":
-        state_update(issue, area, monorepo_root, {"step": "log"})
+        fetch_prune(str(repo_dir))
+        log_transition(issue, area, monorepo_root, "merge", "done", "PR already merged")
+        cleanup(issue, area, branch, pr, monorepo_root)
         return StepResult(action="already_merged", data={"pr": pr})
     if pr_state == "CLOSED":
         return StepResult(action="closed", data={"pr": pr})
@@ -556,21 +592,7 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
         return StepResult(action="escalate", data={"reason": f"merge failed: {e}"})
 
     fetch_prune(str(repo_dir))
-    state_update(issue, area, monorepo_root, {"step": "log"})
-    log_transition(issue, area, monorepo_root, "merge", "log", "PR merged")
+    log_transition(issue, area, monorepo_root, "merge", "done", "PR merged")
+    cleanup(issue, area, branch, pr, monorepo_root)
 
     return StepResult(action="merged", data={"pr": pr})
-
-
-# ---------------------------------------------------------------------------
-# 7. log + cleanup
-# ---------------------------------------------------------------------------
-
-def step_log_finalize(
-    issue: int, area: str, monorepo_root: Path, owner: str = "pipeline",
-) -> StepResult:
-    """Cleanup after /dev-log completes."""
-    state = state_read(issue, area, monorepo_root)
-    cleanup(issue, area, state.branch, state.pr, monorepo_root)
-
-    return StepResult(action="done", data={})

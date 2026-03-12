@@ -359,8 +359,9 @@ def cmd_step(args) -> int:
         step_suggestion_decide,
         step_resolve_setup,
         step_resolve_finalize,
-        step_merge,
+        step_log_setup,
         step_log_finalize,
+        step_merge,
     )
 
     name = args.name
@@ -381,8 +382,9 @@ def cmd_step(args) -> int:
         ),
         ("resolve", "setup"): lambda: step_resolve_setup(args.issue, args.area, monorepo_root),
         ("resolve", "finalize"): lambda: step_resolve_finalize(args.issue, args.area, monorepo_root),
-        ("merge", None): lambda: step_merge(args.issue, args.area, monorepo_root),
+        ("log", "setup"): lambda: step_log_setup(args.issue, args.area, monorepo_root),
         ("log", "finalize"): lambda: step_log_finalize(args.issue, args.area, monorepo_root),
+        ("merge", None): lambda: step_merge(args.issue, args.area, monorepo_root),
     }
     fn = dispatch.get((name, phase))
     if fn is None:
