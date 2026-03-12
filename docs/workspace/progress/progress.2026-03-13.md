@@ -10,6 +10,19 @@
 - **리뷰 피드백**: `push_safely` 반환값 미검사 경고 수정, `log_transition` audit trail 추가
 - 2라운드 리뷰, PR #165 squash merge 완료
 
+## orchctl CLI skeleton + SQLite schema (#85, PR #167)
+
+- **목적**: Stage 2 오케스트레이터 재설계의 기반 - Python 기반 `orchctl` CLI와 WAL+FK SQLite 데이터베이스
+- **구현**: `tools/orchctl/` 패키지 신규 생성
+  - Click CLI 진입점: `init`, `status`, `doctor`, `reconcile` (stub) subcommands
+  - SQLite schema v1: `issues`(CHECK constraints), `attempts`, `heartbeats`, `leases`, `config` + `issues_updated_at` 트리거
+  - 마이그레이션 러너: idempotent DDL(`IF NOT EXISTS` / `ON CONFLICT DO NOTHING`), `current_version()` 공개 API
+  - FK 인덱스: `idx_attempts_issue_id`, `idx_heartbeats_attempt_id`
+  - `status`/`doctor`는 uninit DB에서 `ClickException` 발생, try/finally로 connection 보장 해제
+- **테스트**: 16개 tests (DB 초기화, schema, CRUD, 멱등성, CLI 명령, doctor dirty-data 탐지)
+- **리뷰**: 5라운드 - `_current_version` 공개 API 승격, heartbeats FK 인덱스, `check_same_thread=False` 제거, `run_migrations()` hardcoded constant 수정, try/finally 패턴, 탐지 테스트 추가
+- PR #167 5라운드 리뷰 resolve 완료
+
 ## dev-log detect-context area 검증 (#164, PR #166)
 
 - **문제**: `detect-context`가 `.workspace/worktrees/` 하위 경로만으로 `inRootWorktree: true` 판단하여 client/server worktree에서 false positive 발생. dev-log가 client/server PR branch에 docs를 혼입할 위험
