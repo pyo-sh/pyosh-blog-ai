@@ -348,6 +348,65 @@ def step_review_process(
 
 
 # ---------------------------------------------------------------------------
+# 3b. suggestion_decide
+# ---------------------------------------------------------------------------
+
+def step_suggestion_decide(
+    issue: int, area: str, monorepo_root: Path, decision: str,
+) -> StepResult:
+    """Apply AI's suggestion_only decision: merge, resolve-skip, or resolve-review.
+
+    Called after step_review_process returns action=suggestion_only and the AI
+    decides how to handle suggestions.
+
+    Args:
+        decision: one of "merge", "resolve-skip", "resolve-review"
+    """
+    state = state_read(issue, area, monorepo_root)
+    round_num = state.review_resolve_round
+
+    if decision == "merge":
+        state_update(issue, area, monorepo_root, {
+            "step": "merge",
+            "reviewResolveRound": round_num + 1,
+        })
+        log_transition(
+            issue, area, monorepo_root,
+            "review_process", "merge", "suggestion_only -> merge",
+        )
+        return StepResult(action="merge", data={"round": round_num + 1})
+
+    if decision == "resolve-skip":
+        state_update(issue, area, monorepo_root, {
+            "step": "resolve",
+            "skipReview": True,
+            "reviewResolveRound": round_num + 1,
+        })
+        log_transition(
+            issue, area, monorepo_root,
+            "review_process", "resolve", "suggestion_only -> resolve (skipReview)",
+        )
+        return StepResult(action="resolve", data={"round": round_num + 1})
+
+    if decision == "resolve-review":
+        state_update(issue, area, monorepo_root, {
+            "step": "resolve",
+            "skipReview": False,
+            "reviewResolveRound": round_num + 1,
+        })
+        log_transition(
+            issue, area, monorepo_root,
+            "review_process", "resolve", "suggestion_only -> resolve (re-review)",
+        )
+        return StepResult(action="resolve", data={"round": round_num + 1})
+
+    return StepResult(
+        action="error",
+        data={"error": f"invalid decision: {decision}"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # 4. resolve (setup + finalize)
 # ---------------------------------------------------------------------------
 
@@ -447,11 +506,11 @@ def step_resolve_finalize(issue: int, area: str, monorepo_root: Path) -> StepRes
     if has_staged_changes(str(wt)):
         commit(str(wt), f"fix: address review comments (#{issue})")
         push_safely(str(wt))
-        new_sha = rev_parse_head(str(wt))
-        if new_sha:
-            state_update(issue, area, monorepo_root, {"lastCommitSha": new_sha})
-    else:
-        new_sha = state.last_commit_sha
+
+    # Always read current HEAD - AI may have committed directly before finalize
+    new_sha = rev_parse_head(str(wt))
+    if new_sha and new_sha != state.last_commit_sha:
+        state_update(issue, area, monorepo_root, {"lastCommitSha": new_sha})
 
     if state.skip_review:
         state_update(issue, area, monorepo_root, {"step": "merge"})

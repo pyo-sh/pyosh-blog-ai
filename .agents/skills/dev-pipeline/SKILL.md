@@ -7,7 +7,7 @@ description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge 
 
 Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 
-> CLI: `cd .agents/skills/dev-pipeline/scripts && python -m dev_pipeline <cmd>`
+> CLI: `cd .agents/skills/dev-pipeline/scripts && python3 -m dev_pipeline <cmd>`
 > Worktree: `.workspace/worktrees/{area}/issue-{N}` | State: `.workspace/pipeline/{area}/issue-{N}.state.json`
 
 ## Invariants
@@ -15,9 +15,9 @@ Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 1. **Headless review cwd is always monorepo root**. Never start `claude -p` from a worktree.
 2. **Feature-branch edits happen only in the issue worktree**.
 3. **gh commands use explicit repo selection** (`-R owner/name`).
-4. **Review dispatch always via `python -m dev_pipeline run`**. Never invoke review tools directly.
+4. **Review dispatch always via `python3 -m dev_pipeline run`**. Never invoke review tools directly.
 5. **Resolve runs directly in the pipeline session**, not as a headless sub-agent.
-6. **Merge lock held inside one CLI call** (`python -m dev_pipeline merge`).
+6. **Merge lock held inside one CLI call** (`python3 -m dev_pipeline merge`).
 7. **`run`/`cleanup` manage the issue lease internally.** `--owner manual` for interactive; `--owner pipeline` for automated.
 8. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees` under `.workspace/.../{area}/`).
 
@@ -31,6 +31,8 @@ Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 | `review_wait` | `review_dispatch` | Review not found + job failed | No |
 | `review_process` | `resolve` | Critical > 0 or Warning > 0 | No |
 | `review_process` | `merge` | Critical = 0 and Warning = 0 | No |
+| `review_process` | `suggestion_decide` | Suggestion > 0 only | No |
+| `suggestion_decide` | `resolve` or `merge` | AI decision | No |
 | `resolve` | `review_dispatch` | skipReview=false, fixes applied | No |
 | `resolve` | `merge` | skipReview=true | No |
 | `merge` | `log` | PR merged | No |
@@ -41,27 +43,27 @@ Only `review_dispatch -> review_wait` requires a turn break. All other transitio
 ## Workflow
 
 ### 0. Initialize / resume
-`python -m dev_pipeline init --area "$AREA" --issue "$ISSUE"`
-If state exists, resume from `.step`. On crash: `python -m dev_pipeline sync-state --issue "$ISSUE" --area "$AREA"`
+`python3 -m dev_pipeline init --area "$AREA" --issue "$ISSUE"`
+If state exists, resume from `.step`. On crash: `python3 -m dev_pipeline sync-state --issue "$ISSUE" --area "$AREA"`
 
 ### 1. build
-Pre: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase setup`
+Pre: `python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase setup`
 Act: `/dev-build root #$ISSUE`
-Post: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase finalize` -> review_dispatch
+Post: `python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase finalize` -> review_dispatch
 
 ### 2a. review_dispatch
-`python -m dev_pipeline step review-dispatch --issue $ISSUE --area $AREA [--tool $TOOL]`
+`python3 -m dev_pipeline step review-dispatch --issue $ISSUE --area $AREA [--tool $TOOL]`
 
 | action | Next |
 |---|---|
 | `found` | review_process (`data.reviewId`) |
-| `dispatch` | `python -m dev_pipeline run ... --pr $PR --tool $TOOL` in **background** -> **end turn** (do not sleep, poll, or output status; resume on task-notification only) |
+| `dispatch` | `python3 -m dev_pipeline run ... --pr $PR --tool $TOOL [--model $MODEL]` in **background** -> **end turn** (do not sleep, poll, or output status; resume on task-notification only) |
 | `error` | Stop, report |
 
 When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling Step 3.
 
 ### 2b. review_wait (on resume after task-notification)
-`python -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
+`python3 -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
 
 | action | Next |
 |---|---|
@@ -72,7 +74,7 @@ When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling 
 Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 
 ### 3. review_process
-`python -m dev_pipeline step review-process --issue $ISSUE --area $AREA --review-id $REVIEW_ID`
+`python3 -m dev_pipeline step review-process --issue $ISSUE --area $AREA --review-id $REVIEW_ID`
 
 | action | Next |
 |---|---|
@@ -83,16 +85,27 @@ Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 | `escalate` | Stop, report |
 
 **`suggestion_only` rules** (Critical=0, Warning=0, Suggestion>0; first matching rule wins):
-- Style/formatting only, all 1-line -> merge (auto)
-- Logic change or structural impact -> resolve then re-review (skipReview=false)
-- All trivial, count <= 3 -> resolve then merge (skipReview=true)
-- Otherwise -> merge (auto)
+- Style/formatting only, all 1-line -> `merge`
+- Logic change or structural impact -> `resolve-review`
+- All trivial, count <= 3 -> `resolve-skip`
+- Otherwise -> `merge`
+
+### 3b. suggestion_decide
+`python3 -m dev_pipeline step suggestion-decide --issue $ISSUE --area $AREA --decision $DECISION`
+
+`$DECISION` is one of: `merge`, `resolve-skip`, `resolve-review` (from the rules above).
+
+| action | Next |
+|---|---|
+| `merge` | merge |
+| `resolve` | resolve |
+| `error` | Stop, report |
 
 ### 4. resolve
-Pre: `python -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase setup`
+Pre: `python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase setup`
 `data`: `reviewBody`, `comments` (JSON array), `worktreePath`
 Act: Fix code in worktree. `[CRITICAL]`/`[WARNING]`: must fix. `[SUGGESTION]`: fix if valid.
-Post: `python -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase finalize`
+Post: `python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase finalize`
 
 | action | Next |
 |---|---|
@@ -100,7 +113,7 @@ Post: `python -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase f
 | `merge` | merge |
 
 ### 5. merge
-`python -m dev_pipeline step merge --issue $ISSUE --area $AREA`
+`python3 -m dev_pipeline step merge --issue $ISSUE --area $AREA`
 
 | action | Next |
 |---|---|
@@ -110,7 +123,7 @@ Post: `python -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase f
 
 ### 6. log + cleanup
 Act: `/dev-log`
-Post: `python -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize` -> Done.
+Post: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize` -> Done.
 
 ## Constraints
 
@@ -118,7 +131,7 @@ Post: `python -m dev_pipeline step log --issue $ISSUE --area $AREA --phase final
 - **Auto-merge** when Critical=0 AND Warning=0, or user approves.
 - **User approval required** when round limit reached with Critical/Warning.
 - Source edits only in resolve step, only in the issue worktree.
-- On error: `python -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step "$STEP"`
+- On error: `python3 -m dev_pipeline escalation --issue "$ISSUE" --area "$AREA" --step "$STEP"`
 
 ## References
 

@@ -356,6 +356,7 @@ def cmd_step(args) -> int:
         step_review_dispatch,
         step_review_wait,
         step_review_process,
+        step_suggestion_decide,
         step_resolve_setup,
         step_resolve_finalize,
         step_merge,
@@ -374,6 +375,9 @@ def cmd_step(args) -> int:
         ("review-wait", None): lambda: step_review_wait(args.issue, args.area, monorepo_root),
         ("review-process", None): lambda: step_review_process(
             args.issue, args.area, monorepo_root, review_id=args.review_id,
+        ),
+        ("suggestion-decide", None): lambda: step_suggestion_decide(
+            args.issue, args.area, monorepo_root, decision=args.decision,
         ),
         ("resolve", "setup"): lambda: step_resolve_setup(args.issue, args.area, monorepo_root),
         ("resolve", "finalize"): lambda: step_resolve_finalize(args.issue, args.area, monorepo_root),
@@ -542,7 +546,7 @@ def main():
     # step
     _STEP_CHOICES = [
         "build", "review-dispatch", "review-wait", "review-process",
-        "resolve", "merge", "log",
+        "suggestion-decide", "resolve", "merge", "log",
     ]
     p_step = sub.add_parser("step", help="Execute a pipeline step")
     p_step.add_argument("name", choices=_STEP_CHOICES)
@@ -551,6 +555,7 @@ def main():
     p_step.add_argument("--phase", choices=["setup", "finalize"])
     p_step.add_argument("--review-id", type=int, default=0)
     p_step.add_argument("--tool", default="claude")
+    p_step.add_argument("--decision", default="", choices=["merge", "resolve-skip", "resolve-review"])
     p_step.set_defaults(func=cmd_step)
 
     # check-lease
