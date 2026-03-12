@@ -1,11 +1,11 @@
 ---
 name: dev-pipeline
-description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge for a monorepo with area-scoped worktrees. Headless review sessions start from monorepo root so skills resolve correctly; resolve runs directly in the pipeline session. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
+description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> log -> merge for a monorepo with area-scoped worktrees. Headless review sessions start from monorepo root so skills resolve correctly; resolve runs directly in the pipeline session. Activates on "/dev-pipeline", "run pipeline", "automated review", etc.
 ---
 
 # Dev-Pipeline
 
-Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
+Orchestrate build -> review -> resolve -> log -> merge for area-scoped issues.
 
 > CLI: `cd .agents/skills/dev-pipeline/scripts && python3 -m dev_pipeline <cmd>`
 > Worktree: `.workspace/worktrees/{area}/issue-{N}` | State: `.workspace/pipeline/{area}/issue-{N}.state.json`
@@ -30,13 +30,13 @@ Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 | `review_wait` | `review_process` | Review found on GitHub | No |
 | `review_wait` | `review_dispatch` | Review not found + job failed | No |
 | `review_process` | `resolve` | Critical > 0 or Warning > 0 | No |
-| `review_process` | `merge` | Critical = 0 and Warning = 0 | No |
+| `review_process` | `log` | Critical = 0 and Warning = 0 | No |
 | `review_process` | `suggestion_decide` | Suggestion > 0 only | No |
-| `suggestion_decide` | `resolve` or `merge` | AI decision | No |
+| `suggestion_decide` | `resolve` or `log` | AI decision | No |
 | `resolve` | `review_dispatch` | skipReview=false, fixes applied | No |
-| `resolve` | `merge` | skipReview=true | No |
-| `merge` | `log` | PR merged | No |
-| `log` | (done) | Cleanup complete | No |
+| `resolve` | `log` | skipReview=true | No |
+| `log` | `merge` | dev-log complete | No |
+| `merge` | (done) | PR merged + cleanup | No |
 
 Only `review_dispatch -> review_wait` requires a turn break. All other transitions happen within the same turn.
 
@@ -78,7 +78,7 @@ Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 
 | action | Next |
 |---|---|
-| `clean` | merge |
+| `clean` | log |
 | `resolve` | resolve |
 | `round_limit` | Interactive: ask user (continue / merge as-is / abort). Headless: `escalate` for Critical/Warning; auto-merge for suggestion-only |
 | `suggestion_only` | AI decides (see below) |
@@ -97,7 +97,7 @@ Extract `REVIEW_ID` from the step `data` JSON output before calling Step 3.
 
 | action | Next |
 |---|---|
-| `merge` | merge |
+| `merge` | log |
 | `resolve` | resolve |
 | `error` | Stop, report |
 
@@ -110,20 +110,27 @@ Post: `python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase 
 | action | Next |
 |---|---|
 | `re_review` | review_dispatch |
-| `merge` | merge |
+| `merge` | log |
 
-### 5. merge
+### 5. log
+Pre: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase setup`
+`data`: `worktreePath`
+Act: `/dev-log` (run in the issue worktree so dev-log pushes to PR branch)
+Post: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize`
+
+| action | Next |
+|---|---|
+| `merge` | merge |
+| `escalate` | Stop, report |
+
+### 6. merge + cleanup
 `python3 -m dev_pipeline step merge --issue $ISSUE --area $AREA`
 
 | action | Next |
 |---|---|
-| `merged` / `already_merged` | log |
+| `merged` / `already_merged` | (done) |
 | `retry` | merge (re-run) |
 | `closed` / `escalate` | Stop, report |
-
-### 6. log + cleanup
-Act: `/dev-log`
-Post: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize` -> Done.
 
 ## Constraints
 
