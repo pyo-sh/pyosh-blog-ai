@@ -7,6 +7,18 @@ from .models import PipelineState
 from .state_store import state_read
 
 
+class MergeConflictError(RuntimeError):
+    """Raised when a git merge or rebase fails with unresolved conflicts."""
+
+    def __init__(self, worktree: str, files: list):
+        self.worktree = worktree
+        self.files = files
+        super().__init__(
+            f"[controller] merge conflict in {worktree}"
+            + (f": {', '.join(files)}" if files else "")
+        )
+
+
 def format_escalation(issue: int, area: str, stage: str, monorepo_root: Path) -> str:
     """Return a multi-line escalation message for the given stage."""
     try:
@@ -61,6 +73,7 @@ def merge_pr(
     from .merge_lock import MergeLock
     from .git_ops import (
         fetch,
+        get_conflict_files,
         merge_abort,
         merge_no_edit,
         push_safely,
@@ -89,9 +102,9 @@ def merge_pr(
             if not rebase(wt, "origin/main"):
                 rebase_abort(wt)
                 if not merge_no_edit(wt, "origin/main"):
-                    raise RuntimeError(
-                        f"[controller] both rebase and merge failed in worktree {wt}"
-                    )
+                    conflict_files = get_conflict_files(wt)
+                    merge_abort(wt)
+                    raise MergeConflictError(wt, conflict_files)
 
             if not push_safely(wt):
                 raise RuntimeError(

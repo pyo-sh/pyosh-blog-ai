@@ -118,6 +118,7 @@ class PipelineState:
     transition_log: list = field(default_factory=list)
     recovery_log: list = field(default_factory=list)
     updated_at: Optional[str] = None
+    round_limit_reached_at: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -139,6 +140,7 @@ class PipelineState:
             "transitionLog": self.transition_log,
             "recoveryLog": self.recovery_log,
             "updatedAt": self.updated_at,
+            "roundLimitReachedAt": self.round_limit_reached_at,
         }
 
     @classmethod
@@ -186,4 +188,5 @@ class PipelineState:
             transition_log=d.get("transitionLog", []),
             recovery_log=d.get("recoveryLog", []),
             updated_at=d.get("updatedAt"),
+            round_limit_reached_at=d.get("roundLimitReachedAt"),
         )

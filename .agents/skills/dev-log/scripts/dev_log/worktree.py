@@ -30,7 +30,7 @@ def create_worktree(root: str) -> dict:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     branch = f"dev-log/{timestamp}"
     wt_path = str(Path(root) / ".workspace" / "worktrees" / f"dev-log-{timestamp}")
-    worktree_add(root, wt_path, branch, base="docs")
+    worktree_add(root, wt_path, branch, base="origin/docs")
     return {"worktreePath": wt_path, "branch": branch}
 
 

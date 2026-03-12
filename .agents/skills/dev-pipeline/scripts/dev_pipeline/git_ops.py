@@ -106,3 +106,14 @@ def branch_delete(repo_dir: str, branch: str) -> None:
 
 def fetch_prune(repo_dir: str) -> None:
     run(["git", "-C", repo_dir, "fetch", "--prune"], timeout=60)
+
+
+def get_conflict_files(worktree_dir: str) -> list:
+    """Return list of files with unresolved merge conflicts."""
+    result = run(
+        ["git", "-C", worktree_dir, "diff", "--name-only", "--diff-filter=U"],
+        timeout=10,
+    )
+    if result.rc != 0 or not result.stdout.strip():
+        return []
+    return [f for f in result.stdout.strip().splitlines() if f]

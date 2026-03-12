@@ -47,3 +47,5 @@ python3 "${MONOREPO}/.agents/skills/dev-review/scripts/review_publish.py" \
 - `request_changes`: any P0 or P1 issue exists
 - `comment`: only P2/P3/info issues
 - `approve`: no issues found
+
+**All verdicts** (including `approve`) must complete Steps 3-5. For `approve` with no issues: write review JSON with an empty `findings` array and `verdict: "approve"`, then publish normally via `review_publish.py`.

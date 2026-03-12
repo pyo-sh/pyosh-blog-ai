@@ -10,11 +10,12 @@ Signature convention:
 
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from .command_runner import run as run_cmd
-from .controller import cleanup, merge_pr
+from .controller import MergeConflictError, cleanup, merge_pr
 from .git_ops import (
     add_all,
     commit,
@@ -188,7 +189,10 @@ def step_review_dispatch(
             message=f"[step:review_dispatch] existing review found: {review_id}",
         )
 
-    state_update(issue, area, monorepo_root, {"step": "review_wait"})
+    state_update(issue, area, monorepo_root, {
+        "step": "review_wait",
+        "stageRetries": {"review_dispatch": 0},
+    })
     log_transition(
         issue, area, monorepo_root,
         "review_dispatch", "review_wait", f"dispatching with {tool}",
@@ -229,8 +233,19 @@ def step_review_wait(issue: int, area: str, monorepo_root: Path) -> StepResult:
         )
 
     # No review found - branch on job status
+
+    # failed_postcondition: AI ran but didn't post review. Retry once regardless of tool.
+    if job.status == ReviewJobStatus.FAILED_POSTCONDITION:
+        can_retry = stage_retry(issue, area, monorepo_root, "review_dispatch")
+        if can_retry:
+            state_update(issue, area, monorepo_root, {"step": "review_dispatch"})
+            return StepResult(
+                action="retry",
+                data={"tool": job.tool, "reason": "postcondition failed, retrying"},
+            )
+        # retries exhausted - fall through to existing _FAILED_STATUSES logic
+
     if job.status in _FAILED_STATUSES:
-        # Bug fix #2: ALL failed_* statuses trigger codex->claude fallback
         if job.tool == "codex":
             can_retry = stage_retry(issue, area, monorepo_root, "review_dispatch")
             if can_retry:
@@ -318,6 +333,9 @@ def step_review_process(
 
     if counts.critical > 0 or counts.warning > 0:
         if round_num >= max_rounds:
+            state_update(issue, area, monorepo_root, {
+                "roundLimitReachedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
             return StepResult(
                 action="round_limit",
                 data={
@@ -562,9 +580,19 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
         merge_pr(issue, area, pr, branch, monorepo_root)
     except Exception as e:
         can_retry = stage_retry(issue, area, monorepo_root, "merge")
+        error_kind = "conflict" if isinstance(e, MergeConflictError) else "unknown"
+        conflict_files = e.files if isinstance(e, MergeConflictError) else []
         if can_retry:
-            return StepResult(action="retry", data={"error": str(e)})
-        return StepResult(action="escalate", data={"reason": f"merge failed: {e}"})
+            return StepResult(action="retry", data={
+                "error": str(e),
+                "errorKind": error_kind,
+                "conflictFiles": conflict_files,
+            })
+        return StepResult(action="escalate", data={
+            "reason": f"merge failed: {e}",
+            "errorKind": error_kind,
+            "conflictFiles": conflict_files,
+        })
 
     fetch_prune(str(repo_dir))
     log_transition(issue, area, monorepo_root, "merge", "log", "PR merged")
