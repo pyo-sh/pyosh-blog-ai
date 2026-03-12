@@ -134,6 +134,7 @@ A review is valid only when its body contains:
       __main__.py
       cli.py
       command_runner.py
+      steps.py
       controller.py
       git_ops.py
       github_client.py
@@ -152,7 +153,9 @@ A review is valid only when its body contains:
     test_models.py
     test_paths.py
     test_review_normalizer.py
+    test_review_postcondition.py
     test_state_store.py
+    test_steps.py
   references/
     python-migration-spec.md  (this file)
   SKILL.md

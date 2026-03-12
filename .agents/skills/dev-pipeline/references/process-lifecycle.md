@@ -42,6 +42,31 @@ merge_lock.MergeLock.release(area)
 
 Per-stage retry via `state_store.stage_retry()` (max 3). Log actions with `state_store.recovery_log_append()`. On max retries -> `controller.format_escalation()` reports to user.
 
+## Step subcommands
+
+High-level CLI interface that replaces inline Bash in SKILL.md (v3).
+
+### Invocation
+
+`python -m dev_pipeline step <name> --issue N --area A [--phase setup|finalize] [--review-id N] [--tool T]`
+
+### Output contract
+
+stdout emits 2 lines:
+- `action:<action_name>` - SKILL.md routing key
+- `data:<json>` - structured payload
+
+stderr emits human-readable log messages.
+
+### Two patterns
+
+1. **Single call** (fully automated): `review-dispatch`, `review-wait`, `review-process`, `merge`
+   - Python handles the entire logic, returns action for next step routing
+2. **Two-phase** (AI skill invocation required): `build`, `resolve`, `log`
+   - `--phase setup`: preparation before AI skill (fetch, state init, review fetch)
+   - AI performs `/dev-build`, code fixes, or `/dev-log`
+   - `--phase finalize`: cleanup after AI skill (state update, commit, push)
+
 ## State schema
 
 See [python-migration-spec.md](python-migration-spec.md) for the canonical v2 schema.
