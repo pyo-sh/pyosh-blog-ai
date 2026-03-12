@@ -16,6 +16,10 @@
 #   - terminal.json: explicit completion signal with attemptId matching
 #   - heartbeat: explicit activity signal from dispatch wrapper
 #   - skipped_dep_failed: failed dependency propagation without dispatching
+#   - failed-terminal: unrecoverable failure (no retry)
+#   - needs-human: requires human intervention (sets GitHub label + comment)
+#   - needs-spec: issue specification insufficient (sets GitHub label)
+#   - cancelled: explicitly cancelled
 
 # Source shared monorepo helpers for MONOREPO_ROOT and area resolution.
 _ORCH_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -212,6 +216,7 @@ orch_state_update() {
 orch_status_set() {
   # Usage: orch_status_set <area> <issue> <status>
   # Valid statuses: pending | blocked | dispatched | completed | failed |
+  #   failed-terminal | needs-human | needs-spec | cancelled |
   #   skipped_dep_failed (legacy) | blocked-failed-dependency | blocked-external | cycle-isolated
   local area=$1
   local issue=$2
@@ -353,6 +358,12 @@ orch_dispatch() {
   local repo
   repo=$(monorepo_area_repo "$area")
 
+  # Skip issues with the manual-hold label (set by humans to pause orchestrator dispatch).
+  if orch_check_manual_hold "$area" "$issue" 2>/dev/null; then
+    >&2 echo "[orchestrator] Issue #${issue} has manual-hold label - skipping dispatch"
+    return 1
+  fi
+
   local tool model
   read -r tool model <<< "$(_orch_parse_agent "$agent")"
 
@@ -464,6 +475,9 @@ orch_dispatch() {
     orch_stop_process "$area" "$issue"
     return 1
   fi
+
+  # Claim the issue on GitHub to signal orchestrator ownership (best-effort).
+  orch_issue_add_label "$area" "$issue" "claimed-by-orch"
 
   echo "$pid"
   return 0
@@ -837,6 +851,113 @@ orch_label_pr() {
 }
 
 # ──────────────────────────────────────────────
+# Issue-level label and claim management
+# ──────────────────────────────────────────────
+
+_ORCH_ISSUE_LABEL_CACHE=""
+_orch_ensure_issue_labels() {
+  # Internal: ensures orchestrator issue-level labels exist in the repo (idempotent).
+  # Labels: claimed-by-orch, needs-human, needs-spec, manual-hold
+  # Uses bare gh (not orch_gh): label creation is best-effort.
+  local area=$1
+  local repo
+  repo=$(monorepo_area_repo "$area")
+  local cache_key="issue:${repo}"
+  if echo "$_ORCH_ISSUE_LABEL_CACHE" | grep -qF "$cache_key"; then
+    return 0
+  fi
+  gh label create "claimed-by-orch" --description "Orchestrator is processing this issue" --color "0075ca" --force -R "$repo" 2>/dev/null || true
+  gh label create "needs-human"     --description "Requires human intervention"           --color "e4e669" --force -R "$repo" 2>/dev/null || true
+  gh label create "needs-spec"      --description "Issue specification is insufficient"   --color "f9d0c4" --force -R "$repo" 2>/dev/null || true
+  gh label create "manual-hold"     --description "Manually held; orchestrator skips"     --color "b60205" --force -R "$repo" 2>/dev/null || true
+  _ORCH_ISSUE_LABEL_CACHE="$_ORCH_ISSUE_LABEL_CACHE $cache_key"
+}
+
+orch_issue_add_label() {
+  # Usage: orch_issue_add_label <area> <issue> <label>
+  # Adds a label to a GitHub issue (best-effort; does not affect provider health).
+  local area=$1 issue=$2 label=$3
+  local repo
+  repo=$(monorepo_area_repo "$area")
+  _orch_ensure_issue_labels "$area"
+  gh issue edit "$issue" -R "$repo" --add-label "$label" 2>/dev/null || {
+    >&2 echo "[orchestrator] WARNING: failed to add label '$label' to issue #${issue}"
+  }
+}
+
+orch_issue_remove_label() {
+  # Usage: orch_issue_remove_label <area> <issue> <label>
+  # Removes a label from a GitHub issue (best-effort; ignores not-found errors).
+  local area=$1 issue=$2 label=$3
+  local repo
+  repo=$(monorepo_area_repo "$area")
+  gh issue edit "$issue" -R "$repo" --remove-label "$label" 2>/dev/null || true
+}
+
+orch_issue_post_comment() {
+  # Usage: orch_issue_post_comment <area> <issue> <body>
+  # Posts a comment to a GitHub issue (best-effort).
+  local area=$1 issue=$2 body=$3
+  local repo
+  repo=$(monorepo_area_repo "$area")
+  gh issue comment "$issue" -R "$repo" --body "$body" 2>/dev/null || {
+    >&2 echo "[orchestrator] WARNING: failed to post comment to issue #${issue}"
+  }
+}
+
+orch_check_manual_hold() {
+  # Usage: orch_check_manual_hold <area> <issue>
+  # Returns 0 if the issue has the manual-hold label, 1 otherwise.
+  # Uses orch_gh (provider health aware).
+  local area=$1 issue=$2
+  local repo
+  repo=$(monorepo_area_repo "$area")
+  local hold_count
+  hold_count=$(orch_gh "$area" issue view "$issue" -R "$repo" \
+    --json labels --jq '[.labels[].name | select(. == "manual-hold")] | length' \
+    2>/dev/null) || hold_count=""
+  [ "$hold_count" = "1" ]
+}
+
+orch_set_terminal() {
+  # Usage: orch_set_terminal <area> <issue> <status> [reason]
+  # Sets a terminal status, syncs issue labels, and posts a comment if needed.
+  #
+  # Terminal statuses handled here:
+  #   completed | failed | failed-terminal | needs-human | needs-spec | cancelled |
+  #   blocked-failed-dependency | blocked-external | cycle-isolated | skipped_dep_failed
+  #
+  # Side effects (all best-effort):
+  #   - Removes claimed-by-orch from the issue on any terminal transition.
+  #   - needs-human: adds needs-human label + posts comment on the issue.
+  #   - needs-spec:  adds needs-spec label.
+  local area=$1 issue=$2 status=$3 reason=${4:-}
+
+  orch_status_set "$area" "$issue" "$status"
+
+  # Remove claim label only when the issue was actually dispatched (i.e. has the label).
+  # Skipping the API call for never-dispatched issues (blocked, cycle-isolated, etc.)
+  # avoids consuming GitHub API rate limit for no-op removes in large batches.
+  local was_dispatched
+  was_dispatched=$(orch_state_read "$area" | jq -r ".dispatched | has(\"$issue\")" 2>/dev/null) || was_dispatched="false"
+  [ "$was_dispatched" = "true" ] && orch_issue_remove_label "$area" "$issue" "claimed-by-orch"
+
+  # Add status-specific issue label and comment.
+  case "$status" in
+    needs-human)
+      orch_issue_add_label "$area" "$issue" "needs-human"
+      local comment_body
+      comment_body="**Orchestrator**: marked \`needs-human\` - human intervention required."
+      [ -n "$reason" ] && comment_body="${comment_body} Reason: ${reason}"
+      orch_issue_post_comment "$area" "$issue" "$comment_body"
+      ;;
+    needs-spec)
+      orch_issue_add_label "$area" "$issue" "needs-spec"
+      ;;
+  esac
+}
+
+# ──────────────────────────────────────────────
 # Completion detection
 # ──────────────────────────────────────────────
 
@@ -1115,8 +1236,8 @@ orch_unblock() {
   #   pending          — no blocking deps remain
   #
   # Terminal dep statuses (won't make further progress):
-  #   completed | failed | skipped_dep_failed | blocked-failed-dependency |
-  #   blocked-external | cycle-isolated
+  #   completed | failed | failed-terminal | needs-human | needs-spec | cancelled |
+  #   skipped_dep_failed | blocked-failed-dependency | blocked-external | cycle-isolated
   #
   # stdout: space-separated list of issues that transitioned out of blocked.
   #   Includes pending, blocked-failed-dependency, and blocked-external.
@@ -1151,7 +1272,7 @@ orch_unblock() {
         completed)
           # Hard or soft dep completed successfully — always satisfied.
           ;;
-        failed|skipped_dep_failed|blocked-failed-dependency|blocked-external|cycle-isolated)
+        failed|failed-terminal|needs-human|needs-spec|cancelled|skipped_dep_failed|blocked-failed-dependency|blocked-external|cycle-isolated)
           # Dep is terminal but did not complete successfully.
           # Check dep type: hard failure propagates, soft failure is OK.
           local dep_type
@@ -1171,14 +1292,14 @@ orch_unblock() {
 
     if [ "$still_blocked" -eq 0 ]; then
       if [ "$has_hard_failed_dep" -eq 1 ]; then
-        orch_status_set "$area" "$n" "blocked-failed-dependency"
+        orch_set_terminal "$area" "$n" "blocked-failed-dependency"
       else
         # All in-batch deps satisfied; check for cross-area hard deps.
         local has_cross_area_hard
         has_cross_area_hard=$(echo "$cross_area_deps" | \
           jq -r ".[\"$n\"] // [] | map(select(.type == \"hard\")) | length > 0")
         if [ "$has_cross_area_hard" = "true" ]; then
-          orch_status_set "$area" "$n" "blocked-external"
+          orch_set_terminal "$area" "$n" "blocked-external"
         else
           orch_status_set "$area" "$n" "pending"
         fi
@@ -1192,8 +1313,9 @@ orch_unblock() {
 
 _orch_mark_failed_and_unblock() {
   # Internal helper: mark issue failed, remove from dispatched, unblock dependents.
-  local area=$1 issue=$2
-  orch_status_set "$area" "$issue" "failed"
+  # Optional third argument allows marking a specific terminal status (default: failed).
+  local area=$1 issue=$2 status=${3:-failed}
+  orch_set_terminal "$area" "$issue" "$status"
   orch_state_update "$area" "del(.dispatched[\"$issue\"])"
   local newly_unblocked
   newly_unblocked=$(orch_unblock "$area" "$issue")
@@ -1253,7 +1375,7 @@ orch_poll_cycle() {
             fi
           fi
         fi
-        orch_status_set "$area" "$issue" "$result"
+        orch_set_terminal "$area" "$issue" "$result"
         orch_state_update "$area" "del(.dispatched[\"$issue\"])"
         >&2 echo "[orchestrator] Issue #${issue}: ${result}"
         orch_worktree_gc "$area" "$issue" "$result"
@@ -1285,7 +1407,7 @@ orch_poll_cycle() {
             # Label the merged PR for identity tracking (best-effort).
             [ -n "$_attempt_id" ] && orch_label_pr "$area" "$issue" "$merged_pr" "$_attempt_id" || true
             # PR is merged: treat as completed so dependents unblock correctly.
-            orch_status_set "$area" "$issue" "completed"
+            orch_set_terminal "$area" "$issue" "completed"
             orch_state_update "$area" "del(.dispatched[\"$issue\"])"
             orch_unblock "$area" "$issue" || true
             orch_worktree_gc "$area" "$issue" "completed"
