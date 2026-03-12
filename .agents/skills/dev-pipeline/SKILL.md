@@ -58,6 +58,8 @@ Post: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase fin
 | `dispatch` | `python -m dev_pipeline run ... --pr $PR --tool $TOOL` in **background** -> **end turn** (do not sleep, poll, or output status; resume on task-notification only) |
 | `error` | Stop, report |
 
+When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling Step 3.
+
 ### 2b. review_wait (on resume after task-notification)
 `python -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
 
