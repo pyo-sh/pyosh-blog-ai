@@ -66,4 +66,7 @@ def _run_pass(conn: sqlite3.Connection, area: str, pid: int, dry_run: bool) -> N
             continue
         click.echo(f"reconcile [{area}]: issue #{number} ready to dispatch{' (dry-run)' if dry_run else ''}.")
         if not dry_run:
-            pass  # TODO: dispatch issue #number
+            click.echo(
+                f"reconcile [{area}]: dispatch not yet implemented — skipping issue #{number}.",
+                err=True,
+            )  # TODO: dispatch issue #number

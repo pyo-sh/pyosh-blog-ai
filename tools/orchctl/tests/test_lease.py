@@ -99,6 +99,7 @@ def test_cleanup_removes_expired_lease(conn):
     )
     conn.commit()
     removed = cleanup_stale(conn)
+    conn.commit()
     assert removed == 1
     assert conn.execute("SELECT 1 FROM leases WHERE area = 'client'").fetchone() is None
 
@@ -121,13 +122,15 @@ def test_cleanup_removes_dead_pid_lease(conn):
     )
     conn.commit()
     removed = cleanup_stale(conn)
-    assert removed >= 1
+    conn.commit()
+    assert removed == 1
 
 
 def test_cleanup_leaves_live_lease(conn):
     pid = os.getpid()
     acquire(conn, "client", pid)
     removed = cleanup_stale(conn)
+    conn.commit()
     assert removed == 0
     assert conn.execute("SELECT 1 FROM leases WHERE area = 'client'").fetchone() is not None
 

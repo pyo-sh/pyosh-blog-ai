@@ -94,8 +94,9 @@ def cleanup_stale(conn: sqlite3.Connection) -> int:
     expires_at) so that a concurrent insert of a fresh lease for the same area
     is not accidentally evicted.
 
-    **Always calls conn.commit()** before returning.  Callers that have other
-    pending writes on the same connection will have those writes committed too.
+    Does **not** call conn.commit().  The caller is responsible for committing.
+    In `acquire`, the cleanup deletes and the new lease INSERT are committed
+    together; in standalone usage, callers must commit explicitly.
 
     Returns the number of leases removed.
     """
@@ -117,7 +118,6 @@ def cleanup_stale(conn: sqlite3.Connection) -> int:
                 (r["area"], r["holder_pid"], r["expires_at"]),
             ).rowcount
 
-    conn.commit()
     return expired + dead
 
 
