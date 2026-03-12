@@ -20,6 +20,12 @@
 - [x] Review resolve 2라운드 - dead code 제거(~100줄), schema cross-reference, `import subprocess` module-level, unused import 제거, INFO severity count table 추가
 - [x] dev-review 스킬 최적화 - SKILL.md 109줄→42줄(-61%), 구 `review-template.md` 삭제, 토큰 절감 ~72%
 
+- [x] dev-review 자동 게시 + dev-log standalone squash merge 충돌 수정 (#148, PR #149)
+  - `dev-review/SKILL.md`: `${REVIEW_MODE:-dry-run}` → `${REVIEW_MODE:-publish}` 기본값 변경
+  - `review_publish.py`: `_is_pr_author(repo, pr)` 추가 - gh API로 reviewer=PR작성자 감지 시 verdict를 `comment`로 자동 하강; `argparse` 기본값도 `publish`로 통일
+  - `dev-log/SKILL.md`: Phase 0에 worktree 컨텍스트 감지 지시 추가 - 선행 `/dev-build` 컨텍스트에 worktree 경로가 있으면 이동 후 Phase 0 실행 → `IN_ROOT_WORKTREE=true` → Phase 4.5 → squash merge 충돌 방지
+  - codex 0.114.0 `--output-schema` 플래그 제거로 codex review 실패 → claude 폴백으로 자동 전환 확인
+
 ## Discoveries
 - `gh pr edit --body-file` 실패: GitHub Projects Classic deprecation 에러 발생 시 GraphQL `updatePullRequest` mutation으로 우회
 

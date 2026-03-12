@@ -7,6 +7,11 @@ description: PR code review skill. Outputs structured review JSON then publishes
 
 Read-only review. Never modify code.
 
+## Invariants
+
+1. Never modify code - read-only review only.
+2. All publishing via `review_publish.py`. Never call `gh pr comment`, `gh pr review`, or `gh api` for posting directly.
+
 ## Environment
 
 Use these env vars when present (pipeline sets them). Do not assume cwd is the repo checkout.
@@ -18,7 +23,7 @@ PR="${PIPELINE_PR:?PIPELINE_PR is required}"
 MONOREPO="${PIPELINE_MONOREPO_ROOT:-/workspace}"
 ```
 
-## Steps
+## Workflow
 
 1. **Read PR** with explicit `-R`: `gh pr diff "$PR" -R "$REPO"` and `gh pr view "$PR" -R "$REPO" --json number,title,state,body`
 2. **Analyze**: Review diff first. Read files under `REPO_DIR` only when diff context is insufficient.
@@ -35,12 +40,10 @@ python3 "${MONOREPO}/.agents/skills/dev-review/scripts/review_publish.py" \
 
 5. **Report** artifact path and publisher exit status, then exit.
 
-## Verdict rules
+## Constraints
+
+### Verdict rules
 
 - `request_changes`: any P0 or P1 issue exists
 - `comment`: only P2/P3/info issues
 - `approve`: no issues found
-
-## Prohibited
-
-Never call `gh pr comment`, `gh pr review`, or `gh api` for posting. All publishing goes through `review_publish.py`.
