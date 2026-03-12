@@ -31,16 +31,6 @@ def _check_stale_leases(conn) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def _check_schema_version(conn) -> int:
-    row = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
-    ).fetchone()
-    if row is None:
-        return 0
-    row = conn.execute("SELECT version FROM schema_version").fetchone()
-    return row[0] if row else 0
-
-
 @click.command("doctor")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
 @click.pass_context
@@ -48,9 +38,7 @@ def cmd_doctor(ctx: click.Context, as_json: bool) -> None:
     """Check database consistency and report issues."""
     db_path = ctx.obj.get("db_path")
     conn = get_db(db_path)
-    run_migrations(conn)
-
-    schema_ver = _check_schema_version(conn)
+    schema_ver = run_migrations(conn)
     orphan_attempts = _check_orphan_attempts(conn)
     stale_leases = _check_stale_leases(conn)
     conn.close()

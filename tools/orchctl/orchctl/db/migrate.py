@@ -25,7 +25,7 @@ def run_migrations(conn: sqlite3.Connection) -> int:
     for version, sql in sorted(pending, key=lambda x: x[0]):
         conn.executescript(sql)
         conn.execute("DELETE FROM schema_version")
-        conn.execute("INSERT INTO schema_version (version) VALUES (?)", (version,))
+        conn.execute("INSERT INTO schema_version (id, version) VALUES (1, ?)", (version,))
         conn.commit()
 
     return SCHEMA_VERSION

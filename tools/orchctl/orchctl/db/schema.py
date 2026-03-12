@@ -8,6 +8,7 @@ MIGRATIONS: list[tuple[int, str]] = [
         1,
         """
         CREATE TABLE IF NOT EXISTS schema_version (
+            id      INTEGER PRIMARY KEY CHECK (id = 1),
             version INTEGER NOT NULL
         );
 
@@ -15,7 +16,8 @@ MIGRATIONS: list[tuple[int, str]] = [
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             area            TEXT    NOT NULL,
             number          INTEGER NOT NULL,
-            state           TEXT    NOT NULL DEFAULT 'pending',
+            state           TEXT    NOT NULL DEFAULT 'pending'
+                                    CHECK(state IN ('pending','running','done','failed','blocked')),
             dependency_type TEXT    NOT NULL DEFAULT 'none',
             retry_budget    INTEGER NOT NULL DEFAULT 3,
             failure_class   TEXT,
@@ -25,6 +27,12 @@ MIGRATIONS: list[tuple[int, str]] = [
             UNIQUE (area, number)
         );
 
+        CREATE TRIGGER IF NOT EXISTS issues_updated_at
+        AFTER UPDATE ON issues
+        BEGIN
+            UPDATE issues SET updated_at = datetime('now') WHERE id = NEW.id;
+        END;
+
         CREATE TABLE IF NOT EXISTS attempts (
             attempt_id      TEXT    PRIMARY KEY,
             issue_id        INTEGER NOT NULL REFERENCES issues(id),
@@ -32,7 +40,8 @@ MIGRATIONS: list[tuple[int, str]] = [
             pgid            INTEGER,
             started_at      TEXT,
             finished_at     TEXT,
-            status          TEXT    NOT NULL DEFAULT 'running',
+            status          TEXT    NOT NULL DEFAULT 'running'
+                                    CHECK(status IN ('running','success','failure','cancelled')),
             terminal_json   TEXT,
             created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
         );
