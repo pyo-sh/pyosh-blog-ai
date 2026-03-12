@@ -57,12 +57,12 @@ Post: `python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase fi
 | action | Next |
 |---|---|
 | `found` | review_process (`data.reviewId`) |
-| `dispatch` | Bash tool with `run_in_background: true`: `cd .agents/skills/dev-pipeline/scripts && python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL [--model $MODEL]` -> **end turn**. On task-notification: call Step 2b (review-wait) unconditionally. |
+| `dispatch` | Bash tool with `run_in_background: true`: `cd .agents/skills/dev-pipeline/scripts && python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL [--model $MODEL]` -> **end turn** |
 | `error` | Stop, report |
 
 When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling Step 3.
 
-### 2b. review_wait (on resume after task-notification)
+### 2b. review_wait (call unconditionally on any task-notification)
 `python3 -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
 
 | action | Next |

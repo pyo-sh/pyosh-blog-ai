@@ -11,6 +11,7 @@ Read-only review. Never modify code.
 
 1. Never modify code - read-only review only.
 2. All publishing via `review_publish.py`. Never call `gh pr comment`, `gh pr review`, or `gh api` for posting directly.
+3. **All verdicts publish.** `approve`: empty `findings`, `verdict: "approve"` - still complete Steps 3-5.
 
 ## Environment
 
@@ -47,5 +48,3 @@ python3 "${MONOREPO}/.agents/skills/dev-review/scripts/review_publish.py" \
 - `request_changes`: any P0 or P1 issue exists
 - `comment`: only P2/P3/info issues
 - `approve`: no issues found
-
-**All verdicts** (including `approve`) must complete Steps 3-5. For `approve` with no issues: write review JSON with an empty `findings` array and `verdict: "approve"`, then publish normally via `review_publish.py`.
