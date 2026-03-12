@@ -10,6 +10,7 @@ from orchctl.db.connection import init_db
 from orchctl.models import AttemptStatus, DependencyType, IssueState
 from orchctl.state_machine import (
     InvalidTransitionError,
+    StaleStateError,
     apply_attempt_transition,
     apply_issue_transition,
     can_dispatch,
@@ -27,10 +28,11 @@ from orchctl.state_machine import (
 
 
 @pytest.fixture
-def conn(tmp_path: Path) -> sqlite3.Connection:
+def conn(tmp_path: Path):
     db_path = tmp_path / "test.db"
     conn, _ = init_db(db_path)
-    return conn
+    yield conn
+    conn.close()
 
 
 def _insert_issue(
@@ -327,6 +329,61 @@ class TestApplyAttemptTransition:
     def test_missing_attempt_raises_value_error(self, conn):
         with pytest.raises(ValueError, match="not found"):
             apply_attempt_transition(conn, "ghost-id", "running")
+
+
+# ---------------------------------------------------------------------------
+# StaleStateError — concurrent modification detection
+# ---------------------------------------------------------------------------
+
+
+class TestStaleStateError:
+    def test_is_distinct_from_invalid_transition_error(self):
+        """StaleStateError must not be caught by InvalidTransitionError handlers."""
+        err = StaleStateError("concurrent modification")
+        assert not isinstance(err, InvalidTransitionError)
+
+    def test_message_preserved(self):
+        msg = "Issue id=1 state changed concurrently (read 'pending', attempted 'dispatched')"
+        err = StaleStateError(msg)
+        assert msg in str(err)
+
+    def test_concurrent_write_triggers_zero_rowcount(self, tmp_path: Path):
+        """Demonstrate the DB scenario that triggers StaleStateError.
+
+        apply_issue_transition raises StaleStateError when the UPDATE predicate
+        (WHERE id=? AND state=?) matches 0 rows because a concurrent writer
+        already changed the state between SELECT and UPDATE.
+        """
+        from orchctl.db.connection import init_db as _init
+        from orchctl.state_machine import transition_issue
+
+        db_path = tmp_path / "stale.db"
+        conn, _ = _init(db_path)
+
+        cur = conn.execute(
+            "INSERT INTO issues (area, number, state, dependency_type) VALUES (?, ?, ?, ?)",
+            ("client", 99, "pending", "none"),
+        )
+        conn.commit()
+        issue_id = cur.lastrowid
+
+        # Simulate concurrent write: another process dispatches the issue
+        conn.execute(
+            "UPDATE issues SET state = 'dispatched' WHERE id = ?", (issue_id,)
+        )
+        conn.commit()
+
+        # Now simulate what apply_issue_transition would do if it had read "pending"
+        # before the concurrent write — validates ok, but UPDATE returns 0 rows.
+        old_state = "pending"
+        validated = transition_issue(old_state, "dispatched")  # logically valid
+        update = conn.execute(
+            "UPDATE issues SET state = ? WHERE id = ? AND state = ?",
+            (validated, issue_id, old_state),
+        )
+        conn.close()
+        # rowcount==0 is exactly the condition that raises StaleStateError
+        assert update.rowcount == 0
 
 
 # ---------------------------------------------------------------------------

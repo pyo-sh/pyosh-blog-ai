@@ -13,7 +13,7 @@ from .models import (
 
 
 class InvalidTransitionError(Exception):
-    """Raised when a state transition is not allowed."""
+    """Raised when a state transition is not allowed by the state machine rules."""
 
     def __init__(self, from_state: str, to_state: str, entity: str = "issue") -> None:
         self.from_state = from_state
@@ -21,6 +21,15 @@ class InvalidTransitionError(Exception):
         super().__init__(
             f"Invalid {entity} transition: {from_state!r} -> {to_state!r}"
         )
+
+
+class StaleStateError(Exception):
+    """Raised when a DB transition fails because the row state changed concurrently.
+
+    Distinct from InvalidTransitionError (which means the transition is logically
+    forbidden). A StaleStateError means the transition was valid but lost an
+    optimistic-lock race — the caller should re-read state and retry if appropriate.
+    """
 
 
 def transition_issue(current: str, new: str) -> str:
@@ -63,7 +72,9 @@ def resolve_blocked_issue(
 
     Args:
         dep_states: List of terminal states of the blocking dependencies.
-        dependency_type: 'soft' or 'hard'.
+        dependency_type: 'soft', 'hard', or 'none'. 'none' behaves like 'soft'
+            (no failure check applied) — issues with dependency_type='none' should
+            not normally reach 'blocked' state, but are handled gracefully.
 
     Returns:
         New IssueState value ('pending', 'blocked', or 'blocked-failed-dependency').
@@ -162,7 +173,10 @@ def apply_issue_transition(
         (validated, issue_id, old_state),
     )
     if cur.rowcount == 0:
-        raise InvalidTransitionError(old_state, new_state)
+        raise StaleStateError(
+            f"Issue id={issue_id} state changed concurrently "
+            f"(read {old_state!r}, attempted transition to {new_state!r})"
+        )
     conn.commit()
     return validated
 
@@ -175,7 +189,7 @@ def apply_attempt_transition(
     """Validate and apply an attempt status transition in the DB.
 
     Returns the new status string.
-    Raises InvalidTransitionError or ValueError if attempt not found.
+    Raises InvalidTransitionError, StaleStateError, or ValueError if not found.
     """
     row = conn.execute(
         "SELECT status FROM attempts WHERE attempt_id = ?", (attempt_id,)
@@ -189,6 +203,9 @@ def apply_attempt_transition(
         (validated, attempt_id, old_status),
     )
     if cur.rowcount == 0:
-        raise InvalidTransitionError(old_status, new_status, entity="attempt")
+        raise StaleStateError(
+            f"Attempt id={attempt_id!r} status changed concurrently "
+            f"(read {old_status!r}, attempted transition to {new_status!r})"
+        )
     conn.commit()
     return validated
