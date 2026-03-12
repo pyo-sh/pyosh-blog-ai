@@ -108,11 +108,7 @@ def try_acquire_lease(
         INSERT INTO leases (area, holder_pid, acquired_at, expires_at)
         VALUES (?, ?, datetime('now'), datetime('now', ? || ' seconds'))
         ON CONFLICT(area) DO UPDATE SET
-            expires_at = excluded.expires_at,
-            acquired_at = CASE
-                WHEN holder_pid = excluded.holder_pid THEN acquired_at
-                ELSE excluded.acquired_at
-            END
+            expires_at = excluded.expires_at
         WHERE holder_pid = excluded.holder_pid
         """,
         (area, holder_pid, str(ttl_seconds)),
