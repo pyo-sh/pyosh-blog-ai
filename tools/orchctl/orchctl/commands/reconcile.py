@@ -10,7 +10,7 @@ from ..db.schema import LATEST_VERSION
 
 
 @click.command("reconcile")
-@click.option("--area", required=True, help="Area to reconcile (client/server/workspace).")
+@click.option("--area", required=True, type=click.Choice(["client", "server", "workspace"]), help="Area to reconcile.")
 @click.option("--dry-run", is_flag=True, help="Print actions without executing.")
 @click.pass_context
 def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:

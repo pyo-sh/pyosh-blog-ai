@@ -40,6 +40,7 @@ def acquire(conn: sqlite3.Connection, area: str, pid: int, ttl: int = 60) -> boo
     now holds the lease.
     """
     cleanup_stale(conn)
+    conn.commit()  # commit cleanup independently so a rollback below doesn't undo it
     now = _utcnow()
     exp = _expires(ttl)
     try:
