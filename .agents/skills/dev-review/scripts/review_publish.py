@@ -260,8 +260,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--input", required=True, help="Path to review.json")
     parser.add_argument(
-        "--mode", choices=["dry-run", "publish"], default="dry-run",
-        help="dry-run (default): local only; publish: post to GitHub",
+        "--mode", choices=["dry-run", "publish"], default="publish",
+        help="publish (default): post to GitHub; dry-run: local only",
     )
     parser.add_argument("--repo", help="GitHub repo (owner/repo), required for publish")
     parser.add_argument("--pr", type=int, help="PR number, required for publish")
