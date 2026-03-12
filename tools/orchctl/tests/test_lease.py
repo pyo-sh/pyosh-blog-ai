@@ -129,7 +129,7 @@ def test_cleanup_leaves_live_lease(conn):
 
 def _insert_issue(conn, area="client", number=1) -> int:
     conn.execute(
-        "INSERT INTO issues (area, number, state) VALUES (?, ?, 'running')",
+        "INSERT INTO issues (area, number, state) VALUES (?, ?, 'pending')",
         (area, number),
     )
     conn.commit()
@@ -156,7 +156,7 @@ def test_has_active_attempt_false_when_empty(conn):
 def test_has_active_attempt_false_for_terminal(conn):
     issue_id = _insert_issue(conn)
     conn.execute(
-        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a1', ?, 'success')",
+        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a1', ?, 'completed')",
         (issue_id,),
     )
     conn.commit()
@@ -181,11 +181,11 @@ def test_unique_index_prevents_duplicate_active_attempts(conn):
 def test_unique_index_allows_multiple_terminal(conn):
     issue_id = _insert_issue(conn)
     conn.execute(
-        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a1', ?, 'success')",
+        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a1', ?, 'completed')",
         (issue_id,),
     )
     conn.execute(
-        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a2', ?, 'failure')",
+        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a2', ?, 'failed')",
         (issue_id,),
     )
     conn.commit()
