@@ -19,6 +19,7 @@ Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 5. **Resolve runs directly in the pipeline session**, not as a headless sub-agent.
 6. **Merge lock held inside one CLI call** (`python -m dev_pipeline merge`).
 7. **`run`/`cleanup` manage the issue lease internally.** `--owner manual` for interactive; `--owner pipeline` for automated.
+8. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees` under `.workspace/.../{area}/`).
 
 ## State machine
 
@@ -54,7 +55,7 @@ Post: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase fin
 | action | Next |
 |---|---|
 | `found` | review_process (`data.reviewId`) |
-| `dispatch` | `python -m dev_pipeline run ... --pr $PR --tool $TOOL` in **background** -> **end turn** |
+| `dispatch` | `python -m dev_pipeline run ... --pr $PR --tool $TOOL` in **background** -> **end turn** (do not sleep, poll, or output status; resume on task-notification only) |
 | `error` | Stop, report |
 
 ### 2b. review_wait (on resume after task-notification)
@@ -77,10 +78,11 @@ Post: `python -m dev_pipeline step build --issue $ISSUE --area $AREA --phase fin
 | `suggestion_only` | AI decides (see below) |
 | `escalate` | Stop, report |
 
-**`suggestion_only` rules** (Critical=0, Warning=0, Suggestion>0):
-- Style/formatting, 1-line -> merge (auto)
-- Logic change or 2+ lines -> resolve then re-review (skipReview=false)
+**`suggestion_only` rules** (Critical=0, Warning=0, Suggestion>0; first matching rule wins):
+- Style/formatting only, all 1-line -> merge (auto)
+- Logic change or structural impact -> resolve then re-review (skipReview=false)
 - All trivial, count <= 3 -> resolve then merge (skipReview=true)
+- Otherwise -> merge (auto)
 
 ### 4. resolve
 Pre: `python -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase setup`
