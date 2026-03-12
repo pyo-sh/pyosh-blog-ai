@@ -17,6 +17,13 @@
 # Status enum: idle, working, plan, needs-input, done, error, unknown
 # Token source enum: sidecar, scraping, session, unknown
 # Token fresh: true = current, false = stale (>30s since last token update)
+#
+# Source precedence (Claude panes): sidecar > pane scrape > session JSONL
+#   sidecar:      written by hooks (push model); most accurate, includes all fields (#109)
+#   pane scrape:  tmux capture-pane; used for status inference when sidecar is absent or idle
+#   session JSONL: not used for Claude (only Codex panes use session files)
+#
+# Sidecar v2 namespace: <sidecar_dir>/<socket-hash>/<session>/<pane>.json (#109)
 
 # Codex session file mtime cache for incremental reparse detection (#72)
 declare -A _CODEX_CACHE_MTIME=()
@@ -47,6 +54,12 @@ _collect_agents() {
   local session=$1 sidecar_dir=$2
   local -a records=()
 
+  # Compute socket hash for v2 namespace ($TMUX: socket_path,server_pid,session_id)
+  local _socket_hash="default"
+  if [[ -n "${TMUX:-}" ]]; then
+    _socket_hash=$(printf '%s' "${TMUX%%,*}" | md5sum | cut -c1-6)
+  fi
+
   local pane_list
   pane_list=$(tmux list-panes -s -t "$session" \
     -F '#{window_index}:#{pane_index} #{pane_id} #{pane_current_command}' 2>/dev/null) || {
@@ -76,7 +89,7 @@ _collect_agents() {
 
     local record
     if [[ "$etype" == "claude" ]]; then
-      record=$(_collect_claude_pane "$pane_id" "$sidecar_dir" "$pane_addr")
+      record=$(_collect_claude_pane "$pane_id" "$sidecar_dir" "$pane_addr" "$session" "$_socket_hash")
     else
       record=$(_collect_codex_pane "$pane_id" "$_pane_tty" "$pane_addr")
     fi
@@ -95,15 +108,22 @@ _collect_agents() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 _collect_claude_pane() {
-  local pane_id=$1 sidecar_dir=$2 pane_addr=$3
+  local pane_id=$1 sidecar_dir=$2 pane_addr=$3 session=${4:-} socket_hash=${5:-default}
+
+  # Path traversal guard: pane_id must be %N (digits only) (#108)
+  [[ ! "$pane_id" =~ ^%[0-9]+$ ]] && return
+
   local pane_file="${pane_id#%}"
-  local sidecar_path="${sidecar_dir}/${pane_file}.json"
+  # v2 namespace: <sidecar_dir>/<socket-hash>/<session>/<pane>.json (#109)
+  local sidecar_path="${sidecar_dir}/${socket_hash}/${session}/${pane_file}.json"
 
   local model="Claude" status="idle" task="-" activity=""
   local tok_used=0 tok_total=0 tok_pct=0 tok_source="unknown" tok_fresh=true
 
   if [[ -f "$sidecar_path" ]]; then
-    # Read sidecar: single jq call, normalize text to single-line, output @tsv.
+    # Read sidecar: single jq call, normalize text to single-line.
+    # Use RS=\x1e (non-whitespace) so empty fields are never collapsed by read (#108).
+    # task/activity are base64-encoded to survive any control chars in values (#108).
     # Includes tokens_updated_at for independent token freshness tracking (#74).
     local raw
     raw=$(jq -r '[
@@ -112,16 +132,18 @@ _collect_claude_pane() {
       (.tokens.pct // 0 | tostring),
       (.tokens.used // 0 | tostring),
       (.tokens.max // 0 | tostring),
-      ((.task // "-") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " ")),
-      ((.activity // "") | gsub("[\\n\\t\\r]"; " ") | gsub("  +"; " ")),
+      ((.task // "-") | gsub("[\\n\\r]"; " ") | gsub("  +"; " ") | @base64),
+      ((.activity // "") | gsub("[\\n\\r]"; " ") | gsub("  +"; " ") | @base64),
       (.updated_at // 0 | tostring),
       (.tokens_updated_at // 0 | tostring)
-    ] | @tsv' "$sidecar_path" 2>/dev/null)
+    ] | join("\u001e")' "$sidecar_path" 2>/dev/null)
 
     if [[ -n "$raw" ]]; then
-      local updated_at tokens_updated_at
-      IFS=$'\t' read -r model status tok_pct tok_used tok_total \
-        task activity updated_at tokens_updated_at <<< "$raw"
+      local updated_at tokens_updated_at _task_b64 _act_b64
+      IFS=$'\x1e' read -r model status tok_pct tok_used tok_total \
+        _task_b64 _act_b64 updated_at tokens_updated_at <<< "$raw"
+      task=$(printf '%s' "$_task_b64" | base64 -d 2>/dev/null)
+      activity=$(printf '%s' "$_act_b64" | base64 -d 2>/dev/null)
 
       tok_source="sidecar"
 
@@ -136,17 +158,23 @@ _collect_claude_pane() {
         (( tok_age > STALE_THRESHOLD_SECS )) && tok_fresh=false
       fi
 
-      # Status staleness: non-idle without recent update → reset (#47)
-      if [[ "$status" != "idle" && -n "$updated_at" && "$updated_at" != "0" ]]; then
+      # Zero tokens → no token data present yet; source unknown (#108)
+      if [[ "$tok_used" == "0" && "$tok_total" == "0" ]]; then
+        tok_source="unknown"
+      fi
+
+      # Status staleness: non-idle/non-done without recent update → stale (#47, #108)
+      if [[ "$status" != "idle" && "$status" != "done" && \
+            -n "$updated_at" && "$updated_at" != "0" ]]; then
         local age=$(( now_epoch - ${updated_at%.*} ))
         if (( age > STALE_THRESHOLD_SECS )); then
-          status="idle"
+          status="stale"
           activity=""
         fi
       fi
     else
-      # jq failed to parse sidecar → unknown, not silent idle (#72)
-      status="unknown"
+      # jq failed to parse sidecar → fault (partial write / corrupt) (#108)
+      status="fault"
     fi
 
     # Augment idle status from pane scraping (spinner detection)
@@ -192,8 +220,9 @@ _collect_claude_pane() {
     fi
   fi
 
-  # Status promotion: "(Done) " prefix → done
-  if [[ "$status" == "idle" && "$task" == "(Done) "* ]]; then
+  # Status promotion: "(Done) " prefix → done; unconditional so pane-scrape
+  # spinner cannot mask a completed task (#108)
+  if [[ "$task" == "(Done) "* ]]; then
     status="done"
   fi
 
@@ -439,12 +468,17 @@ _collect_orchestrator() {
     IFS=$'\t' read -r area batch_id n_done n_active n_pending n_blocked n_failed \
       n_total orch_pid orch_started_at created_at <<< "$meta_tsv"
 
-    # ── Batch liveness ──
-    _check_pid_alive "$orch_pid" "$orch_started_at" || continue
+    # ── Batch liveness — dead PIDs are shown explicitly, not hidden (#108) ──
+    local batch_alive=true
+    _check_pid_alive "$orch_pid" "$orch_started_at" || batch_alive=false
 
     local n_terminal=$(( n_done + n_failed ))
     local batch_status="active"
-    (( n_terminal >= n_total )) && batch_status="done"
+    if ! $batch_alive; then
+      batch_status="dead"
+    elif (( n_terminal >= n_total )); then
+      batch_status="done"
+    fi
 
     # ── Elapsed ──
     local elapsed_str=""
