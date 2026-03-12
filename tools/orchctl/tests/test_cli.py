@@ -71,3 +71,15 @@ def test_reconcile_stub(runner, db_path):
     result = runner.invoke(cli, ["--db", db_path, "reconcile"])
     assert result.exit_code == 0, result.output
     assert "not yet implemented" in result.output
+
+
+def test_status_requires_init(runner, db_path):
+    result = runner.invoke(cli, ["--db", db_path, "status"])
+    assert result.exit_code != 0
+    assert "not initialised" in result.output
+
+
+def test_doctor_requires_init(runner, db_path):
+    result = runner.invoke(cli, ["--db", db_path, "doctor"])
+    assert result.exit_code != 0
+    assert "not initialised" in result.output

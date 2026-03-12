@@ -46,6 +46,8 @@ MIGRATIONS: list[tuple[int, str]] = [
             created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
         );
 
+        CREATE INDEX IF NOT EXISTS idx_attempts_issue_id ON attempts(issue_id);
+
         CREATE TABLE IF NOT EXISTS heartbeats (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             attempt_id  TEXT    NOT NULL REFERENCES attempts(attempt_id),

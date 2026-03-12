@@ -22,6 +22,10 @@ def run_migrations(conn: sqlite3.Connection) -> int:
     if not pending:
         return current
 
+    # executescript() commits DDL implicitly; schema_version is updated in a
+    # separate transaction. Re-running a migration on crash-recovery is safe only
+    # when every statement is idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING).
+    # All future migrations MUST preserve this property.
     for version, sql in sorted(pending, key=lambda x: x[0]):
         conn.executescript(sql)
         conn.execute("DELETE FROM schema_version")
