@@ -17,6 +17,13 @@
 # Status enum: idle, working, plan, needs-input, done, error, unknown
 # Token source enum: sidecar, scraping, session, unknown
 # Token fresh: true = current, false = stale (>30s since last token update)
+#
+# Source precedence (Claude panes): sidecar > pane scrape > session JSONL
+#   sidecar:      written by hooks (push model); most accurate, includes all fields (#109)
+#   pane scrape:  tmux capture-pane; used for status inference when sidecar is absent or idle
+#   session JSONL: not used for Claude (only Codex panes use session files)
+#
+# Sidecar v2 namespace: <sidecar_dir>/<socket-hash>/<session>/<pane>.json (#109)
 
 # Codex session file mtime cache for incremental reparse detection (#72)
 declare -A _CODEX_CACHE_MTIME=()
@@ -47,6 +54,12 @@ _collect_agents() {
   local session=$1 sidecar_dir=$2
   local -a records=()
 
+  # Compute socket hash for v2 namespace ($TMUX: socket_path,server_pid,session_id)
+  local _socket_hash="default"
+  if [[ -n "${TMUX:-}" ]]; then
+    _socket_hash=$(printf '%s' "${TMUX%%,*}" | md5sum | cut -c1-6)
+  fi
+
   local pane_list
   pane_list=$(tmux list-panes -s -t "$session" \
     -F '#{window_index}:#{pane_index} #{pane_id} #{pane_current_command}' 2>/dev/null) || {
@@ -76,7 +89,7 @@ _collect_agents() {
 
     local record
     if [[ "$etype" == "claude" ]]; then
-      record=$(_collect_claude_pane "$pane_id" "$sidecar_dir" "$pane_addr")
+      record=$(_collect_claude_pane "$pane_id" "$sidecar_dir" "$pane_addr" "$session" "$_socket_hash")
     else
       record=$(_collect_codex_pane "$pane_id" "$_pane_tty" "$pane_addr")
     fi
@@ -95,13 +108,14 @@ _collect_agents() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 _collect_claude_pane() {
-  local pane_id=$1 sidecar_dir=$2 pane_addr=$3
+  local pane_id=$1 sidecar_dir=$2 pane_addr=$3 session=${4:-} socket_hash=${5:-default}
 
   # Path traversal guard: pane_id must be %N (digits only) (#108)
   [[ ! "$pane_id" =~ ^%[0-9]+$ ]] && return
 
   local pane_file="${pane_id#%}"
-  local sidecar_path="${sidecar_dir}/${pane_file}.json"
+  # v2 namespace: <sidecar_dir>/<socket-hash>/<session>/<pane>.json (#109)
+  local sidecar_path="${sidecar_dir}/${socket_hash}/${session}/${pane_file}.json"
 
   local model="Claude" status="idle" task="-" activity=""
   local tok_used=0 tok_total=0 tok_pct=0 tok_source="unknown" tok_fresh=true
