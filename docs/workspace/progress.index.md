@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | 확장 terminal states + claim/hold 라벨 (#91, PR #179) - `failed-terminal`/`needs-human`/`needs-spec`/`cancelled` 신규 terminal state, `orch_set_terminal` 래퍼, `claimed-by-orch`/`needs-human`/`needs-spec`/`manual-hold` issue 라벨 자동 관리, dispatch 전 `manual-hold` skip | done |
 | 2026-03-13 | agent-tracker writer contract alignment (#110, PR #180) - ANSI/OSC sanitization, model "unknown" fallback, tokens_updated_at 정확성, v1 sidecar 마이그레이션, pipeline state issue int 정규화 | done |
 | 2026-03-13 | dev-pipeline/dev-log 안정성 버그 10건 수정 (#177, PR #178) - dev-log rebase base fix, failed_postcondition retry(B/D 무한루프 방지), merge conflict 진단, stageRetries 이월, round_limit 기록, dispatch cwd+review-wait 의무, approve publish 강제, pr_helpers --head, gh CLI 업데이트, resolve_finalize 항상 push | done |
 | 2026-03-13 | hard/soft dependency + cross-area policy (#90) - fenced orchestrator 블록 파서, `--parse-typed`/`--find-sccs` 모드, SCC cycle 격리, `blocked-failed-dependency`/`blocked-external`/`cycle-isolated` 신규 상태, 25 tests (PR #176) | done |

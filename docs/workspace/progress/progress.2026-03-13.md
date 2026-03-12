@@ -1,5 +1,21 @@
 # Progress 2026-03-13
 
+## 확장 terminal states + claim/hold 라벨 (#91, PR #179)
+
+- **목적**: orchestrator 상태 머신에 신규 terminal state 4종 추가 + GitHub issue 라벨 자동 관리
+- **구현**:
+  - `orchestrate-helpers.sh`: `failed-terminal`, `needs-human`, `needs-spec`, `cancelled` 신규 terminal state 추가
+  - `orchestrate-helpers.sh`: `orch_set_terminal()` 래퍼 신규 - 단일 진입점으로 상태 설정 + issue 라벨 side-effect 처리
+  - `orchestrate-helpers.sh`: `orch_issue_add_label()` / `orch_issue_remove_label()` / `orch_issue_post_comment()` 신규 - best-effort issue 라벨 관리 (bare gh 사용, provider health 비관여)
+  - `orchestrate-helpers.sh`: `orch_check_manual_hold()` 신규 - dispatch 전 `manual-hold` 라벨 체크 (orch_gh 사용, provider health 관여)
+  - `orchestrate-helpers.sh`: `orch_dispatch()` - dispatch 전 `manual-hold` 체크 추가, 성공 시 `claimed-by-orch` 라벨 부착
+  - `orchestrate-helpers.sh`: `orch_set_terminal()` - `claimed-by-orch` 제거는 dispatched 맵 확인 후 실행 (never-dispatched 이슈의 불필요한 API 호출 방지)
+  - `orch_unblock()` / `_orch_mark_failed_and_unblock()` / `orch_poll_cycle()` - `orch_status_set` → `orch_set_terminal` 전환
+  - `state-detection.md`: 상태 머신 다이어그램 업데이트, GitHub issue 라벨 관리 섹션 신규
+  - `dependency-resolution.md`: terminal non-completed statuses 목록 업데이트
+- **라벨 정책**: `claimed-by-orch`(dispatch 시 부착/terminal 시 제거), `needs-human`(전이 시 부착 + 코멘트), `needs-spec`(전이 시 부착), `manual-hold`(human이 설정 - orchestrator skip)
+- **결과**: 1라운드 warning(never-dispatched API 호출 최적화) → fix, 2라운드 suggestion-only → skip, merge
+
 ## Agent tracker writer contract alignment (#110, PR #180)
 
 - **목적**: agent-tracker hooks/writer/reader 계약을 sidecar v2 schema와 일관되게 강화
