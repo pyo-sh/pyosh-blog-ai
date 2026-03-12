@@ -13,7 +13,7 @@ def acquire_lock(
     deadline = time.monotonic() + timeout
     while True:
         try:
-            lock_path.mkdir(parents=False, exist_ok=False)
+            lock_path.mkdir(parents=True, exist_ok=False)
             return
         except FileExistsError:
             if time.monotonic() >= deadline:

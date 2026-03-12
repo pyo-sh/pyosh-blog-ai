@@ -1,7 +1,8 @@
 from pathlib import Path
+from typing import Optional
 
 
-def detect_context(cwd: str | None = None) -> dict:
+def detect_context(cwd: Optional[str] = None) -> dict:
     """Detect whether CWD is inside a root repo worktree."""
     path = Path(cwd) if cwd else Path.cwd()
 

@@ -1,6 +1,7 @@
 import re
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 
 def next_sequence(docs_dir: str, record_type: str) -> dict:
@@ -20,7 +21,7 @@ def next_sequence(docs_dir: str, record_type: str) -> dict:
     return {"next": next_val, "formatted": f"{next_val:03d}"}
 
 
-def check_progress(docs_dir: str, target_date: str | None = None) -> dict:
+def check_progress(docs_dir: str, target_date: Optional[str] = None) -> dict:
     """Check if today's (or given date's) progress file exists."""
     d = Path(docs_dir) / "progress"
     dt = target_date or date.today().isoformat()

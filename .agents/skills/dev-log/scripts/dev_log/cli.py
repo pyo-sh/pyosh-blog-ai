@@ -101,7 +101,6 @@ def main():
 
             _output(cleanup_worktree(args.worktree, args.branch, args.root))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
