@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | agent-tracker sidecar v2 + immediate cutover (#109) - schema_version/session_name/tmux_server 필드 추가, socket-hash/session/pane 3레벨 namespace로 변경, v1 flat 파일 자동 정리, source precedence 문서화 (PR #175) | done |
 | 2026-03-13 | agent-tracker Bash safety hotfix (#108) - @tsv 필드 밀림(RS=\x1e+base64), dead orchestrator [DEAD] 표시, 토큰 0/0 unknown, done 체크 무조건화, pane_id guard, stale/fault/dead 분리 (PR #174) | done |
 | 2026-03-13 | orchctl core state machine Python 이전 + 기본 테스트 (#86) - IssueState/AttemptStatus enums, ISSUE_TRANSITIONS/ATTEMPT_TRANSITIONS 맵, optimistic-lock apply_*_transition(StaleStateError), resolve_blocked_issue(soft/hard dep), try_acquire_lease upsert, schema v2(state 어휘 확장 + idx_issues_state), 93 tests, 5라운드 리뷰 (PR #172) | done |
 | 2026-03-13 | dev-pipeline 4개 버그 수정 (#170) - review-wait pending 분기 추가, suggestion_only round 카운터 수정, normalizer 들여쓰기 오파싱 수정, reviewBody 데이터 포함 (PR #171) | done |

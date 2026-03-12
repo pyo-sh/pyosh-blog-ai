@@ -89,6 +89,19 @@
 - **Bug 6 - stale/fault/dead/unknown idle 혼입**: stale(갱신 초과 비idle) → `status="stale"`, 파싱 실패 → `status="fault"`, done은 staleness 체크 제외. `n_stale` 카운터 분리, `status_badge`에 `stale`(GOLD)/`fault`(ROSE) 추가
 - 클린 리뷰 통과(0/0/0), PR #174 머지 완료
 
+## agent-tracker: sidecar v2 contract + immediate cutover (#109, PR #175)
+
+- **목적**: sidecar JSON schema를 v2로 업그레이드하고 namespace를 multi-server/multi-session 안전 구조로 변경
+- **신규 필드**: `schema_version: "v2"`, `session_name` (tmux session 이름), `tmux_server` (소켓 경로)
+- **namespace 변경**: `.workspace/agent-tracker/{pane_id}.json` - `.workspace/agent-tracker/<socket-hash>/<session>/<pane>.json`
+  - `socket-hash`: `$TMUX` 소켓 경로의 MD5 앞 6자 - 다중 tmux 서버 충돌 방지
+  - `session`: tmux session 이름 (예: `lab`)
+  - `pane`: pane id % prefix 제거 (예: `5`)
+- **즉시 cutover**: `agent-tracker.sh` 시작 시 v1 flat 파일(`SIDECAR_DIR/*.json`) 자동 정리
+- **reader 업데이트**: `collect.sh`에서 socket hash + session 계산 후 v2 경로로 sidecar 조회. source precedence 문서화 추가
+- **리뷰 피드백 수정**: `_pid` unset 누락 수정, `md5sum` Linux-only 주석 추가, 활성 세션 orphan 삭제 테스트 신규 추가 (4 - 6개)
+- **병렬 수정**: origin/main에 #108 변경(path traversal guard, `status: "stale"/"fault"` 신규, base64 인코딩)이 선반영되어 merge conflict 해소 후 PR merge
+
 ## dev-log detect-context area 검증 (#164, PR #166)
 
 - **문제**: `detect-context`가 `.workspace/worktrees/` 하위 경로만으로 `inRootWorktree: true` 판단하여 client/server worktree에서 false positive 발생. dev-log가 client/server PR branch에 docs를 혼입할 위험
