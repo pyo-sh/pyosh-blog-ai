@@ -7,7 +7,8 @@ description: GitHub Issue-based development workflow. Issue → Worktree → Cod
 
 Issue → Worktree → Code → Push → PR. Review/merge handled by separate skills.
 
-> CLI: `python3 .agents/skills/dev-build/scripts/<script>.py`
+> CLI: `python3 $MONOREPO_ROOT/.agents/skills/dev-build/scripts/<script>.py`
+> `MONOREPO_ROOT`: use `source .agents/scripts/monorepo-helpers.sh` from monorepo root, or bootstrap with `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 > Area definitions, directory/repo mappings, worktree paths: [monorepo-layout.md](../../references/monorepo-layout.md)
 
 ## Invariants
@@ -18,6 +19,8 @@ Issue → Worktree → Code → Push → PR. Review/merge handled by separate sk
 4. Commit: `{type}: {description} (#{N})`
 5. PR title: `{type}: {description} (#{N})`
 6. PR body uses `--body-file` (not inline `--body`) to avoid shell escape conflicts.
+7. `gh issue view` must always include `--json number,title,body,state,labels`. Calling it without `--json` triggers a GitHub Projects (classic) deprecation error and exits with code 1.
+   Correct: `gh issue view $N -R $REPO --json number,title,body,state,labels`
 
 | Type | Purpose |
 |------|---------|
@@ -38,7 +41,7 @@ Run `gh issue list --assignee @me` in the target area. If none exists, get user 
 ### 1. Create worktree
 
 ```
-python3 .agents/skills/dev-build/scripts/worktree_setup.py \
+python3 $MONOREPO_ROOT/.agents/skills/dev-build/scripts/worktree_setup.py \
   --area {area} --issue {N} --type {type} --desc {desc}
 ```
 
@@ -55,14 +58,14 @@ After implementation, mark completed DoD items in the issue body. Only check ful
 ### 3. Push and create PR
 
 ```
-python3 .agents/skills/dev-build/scripts/pr_helpers.py push \
+python3 $MONOREPO_ROOT/.agents/skills/dev-build/scripts/pr_helpers.py push \
   --worktree {worktreePath} --branch {branch}
 ```
 
 Read `{area}/.github/PULL_REQUEST_TEMPLATE.md` for the PR body structure. Write body to `.workspace/messages/pr-{N}-body.md`, then:
 
 ```
-python3 .agents/skills/dev-build/scripts/pr_helpers.py create \
+python3 $MONOREPO_ROOT/.agents/skills/dev-build/scripts/pr_helpers.py create \
   --worktree {worktreePath} --repo {repo} \
   --title "{type}: description (#{N})" --body-file .workspace/messages/pr-{N}-body.md
 ```
@@ -76,6 +79,6 @@ If called from `/dev-pipeline`, return control to the caller. Otherwise, instruc
 ### 5. Cleanup
 
 ```
-python3 .agents/skills/dev-build/scripts/worktree_cleanup.py \
+python3 $MONOREPO_ROOT/.agents/skills/dev-build/scripts/worktree_cleanup.py \
   --repo-dir {repoDir} --worktree {worktreePath} --branch {branch}
 ```

@@ -48,7 +48,7 @@ High-level CLI interface that replaces inline Bash in SKILL.md (v3).
 
 ### Invocation
 
-`python3 -m dev_pipeline step <name> --issue N --area A [--phase setup|finalize] [--review-id N] [--tool T] [--decision D]`
+`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step <name> --issue N --area A [--phase setup|finalize] [--review-id N] [--tool T] [--model M] [--decision D]`
 
 ### Output contract
 
