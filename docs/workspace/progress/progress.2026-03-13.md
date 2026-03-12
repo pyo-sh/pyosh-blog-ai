@@ -10,6 +10,20 @@
 - **리뷰 피드백**: `push_safely` 반환값 미검사 경고 수정, `log_transition` audit trail 추가
 - 2라운드 리뷰, PR #165 squash merge 완료
 
+## docs branch git strategy (#168, PR #169)
+
+- **목적**: dev-log 커밋이 main에 직접 노이즈를 만들지 않고, 배치 관리가 가능한 구조로 전환
+- **Phase A - dev-log 재작성**:
+  - `context.py`/`test_context.py` 삭제 (worktree 감지 불필요)
+  - `git_ops.py`: `push_to_docs`, `branch_exists_remote`, `create_branch_from` 추가
+  - `worktree.py`: base를 `docs`로 변경, `ensure_docs_branch()` 추가
+  - `merge.py`: `lock_merge` -> `merge_to_docs` (origin/docs에 rebase 후 push)
+  - `cli.py`: `detect-context`/`push` 제거, `ensure-branch`/`merge-to-docs` 추가
+  - SKILL.md: 7단계 선형 워크플로우로 재작성
+- **Phase B - dev-archive 신규 스킬**: `check-diff`, `ensure-label`, `create-pr`, `squash-merge`, `sync-branch` 5개 CLI 서브커맨드
+- **Phase C - pipeline 상태 머신 재배치**: merge -> log 순서로 변경, `step_merge`는 log로 전이, `step_log_finalize`에서 cleanup + done 반환
+- 24 tests pass, 1라운드 리뷰 (WARNING 1 + SUGGESTION 1 수정)
+
 ## orchctl CLI skeleton + SQLite schema (#85, PR #167)
 
 - **목적**: Stage 2 오케스트레이터 재설계의 기반 - Python 기반 `orchctl` CLI와 WAL+FK SQLite 데이터베이스

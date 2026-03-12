@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | docs branch git strategy (#168) - dev-log 커밋을 long-lived `docs` 브랜치로 전환, `/dev-archive` squash-merge PR 신규 스킬, pipeline merge -> log 순서 재배치 (PR #169) | done |
 | 2026-03-13 | orchctl CLI skeleton + SQLite schema (#85) - `tools/orchctl/` Python 패키지, Click CLI(init/status/doctor/reconcile), WAL+FK SQLite schema v1(issues/attempts/heartbeats/leases/config), 마이그레이션 러너, 16 tests, 5라운드 리뷰 (PR #167) | done |
 | 2026-03-13 | dev-pipeline log → merge 순서 변경 (#164) - 상태 머신 `log → merge → done` 재배치로 `lock_merge` 발산 원천 차단 + detect-context area 검증 추가 (PR #165, #166) | done |
 | 2026-03-12 | dev-log Python CLI + SKILL.md thin contract (#153) - dev_log Python 패키지 8모듈, SKILL.md 108→71줄(-34%), 참조 3파일 삭제, AI 컨텍스트 537→211줄(-61%), 22 tests, 4라운드 리뷰 (PR #159) | done |
