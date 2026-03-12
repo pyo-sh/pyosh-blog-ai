@@ -547,7 +547,8 @@ def step_log_finalize(issue: int, area: str, monorepo_root: Path) -> StepResult:
 
     # Push any dev-log commits to the PR branch
     if wt.exists():
-        push_safely(str(wt))
+        if not push_safely(str(wt)):
+            return StepResult(action="escalate", data={"reason": "dev-log push failed"})
         new_sha = rev_parse_head(str(wt))
         if new_sha:
             state_update(issue, area, monorepo_root, {"lastCommitSha": new_sha})
