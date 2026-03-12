@@ -36,7 +36,7 @@ _socket_hash="default"
 _session="unknown"
 if [[ -n "${TMUX:-}" ]]; then
   _tmux_socket="${TMUX%%,*}"
-  _socket_hash=$(printf '%s' "$_tmux_socket" | md5sum | cut -c1-6)
+  _socket_hash=$(printf '%s' "$_tmux_socket" | md5sum | cut -c1-6)  # md5sum: GNU coreutils (Linux only)
   _session=$(tmux display-message -p '#{session_name}' 2>/dev/null || true)
   _session="${_session:-unknown}"
 fi

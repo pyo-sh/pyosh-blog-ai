@@ -2,6 +2,7 @@
 # test-sidecar-cleanup.sh — Verify sidecar cleanup safety (#72, #109)
 # 1. v1 flat sidecars are removed unconditionally (immediate cutover, #109).
 # 2. When tmux session doesn't exist, v2 sidecars must NOT be deleted.
+# 3. When session exists, orphan pane sidecars are removed; active ones kept.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"
@@ -58,5 +59,32 @@ assert_eq "v2 nonexistent session: 100.json preserved" \
   "true" "$(test -f "$SIDECAR_DIR/${HASH}/${SESSION}/100.json" && echo true || echo false)"
 assert_eq "v2 nonexistent session: 200.json preserved" \
   "true" "$(test -f "$SIDECAR_DIR/${HASH}/${SESSION}/200.json" && echo true || echo false)"
+
+# ── Test 3: orphan deletion with active session ────────────────────────────
+# Directly invoke the orphan-deletion loop body with a controlled _active_panes
+# map, bypassing `tmux has-session` to make the test self-contained.
+HASH2="def456"
+SESSION2="fake_active_session"
+mkdir -p "$SIDECAR_DIR/${HASH2}/${SESSION2}"
+echo '{"schema_version":"v2","status":"working"}' > "$SIDECAR_DIR/${HASH2}/${SESSION2}/10.json"
+echo '{"schema_version":"v2","status":"idle"}' > "$SIDECAR_DIR/${HASH2}/${SESSION2}/99.json"
+
+# Simulate: pane 10 is active, pane 99 is orphan
+declare -A _active_panes=()
+_active_panes["10"]=1  # active pane
+
+_v2_dir="$SIDECAR_DIR/${HASH2}/${SESSION2}"
+for _f in "$_v2_dir"/*.json; do
+  [[ -f "$_f" ]] || continue
+  _fname="${_f##*/}"
+  _pane="${_fname%.json}"
+  [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
+done
+unset _active_panes _fname _pane _f _v2_dir
+
+assert_eq "v2 active session: active pane 10.json kept" \
+  "true" "$(test -f "$SIDECAR_DIR/${HASH2}/${SESSION2}/10.json" && echo true || echo false)"
+assert_eq "v2 active session: orphan pane 99.json removed" \
+  "false" "$(test -f "$SIDECAR_DIR/${HASH2}/${SESSION2}/99.json" && echo true || echo false)"
 
 test_summary

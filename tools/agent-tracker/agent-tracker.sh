@@ -67,6 +67,7 @@ fi
 mkdir -p "$SIDECAR_DIR"
 
 # Compute socket hash for this tmux server ($TMUX: socket_path,server_pid,session_id)
+# md5sum: GNU coreutils (Linux only)
 _tmux_socket="${TMUX%%,*}"
 _socket_hash=$(printf '%s' "$_tmux_socket" | md5sum | cut -c1-6)
 
@@ -91,7 +92,7 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
       [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
     done
   fi
-  unset _active_panes _fname _pane _f _v2_dir
+  unset _active_panes _fname _pane _f _v2_dir _pid
 fi
 unset _tmux_socket _socket_hash
 
