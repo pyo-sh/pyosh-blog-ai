@@ -1,5 +1,17 @@
 # Progress 2026-03-13
 
+## Agent tracker writer contract alignment (#110, PR #180)
+
+- **목적**: agent-tracker hooks/writer/reader 계약을 sidecar v2 schema와 일관되게 강화
+- **구현**:
+  - `hooks/on-status.sh`: task(UserPromptSubmit) 및 key_arg(PreToolUse) 처리 시 ANSI CSI/OSC/ESC 시퀀스 제거 3단계(`\\u001b\\[...[A-Za-z]` → `\\u001b]...\\u0007` → `\\u001b.`) 추가, 기존 `[[:cntrl:]]` strip 이전에 수행
+  - `hooks/on-statusline.sh`: model fallback을 `"Claude"` 하드코딩 → `$existing.model // "unknown"` 조건부 보존으로 변경; `tokens_updated_at`는 `$used_tokens > 0`일 때만 갱신하여 토큰 데이터 없는 경우 허위 freshness 방지
+  - `statusline-wrapper.sh`: `TRANSCRIPT_LAST_MSG` jq 파이프라인에 ANSI/OSC sanitization 추가
+  - `lib/collect.sh`: model reader fallback `"Claude"` → `"unknown"` (default 및 jq fallback 모두)
+  - `setup.sh`: sidecar directory 출력을 v2 namespace 형식으로 업데이트; v1 flat sidecar 파일(`.workspace/agent-tracker/*.json`) 자동 마이그레이션 추가
+  - `.agents/skills/dev-pipeline/scripts/dev_pipeline/models.py`: `issue` 필드 로드 시 `int(d.get("issue") or 0)`으로 정규화 - 구 bash 기반 writer가 생성한 string 타입("30") → int 타입(30) 자동 변환
+- **결과**: review clean (critical 0, warning 0, suggestion 0), 1라운드 통과
+
 ## Hard/soft dependency + cross-area policy (#90, PR #176)
 
 - **목적**: dev-orchestrator Stage 2 - dependency 유형을 hard/soft로 구분하고 cross-area 및 SCC cycle 격리 정책 정의
