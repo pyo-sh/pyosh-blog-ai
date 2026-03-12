@@ -30,7 +30,7 @@ render_dashboard() {
 
   # ── Extract agent data from snapshot (single jq call for all rows) ──
   local -a agent_rows=()
-  local n_working=0 n_plan=0 n_idle=0 n_total=0
+  local n_working=0 n_plan=0 n_idle=0 n_stale=0 n_total=0
 
   local agents_tsv
   agents_tsv=$(printf '%s' "$snapshot" | jq -r '
@@ -49,6 +49,7 @@ render_dashboard() {
       case "$status" in
         working|needs-input) (( n_working++ )) ;;
         plan)                (( n_plan++ ))    ;;
+        stale|fault|unknown) (( n_stale++ ))   ;;
         *)                   (( n_idle++ ))    ;;
       esac
 
@@ -184,7 +185,8 @@ render_dashboard() {
 
   # ── Footer ──
   local n_stat="(${n_working} working"
-  (( n_plan > 0 )) && n_stat+=", ${n_plan} plan"
+  (( n_plan > 0 ))  && n_stat+=", ${n_plan} plan"
+  (( n_stale > 0 )) && n_stat+=", ${n_stale} stale"
   n_stat+=", ${n_idle} idle)"
 
   local left_colored="${GREEN}●${R} ${GRAY}Active: ${n_total} agents ${n_stat}${R}"
@@ -248,6 +250,7 @@ _render_orchestrator() {
 
     h_color="$GOLD"
     [[ "$batch_status" == "done" ]] && h_color="$BLUE"
+    [[ "$batch_status" == "dead" ]] && h_color="$ROSE"
 
     printf "${GRAY}║${R}  ${BOLD}${h_color}%s${R}%*s${GRAY}%s${R}  ${GRAY}║${R}" \
       "$h_left" "$hgap" "" "$h_right"
@@ -337,6 +340,9 @@ _render_orchestrator() {
     if [[ "$batch_status" == "done" ]]; then
       batch_label="${BLUE}[DONE]${R}"
       batch_label_plain="[DONE]"
+    elif [[ "$batch_status" == "dead" ]]; then
+      batch_label="${ROSE}[DEAD]${R}"
+      batch_label_plain="[DEAD]"
     fi
 
     local of_dw bl_dw bl_extra fp

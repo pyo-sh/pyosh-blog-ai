@@ -86,6 +86,8 @@ status_badge() {
     needs-input)  printf "${ROSE}◉ wait${R}" ;;
     error)        printf "${ROSE}✖ err ${R}" ;;
     done)         printf "${BLUE}✓ done${R}" ;;
+    stale)        printf "${GOLD}~ stal${R}" ;;
+    fault)        printf "${ROSE}! flt ${R}" ;;
     unknown)      printf "${ROSE}? unkn${R}" ;;
     *)            printf "${GRAY}○ idle${R}" ;;
   esac
