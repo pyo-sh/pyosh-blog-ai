@@ -577,6 +577,7 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
 
     if pr_state == "MERGED":
         fetch_prune(str(repo_dir))
+        log_transition(issue, area, monorepo_root, "merge", "done", "PR already merged")
         cleanup(issue, area, branch, pr, monorepo_root)
         return StepResult(action="already_merged", data={"pr": pr})
     if pr_state == "CLOSED":
@@ -591,6 +592,7 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
         return StepResult(action="escalate", data={"reason": f"merge failed: {e}"})
 
     fetch_prune(str(repo_dir))
+    log_transition(issue, area, monorepo_root, "merge", "done", "PR merged")
     cleanup(issue, area, branch, pr, monorepo_root)
 
     return StepResult(action="merged", data={"pr": pr})
