@@ -3,7 +3,10 @@
 # Reads StatusLine JSON from stdin, writes sidecar file for agent-tracker dashboard.
 # Called by statusline-wrapper.sh every ~300ms. Must be non-blocking.
 #
-# Sidecar location: .workspace/agent-tracker/{pane_id}.json
+# Sidecar v2 location: .workspace/agent-tracker/<socket-hash>/<session>/<pane>.json
+#   socket-hash: first 6 chars of MD5 of tmux socket path (from $TMUX env)
+#   session: tmux session name
+#   pane: pane id without % prefix
 # Falls back to PID-based filename when TMUX_PANE is not set.
 # Uses flock to prevent race conditions with on-status.sh.
 
@@ -26,9 +29,21 @@ pane_file="${pane_id#%}"
 input=$(cat)
 [[ -z "$input" ]] && exit 0
 
-mkdir -p "$SIDECAR_DIR"
+# ── v2 namespace: socket-hash / session / pane ──────────────────────────────
+# $TMUX format: socket_path,server_pid,session_id
+_tmux_socket=""
+_socket_hash="default"
+_session="unknown"
+if [[ -n "${TMUX:-}" ]]; then
+  _tmux_socket="${TMUX%%,*}"
+  _socket_hash=$(printf '%s' "$_tmux_socket" | md5sum | cut -c1-6)
+  _session=$(tmux display-message -p '#{session_name}' 2>/dev/null || true)
+  _session="${_session:-unknown}"
+fi
 
-sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
+mkdir -p "${SIDECAR_DIR}/${_socket_hash}/${_session}"
+
+sidecar_path="${SIDECAR_DIR}/${_socket_hash}/${_session}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
 # Use pre-computed tokens from statusline-wrapper.sh when available (avoids duplicate jq).
@@ -52,7 +67,10 @@ jq_expr='
     else 0 end
   ) as $used_tokens |
   $existing * {
+    schema_version: "v2",
     pane_id: $pane_id,
+    session_name: $session,
+    tmux_server: $tmux_socket,
     session_id: ($input.session_id // $existing.session_id // null),
     model: $model,
     tokens: {
@@ -75,6 +93,7 @@ jq_expr='
   [[ -f "$sidecar_path" ]] && existing=$(cat "$sidecar_path" 2>/dev/null || echo "{}")
 
   updated=$(jq -n --argjson existing "$existing" --argjson input "$input" --arg pane_id "$pane_id" \
+    --arg session "$_session" --arg tmux_socket "$_tmux_socket" \
     --argjson precomputed "${_precomputed:-0}" "$jq_expr" 2>/dev/null)
 
   if [[ -n "$updated" ]]; then

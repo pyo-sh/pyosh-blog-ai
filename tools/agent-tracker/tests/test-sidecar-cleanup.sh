@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# test-sidecar-cleanup.sh — Verify sidecar cleanup safety (#72 item 5)
-# When tmux session doesn't exist, sidecars must NOT be deleted.
+# test-sidecar-cleanup.sh — Verify sidecar cleanup safety (#72, #109)
+# 1. v1 flat sidecars are removed unconditionally (immediate cutover, #109).
+# 2. When tmux session doesn't exist, v2 sidecars must NOT be deleted.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"
@@ -11,33 +12,51 @@ trap 'rm -rf "$TMPDIR"' EXIT
 SIDECAR_DIR="$TMPDIR/sidecar"
 mkdir -p "$SIDECAR_DIR"
 
-# Create test sidecar files
-echo '{"status":"working"}' > "$SIDECAR_DIR/100.json"
-echo '{"status":"idle"}' > "$SIDECAR_DIR/200.json"
+# ── Test 1: v1 flat sidecars are removed at startup ────────────────────────
+echo '{"status":"working","schema_version":"v1"}' > "$SIDECAR_DIR/100.json"
+echo '{"status":"idle","schema_version":"v1"}' > "$SIDECAR_DIR/200.json"
 
-# Simulate the safe cleanup logic from agent-tracker.sh
+# Simulate v1 flat cleanup
+for _f in "$SIDECAR_DIR"/*.json; do
+  [[ -f "$_f" ]] && rm -f "$_f"
+done
+unset _f
+
+assert_eq "v1 flat: 100.json removed" \
+  "false" "$(test -f "$SIDECAR_DIR/100.json" && echo true || echo false)"
+assert_eq "v1 flat: 200.json removed" \
+  "false" "$(test -f "$SIDECAR_DIR/200.json" && echo true || echo false)"
+
+# ── Test 2: v2 sidecars preserved when session doesn't exist ──────────────
+HASH="abc123"
 SESSION="nonexistent_session_$$"
 
+mkdir -p "$SIDECAR_DIR/${HASH}/${SESSION}"
+echo '{"schema_version":"v2","status":"working"}' > "$SIDECAR_DIR/${HASH}/${SESSION}/100.json"
+echo '{"schema_version":"v2","status":"idle"}' > "$SIDECAR_DIR/${HASH}/${SESSION}/200.json"
+
 # The key: tmux has-session fails for nonexistent session,
-# so the entire cleanup block is skipped.
+# so the v2 cleanup block is skipped entirely.
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   # This should NOT execute
   declare -A _active_panes=()
   while IFS= read -r _pid; do
     _active_panes["$_pid"]=1
   done < <(tmux list-panes -s -t "$SESSION" -F '#{pane_id}' 2>/dev/null | sed 's/^%//')
-  for _f in "$SIDECAR_DIR"/*.json; do
-    [[ -f "$_f" ]] || continue
-    _fname="${_f##*/}"
-    _pane="${_fname%.json}"
-    [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
-  done
+  _v2_dir="$SIDECAR_DIR/${HASH}/${SESSION}"
+  if [[ -d "$_v2_dir" ]]; then
+    for _f in "$_v2_dir"/*.json; do
+      [[ -f "$_f" ]] || continue
+      _fname="${_f##*/}"
+      _pane="${_fname%.json}"
+      [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
+    done
+  fi
 fi
 
-# Verify files still exist
-assert_eq "nonexistent session: sidecar 100.json preserved" \
-  "true" "$(test -f "$SIDECAR_DIR/100.json" && echo true || echo false)"
-assert_eq "nonexistent session: sidecar 200.json preserved" \
-  "true" "$(test -f "$SIDECAR_DIR/200.json" && echo true || echo false)"
+assert_eq "v2 nonexistent session: 100.json preserved" \
+  "true" "$(test -f "$SIDECAR_DIR/${HASH}/${SESSION}/100.json" && echo true || echo false)"
+assert_eq "v2 nonexistent session: 200.json preserved" \
+  "true" "$(test -f "$SIDECAR_DIR/${HASH}/${SESSION}/200.json" && echo true || echo false)"
 
 test_summary

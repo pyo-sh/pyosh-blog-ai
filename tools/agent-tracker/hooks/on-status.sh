@@ -12,6 +12,7 @@
 #   PostToolUse      → clears activity, restores needs-input → working (#47)
 #   SessionEnd       → deletes sidecar file for this pane (#32)
 #
+# Sidecar v2 location: .workspace/agent-tracker/<socket-hash>/<session>/<pane>.json
 # Uses flock to prevent race conditions with on-statusline.sh.
 
 set -euo pipefail
@@ -33,7 +34,19 @@ input=$(cat)
 event=$(printf '%s' "$input" | jq -r '.hook_event_name // empty')
 [[ -z "$event" ]] && exit 0
 
-sidecar_path="${SIDECAR_DIR}/${pane_file}.json"
+# ── v2 namespace: socket-hash / session / pane ──────────────────────────────
+# $TMUX format: socket_path,server_pid,session_id
+_tmux_socket=""
+_socket_hash="default"
+_session="unknown"
+if [[ -n "${TMUX:-}" ]]; then
+  _tmux_socket="${TMUX%%,*}"
+  _socket_hash=$(printf '%s' "$_tmux_socket" | md5sum | cut -c1-6)
+  _session=$(tmux display-message -p '#{session_name}' 2>/dev/null || true)
+  _session="${_session:-unknown}"
+fi
+
+sidecar_path="${SIDECAR_DIR}/${_socket_hash}/${_session}/${pane_file}.json"
 lock_path="${sidecar_path}.lock"
 
 # ── SessionEnd: delete sidecar file immediately, no lock needed (#32) ────────
@@ -42,7 +55,7 @@ if [[ "$event" == "SessionEnd" ]]; then
   exit 0
 fi
 
-mkdir -p "$SIDECAR_DIR"
+mkdir -p "${SIDECAR_DIR}/${_socket_hash}/${_session}"
 
 # ── Prepare update fields from input (outside lock to minimize lock time) ──
 
@@ -61,17 +74,17 @@ case "$event" in
     # /clear resets sidecar to initial state (#32)
     if [[ "$task" == "/clear" ]]; then
       jq_args=(--arg pane_id "$pane_id")
-      jq_expr='. + {status: "idle", task: "—", activity: null, pane_id: $pane_id, updated_at: now}'
+      jq_expr='. + {schema_version: "v2", status: "idle", task: "—", activity: null, pane_id: $pane_id, updated_at: now}'
     else
       jq_args=(--arg status "working" --arg task "$task" --arg pane_id "$pane_id")
-      jq_expr='. + {status: $status, task: $task, activity: null, pane_id: $pane_id, updated_at: now}'
+      jq_expr='. + {schema_version: "v2", status: $status, task: $task, activity: null, pane_id: $pane_id, updated_at: now}'
     fi
     ;;
   Stop)
     # Add "(Done) " prefix to task when a task was active (#32)
     jq_args=(--arg pane_id "$pane_id")
     jq_expr='
-      . + {status: "idle", activity: null, pane_id: $pane_id, updated_at: now} |
+      . + {schema_version: "v2", status: "idle", activity: null, pane_id: $pane_id, updated_at: now} |
       if (.task != null and .task != "—" and (.task | startswith("(Done) ") | not))
       then .task = "(Done) " + .task
       else . end
@@ -113,17 +126,17 @@ case "$event" in
 
     if [[ "$tool_name" == "AskUserQuestion" ]]; then
       jq_args=(--arg activity "$activity" --arg pane_id "$pane_id")
-      jq_expr='. + {status: "needs-input", activity: $activity, pane_id: $pane_id, updated_at: now}'
+      jq_expr='. + {schema_version: "v2", status: "needs-input", activity: $activity, pane_id: $pane_id, updated_at: now}'
     else
       jq_args=(--arg activity "$activity" --arg pane_id "$pane_id")
-      jq_expr='. + {activity: $activity, pane_id: $pane_id, updated_at: now}'
+      jq_expr='. + {schema_version: "v2", activity: $activity, pane_id: $pane_id, updated_at: now}'
     fi
     ;;
   PostToolUse)
     # Reset needs-input → working when AskUserQuestion completes (#47)
     jq_args=(--arg pane_id "$pane_id")
     jq_expr='
-      . + {activity: null, pane_id: $pane_id, updated_at: now} |
+      . + {schema_version: "v2", activity: null, pane_id: $pane_id, updated_at: now} |
       if .status == "needs-input" then .status = "working" else . end
     '
     ;;

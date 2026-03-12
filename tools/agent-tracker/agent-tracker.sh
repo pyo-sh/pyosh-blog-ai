@@ -7,7 +7,7 @@
 #   No \x1e/\x1f delimiter protocols. All data boundaries are JSON + @tsv.
 #   Layers: collect (lib/collect.sh) → render (lib/render.sh) → util (lib/util.sh)
 #
-# Claude Code panes: data pushed by hooks → .workspace/agent-tracker/{pane_id}.json
+# Claude Code panes: data pushed by hooks → .workspace/agent-tracker/<socket-hash>/<session>/<pane>.json (v2)
 # Codex panes: pane scraping fallback (no hooks support)
 #
 # Usage: bash tools/agent-tracker/agent-tracker.sh [-s SESSION] [-i INTERVAL]
@@ -60,23 +60,40 @@ if ! [[ "$INTERVAL" =~ ^[0-9]*\.?[0-9]+$ ]] || \
 fi
 
 # ── Sidecar cleanup (safe) ──
-# Only clean orphan sidecars when tmux session is confirmed accessible (#72).
-# If tmux session doesn't exist or query fails, skip cleanup entirely
-# to avoid deleting valid sidecars from another session.
+# Runs once at startup. Scoped to the current tmux server + target session only.
+# 1. Remove stale v1 flat sidecars (immediate cutover, #109).
+# 2. Remove orphan v2 sidecars for panes no longer active in SESSION.
+# Skip entirely if session is inaccessible to avoid deleting sidecars from other sessions (#72).
 mkdir -p "$SIDECAR_DIR"
+
+# Compute socket hash for this tmux server ($TMUX: socket_path,server_pid,session_id)
+_tmux_socket="${TMUX%%,*}"
+_socket_hash=$(printf '%s' "$_tmux_socket" | md5sum | cut -c1-6)
+
+# Remove v1 flat sidecars (old namespace: SIDECAR_DIR/*.json)
+for _f in "$SIDECAR_DIR"/*.json; do
+  [[ -f "$_f" ]] && rm -f "$_f"
+done
+unset _f
+
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   declare -A _active_panes=()
   while IFS= read -r _pid; do
     _active_panes["$_pid"]=1
   done < <(tmux list-panes -s -t "$SESSION" -F '#{pane_id}' 2>/dev/null | sed 's/^%//')
-  for _f in "$SIDECAR_DIR"/*.json; do
-    [[ -f "$_f" ]] || continue
-    _fname="${_f##*/}"
-    _pane="${_fname%.json}"
-    [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
-  done
-  unset _active_panes _fname _pane _f _pid
+  # Remove orphan v2 sidecars for this server + session
+  _v2_dir="$SIDECAR_DIR/${_socket_hash}/${SESSION}"
+  if [[ -d "$_v2_dir" ]]; then
+    for _f in "$_v2_dir"/*.json; do
+      [[ -f "$_f" ]] || continue
+      _fname="${_f##*/}"
+      _pane="${_fname%.json}"
+      [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
+    done
+  fi
+  unset _active_panes _fname _pane _f _v2_dir
 fi
+unset _tmux_socket _socket_hash
 
 # ── Main loop ──
 tput smcup 2>/dev/null
