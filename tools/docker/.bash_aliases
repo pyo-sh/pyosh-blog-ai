@@ -16,7 +16,7 @@ dev-update() {
   local failed=0
 
   # System packages (손상된 apt lists 정리 후 업데이트)
-  echo "[1/4] System packages"
+  echo "[1/5] System packages"
   sudo rm -rf /var/lib/apt/lists/*
   if sudo apt-get update && sudo apt-get upgrade -y; then
     sudo rm -rf /var/lib/apt/lists/*
@@ -27,8 +27,17 @@ dev-update() {
     ((failed++)) || true
   fi
 
+  # GitHub CLI (gh)
+  echo "[2/5] GitHub CLI (gh)"
+  if sudo apt-get update -qq && sudo apt-get install --only-upgrade -y gh; then
+    echo "  done"
+  else
+    echo "  SKIPPED (install failed)"
+    ((failed++)) || true
+  fi
+
   # Claude Code CLI (native installer)
-  echo "[2/4] Claude Code CLI"
+  echo "[3/5] Claude Code CLI"
   if curl -fsSL https://claude.ai/install.sh | bash; then
     echo "  done"
   else
@@ -37,7 +46,7 @@ dev-update() {
   fi
 
   # Codex CLI
-  echo "[3/4] Codex CLI"
+  echo "[4/5] Codex CLI"
   if sudo npm update -g @openai/codex; then
     echo "  done"
   else
@@ -46,7 +55,7 @@ dev-update() {
   fi
 
   # pnpm (corepack)
-  echo "[4/4] pnpm"
+  echo "[5/5] pnpm"
   if sudo corepack prepare pnpm@latest --activate; then
     echo "  done"
   else

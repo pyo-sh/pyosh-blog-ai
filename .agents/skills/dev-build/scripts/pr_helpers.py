@@ -9,8 +9,11 @@ def cmd_push(args):
 
 
 def cmd_create(args):
+    cmd = ["gh", "pr", "create", "-R", args.repo, "--title", args.title, "--body-file", args.body_file]
+    if args.head:
+        cmd += ["--head", args.head]
     result = subprocess.run(
-        ["gh", "pr", "create", "-R", args.repo, "--title", args.title, "--body-file", args.body_file],
+        cmd,
         capture_output=True, text=True, check=True, cwd=args.worktree,
     )
     lines = [l for l in result.stdout.splitlines() if l.strip()]
@@ -32,6 +35,7 @@ def main():
     pc.add_argument("--repo", required=True)
     pc.add_argument("--title", required=True)
     pc.add_argument("--body-file", required=True)
+    pc.add_argument("--head", default="")
 
     args = p.parse_args()
     {"push": cmd_push, "create": cmd_create}[args.command](args)

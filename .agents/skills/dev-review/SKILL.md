@@ -11,6 +11,7 @@ Read-only review. Never modify code.
 
 1. Never modify code - read-only review only.
 2. All publishing via `review_publish.py`. Never call `gh pr comment`, `gh pr review`, or `gh api` for posting directly.
+3. **All verdicts publish.** `approve`: empty `findings`, `verdict: "approve"` - still complete Steps 3-5.
 
 ## Environment
 
