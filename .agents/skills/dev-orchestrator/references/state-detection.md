@@ -201,17 +201,36 @@ blocked
 
 cycle-isolated  (set at orch_init; issue participates in a dependency cycle)
 
-completed       --(triggers orch_unblock)
-failed          --(triggers orch_unblock; hard dep -> blocked-failed-dependency, soft dep OK)
-skipped_dep_failed (legacy) --(triggers orch_unblock for downstream; equivalent to blocked-failed-dependency)
-blocked-failed-dependency   --(triggers orch_unblock for downstream)
-blocked-external            --(terminal; cross-area hard dep; requires manual intervention)
-cycle-isolated              --(terminal; issue is in a dependency cycle)
+completed             --(triggers orch_unblock)
+failed                --(triggers orch_unblock; hard dep -> blocked-failed-dependency, soft dep OK)
+failed-terminal       --(unrecoverable failure; no retry; same downstream effect as failed)
+needs-human           --(terminal; human intervention required; sets needs-human label + comment)
+needs-spec            --(terminal; issue specification insufficient; sets needs-spec label)
+cancelled             --(terminal; explicitly cancelled; same downstream effect as failed)
+skipped_dep_failed    (legacy) --(triggers orch_unblock; equivalent to blocked-failed-dependency)
+blocked-failed-dependency     --(triggers orch_unblock for downstream)
+blocked-external              --(terminal; cross-area hard dep; requires manual intervention)
+cycle-isolated                --(terminal; issue is in a dependency cycle)
 ```
 
-Terminal states: `completed`, `failed`, `skipped_dep_failed` (legacy), `blocked-failed-dependency`, `blocked-external`, `cycle-isolated`.
+Terminal states: `completed`, `failed`, `failed-terminal`, `needs-human`, `needs-spec`, `cancelled`, `skipped_dep_failed` (legacy), `blocked-failed-dependency`, `blocked-external`, `cycle-isolated`.
 
 Non-terminal (active) states: `pending`, `blocked`, `dispatched`.
+
+## GitHub issue label management
+
+The orchestrator manages these labels on GitHub issues (not PRs):
+
+| Label | Trigger | Removal |
+|-------|---------|---------|
+| `claimed-by-orch` | Issue dispatched | Any terminal state reached |
+| `needs-human` | Transition to `needs-human` state | Manual |
+| `needs-spec` | Transition to `needs-spec` state | Manual |
+| `manual-hold` | Set manually by humans | Manual |
+
+`manual-hold` causes the orchestrator to skip dispatch for that issue. The orchestrator never sets this label.
+
+A transition to `needs-human` also posts a comment on the GitHub issue explaining the reason.
 
 ## Provider health
 

@@ -137,7 +137,7 @@ orch_init "$AREA" "$AGENT" "$issues_json" "$dag_json" 4 "$dep_types_json" "$cros
 | `completed` | Satisfied; unblock downstream |
 | Any terminal non-completed | `blocked-failed-dependency` (terminal; downstream not dispatched) |
 
-Terminal non-completed statuses: `failed`, `skipped_dep_failed`, `blocked-failed-dependency`, `blocked-external`, `cycle-isolated`.
+Terminal non-completed statuses: `failed`, `failed-terminal`, `needs-human`, `needs-spec`, `cancelled`, `skipped_dep_failed`, `blocked-failed-dependency`, `blocked-external`, `cycle-isolated`.
 
 ### Soft dependency
 
