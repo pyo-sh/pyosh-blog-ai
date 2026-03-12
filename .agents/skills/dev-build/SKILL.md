@@ -7,7 +7,27 @@ description: GitHub Issue-based development workflow. Issue → Worktree → Cod
 
 Issue → Worktree → Code → Push → PR. Review/merge handled by separate skills.
 
+> CLI: `python3 .agents/skills/dev-build/scripts/<script>.py`
 > Area definitions, directory/repo mappings, worktree paths: [monorepo-layout.md](../../references/monorepo-layout.md)
+
+## Invariants
+
+1. Each area is an independent Git repo. Run git/gh commands in the correct area directory.
+2. Worktrees live at monorepo root `.workspace/worktrees/{area}/issue-{N}`, not inside the area.
+3. Branch: `{type}/issue-{N}-{desc}` - desc is kebab-case, English, max 3 words, lowercase.
+4. Commit: `{type}: {description} (#{N})`
+5. PR title: `{type}: {description} (#{N})`
+6. PR body uses `--body-file` (not inline `--body`) to avoid shell escape conflicts.
+
+| Type | Purpose |
+|------|---------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation change |
+| `style` | Code formatting (no logic change) |
+| `refactor` | Refactoring (no behavior change) |
+| `test` | Add/modify tests |
+| `chore` | Build, config changes |
 
 ## Workflow
 
@@ -17,59 +37,45 @@ Run `gh issue list --assignee @me` in the target area. If none exists, get user 
 
 ### 1. Create worktree
 
-**`cd {area}` first** — each area is an independent Git repo. Worktrees live at monorepo root `.workspace/`, not inside the area.
-
-```bash
-cd {area}
-git fetch origin
-git rebase origin/main || git merge origin/main
-git worktree add -b {type}/issue-{N}-{desc} ../.workspace/worktrees/issue-{N} main
-cd ../.workspace/worktrees/issue-{N}
+```
+python3 .agents/skills/dev-build/scripts/worktree_setup.py \
+  --area {area} --issue {N} --type {type} --desc {desc}
 ```
 
-→ [branch-naming.md](references/branch-naming.md)
+Output JSON: `{"worktreePath", "branch", "repoDir", "repo"}`. `cd` into `worktreePath`.
 
 ### 2. Code
 
 Follow `{area}/CLAUDE.md`. Record technical decisions via `/dev-log`.
 
-### 2.5. Check Definition of Done (feat issues only)
+### 2.5. Check definition of done (feat issues only)
 
-After implementation, mark completed DoD items in the Issue body:
+After implementation, mark completed DoD items in the issue body. Only check fully implemented items. Leave partial or future items unchecked.
 
-```bash
-BODY=$(gh issue view {N} --json body -q '.body')
-BODY=$(echo "$BODY" | sed 's/- \[ \] Completed item/- [x] Completed item/')
-gh issue edit {N} --body "$BODY"
+### 3. Push and create PR
+
 ```
-
-Only check fully implemented items. Leave partial or future items unchecked.
-
-### 3. Push & create PR
-
-```bash
-git push -u origin {type}/issue-{N}-{desc}
+python3 .agents/skills/dev-build/scripts/pr_helpers.py push \
+  --worktree {worktreePath} --branch {branch}
 ```
 
 Read `{area}/.github/PULL_REQUEST_TEMPLATE.md` for the PR body structure. Write body to `.workspace/messages/pr-{N}-body.md`, then:
 
-```bash
-gh pr create --title "{type}: description (#{N})" --body-file .workspace/messages/pr-{N}-body.md
-rm .workspace/messages/pr-{N}-body.md
+```
+python3 .agents/skills/dev-build/scripts/pr_helpers.py create \
+  --worktree {worktreePath} --repo {repo} \
+  --title "{type}: description (#{N})" --body-file .workspace/messages/pr-{N}-body.md
 ```
 
-→ [pr-template.md](references/pr-template.md) (title format, `gh pr create` usage)
+Output JSON: `{"number", "url"}`. Clean up the body file after.
 
 ### 4. Next step
 
-If called from `/dev-pipeline` (check: the conversation prompt contains `/dev-pipeline`), skip this step and return control to the caller.
-
-Otherwise, instruct user to run `/dev-review` in a new session or `/dev-pipeline` for automated orchestration.
+If called from `/dev-pipeline`, return control to the caller. Otherwise, instruct user to run `/dev-review` in a new session.
 
 ### 5. Cleanup
 
-```bash
-cd {area}
-git worktree remove ../.workspace/worktrees/issue-{N}
-git branch -d {type}/issue-{N}-{desc}
+```
+python3 .agents/skills/dev-build/scripts/worktree_cleanup.py \
+  --repo-dir {repoDir} --worktree {worktreePath} --branch {branch}
 ```
