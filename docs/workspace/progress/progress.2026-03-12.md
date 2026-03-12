@@ -32,6 +32,14 @@
   - `dev-review`: `## Prohibited` → `## Invariants`로 이동, `## Steps` → `## Workflow` 이름 변경, `## Verdict rules` → `## Constraints` 하위로 이동
   - `dev-issue`: `## Constraints` 3줄 → `## Invariants`로 승격, Title rules/Labels → `## Constraints` 하위로 이동, 섹션 순서 재배치
 
+- [x] dev-pipeline Python CLI step subcommand + bug fixes (#150, PR #157)
+  - `steps.py`: 9개 step 함수 (`step_build_setup/finalize`, `step_review_dispatch/wait/process`, `step_resolve_setup/finalize`, `step_merge`, `step_log_finalize`) + `StepResult` 데이터클래스(action/data/message)
+  - `cli.py`: `step` 서브커맨드 파서(7 step names, `--phase setup/finalize`, `--review-id`, `--tool`), `cmd_step` 핸들러(stdout `action:`/`data:` 라우팅)
+  - Bug fix #1: codex `--output-schema` → `--output-last-message` (v0.114.0 호환)
+  - Bug fix #2: `step_review_wait`에서 모든 `failed_*` 상태(6종) codex→claude 폴백 (기존: `failed_parse`만)
+  - Bug fix #3: `init --issue N`이 초기 상태 파일 생성 (기존: 디렉토리만 생성)
+  - 37 new tests (`test_steps.py`), 258 total passing, 0 regressions
+
 
 ## Discoveries
 - `gh pr edit --body-file` 실패: GitHub Projects Classic deprecation 에러 발생 시 GraphQL `updatePullRequest` mutation으로 우회
