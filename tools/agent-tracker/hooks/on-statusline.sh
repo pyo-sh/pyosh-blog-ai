@@ -53,7 +53,7 @@ _precomputed="${TRANSCRIPT_TOKENS:-0}"
 # Build jq expression for the merge.
 # Token priority: pre-computed > current_usage > used_percentage reverse-calc > 0.
 jq_expr='
-  ($input.model.display_name // $input.model.id // "Claude") as $model |
+  ($input.model.display_name // $input.model.id) as $model_raw |
   ($input.context_window.context_window_size // 200000) as $max_tokens |
   (($input.context_window.used_percentage // 0) | floor) as $pct |
   (
@@ -66,13 +66,13 @@ jq_expr='
       ($max_tokens * $pct / 100 | floor)
     else 0 end
   ) as $used_tokens |
-  $existing * {
+  ($existing * {
     schema_version: "v2",
     pane_id: $pane_id,
     session_name: $session,
     tmux_server: $tmux_socket,
     session_id: ($input.session_id // $existing.session_id // null),
-    model: $model,
+    model: ($model_raw // $existing.model // "unknown"),
     tokens: {
       used: $used_tokens,
       max: $max_tokens,
@@ -80,9 +80,9 @@ jq_expr='
     },
     cwd: ($input.cwd // $existing.cwd // null),
     transcript_path: ($input.transcript_path // $existing.transcript_path // null),
-    updated_at: now,
-    tokens_updated_at: now
-  }
+    updated_at: now
+  }) |
+  if $used_tokens > 0 then . + { tokens_updated_at: now } else . end
 '
 
 # Locked read-modify-write to prevent race with on-status.sh

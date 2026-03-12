@@ -171,7 +171,7 @@ class PipelineState:
 
         return cls(
             version=d.get("version", 2),
-            issue=d.get("issue", 0),
+            issue=int(d.get("issue") or 0),
             area=d.get("area", ""),
             pr=d.get("pr", 0),
             branch=d.get("branch", ""),

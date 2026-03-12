@@ -117,7 +117,7 @@ _collect_claude_pane() {
   # v2 namespace: <sidecar_dir>/<socket-hash>/<session>/<pane>.json (#109)
   local sidecar_path="${sidecar_dir}/${socket_hash}/${session}/${pane_file}.json"
 
-  local model="Claude" status="idle" task="-" activity=""
+  local model="unknown" status="idle" task="-" activity=""
   local tok_used=0 tok_total=0 tok_pct=0 tok_source="unknown" tok_fresh=true
 
   if [[ -f "$sidecar_path" ]]; then
@@ -127,7 +127,7 @@ _collect_claude_pane() {
     # Includes tokens_updated_at for independent token freshness tracking (#74).
     local raw
     raw=$(jq -r '[
-      (.model // "Claude"),
+      (.model // "unknown"),
       (.status // "idle"),
       (.tokens.pct // 0 | tostring),
       (.tokens.used // 0 | tostring),

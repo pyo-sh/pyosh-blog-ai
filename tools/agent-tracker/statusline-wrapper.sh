@@ -52,6 +52,10 @@ if [[ -n "$_tp" && -f "$_tp" ]]; then
     map(.message.content |
       if type == "string" then .
       else [.[] | select(.type == "text") | .text] | join(" ") end |
+      gsub("\\u001b\\[[0-9;?]*[A-Za-z]"; "") |
+      gsub("\\u001b][^\u0007]*\u0007"; "") |
+      gsub("\\u001b."; "") |
+      gsub("[[:cntrl:]]"; "") |
       gsub("\n"; " ") | gsub("  +"; " ")) |
     map(select(is_unhelpful | not)) |
     first // ""
