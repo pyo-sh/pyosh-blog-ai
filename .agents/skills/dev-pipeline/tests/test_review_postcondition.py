@@ -22,7 +22,7 @@ def _make_run_result(rc=0, stdout="", stderr="", timed_out=False):
     return RunResult(command=[], rc=rc, stdout=stdout, stderr=stderr, timed_out=timed_out)
 
 
-def _init_state(tmp_path, issue=1, area="client", pr=10):
+def _init_state(tmp_path, issue=1, area="client", pr=10, last_review_id=0):
     for sub in [
         f".workspace/pipeline/{area}",
         f".workspace/pipeline/logs/{area}",
@@ -43,7 +43,7 @@ def _init_state(tmp_path, issue=1, area="client", pr=10):
             "worktreeDir": str(tmp_path / f".workspace/worktrees/{area}/issue-{issue}"),
         },
         "step": "review_dispatch",
-        "lastReviewId": 0,
+        "lastReviewId": last_review_id,
         "lastCommitSha": "abc123",
         "skipReview": False,
         "reviewResolveRound": 0,
@@ -233,3 +233,92 @@ class TestCodexPostCondition:
         assert rc == 0
         state = state_read(issue, area, tmp_path)
         assert state.review_job.status == ReviewJobStatus.SUCCESS
+
+
+class TestPostConditionWatermark:
+    """REGRESSION: post-condition must require a review newer than last_review_id.
+
+    Before the fix, check_review_exists was called without last_review_id, defaulting
+    to 0.  On any second-or-later review round an older existing review could satisfy
+    the check even when the current publish step silently failed.
+    """
+
+    def test_claude_old_review_id_does_not_satisfy_postcondition(self, tmp_path):
+        """A review whose id <= last_review_id must not count as a new review."""
+        # last_review_id=500 means any review with id <=500 is old
+        issue, area, pr = _init_state(tmp_path, last_review_id=500)
+
+        check_calls = []
+
+        def fake_check(area, pr, last_review_id=0):
+            check_calls.append(last_review_id)
+            # The stale review has id=500 which is NOT > last_review_id=500
+            return None  # check_review_exists returns None when no qualifying review found
+
+        def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
+            return _make_run_result(rc=0, stdout="")
+
+        with (
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.check_review_exists", side_effect=fake_check),
+        ):
+            from dev_pipeline import review_runner
+            rc = review_runner._dispatch_claude(
+                issue=issue, area=area, pr=pr, monorepo_root=tmp_path,
+                last_review_id=500,
+            )
+
+        assert rc == 1
+        assert check_calls == [500], (
+            "REGRESSION: post-condition must pass last_review_id=500 to check_review_exists"
+        )
+        state = state_read(issue, area, tmp_path)
+        assert state.review_job.status == ReviewJobStatus.FAILED_POSTCONDITION
+
+    def test_claude_new_review_id_satisfies_postcondition(self, tmp_path):
+        """A review with id > last_review_id counts as a new review."""
+        issue, area, pr = _init_state(tmp_path, last_review_id=500)
+
+        def fake_check(area, pr, last_review_id=0):
+            # New review has id=501 which is > 500
+            return 501
+
+        def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
+            return _make_run_result(rc=0, stdout="")
+
+        with (
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.check_review_exists", side_effect=fake_check),
+        ):
+            from dev_pipeline import review_runner
+            rc = review_runner._dispatch_claude(
+                issue=issue, area=area, pr=pr, monorepo_root=tmp_path,
+                last_review_id=500,
+            )
+
+        assert rc == 0
+        state = state_read(issue, area, tmp_path)
+        assert state.review_job.status == ReviewJobStatus.SUCCESS
+
+    def test_dispatch_review_reads_last_review_id_from_state(self, tmp_path):
+        """REGRESSION: dispatch_review must read last_review_id from state before dispatch.
+
+        If dispatch_review always passes 0, the watermark from a previous round is
+        ignored and the false-success window remains open.
+        """
+        issue, area, pr = _init_state(tmp_path, last_review_id=777)
+
+        captured_last_review_ids = []
+
+        def fake_dispatch_claude(issue, area, pr, monorepo_root, model, last_review_id=0):
+            captured_last_review_ids.append(last_review_id)
+            return 0
+
+        with patch("dev_pipeline.review_runner._dispatch_claude", side_effect=fake_dispatch_claude):
+            from dev_pipeline.review_runner import dispatch_review
+            dispatch_review(issue, area, pr, tmp_path, tool="claude")
+
+        assert captured_last_review_ids == [777], (
+            "REGRESSION: dispatch_review must pass last_review_id=777 from state to "
+            "_dispatch_claude, not 0"
+        )

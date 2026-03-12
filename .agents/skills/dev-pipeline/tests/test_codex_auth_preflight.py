@@ -139,6 +139,32 @@ class TestDetectCodexAuth:
         assert mode == "session"
         assert path is None
 
+    def test_preflight_runs_under_cleaned_env(self):
+        """REGRESSION: _detect_codex_auth must pass the provided env to codex login status.
+
+        Before the fix, subprocess.run was called without env=env, so the probe
+        ran under the full parent environment including Claude-specific vars that
+        trigger Codex external-agent-config detection.  This could cause the probe
+        to fail spuriously in the Claude-driven pipeline path.
+        """
+        from dev_pipeline.review_runner import _detect_codex_auth
+
+        captured_env = {}
+
+        def fake_subprocess_run(cmd, **kwargs):
+            if cmd[:3] == ["codex", "login", "status"]:
+                captured_env.update(kwargs.get("env") or {})
+            return MagicMock(returncode=0)
+
+        clean_env = {"PATH": "/usr/bin", "HOME": "/home/dev"}
+        with patch("subprocess.run", side_effect=fake_subprocess_run):
+            _detect_codex_auth(clean_env)
+
+        assert captured_env == clean_env, (
+            "REGRESSION: _detect_codex_auth must pass env= to the codex login status "
+            "subprocess call so Claude-specific env vars are excluded from the probe"
+        )
+
 
 class TestDispatchCodexAuthPreflight:
     def test_missing_auth_sets_failed_auth_status(self, tmp_path):

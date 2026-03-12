@@ -67,6 +67,7 @@ def _detect_codex_auth(env: dict) -> tuple[str, Optional[Path]]:
             capture_output=True,
             text=True,
             timeout=10,
+            env=env,
         )
         if proc.returncode == 0:
             # Session-auth is valid. Try to locate file-backed auth.json so the
@@ -172,20 +173,26 @@ def dispatch_review(
     """Dispatch a review subprocess. Returns exit code."""
     repo = area_repo_name(area)
 
-    # Duplicate dispatch guard with stale detection
+    # Read last_review_id before dispatch so the post-condition can require
+    # a review newer than any previously seen on the PR.  Default to 0 when
+    # no state file exists (first dispatch).
+    last_review_id = 0
     try:
-        state = state_read(issue, area, monorepo_root)
-        if state.review_job.status == ReviewJobStatus.RUNNING:
-            if state.review_job.is_stale(REVIEW_JOB_STALE_TIMEOUT_SECS):
+        pre_state = state_read(issue, area, monorepo_root)
+        last_review_id = pre_state.last_review_id
+
+        # Duplicate dispatch guard with stale detection
+        if pre_state.review_job.status == ReviewJobStatus.RUNNING:
+            if pre_state.review_job.is_stale(REVIEW_JOB_STALE_TIMEOUT_SECS):
                 print(
                     f"[review_runner] stale review job detected for issue #{issue} "
-                    f"area={area} (startedAt={state.review_job.started_at}) - reclaiming",
+                    f"area={area} (startedAt={pre_state.review_job.started_at}) - reclaiming",
                     file=sys.stderr,
                 )
                 recovery_log_append(
                     issue, area, monorepo_root,
                     "review_dispatch",
-                    f"stale review job (runId={state.review_job.run_id})",
+                    f"stale review job (runId={pre_state.review_job.run_id})",
                     "reclaim",
                     "proceeding with new dispatch",
                 )
@@ -216,9 +223,9 @@ def dispatch_review(
         pass
 
     if tool == "claude":
-        rc = _dispatch_claude(issue, area, pr, monorepo_root, model)
+        rc = _dispatch_claude(issue, area, pr, monorepo_root, model, last_review_id=last_review_id)
     elif tool == "codex":
-        rc = _dispatch_codex(issue, area, pr, monorepo_root, model)
+        rc = _dispatch_codex(issue, area, pr, monorepo_root, model, last_review_id=last_review_id)
     else:
         print(f"[review_runner] unknown tool: {tool}", file=sys.stderr)
         rc = 2
@@ -256,6 +263,7 @@ def _dispatch_claude(
     pr: int,
     monorepo_root: Path,
     model: str = "",
+    last_review_id: int = 0,
 ) -> int:
     repo = area_repo_name(area)
     pipeline_init(area, monorepo_root)
@@ -382,9 +390,11 @@ def _dispatch_claude(
         return 1
 
     try:
-        review_id = check_review_exists(area, pr)
+        review_id = check_review_exists(area, pr, last_review_id)
         if review_id is None:
-            return _fail_postcondition_claude("no actionable review found on GitHub after subprocess success")
+            return _fail_postcondition_claude(
+                f"no actionable review newer than id={last_review_id} found on GitHub after subprocess success"
+            )
     except Exception as exc:
         return _fail_postcondition_claude(f"check_review_exists raised: {exc}")
 
@@ -453,6 +463,7 @@ def _dispatch_codex(
     pr: int,
     monorepo_root: Path,
     model: str = "",
+    last_review_id: int = 0,
 ) -> int:
     from .github_client import get_pr_base_ref
 
@@ -764,10 +775,10 @@ def _dispatch_codex(
         return 1
 
     try:
-        review_id = check_review_exists(area, pr)
+        review_id = check_review_exists(area, pr, last_review_id)
         if review_id is None:
             return _fail_postcondition_codex(
-                "no actionable review found on GitHub after publisher success"
+                f"no actionable review newer than id={last_review_id} found on GitHub after publisher success"
             )
     except Exception as exc:
         return _fail_postcondition_codex(f"check_review_exists raised: {exc}")
