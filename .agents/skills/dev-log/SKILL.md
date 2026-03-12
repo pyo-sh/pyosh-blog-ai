@@ -1,11 +1,11 @@
 ---
 name: dev-log
-description: Manage progress/, findings/, and decisions/ records in the pyosh-blog monorepo. Use when (1) recording progress after task completion, (2) documenting technical research as findings, (3) writing architecture/tech decisions, (4) user requests "/dev-log", "record this", "write progress", etc. Parallel-agent safe (worktree isolation + lock merge).
+description: Manage progress/, findings/, and decisions/ records in the pyosh-blog monorepo. Commits go to a long-lived docs branch (not main). Use when (1) recording progress after task completion, (2) documenting technical research as findings, (3) writing architecture/tech decisions, (4) user requests "/dev-log", "record this", "write progress", etc. Parallel-agent safe (worktree isolation + lock merge).
 ---
 
 # Dev-log
 
-Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md`.
+Record-only skill. All commits target the `docs` branch. Merge to `main` via `/dev-archive`.
 
 > CLI: `cd .agents/skills/dev-log/scripts && python3 -m dev_log <cmd>`
 > Area definitions: [monorepo-layout.md](../../references/monorepo-layout.md) | Templates: [templates.md](references/templates.md)
@@ -20,22 +20,19 @@ Record-only skill. Task management via GitHub Issues, global rules in `CLAUDE.md
 
 ## Workflow
 
-### Phase 0: Detect context
+### Phase 1: Ensure docs branch
 
-`python3 -m dev_log detect-context` (uses cwd; pass `--cwd "$WT"` if a worktree path is known)
+`python3 -m dev_log ensure-branch --root "$ROOT_REPO"` - creates `docs` from `origin/main` if not exists.
 
-- `inRootWorktree: true` - skip Phase 1, 5, 6. Push to PR branch after Phase 4.
-- `inRootWorktree: false` - full standalone flow (Phase 1-6).
+### Phase 2: Create worktree
 
-### Phase 1: Create worktree (skip if in worktree)
+`python3 -m dev_log create-worktree --root "$ROOT_REPO"` - returns `worktreePath`, `branch`. Worktree branches from `docs`.
 
-`python3 -m dev_log create-worktree --root "$ROOT_REPO"` - returns `worktreePath`, `branch`.
-
-### Phase 2: Check context
+### Phase 3: Check context
 
 Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside worktree. Selectively read relevant sub-files only.
 
-### Phase 3: Write records (inside worktree)
+### Phase 4: Write records (inside worktree)
 
 `python3 -m dev_log next-seq --dir "$DOCS_DIR/findings" --type findings`
 `python3 -m dev_log next-seq --dir "$DOCS_DIR/decisions" --type decision`
@@ -46,21 +43,17 @@ Read `progress.index.md` + `findings.index.md` + `decisions.index.md` inside wor
 - **Progress**: create/update `progress/progress.YYYY-MM-DD.md` + update `progress.index.md`
 - Include related GitHub Issue numbers
 
-### Phase 4: Commit
+### Phase 5: Commit
 
 `python3 -m dev_log commit --worktree "$WT" --message "docs: {type} - {summary}"`
 
-### Phase 4.5: Push to PR branch (only if in worktree)
+### Phase 6: Merge to docs
 
-`python3 -m dev_log push --worktree "$WT"` - done, skip Phase 5/6.
+`python3 -m dev_log merge-to-docs --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
 
-### Phase 5: Lock merge (skip if in worktree)
+Acquires lock, fetches `origin/docs`, rebases, pushes to `origin docs`, releases lock. Lock always released on failure.
 
-`python3 -m dev_log lock-merge --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
-
-Acquires lock, fetches, rebases, fast-forward merges, releases lock. Lock always released on failure.
-
-### Phase 6: Cleanup (skip if in worktree)
+### Phase 7: Cleanup
 
 `python3 -m dev_log cleanup --worktree "$WT" --branch "$BRANCH" --root "$ROOT_REPO"`
 

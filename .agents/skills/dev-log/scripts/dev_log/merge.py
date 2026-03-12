@@ -1,7 +1,7 @@
 import time
 from pathlib import Path
 
-from .git_ops import current_branch, fetch, merge_ff_only, rebase, rebase_abort, rev_parse_head
+from .git_ops import fetch, push_to_docs, rebase, rebase_abort, rev_parse_head
 
 LOCK_TIMEOUT = 60  # seconds
 LOCK_INTERVAL = 5  # seconds
@@ -30,30 +30,23 @@ def release_lock(lock_path: Path) -> None:
         pass
 
 
-def lock_merge(worktree: str, branch: str, root: str) -> dict:
-    """Acquire lock, fetch+rebase, ff-merge to main, release lock."""
+def merge_to_docs(worktree: str, branch: str, root: str) -> dict:
+    """Acquire lock, fetch+rebase onto origin/docs, push to docs branch."""
     root_path = Path(root)
     lock_path = root_path / ".workspace" / "dev-log.lock"
 
-    branch_head = current_branch(root)
-    if branch_head != "main":
-        raise RuntimeError(
-            f"Root repo HEAD is '{branch_head}', expected 'main'"
-        )
-
     acquire_lock(lock_path)
     try:
-        fetch(root, ref="main")
-        merge_ff_only(root, "origin/main")
+        fetch(root, ref="docs")
 
         try:
-            rebase(worktree, "main")
+            rebase(worktree, "origin/docs")
         except Exception:
             rebase_abort(worktree)
             raise
 
-        merge_ff_only(root, branch)
-        sha = rev_parse_head(root)
+        push_to_docs(worktree)
+        sha = rev_parse_head(worktree)
         return {"merged": True, "sha": sha}
     finally:
         release_lock(lock_path)
