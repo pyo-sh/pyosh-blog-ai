@@ -4,7 +4,7 @@ import os
 
 import click
 
-from ..db import acquire, cleanup_stale, current_version, get_db, has_active_attempt, release, renew
+from ..db import acquire, current_version, get_db, has_active_attempt, release, renew
 from ..db.schema import LATEST_VERSION
 
 
@@ -45,8 +45,6 @@ def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
 
 def _run_pass(conn, area: str, pid: int, dry_run: bool) -> None:
     """Execute one reconciliation pass under the area lease."""
-    cleanup_stale(conn)
-
     pending = conn.execute(
         "SELECT id, number FROM issues WHERE area = ? AND state = 'pending'",
         (area,),
@@ -64,3 +62,5 @@ def _run_pass(conn, area: str, pid: int, dry_run: bool) -> None:
             click.echo(f"reconcile [{area}]: issue #{number} already has an active attempt — skipping.")
             continue
         click.echo(f"reconcile [{area}]: issue #{number} ready to dispatch{' (dry-run)' if dry_run else ''}.")
+        if not dry_run:
+            pass  # TODO: dispatch issue #number

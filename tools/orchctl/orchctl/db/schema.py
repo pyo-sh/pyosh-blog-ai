@@ -79,6 +79,7 @@ MIGRATIONS: list[tuple[int, str]] = [
     (
         2,
         """
+        BEGIN;
         CREATE TABLE IF NOT EXISTS _leases_new (
             area         TEXT    PRIMARY KEY,
             holder_pid   INTEGER NOT NULL,
@@ -87,9 +88,11 @@ MIGRATIONS: list[tuple[int, str]] = [
             expires_at   TEXT    NOT NULL
         );
         INSERT OR IGNORE INTO _leases_new (area, holder_pid, acquired_at, expires_at)
-            SELECT area, holder_pid, acquired_at, expires_at FROM leases;
-        DROP TABLE leases;
+            SELECT area, holder_pid, acquired_at, expires_at FROM leases
+            WHERE EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='leases');
+        DROP TABLE IF EXISTS leases;
         ALTER TABLE _leases_new RENAME TO leases;
+        COMMIT;
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_active_unique
         ON attempts(issue_id)
