@@ -78,6 +78,17 @@
   - R5: suggestion_only (1-line doc) → auto-merge
 - PR #172 5라운드 리뷰 resolve 완료, squash merge
 
+## Agent tracker Bash safety hotfix (#108, PR #174)
+
+- **목적**: Bash tracker의 운영상 오판을 줄이기 위한 최소 범위 correctness hotfix (live 버그 6개 수정)
+- **Bug 1 - @tsv 필드 밀림**: `IFS=$'\t' read`는 bash whitespace-IFS 규칙으로 연속 탭을 하나로 축소. `activity`가 비어 있으면 `updated_at`이 `activity` 열에 노출. `join("\u001e")` + `IFS=$'\x1e'`(비공백 구분자) + `@base64`(task/activity)로 교체
+- **Bug 2 - dead orchestrator 은닉**: `_check_pid_alive || continue`로 죽은 배치가 완전 숨겨짐. `batch_alive=false` 추적으로 변경, `batch_status="dead"` 설정 후 ROSE 색상 + `[DEAD]` 레이블로 표시
+- **Bug 3 - 토큰 0/0 source 오표시**: 사이드카 존재하지만 토큰 미기록 시 `source=sidecar, fresh=true` 표시. `tok_used==0 && tok_total==0`이면 `tok_source="unknown"` 설정
+- **Bug 4 - done 태스크 working으로 오표시**: `_infer_status_from_pane` 스피너 감지가 `(Done) ` prefix 확인보다 먼저 실행되어 `idle→working` 덮어씀. `(Done) ` prefix 확인을 무조건적(status 조건 제거)으로 변경
+- **Bug 5 - pane_id 경로 탐색 취약점**: `pane_id`를 직접 파일 경로에 사용. `^%[0-9]+$` 형식 검증 guard 추가
+- **Bug 6 - stale/fault/dead/unknown idle 혼입**: stale(갱신 초과 비idle) → `status="stale"`, 파싱 실패 → `status="fault"`, done은 staleness 체크 제외. `n_stale` 카운터 분리, `status_badge`에 `stale`(GOLD)/`fault`(ROSE) 추가
+- 클린 리뷰 통과(0/0/0), PR #174 머지 완료
+
 ## dev-log detect-context area 검증 (#164, PR #166)
 
 - **문제**: `detect-context`가 `.workspace/worktrees/` 하위 경로만으로 `inRootWorktree: true` 판단하여 client/server worktree에서 false positive 발생. dev-log가 client/server PR branch에 docs를 혼입할 위험

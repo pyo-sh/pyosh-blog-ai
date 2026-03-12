@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | agent-tracker Bash safety hotfix (#108) - @tsv 필드 밀림(RS=\x1e+base64), dead orchestrator [DEAD] 표시, 토큰 0/0 unknown, done 체크 무조건화, pane_id guard, stale/fault/dead 분리 (PR #174) | done |
 | 2026-03-13 | orchctl core state machine Python 이전 + 기본 테스트 (#86) - IssueState/AttemptStatus enums, ISSUE_TRANSITIONS/ATTEMPT_TRANSITIONS 맵, optimistic-lock apply_*_transition(StaleStateError), resolve_blocked_issue(soft/hard dep), try_acquire_lease upsert, schema v2(state 어휘 확장 + idx_issues_state), 93 tests, 5라운드 리뷰 (PR #172) | done |
 | 2026-03-13 | dev-pipeline 4개 버그 수정 (#170) - review-wait pending 분기 추가, suggestion_only round 카운터 수정, normalizer 들여쓰기 오파싱 수정, reviewBody 데이터 포함 (PR #171) | done |
 | 2026-03-13 | docs branch git strategy (#168) - dev-log 커밋을 long-lived `docs` 브랜치로 전환, `/dev-archive` squash-merge PR 신규 스킬, pipeline merge -> log 순서 재배치 (PR #169) | done |
