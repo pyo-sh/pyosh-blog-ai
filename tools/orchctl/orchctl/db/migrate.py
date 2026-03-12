@@ -12,7 +12,7 @@ def _current_version(conn: sqlite3.Connection) -> int:
     if row is None:
         return 0
     row = conn.execute("SELECT version FROM schema_version").fetchone()
-    return row[0] if row else 0
+    return row["version"] if row else 0
 
 
 def run_migrations(conn: sqlite3.Connection) -> int:

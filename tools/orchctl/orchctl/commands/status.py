@@ -4,8 +4,7 @@ import json
 
 import click
 
-from ..db import get_db
-from ..db.migrate import _current_version
+from ..db import current_version, get_db
 
 
 @click.command("status")
@@ -15,7 +14,7 @@ def cmd_status(ctx: click.Context, as_json: bool) -> None:
     """Show issue counts and active attempt summary."""
     db_path = ctx.obj.get("db_path")
     conn = get_db(db_path)
-    if _current_version(conn) == 0:
+    if current_version(conn) == 0:
         raise click.ClickException("Database not initialised — run `orchctl init` first.")
 
     issue_counts: dict[str, int] = {}

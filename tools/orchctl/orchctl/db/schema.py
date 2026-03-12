@@ -55,6 +55,8 @@ MIGRATIONS: list[tuple[int, str]] = [
             signals     TEXT
         );
 
+        CREATE INDEX IF NOT EXISTS idx_heartbeats_attempt_id ON heartbeats(attempt_id);
+
         CREATE TABLE IF NOT EXISTS leases (
             area        TEXT    PRIMARY KEY,
             holder_pid  INTEGER NOT NULL,

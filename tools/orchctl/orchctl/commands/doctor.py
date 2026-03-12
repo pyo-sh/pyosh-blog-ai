@@ -4,8 +4,7 @@ import json
 
 import click
 
-from ..db import get_db
-from ..db.migrate import _current_version
+from ..db import current_version, get_db
 
 
 def _check_orphan_attempts(conn) -> list[str]:
@@ -38,7 +37,7 @@ def cmd_doctor(ctx: click.Context, as_json: bool) -> None:
     """Check database consistency and report issues."""
     db_path = ctx.obj.get("db_path")
     conn = get_db(db_path)
-    schema_ver = _current_version(conn)
+    schema_ver = current_version(conn)
     if schema_ver == 0:
         raise click.ClickException("Database not initialised — run `orchctl init` first.")
     orphan_attempts = _check_orphan_attempts(conn)
