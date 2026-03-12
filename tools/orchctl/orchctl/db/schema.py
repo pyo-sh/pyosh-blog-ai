@@ -190,6 +190,8 @@ MIGRATIONS: list[tuple[int, str]] = [
         ALTER TABLE attempts_v2 RENAME TO attempts;
 
         CREATE INDEX idx_attempts_issue_id ON attempts(issue_id);
+
+        CREATE INDEX idx_issues_state ON issues(state);
         """,
     ),
 ]

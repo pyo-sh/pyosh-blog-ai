@@ -159,11 +159,14 @@ def apply_issue_transition(
     ).fetchone()
     if row is None:
         raise ValueError(f"Issue id={issue_id} not found")
-    validated = transition_issue(row["state"], new_state)
-    conn.execute(
-        "UPDATE issues SET state = ? WHERE id = ?",
-        (validated, issue_id),
+    old_state = row["state"]
+    validated = transition_issue(old_state, new_state)
+    cur = conn.execute(
+        "UPDATE issues SET state = ? WHERE id = ? AND state = ?",
+        (validated, issue_id, old_state),
     )
+    if cur.rowcount == 0:
+        raise InvalidTransitionError(old_state, new_state)
     conn.commit()
     return validated
 
@@ -183,10 +186,13 @@ def apply_attempt_transition(
     ).fetchone()
     if row is None:
         raise ValueError(f"Attempt id={attempt_id!r} not found")
-    validated = transition_attempt(row["status"], new_status)
-    conn.execute(
-        "UPDATE attempts SET status = ? WHERE attempt_id = ?",
-        (validated, attempt_id),
+    old_status = row["status"]
+    validated = transition_attempt(old_status, new_status)
+    cur = conn.execute(
+        "UPDATE attempts SET status = ? WHERE attempt_id = ? AND status = ?",
+        (validated, attempt_id, old_status),
     )
+    if cur.rowcount == 0:
+        raise InvalidTransitionError(old_status, new_status, entity="attempt")
     conn.commit()
     return validated

@@ -261,6 +261,12 @@ class TestResolveBlockedIssue:
         result = resolve_blocked_issue(deps, DependencyType.HARD.value)
         assert result == IssueState.BLOCKED.value
 
+    def test_cancelled_dep_soft_returns_pending(self):
+        """Soft dep: cancelled blocker still allows dependent to proceed."""
+        deps = ["cancelled"]
+        result = resolve_blocked_issue(deps, DependencyType.SOFT.value)
+        assert result == IssueState.PENDING.value
+
     def test_pending_dep_returns_blocked(self):
         deps = ["pending"]
         result = resolve_blocked_issue(deps, DependencyType.SOFT.value)
