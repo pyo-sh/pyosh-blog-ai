@@ -361,6 +361,10 @@ def _dispatch_pass(
         click.echo(f"reconcile [{area}]: no pending issues.")
         return
 
+    # Pre-compute active repair count once; incremented locally after each dispatch
+    # to avoid N DB round-trips for N retry candidates.
+    active_repairs = _count_active_repairs(conn, area)
+
     for issue in pending:
         if not renew(conn, area, pid):
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
@@ -385,16 +389,14 @@ def _dispatch_pass(
             return
 
         # maxConcurrentRepair: limit simultaneously dispatched retry attempts.
-        retry_count = issue["retry_count"] if "retry_count" in issue.keys() else 0
-        if retry_count > 0:
-            active_repairs = _count_active_repairs(conn, area)
-            if active_repairs >= max_repair:
-                click.echo(
-                    f"reconcile [{area}]: issue #{issue['number']} is a repair attempt"
-                    f" (retry_count={retry_count}); maxConcurrentRepair={max_repair} reached"
-                    " — skipping."
-                )
-                continue
+        retry_count = issue["retry_count"]
+        if retry_count > 0 and active_repairs >= max_repair:
+            click.echo(
+                f"reconcile [{area}]: issue #{issue['number']} is a repair attempt"
+                f" (retry_count={retry_count}); maxConcurrentRepair={max_repair} reached"
+                " — skipping."
+            )
+            continue
 
         issue_id = issue["id"]
         number = issue["number"]
@@ -421,6 +423,8 @@ def _dispatch_pass(
                     " — global cap enforced concurrently, stopping."
                 )
                 return
+            if retry_count > 0:
+                active_repairs += 1
             if dispatch_fn is not None:
                 dispatch_fn(area, issue_id, number, attempt_id)
 

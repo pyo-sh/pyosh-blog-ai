@@ -6,7 +6,7 @@ import click
 
 from ..db import current_version, get_db, get_config_bool, set_config
 from ..db.schema import LATEST_VERSION
-from ..state_machine import apply_issue_transition
+from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
 
 # ---------------------------------------------------------------------------
@@ -95,8 +95,15 @@ def cmd_stop(ctx: click.Context, area: str, confirm: bool) -> None:
         if not rows:
             click.echo(f"control [{area}]: no dispatched issues to stop.")
             return
+        # Cancel all in one transaction so partial failure leaves no mixed state.
+        try:
+            for row in rows:
+                apply_issue_transition_tx(conn, row["id"], "cancelled")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         for row in rows:
-            apply_issue_transition(conn, row["id"], "cancelled")
             click.echo(f"control [{area}]: issue #{row['number']} → cancelled.")
         click.echo(f"control [{area}]: stopped {len(rows)} issue(s).")
     finally:
