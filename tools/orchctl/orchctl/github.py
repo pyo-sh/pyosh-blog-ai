@@ -61,6 +61,10 @@ def list_open_issues(
     Raises:
         GitHubError: When the ``gh`` subprocess exits non-zero or times out.
     """
+    # Note on filter asymmetry: the milestone filter is pushed down to the
+    # gh CLI (--milestone) because gh supports it natively as an exact match.
+    # Label filters (include/exclude) are applied in Python to achieve OR
+    # semantics — the gh CLI only supports AND when --label is repeated.
     cmd = [
         "gh", "issue", "list",
         "-R", repo,

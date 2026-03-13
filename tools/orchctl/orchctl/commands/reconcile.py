@@ -25,6 +25,7 @@ from ..db import (
 )
 from ..db.schema import LATEST_VERSION
 from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
+from ..models import ISSUE_TRANSITIONS, IssueState, TERMINAL_ISSUE_STATES
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
 
@@ -154,8 +155,13 @@ def _observe_config(conn: sqlite3.Connection) -> dict:
 # Discovery pass
 # ---------------------------------------------------------------------------
 
-# States that are re-enqueued when GitHub reports the issue as open again.
-_REOPEN_STATES = {"completed", "failed-terminal", "cancelled"}
+# Derived from ISSUE_TRANSITIONS: terminal states with a -> pending outgoing edge.
+# Computed at import time so it stays automatically in sync with models.py.
+_REOPEN_STATES: frozenset[str] = frozenset(
+    s.value
+    for s, targets in ISSUE_TRANSITIONS.items()
+    if s in TERMINAL_ISSUE_STATES and IssueState.PENDING in targets
+)
 
 
 def _discovery_pass(
@@ -196,8 +202,11 @@ def _discovery_pass(
         click.echo(f"reconcile [{area}]: discovery error — {exc}", err=True)
         return True  # non-fatal; continue with existing queue
 
-    for gh_issue in gh_issues:
-        if not renew(conn, area, pid):
+    # Renew lease every 50 issues rather than on every iteration to limit
+    # lease-table write churn when processing large backlogs.
+    _RENEW_EVERY = 50
+    for idx, gh_issue in enumerate(gh_issues):
+        if idx % _RENEW_EVERY == 0 and not renew(conn, area, pid):
             click.echo(
                 f"reconcile [{area}]: lease lost during discovery — aborting.",
                 err=True,

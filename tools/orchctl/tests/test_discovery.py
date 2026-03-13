@@ -589,3 +589,48 @@ class TestListOpenIssues:
         assert len(issues) == 1
         captured = capsys.readouterr()
         assert "hit issue limit" not in captured.err
+
+
+# ---------------------------------------------------------------------------
+# AREA_REPOS coverage: every reconcile-valid area must have a repo mapping
+# ---------------------------------------------------------------------------
+
+
+def test_area_repos_covers_all_reconcile_areas():
+    """AREA_REPOS must map every area accepted by cmd_reconcile.
+
+    This catches drift between github.py and the CLI's valid-area list.
+    If an area is added to cmd_reconcile without updating AREA_REPOS,
+    discovery would silently skip it.
+    """
+    import click
+    from orchctl.commands.reconcile import cmd_reconcile
+    from orchctl.github import AREA_REPOS
+
+    # Extract the valid choices from the --area option
+    area_param = next(p for p in cmd_reconcile.params if p.name == "area")
+    valid_areas: set[str] = set(area_param.type.choices)
+
+    missing = valid_areas - set(AREA_REPOS.keys())
+    assert not missing, (
+        f"AREA_REPOS is missing entries for areas: {missing}. "
+        "Update orchctl/github.py to keep it in sync with the CLI."
+    )
+
+
+# ---------------------------------------------------------------------------
+# _REOPEN_STATES: derived from ISSUE_TRANSITIONS (auto-sync smoke test)
+# ---------------------------------------------------------------------------
+
+
+def test_reopen_states_derived_from_transitions():
+    """_REOPEN_STATES must equal the terminal states with a -> pending edge."""
+    from orchctl.commands.reconcile import _REOPEN_STATES
+    from orchctl.models import ISSUE_TRANSITIONS, IssueState, TERMINAL_ISSUE_STATES
+
+    expected = frozenset(
+        s.value
+        for s, targets in ISSUE_TRANSITIONS.items()
+        if s in TERMINAL_ISSUE_STATES and IssueState.PENDING in targets
+    )
+    assert _REOPEN_STATES == expected
