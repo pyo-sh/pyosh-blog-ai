@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import uuid
@@ -578,8 +579,7 @@ def _run_ci_repair_playbook(
     pr_number: int | None = None
     if terminal_json:
         try:
-            import json as _json
-            tj = _json.loads(terminal_json)
+            tj = json.loads(terminal_json)
             raw_pr = tj.get("prNumber")
             if raw_pr and raw_pr != "null":
                 pr_number = int(raw_pr)
@@ -609,7 +609,10 @@ def _run_ci_repair_playbook(
         f"- This repair worker will receive the CI failure context below."
         f"{log_section}"
     )
-    post_issue_comment(repo, number, body)
+    try:
+        post_issue_comment(repo, number, body)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"reconcile [{area}]: repair comment failed (#{number}): {exc}", err=True)
 
 
 def _create_ci_blocker_issue(
@@ -643,8 +646,7 @@ def _create_ci_blocker_issue(
     history_lines: list[str] = []
     for i, row in enumerate(attempt_rows, 1):
         try:
-            import json as _json
-            tj = _json.loads(row["terminal_json"] or "{}")
+            tj = json.loads(row["terminal_json"] or "{}")
         except (ValueError, TypeError):
             tj = {}
         pr = tj.get("prNumber")
@@ -683,13 +685,18 @@ def _create_ci_blocker_issue(
         click.echo(
             f"reconcile [{area}]: issue #{number} blocker issue created: #{blocker_number}."
         )
-        post_issue_comment(
-            repo,
-            number,
-            f"**Blocker issue created:** #{blocker_number}\n\n"
-            f"Repair attempts exhausted after {retry_count + 1} tries. "
-            f"See #{blocker_number} for failure history and next steps.",
-        )
+        try:
+            post_issue_comment(
+                repo,
+                number,
+                f"**Blocker issue created:** #{blocker_number}\n\n"
+                f"Repair attempts exhausted after {retry_count + 1} tries. "
+                f"See #{blocker_number} for failure history and next steps.",
+            )
+        except Exception as exc:  # noqa: BLE001
+            click.echo(
+                f"reconcile [{area}]: blocker comment failed (#{number}): {exc}", err=True
+            )
     else:
         click.echo(
             f"reconcile [{area}]: issue #{number} blocker issue creation failed.",
