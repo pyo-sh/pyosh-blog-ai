@@ -213,11 +213,12 @@ class TestEnqueueOrReopen:
         ).fetchone()["state"]
         assert state == terminal_state
 
-    @pytest.mark.parametrize("non_reopen_state", ["needs-human", "blocked-failed-dependency"])
-    def test_non_reopen_terminal_not_touched(self, db_conn, non_reopen_state):
+    @pytest.mark.parametrize("reopen_state", ["needs-human", "blocked-failed-dependency"])
+    def test_operator_terminal_reopen_becomes_pending(self, db_conn, reopen_state):
+        """needs-human and blocked-failed-dependency can be re-enqueued (operator requeue feature)."""
         db_conn.execute(
             "INSERT INTO issues (area, number, state) VALUES ('client', 22, ?)",
-            (non_reopen_state,),
+            (reopen_state,),
         )
         db_conn.commit()
 
@@ -228,7 +229,7 @@ class TestEnqueueOrReopen:
         state = db_conn.execute(
             "SELECT state FROM issues WHERE area='client' AND number=22"
         ).fetchone()["state"]
-        assert state == non_reopen_state
+        assert state == "pending"
 
 
 # ---------------------------------------------------------------------------
@@ -504,13 +505,12 @@ class TestReopenTransitions:
         new_state = apply_issue_transition(db_conn, issue_id, "pending")
         assert new_state == "pending"
 
-    @pytest.mark.parametrize("non_reopen_state", ["needs-human", "blocked-failed-dependency"])
-    def test_operator_terminal_cannot_reopen(self, non_reopen_state):
-        from orchctl.models import IssueState, ISSUE_TRANSITIONS
-        from orchctl.state_machine import InvalidTransitionError, transition_issue
+    @pytest.mark.parametrize("reopen_state", ["needs-human", "blocked-failed-dependency"])
+    def test_operator_terminal_can_reopen_to_pending(self, reopen_state):
+        """needs-human and blocked-failed-dependency support operator requeue -> pending."""
+        from orchctl.state_machine import transition_issue
 
-        with pytest.raises(InvalidTransitionError):
-            transition_issue(non_reopen_state, "pending")
+        assert transition_issue(reopen_state, "pending") == "pending"
 
 
 # ---------------------------------------------------------------------------

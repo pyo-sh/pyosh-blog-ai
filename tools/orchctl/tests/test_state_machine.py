@@ -139,14 +139,29 @@ class TestTransitionIssuePure:
         with pytest.raises(InvalidTransitionError):
             transition_issue("failed-terminal", "dispatched")
 
-    # Operator-intervention states remain fully terminal
-    def test_needs_human_is_terminal(self):
-        with pytest.raises(InvalidTransitionError):
-            transition_issue("needs-human", "pending")
+    def test_needs_human_can_requeue_to_pending(self):
+        """Operator requeue: needs-human -> pending is allowed."""
+        assert transition_issue("needs-human", "pending") == "pending"
 
-    def test_blocked_failed_dep_is_terminal(self):
+    def test_needs_human_cannot_go_to_dispatched(self):
         with pytest.raises(InvalidTransitionError):
-            transition_issue("blocked-failed-dependency", "pending")
+            transition_issue("needs-human", "dispatched")
+
+    def test_blocked_failed_dep_can_requeue_to_pending(self):
+        """Operator requeue: blocked-failed-dependency -> pending is allowed."""
+        assert transition_issue("blocked-failed-dependency", "pending") == "pending"
+
+    def test_blocked_failed_dep_cannot_go_to_dispatched(self):
+        with pytest.raises(InvalidTransitionError):
+            transition_issue("blocked-failed-dependency", "dispatched")
+
+    def test_cancelled_can_requeue_to_pending(self):
+        """Operator requeue: cancelled -> pending is allowed."""
+        assert transition_issue("cancelled", "pending") == "pending"
+
+    def test_cancelled_cannot_go_to_dispatched(self):
+        with pytest.raises(InvalidTransitionError):
+            transition_issue("cancelled", "dispatched")
 
     def test_unknown_state_raises(self):
         with pytest.raises(InvalidTransitionError):

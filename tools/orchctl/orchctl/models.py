@@ -54,13 +54,12 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
     }),
     # Re-openable terminal states: a GitHub issue re-open event drives these
     # back to pending so the orchestrator picks them up in the next cycle.
+    # Operator requeue also allows returning operator-intervention states to pending.
     IssueState.COMPLETED: frozenset({IssueState.PENDING}),
     IssueState.FAILED_TERMINAL: frozenset({IssueState.PENDING}),
+    IssueState.NEEDS_HUMAN: frozenset({IssueState.PENDING}),
+    IssueState.BLOCKED_FAILED_DEP: frozenset({IssueState.PENDING}),
     IssueState.CANCELLED: frozenset({IssueState.PENDING}),
-    # Operator-intervention states remain closed until a human unblocks them.
-    # needs-human / blocked-failed-dependency re-entry edges deferred to a future PR.
-    IssueState.NEEDS_HUMAN: frozenset(),
-    IssueState.BLOCKED_FAILED_DEP: frozenset(),
 }
 
 ATTEMPT_TRANSITIONS: dict[AttemptStatus, frozenset[AttemptStatus]] = {
