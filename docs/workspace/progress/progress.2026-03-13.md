@@ -1,5 +1,39 @@
 # Progress 2026-03-13
 
+## agent-tracker orchctl normalized export contract + adapter (#112, PR #186)
+
+- **목적**: agent-tracker가 orchctl SQLite를 직접 읽지 않고 orchctl이 생성한 normalized export JSON만 소비하도록 contract와 adapter 구현
+- **`tools/orchctl/orchctl/contract.py` 신규** - 퍼-에어리어 export 스키마 contract:
+  - `EXPORT_SCHEMA_VERSION = "v1"`, `EXPORT_PATH_TEMPLATE`, `EXPORT_BATCH_FIELDS`(started_at 포함), `EXPORT_ISSUE_FIELDS`, `EXPORT_WORKER_FIELDS`
+  - liveness 상수 (`alive`/`dead`/`unknown`), issue state 상수 (orchctl.models 의존 없이 트래커에서 직접 사용 가능)
+  - `validate_export()` - top-level/issue/batch/worker 필드 검증, liveness 값 검증, schema_version 검증
+  - `ExportValidationError` 사용자 정의 예외
+- **`tools/orchctl/orchctl/commands/export.py` 신규** - `orchctl export --area` CLI 커맨드:
+  - SQLite에서 issues/attempts 읽어 normalized JSON 생성 및 atomic write
+  - `batches[].started_at`: 에어리어 내 이슈 중 가장 오래된 `created_at` - 정확한 배치 경과 시간 계산용
+  - `active_workers[]`: dispatched 상태 이슈의 실행 중 attempt (PID + liveness 포함)
+  - `--validate/--no-validate`, `--print` 플래그, `--output` 커스텀 경로
+- **`tools/orchctl/orchctl/cli.py` 수정** - `cmd_export` 등록
+- **`tools/agent-tracker/backend/adapters/orchctl_adapter.py` 신규** - 트래커 어댑터:
+  - `load_exports(export_dir)`: 실제 export 파일 우선, 없으면 built-in fixture로 fallback
+  - `read_exports(export_dir)`: 실제 export만 읽음
+  - `read_exports_from_fixture(fixture_path)`: fixture 직접 읽기
+  - export → BatchState/DispatchedIssue 매핑, `batch.started_at`으로 elapsed 계산
+  - pipeline state 보강: worktree 경로 있으면 DispatchedIssue.step/pr_num 채움
+- **`tools/agent-tracker/backend/fixtures/orchctl_export.json` 신규** - 개발/테스트용 fixture
+- **`tools/agent-tracker/backend/contract.py` 수정** - orchctl export 스키마 상수 추가 (`ORCHCTL_EXPORT_SCHEMA_VERSION`, `ORCHCTL_EXPORT_DIR`, `ORCHCTL_EXPORT_TOP_FIELDS`)
+- **`tools/agent-tracker/backend/collector.py` 수정** - `_collect_orchestrators()` 교체:
+  - 기존 `batch.state.json` 직접 읽기 → `orchctl_adapter.load_exports()` 사용
+  - `export_dir` 파라미터 추가, `_resolve_export_dir()` (monorepo root `.agents/` 탐색 기반)
+  - legacy `_parse_batch()` 함수 제거
+- **테스트 35개** (orchctl 19 + adapter 16):
+  - `test_export.py` (19개): `TestValidateExport`(10), `TestCmdExport`(9)
+  - `test_orchctl_adapter.py` (16개): `TestReadExports`(6), `TestBatchStatus`(3), `TestCounts`(2), `TestDispatchedIssues`(2), `TestFixtureFallback`(3)
+- **2라운드 리뷰**:
+  - R1: `ORCHCTL_EXPORT_SCHEMA_VERSION` → 어댑터에서 직접 참조, `_ACTIVE_STATES` dead code 제거, `batch.started_at` 추가 (elapsed 정확도)
+  - R2: hardcoded area choices, PID reuse deferral, fixture timestamp 코멘트 (모두 P3, merge)
+- **pipeline runner 버그 수정** (review_runner.py): `--max-turns 15→30`, `Write` tool을 allowedTools에 추가
+
 ## orchctl issue discovery + auto-enqueue + configurable scope (#89, PR #185)
 
 - **목적**: orchctl reconcile 사이클에 discovery phase 추가 - GitHub open 이슈를 자동 감지하여 큐에 추가하고, scope를 설정으로 제어
