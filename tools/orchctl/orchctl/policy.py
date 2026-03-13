@@ -105,6 +105,36 @@ def apply_policy(conn: sqlite3.Connection, policy: dict) -> list[str]:
         _maybe_set(
             conn, "dangerous_tools", _list_str(guardrails["dangerous_tools"]), changed
         )
+    if "max_awaiting_merge" in guardrails:
+        _maybe_set(
+            conn,
+            "max_awaiting_merge",
+            str(int(guardrails["max_awaiting_merge"])),
+            changed,
+        )
+
+    scheduling = policy.get("scheduling") or {}
+    if "priority_weight" in scheduling:
+        _maybe_set(
+            conn,
+            "scheduling_priority_weight",
+            str(float(scheduling["priority_weight"])),
+            changed,
+        )
+    if "age_weight" in scheduling:
+        _maybe_set(
+            conn,
+            "scheduling_age_weight",
+            str(float(scheduling["age_weight"])),
+            changed,
+        )
+    if "retry_weight" in scheduling:
+        _maybe_set(
+            conn,
+            "scheduling_retry_weight",
+            str(float(scheduling["retry_weight"])),
+            changed,
+        )
 
     return changed
 

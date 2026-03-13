@@ -6,6 +6,7 @@ import os
 import sqlite3
 import uuid
 from collections import defaultdict
+from datetime import datetime
 from typing import Callable
 
 import click
@@ -205,7 +206,8 @@ def _observe_issues(
 ) -> dict[str, list[sqlite3.Row]]:
     """Return all issues for the area grouped by state."""
     rows = conn.execute(
-        "SELECT id, number, state, dependency_type, retry_count FROM issues WHERE area = ?",
+        "SELECT id, number, state, dependency_type, retry_count, priority, created_at"
+        " FROM issues WHERE area = ?",
         (area,),
     ).fetchall()
     by_state: dict[str, list[sqlite3.Row]] = defaultdict(list)
@@ -229,7 +231,22 @@ def _observe_config(conn: sqlite3.Connection, area: str) -> dict:
         "scope_exclude_labels": get_config_json(conn, "scope_exclude_labels", default=[]),
         "scope_milestone": get_config(conn, "scope_milestone", default=""),
         "scope_allow_unassigned": get_config_bool(conn, "scope_allow_unassigned", default=True),
+        "scheduling_priority_weight": _get_config_float(conn, "scheduling_priority_weight", default=1.0),
+        "scheduling_age_weight": _get_config_float(conn, "scheduling_age_weight", default=0.1),
+        "scheduling_retry_weight": _get_config_float(conn, "scheduling_retry_weight", default=1.0),
+        "max_awaiting_merge": get_config_int(conn, "max_awaiting_merge", default=0),
     }
+
+
+def _get_config_float(conn: sqlite3.Connection, key: str, *, default: float) -> float:
+    """Read a config key and parse it as a float, returning default on error."""
+    raw = get_config(conn, key, default=None)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return default
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +310,7 @@ def _discovery_pass(
                 err=True,
             )
             return False
-        _enqueue_or_reopen(conn, area, gh_issue.number, dry_run)
+        _enqueue_or_reopen(conn, area, gh_issue.number, dry_run, priority=gh_issue.priority)
 
     return True
 
@@ -303,6 +320,7 @@ def _enqueue_or_reopen(
     area: str,
     number: int,
     dry_run: bool,
+    priority: int = 0,
 ) -> None:
     """Insert a new issue as pending, or re-enqueue a reopened terminal issue."""
     row = conn.execute(
@@ -313,12 +331,13 @@ def _enqueue_or_reopen(
     if row is None:
         click.echo(
             f"reconcile [{area}]: discovered issue #{number}"
+            f" (priority={priority})"
             f" → enqueueing as pending{' (dry-run)' if dry_run else ''}."
         )
         if not dry_run:
             conn.execute(
-                "INSERT INTO issues (area, number, state) VALUES (?, ?, 'pending')",
-                (area, number),
+                "INSERT INTO issues (area, number, state, priority) VALUES (?, ?, 'pending', ?)",
+                (area, number, priority),
             )
             conn.commit()
         return
@@ -651,6 +670,67 @@ def _unblock_pass(
 
 
 # ---------------------------------------------------------------------------
+# Scheduling helpers
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_score(
+    row: sqlite3.Row,
+    priority_weight: float,
+    age_weight: float,
+    retry_weight: float,
+) -> float:
+    """Compute the dispatch priority score for a pending issue.
+
+    Higher score = dispatched sooner.
+
+    Score = priority_weight * priority
+          + age_weight * age_days
+          - retry_weight * retry_count
+
+    All three terms are additive so operators can zero-out any dimension by
+    setting its weight to 0 in policy.yaml.
+    """
+    priority = row["priority"] or 0
+    retry_count = row["retry_count"] or 0
+    created_at_str = row["created_at"] or ""
+    try:
+        created_at = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+        age_days = (datetime.utcnow() - created_at).total_seconds() / 86400.0
+    except (ValueError, TypeError):
+        age_days = 0.0
+    return (
+        priority_weight * priority
+        + age_weight * age_days
+        - retry_weight * retry_count
+    )
+
+
+def _sort_pending(
+    pending: list[sqlite3.Row],
+    priority_weight: float,
+    age_weight: float,
+    retry_weight: float,
+) -> list[sqlite3.Row]:
+    """Return *pending* sorted by dispatch score, highest first."""
+    return sorted(
+        pending,
+        key=lambda row: _dispatch_score(row, priority_weight, age_weight, retry_weight),
+        reverse=True,
+    )
+
+
+def _count_awaiting_merge(conn: sqlite3.Connection) -> int:
+    """Count completed issues whose PRs have not yet been merged or rejected."""
+    row = conn.execute(
+        "SELECT COUNT(*) FROM issues"
+        " WHERE state = 'completed'"
+        " AND merge_state NOT IN ('done', 'rejected')"
+    ).fetchone()
+    return row[0]
+
+
+# ---------------------------------------------------------------------------
 # Dispatch pass (admission control)
 # ---------------------------------------------------------------------------
 
@@ -676,7 +756,12 @@ def _dispatch_pass(
          Enforced atomically inside _record_dispatch to prevent TOCTOU races
          when multiple area reconcilers run concurrently.
       6. maxConcurrentRepair: cap on concurrently dispatched retry attempts.
-      7. Per-issue: skip if an active attempt already exists.
+      7. maxAwaitingMerge: stop new dispatches when too many completed issues
+         still have unmerged PRs (0 = no limit).
+      8. Per-issue: skip if an active attempt already exists.
+
+    Pending issues are sorted by dispatch score before the loop so that
+    high-priority issues are dispatched first within each admission window.
     """
     if config["drain_mode"]:
         click.echo(f"reconcile [{area}]: drain mode active — no new dispatches.")
@@ -709,11 +794,30 @@ def _dispatch_pass(
     max_concurrent = config["max_concurrent"]
     max_open_pr = config["max_open_pr"]
     max_repair = config["max_concurrent_repair"]
+    max_awaiting = config["max_awaiting_merge"]
 
     pending = issues_by_state.get("pending", [])
     if not pending:
         click.echo(f"reconcile [{area}]: no pending issues.")
         return
+
+    # maxAwaitingMerge: gate on unmerged completed PRs (0 = disabled).
+    if max_awaiting > 0:
+        awaiting = _count_awaiting_merge(conn)
+        if awaiting >= max_awaiting:
+            click.echo(
+                f"reconcile [{area}]: maxAwaitingMerge={max_awaiting} reached"
+                f" ({awaiting} unmerged PRs) — no new dispatches."
+            )
+            return
+
+    # Sort pending issues by composite score before dispatch.
+    pending = _sort_pending(
+        pending,
+        priority_weight=config["scheduling_priority_weight"],
+        age_weight=config["scheduling_age_weight"],
+        retry_weight=config["scheduling_retry_weight"],
+    )
 
     # Pre-compute active repair count once; incremented locally after each dispatch
     # to avoid N DB round-trips for N retry candidates.
