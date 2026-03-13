@@ -99,6 +99,7 @@ class TestEvaluateMergeGate:
         result = evaluate_merge_gate(conn, "client", 1)
         assert result["eligible"] is False
         assert result["checks"]["branch_protection"] is False
+        assert result["reason"] == "merge_disabled"
 
     def test_fails_when_target_branch_is_protected(self, conn):
         set_config(conn, "merge_enabled", "true")

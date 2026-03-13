@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from ..db import current_version, get_db, get_config_bool, set_config
+from ..db import get_db, get_config_bool, set_config
 from ..db.schema import LATEST_VERSION
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
@@ -136,13 +136,17 @@ def cmd_cancel_attempt(ctx: click.Context, area: str, issue_number: int) -> None
             raise click.ClickException(
                 f"Issue #{issue_number} is in state '{issue_row['state']}', not 'dispatched'."
             )
-        # Mark any running attempt as failed before transitioning the issue.
-        conn.execute(
-            "UPDATE attempts SET status = 'failed' WHERE issue_id = ? AND status = 'running'",
-            (issue_row["id"],),
-        )
-        conn.commit()
-        apply_issue_transition(conn, issue_row["id"], "cancelled")
+        # Batch attempt update and issue transition in one transaction.
+        try:
+            conn.execute(
+                "UPDATE attempts SET status = 'failed' WHERE issue_id = ? AND status = 'running'",
+                (issue_row["id"],),
+            )
+            apply_issue_transition_tx(conn, issue_row["id"], "cancelled")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         click.echo(f"control [{area}]: issue #{issue_number} attempt cancelled.")
     finally:
         conn.close()

@@ -124,17 +124,18 @@ def evaluate_merge_gate(
         checks["no_blocking_labels"] = eligibility_checks.get("noBlockingLabels")
 
     # --- Check 5: branch protection ---
-    # merge_enabled must be true AND target branch must not be in protected list.
+    # Short-circuit immediately when merge_enabled=false so the reason is
+    # unambiguous ("merge_disabled"), not whichever check happens to be first.
     merge_enabled = get_config_bool(conn, "merge_enabled", default=False)
     if not merge_enabled:
-        # Merge gate is globally disabled — block all merges.
         checks["branch_protection"] = False
-    else:
-        protected_raw = get_config(conn, "protected_branches", default="main")
-        protected = {b.strip() for b in protected_raw.split(",") if b.strip()}
-        # The branch to be merged into is read from terminal.json if present.
-        target_branch = (terminal or {}).get("targetBranch", "main")
-        checks["branch_protection"] = target_branch not in protected
+        return _result(checks, eligible=False, reason="merge_disabled", terminal=terminal)
+
+    protected_raw = get_config(conn, "protected_branches", default="main")
+    protected = {b.strip() for b in protected_raw.split(",") if b.strip()}
+    # The branch to be merged into is read from terminal.json if present.
+    target_branch = (terminal or {}).get("targetBranch", "main")
+    checks["branch_protection"] = target_branch not in protected
 
     # Overall eligibility: all checks must be explicitly True
     failing = [k for k, v in checks.items() if v is not True]

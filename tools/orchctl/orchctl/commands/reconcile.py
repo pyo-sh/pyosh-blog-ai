@@ -75,7 +75,8 @@ def cmd_reconcile(
         _load_policy_if_present(conn, area, policy_file, dry_run)
 
         pid = os.getpid()
-        if not acquire(conn, area, pid):
+        owns_lease = acquire(conn, area, pid)
+        if not owns_lease:
             overlap_ok = get_config_bool(conn, "scheduler_overlap", default=False)
             if not overlap_ok:
                 click.echo(
@@ -88,9 +89,10 @@ def cmd_reconcile(
             )
 
         try:
-            _run_pass(conn, area, pid, dry_run)
+            _run_pass(conn, area, pid, dry_run, owns_lease=owns_lease)
         finally:
-            release(conn, area, pid)
+            if owns_lease:
+                release(conn, area, pid)
     finally:
         conn.close()
 
@@ -138,6 +140,7 @@ def _run_pass(
     pid: int,
     dry_run: bool,
     dispatch_fn: Callable[[str, int, int, str], None] | None = None,
+    owns_lease: bool = True,
 ) -> None:
     """Execute one full reconciliation pass under the area lease.
 
@@ -152,15 +155,18 @@ def _run_pass(
         dispatch_fn: Optional callback invoked when an issue is dispatched.
             Signature: (area, issue_id, issue_number, attempt_id) -> None.
             Used in tests to observe or replace the actual launch logic.
+        owns_lease: True if this process holds the area lease. When False
+            (scheduler_overlap=true, second reconciler), renew() calls are
+            skipped to avoid mid-pass abort from a lease never acquired.
     """
     issues_by_state = _observe_issues(conn, area)
     config = _observe_config(conn, area)
 
-    if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state):
+    if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
-    if not _unblock_pass(conn, area, pid, dry_run, issues_by_state):
+    if not _unblock_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
-    _dispatch_pass(conn, area, pid, dry_run, issues_by_state, config, dispatch_fn)
+    _dispatch_pass(conn, area, pid, dry_run, issues_by_state, config, dispatch_fn, owns_lease)
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +212,7 @@ def _mark_complete_pass(
     pid: int,
     dry_run: bool,
     issues_by_state: dict,
+    owns_lease: bool = True,
 ) -> bool:
     """Transition dispatched issues to completed/failed-terminal based on attempt status.
 
@@ -213,7 +220,7 @@ def _mark_complete_pass(
     """
     dispatched = issues_by_state.get("dispatched", [])
     for issue in dispatched:
-        if not renew(conn, area, pid):
+        if owns_lease and not renew(conn, area, pid):
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
             return False
 
@@ -263,6 +270,7 @@ def _unblock_pass(
     pid: int,
     dry_run: bool,
     issues_by_state: dict,
+    owns_lease: bool = True,
 ) -> bool:
     """Transition blocked issues to pending when their dependencies are done.
 
@@ -274,7 +282,7 @@ def _unblock_pass(
     """
     blocked = issues_by_state.get("blocked", [])
     for issue in blocked:
-        if not renew(conn, area, pid):
+        if owns_lease and not renew(conn, area, pid):
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
             return False
 
@@ -310,6 +318,7 @@ def _dispatch_pass(
     issues_by_state: dict,
     config: dict,
     dispatch_fn: Callable[[str, int, int, str], None] | None = None,
+    owns_lease: bool = True,
 ) -> None:
     """Dispatch pending issues subject to admission control.
 
@@ -366,7 +375,7 @@ def _dispatch_pass(
     active_repairs = _count_active_repairs(conn, area)
 
     for issue in pending:
-        if not renew(conn, area, pid):
+        if owns_lease and not renew(conn, area, pid):
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
             return
 
