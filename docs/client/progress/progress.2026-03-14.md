@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #43 Admin 대시보드 페이지 PR #136 머지
+  - PR: `feat: implement dashboard page (#43)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/page.tsx`, `src/app/dashboard/loading.tsx`, `src/widgets/dashboard/ui/dashboard-home.tsx`, `src/widgets/dashboard/index.ts`
+  - review fix 1: 존재하지 않는 `/dashboard/stats` CTA와 pending quick-action 링크를 제거하고, 실제 경로가 준비될 때까지 비동작 상태/안내 섹션으로 전환
+  - review fix 2: 최신 댓글 샘플 데이터를 제거하고, 실제 API 연결 전까지 명시적인 준비 중 empty state로 교체
+  - review fix 3: misleading한 `빠른 이동` 섹션을 `관리 메뉴 준비 현황`으로 재구성하고 undefined typography token `text-heading-md`를 `text-h2`로 교체
+  - verification: `pnpm lint && pnpm build && pnpm compile:types`
+  - merge: squash merge, merge commit `b9e1bc851ae623511dbbebbc59af820e589279e7`
+  - branch: `feat/issue-43-dashboard-page` (remote branch deleted, local issue worktree cleanup pending at log time)
 - [x] #45 Admin 글 목록 페이지 PR #137 머지
   - PR: `feat: add admin posts page (#45)`
   - merge target: `main`
@@ -49,6 +59,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- Admin landing pages should not advertise unavailable routes as primary CTAs or shortcut cards; if the backing route is missing, the dashboard needs explicit status/coming-soon presentation instead of broken or dead navigation.
+- In this repo, `text-heading-md` is referenced in app code but is not defined in `src/app-layer/style/typography.css`; dashboard headings need to use the existing `text-h*` or `text-body-*` utility set.
 - Admin list UI could not call the existing admin read helpers from a client component until `fetchAdminPost` and `fetchAdminPosts` supported a browser `clientFetch` path when no server cookie header is provided.
 - The initial `#45` UI matched the issue text but exposed `/dashboard/posts/new` and `/dashboard/posts/[id]` targets that do not exist yet in this branch, so the review required removing those navigation links instead of advertising broken flows.
 - Admin post mutations are not usable with the current shared client fetch path unless empty `204/205` responses are handled before unconditional JSON parsing.
@@ -70,6 +82,10 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: The first `#43` dashboard implementation exposed `/dashboard/stats` and several admin shortcuts before those app routes existed, which made the new landing page send users directly into 404 states.
+- **Resolution**: replaced the broken CTA/shortcut links with explicit ready-state messaging and reframed the lower section as `관리 메뉴 준비 현황` until real admin routes are implemented.
+- **Issue**: The original `최신 댓글` panel in `#43` rendered hard-coded sample entries as if they were real moderation data.
+- **Resolution**: removed the fabricated list and replaced it with a clear empty/coming-soon state until a real recent-comments API and screen exist.
 - **Issue**: `#45` needed to fetch admin posts inside a `use client` page, but the existing admin read helpers only used `serverFetch`, which expects a server-side cookie header.
 - **Resolution**: updated `src/entities/post/api.ts` so admin read helpers use `clientFetch` in browser contexts and keep `serverFetch` for server-side callers.
 - **Issue**: The first review on PR #137 identified that the list page linked to `/dashboard/posts/new` and `/dashboard/posts/[id]`, but those routes are not implemented yet and caused immediate 404s.
