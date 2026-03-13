@@ -1327,8 +1327,16 @@ def _check_and_release_backoff(
         if backoff_until.tzinfo is None:
             backoff_until = backoff_until.replace(tzinfo=timezone.utc)
     except ValueError:
-        # Unparseable timestamp — clear it defensively.
+        # Unparseable timestamp — clear all backoff state so the area is not
+        # left permanently paused with no auto-recovery path.
+        click.echo(
+            f"reconcile [{area}]: unparseable backoff_until — clearing all backoff state"
+            f"{' (dry-run)' if dry_run else ''}.",
+            err=True,
+        )
         if not dry_run:
+            set_config(conn, f"{area}.paused", "false")
+            set_config(conn, f"{area}.backoff_count", "0")
             set_config(conn, f"{area}.backoff_until", "")
         return
 

@@ -366,7 +366,7 @@ class TestCycleQuarantinePass:
         # Both issue numbers should appear in each call's body.
         for call_args in mock_comment.call_args_list:
             body = call_args[0][2]
-            assert "#40" in body or "#41" in body
+            assert "#40" in body and "#41" in body
 
 
 # ---------------------------------------------------------------------------
