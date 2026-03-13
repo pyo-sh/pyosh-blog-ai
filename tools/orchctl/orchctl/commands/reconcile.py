@@ -431,7 +431,7 @@ def _next_action_to_state(
             return IssueState.PENDING.value
         click.echo(
             f"reconcile [{area}]: issue #{number}"
-            f" retry budget exhausted ({retry_count}/{budget}) — escalating"
+            f" retry budget exhausted ({retry_count}/{budget}) — marking failed-terminal"
             f"{' (dry-run)' if dry_run else ''}."
         )
         return IssueState.FAILED_TERMINAL.value

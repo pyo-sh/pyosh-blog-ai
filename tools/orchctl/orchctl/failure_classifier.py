@@ -140,9 +140,9 @@ def classify_and_record(
 ) -> tuple[FailureClass, NextAction]:
     """Classify the attempt, write results to DB, and return (class, next_action).
 
-    Prefer calling classify() + record_failure_class() separately when the
-    classification result is needed before the DB write (e.g. for dry-run
-    output).  This function is kept for callers that want both in one call.
+    Not used by the reconcile command (which calls classify() and
+    record_failure_class() separately for dry-run support).  This function
+    is provided for callers that want classification and DB write in one call.
 
     Does NOT commit — caller owns the transaction.
 
