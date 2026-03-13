@@ -238,7 +238,8 @@ def test_reconcile_max_concurrent_blocks_dispatch(runner, db_path):
     """No new dispatches when active dispatched count equals maxConcurrent."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     # Set maxConcurrent to 1
     conn.execute("UPDATE config SET value = '1' WHERE key = 'max_concurrent'")
@@ -258,7 +259,8 @@ def test_reconcile_max_open_pr_blocks_dispatch(runner, db_path):
     """No new dispatches when global dispatched count equals maxOpenPR."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     # Set maxOpenPR to 1 (global limit)
     conn.execute("UPDATE config SET value = '1' WHERE key = 'max_open_pr'")
@@ -278,7 +280,8 @@ def test_reconcile_drain_mode_blocks_dispatch(runner, db_path):
     """No new dispatches when drain mode is active."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute("UPDATE config SET value = 'true' WHERE key = 'drain_mode'")
     conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 7, 'pending')")
@@ -295,7 +298,8 @@ def test_reconcile_drain_mode_does_not_block_mark_complete(runner, db_path):
     """drain mode only stops new dispatches; completing existing work is allowed."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute("UPDATE config SET value = 'true' WHERE key = 'drain_mode'")
     conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 8, 'dispatched')")
@@ -318,7 +322,8 @@ def test_reconcile_dispatch_transitions_issue_to_dispatched(runner, db_path):
     """A dispatched pending issue should be in 'dispatched' state after reconcile."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 9, 'pending')")
     conn.commit()
@@ -340,7 +345,8 @@ def test_reconcile_idempotent_double_run(runner, db_path):
     """Two consecutive reconcile calls produce no duplicate actions."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     # Set maxConcurrent high enough that both runs can inspect the same state
     conn.execute("UPDATE config SET value = '10' WHERE key = 'max_concurrent'")
@@ -373,7 +379,8 @@ def test_reconcile_mark_complete_dispatched_to_completed(runner, db_path):
     """Dispatched issue with completed attempt transitions to completed."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 12, 'dispatched')")
     issue_id = conn.execute(
@@ -402,7 +409,8 @@ def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path):
     """Dispatched issue with failed attempt transitions to failed-terminal."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 13, 'dispatched')")
     issue_id = conn.execute(
@@ -431,7 +439,8 @@ def test_reconcile_unblock_no_deps(runner, db_path):
     """Blocked issue with dependency_type='none' is unblocked to pending."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute(
         "INSERT INTO issues (area, number, state, dependency_type) VALUES ('client', 14, 'blocked', 'none')"
@@ -455,7 +464,8 @@ def test_reconcile_unblock_deferred_for_soft_deps(runner, db_path):
     """Blocked issue with soft dependency logs 'deferred' rather than unblocking."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute(
         "INSERT INTO issues (area, number, state, dependency_type) VALUES ('client', 15, 'blocked', 'soft')"
@@ -479,7 +489,8 @@ def test_reconcile_dry_run_no_state_change(runner, db_path):
     """--dry-run logs actions but does not change DB state."""
     from orchctl.db.connection import get_db
 
-    runner.invoke(cli, ["--db", db_path, "init"])
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
     conn = get_db(db_path)
     conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 16, 'pending')")
     conn.commit()
@@ -497,3 +508,39 @@ def test_reconcile_dry_run_no_state_change(runner, db_path):
     conn.close()
     assert state == "pending"  # unchanged
     assert attempt_count == 0  # no attempt created
+
+
+def test_reconcile_lease_loss_in_mark_complete_aborts_subsequent_passes(runner, db_path):
+    """Lease loss in mark-complete pass prevents unblock and dispatch from running."""
+    from unittest.mock import patch
+    from orchctl.db.connection import get_db
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+    conn = get_db(db_path)
+    # One dispatched issue (triggers mark-complete pass) and one pending issue
+    conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 17, 'dispatched')")
+    issue17_id = conn.execute(
+        "SELECT id FROM issues WHERE area='client' AND number=17"
+    ).fetchone()["id"]
+    conn.execute(
+        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a-c17', ?, 'completed')",
+        (issue17_id,),
+    )
+    conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 18, 'pending')")
+    conn.commit()
+    conn.close()
+
+    # Simulate lease loss on the first renew call (inside mark-complete)
+    with patch("orchctl.commands.reconcile.renew", return_value=False):
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+
+    assert result.exit_code == 0
+    assert "lease lost mid-pass" in result.output
+    # Dispatch must not have run: pending issue is still pending
+    conn = get_db(db_path)
+    state = conn.execute(
+        "SELECT state FROM issues WHERE area='client' AND number=18"
+    ).fetchone()["state"]
+    conn.close()
+    assert state == "pending"

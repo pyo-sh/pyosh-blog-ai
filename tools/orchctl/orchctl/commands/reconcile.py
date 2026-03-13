@@ -85,6 +85,9 @@ def _run_pass(
 ) -> None:
     """Execute one full reconciliation pass under the area lease.
 
+    Each sub-pass returns True on success or False if the lease was lost.
+    On lease loss, subsequent sub-passes are skipped.
+
     Args:
         conn: Open SQLite connection.
         area: Area being reconciled.
@@ -97,8 +100,10 @@ def _run_pass(
     issues_by_state = _observe_issues(conn, area)
     config = _observe_config(conn)
 
-    _mark_complete_pass(conn, area, pid, dry_run, issues_by_state)
-    _unblock_pass(conn, area, pid, dry_run, issues_by_state)
+    if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state):
+        return
+    if not _unblock_pass(conn, area, pid, dry_run, issues_by_state):
+        return
     _dispatch_pass(conn, area, pid, dry_run, issues_by_state, config, dispatch_fn)
 
 
@@ -139,13 +144,16 @@ def _mark_complete_pass(
     pid: int,
     dry_run: bool,
     issues_by_state: dict,
-) -> None:
-    """Transition dispatched issues to completed/failed-terminal based on attempt status."""
+) -> bool:
+    """Transition dispatched issues to completed/failed-terminal based on attempt status.
+
+    Returns True on success, False if the lease was lost (caller should abort).
+    """
     dispatched = issues_by_state.get("dispatched", [])
     for issue in dispatched:
         if not renew(conn, area, pid):
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
-            return
+            return False
 
         issue_id = issue["id"]
         number = issue["number"]
@@ -179,6 +187,8 @@ def _mark_complete_pass(
             if not dry_run:
                 apply_issue_transition(conn, issue_id, "failed-terminal")
 
+    return True
+
 
 # ---------------------------------------------------------------------------
 # Unblock pass
@@ -190,18 +200,20 @@ def _unblock_pass(
     pid: int,
     dry_run: bool,
     issues_by_state: dict,
-) -> None:
+) -> bool:
     """Transition blocked issues to pending when their dependencies are done.
 
     Full cross-area dependency resolution requires a dedicated deps table
     (deferred to a future PR).  Currently only issues with dependency_type='none'
     and no running blocker can be immediately unblocked.
+
+    Returns True on success, False if the lease was lost (caller should abort).
     """
     blocked = issues_by_state.get("blocked", [])
     for issue in blocked:
         if not renew(conn, area, pid):
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
-            return
+            return False
 
         number = issue["number"]
         dep_type = issue["dependency_type"]
@@ -218,6 +230,8 @@ def _unblock_pass(
                 f"reconcile [{area}]: issue #{number} blocked"
                 f" (dependency check deferred — requires deps table)."
             )
+
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +312,17 @@ def _dispatch_pass(
 def _record_dispatch(
     conn: sqlite3.Connection, issue_id: int, attempt_id: str
 ) -> None:
-    """Create a running attempt and transition the issue to 'dispatched'."""
+    """Create a running attempt and transition the issue to 'dispatched' atomically.
+
+    Both the attempt INSERT and the issue state transition are committed in a
+    single transaction so a mid-operation crash cannot leave the DB in a state
+    where an attempt exists but the issue is still 'pending'.
+
+    Invariant on crash between commit and dispatch_fn call: a 'running' attempt
+    exists and the issue is 'dispatched'.  The next reconcile pass will skip
+    dispatch (has_active_attempt returns True) and eventually mark-complete when
+    the attempt reaches a terminal status.
+    """
     conn.execute(
         """
         INSERT INTO attempts (attempt_id, issue_id, status)
@@ -306,5 +330,9 @@ def _record_dispatch(
         """,
         (attempt_id, issue_id),
     )
+    # Transition issue state within the same (implicit) transaction before committing.
+    conn.execute(
+        "UPDATE issues SET state = 'dispatched' WHERE id = ? AND state = 'pending'",
+        (issue_id,),
+    )
     conn.commit()
-    apply_issue_transition(conn, issue_id, "dispatched")
