@@ -405,8 +405,9 @@ def test_reconcile_mark_complete_dispatched_to_completed(runner, db_path):
     assert state == "completed"
 
 
-def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path):
-    """Dispatched issue with failed attempt transitions to failed-terminal."""
+@pytest.mark.parametrize("attempt_status", ["failed", "timed-out"])
+def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path, attempt_status):
+    """Dispatched issue with failed or timed-out attempt transitions to failed-terminal."""
     from orchctl.db.connection import get_db
 
     result = runner.invoke(cli, ["--db", db_path, "init"])
@@ -417,8 +418,8 @@ def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path):
         "SELECT id FROM issues WHERE area='client' AND number=13"
     ).fetchone()["id"]
     conn.execute(
-        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a-fail', ?, 'failed')",
-        (issue_id,),
+        "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a-fail', ?, ?)",
+        (issue_id, attempt_status),
     )
     conn.commit()
     conn.close()

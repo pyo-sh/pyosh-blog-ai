@@ -10,8 +10,16 @@ def get_config(conn: sqlite3.Connection, key: str, default: str = "") -> str:
 
 
 def get_config_int(conn: sqlite3.Connection, key: str, default: int = 0) -> int:
-    """Return a config value as an integer."""
-    return int(get_config(conn, key, str(default)))
+    """Return a config value as an integer.
+
+    Falls back to default if the stored value is missing or not a valid integer
+    (e.g. from a manual DB edit or a future migration that changes the format).
+    """
+    raw = get_config(conn, key, str(default))
+    try:
+        return int(raw)
+    except (ValueError, TypeError):
+        return default
 
 
 def get_config_bool(conn: sqlite3.Connection, key: str, default: bool = False) -> bool:

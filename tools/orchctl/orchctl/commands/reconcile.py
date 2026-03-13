@@ -22,7 +22,7 @@ from ..db import (
     renew,
 )
 from ..db.schema import LATEST_VERSION
-from ..state_machine import apply_issue_transition
+from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
 
 @click.command("reconcile")
@@ -203,9 +203,9 @@ def _unblock_pass(
 ) -> bool:
     """Transition blocked issues to pending when their dependencies are done.
 
-    Full cross-area dependency resolution requires a dedicated deps table
-    (deferred to a future PR).  Currently only issues with dependency_type='none'
-    and no running blocker can be immediately unblocked.
+    Issues with dependency_type='none' are unblocked immediately (no deps to
+    check).  Issues with soft or hard deps require a dedicated deps table for
+    cross-area resolution, which is deferred to a future PR.
 
     Returns True on success, False if the lease was lost (caller should abort).
     """
@@ -253,6 +253,8 @@ def _dispatch_pass(
       1. Drain mode: no new dispatches when enabled.
       2. maxConcurrent: per-area limit on issues in 'dispatched' state.
       3. maxOpenPR: global limit on issues in 'dispatched' state across all areas.
+         Enforced atomically inside _record_dispatch to prevent TOCTOU races
+         when multiple area reconcilers run concurrently.
       4. Per-issue: skip if an active attempt already exists.
     """
     if config["drain_mode"]:
@@ -272,6 +274,8 @@ def _dispatch_pass(
             click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
             return
 
+        # Optimistic pre-checks (for fast exit and user feedback).
+        # The maxOpenPR cap is also enforced atomically inside _record_dispatch.
         active_area = count_dispatched(conn, area)
         if active_area >= max_concurrent:
             click.echo(
@@ -304,35 +308,47 @@ def _dispatch_pass(
             f"{' (dry-run)' if dry_run else ''}."
         )
         if not dry_run:
-            _record_dispatch(conn, issue_id, attempt_id)
+            dispatched = _record_dispatch(conn, issue_id, attempt_id, max_open_pr)
+            if not dispatched:
+                # A concurrent reconciler filled the global cap between our
+                # optimistic check and the atomic insert.
+                click.echo(
+                    f"reconcile [{area}]: maxOpenPR={max_open_pr} reached"
+                    " — global cap enforced concurrently, stopping."
+                )
+                return
             if dispatch_fn is not None:
                 dispatch_fn(area, issue_id, number, attempt_id)
 
 
 def _record_dispatch(
-    conn: sqlite3.Connection, issue_id: int, attempt_id: str
-) -> None:
+    conn: sqlite3.Connection, issue_id: int, attempt_id: str, max_open_pr: int
+) -> bool:
     """Create a running attempt and transition the issue to 'dispatched' atomically.
 
-    Both the attempt INSERT and the issue state transition are committed in a
-    single transaction so a mid-operation crash cannot leave the DB in a state
-    where an attempt exists but the issue is still 'pending'.
+    The attempt INSERT is conditional on the global dispatched count being below
+    max_open_pr.  SQLite serializes writers, so this check-and-insert is
+    race-free: a concurrent reconciler's INSERT will either precede or follow
+    this one — never interleave — ensuring the cap is never silently exceeded.
 
-    Invariant on crash between commit and dispatch_fn call: a 'running' attempt
-    exists and the issue is 'dispatched'.  The next reconcile pass will skip
-    dispatch (has_active_attempt returns True) and eventually mark-complete when
-    the attempt reaches a terminal status.
+    The issue state transition uses apply_issue_transition_tx (no intermediate
+    commit) so both the attempt INSERT and the state UPDATE are committed
+    together, preventing a crash from leaving the issue stuck in 'pending' with
+    a dangling 'running' attempt.
+
+    Returns True if the dispatch was recorded, False if the global cap was
+    already reached by a concurrent reconciler.
     """
-    conn.execute(
+    cur = conn.execute(
         """
         INSERT INTO attempts (attempt_id, issue_id, status)
-        VALUES (?, ?, 'running')
+        SELECT ?, ?, 'running'
+        WHERE (SELECT COUNT(*) FROM issues WHERE state = 'dispatched') < ?
         """,
-        (attempt_id, issue_id),
+        (attempt_id, issue_id, max_open_pr),
     )
-    # Transition issue state within the same (implicit) transaction before committing.
-    conn.execute(
-        "UPDATE issues SET state = 'dispatched' WHERE id = ? AND state = 'pending'",
-        (issue_id,),
-    )
+    if cur.rowcount == 0:
+        return False
+    apply_issue_transition_tx(conn, issue_id, "dispatched")
     conn.commit()
+    return True
