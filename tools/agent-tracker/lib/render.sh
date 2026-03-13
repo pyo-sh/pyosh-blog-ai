@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tools/agent-tracker/lib/render.sh
-# Dashboard renderer — consumes JSON snapshot from collect.sh.
+# Dashboard renderer — consumes normalized export JSON from the Python backend (#114).
 #
 # No direct tmux/ps/jq-from-source calls. All data comes from the snapshot.
 # Uses @tsv extraction from JSON for safe field parsing.
@@ -30,7 +30,7 @@ render_dashboard() {
 
   # ── Extract agent data from snapshot (single jq call for all rows) ──
   local -a agent_rows=()
-  local n_working=0 n_plan=0 n_idle=0 n_stale=0 n_total=0
+  local n_working=0 n_plan=0 n_idle=0 n_stale=0 n_fault=0 n_unknown=0 n_total=0
 
   local agents_tsv
   agents_tsv=$(printf '%s' "$snapshot" | jq -r '
@@ -49,7 +49,9 @@ render_dashboard() {
       case "$status" in
         working|needs-input) (( n_working++ )) ;;
         plan)                (( n_plan++ ))    ;;
-        stale|fault|unknown) (( n_stale++ ))   ;;
+        stale)               (( n_stale++ ))   ;;
+        fault)               (( n_fault++ ))   ;;
+        unknown)             (( n_unknown++ )) ;;
         *)                   (( n_idle++ ))    ;;
       esac
 
@@ -184,10 +186,22 @@ render_dashboard() {
   printf "${GRAY}╠%s╣${R}" "$_CACHE_eqline"; tput el; echo
 
   # ── Footer ──
+  # Count dead orchestrators for the footer summary (#114).
+  local n_dead_orch=0
+  local dead_tsv
+  dead_tsv=$(printf '%s' "$snapshot" | jq -r '
+    (.orchestrators // .orchestrator // [])[] |
+    select(.batch_status == "dead") | .area
+  ' 2>/dev/null)
+  [[ -n "$dead_tsv" ]] && n_dead_orch=$(printf '%s\n' "$dead_tsv" | grep -c .)
+
   local n_stat="(${n_working} working"
-  (( n_plan > 0 ))  && n_stat+=", ${n_plan} plan"
-  (( n_stale > 0 )) && n_stat+=", ${n_stale} stale"
+  (( n_plan > 0 ))    && n_stat+=", ${n_plan} plan"
+  (( n_stale > 0 ))   && n_stat+=", ${n_stale} stale"
+  (( n_fault > 0 ))   && n_stat+=", ${n_fault} fault"
+  (( n_unknown > 0 )) && n_stat+=", ${n_unknown} unknown"
   n_stat+=", ${n_idle} idle)"
+  (( n_dead_orch > 0 )) && n_stat+=" ● ${n_dead_orch} dead orch"
 
   local left_colored="${GREEN}●${R} ${GRAY}Active: ${n_total} agents ${n_stat}${R}"
   local left_plain="● Active: ${n_total} agents ${n_stat}"
@@ -215,7 +229,8 @@ _render_orchestrator() {
   local snapshot=$1 INNER=$2
 
   local orch_count
-  orch_count=$(printf '%s' "$snapshot" | jq '.orchestrator | length' 2>/dev/null)
+  # Support both .orchestrators (Python backend export) and .orchestrator (legacy) (#114).
+  orch_count=$(printf '%s' "$snapshot" | jq '(.orchestrators // .orchestrator // []) | length' 2>/dev/null)
   [[ -z "$orch_count" || "$orch_count" == "0" ]] && return
 
   # Column widths: ISSUE(7) STEP(13) STATUS(6) TIME(7) INFO(rest)
@@ -226,7 +241,7 @@ _render_orchestrator() {
   # Extract all batch summaries (single jq call)
   local batches_tsv
   batches_tsv=$(printf '%s' "$snapshot" | jq -r '
-    .orchestrator[] |
+    (.orchestrators // .orchestrator // [])[] |
     [.area, .batch_id, .batch_status,
      (.n_done | tostring), (.n_total | tostring), (.n_failed | tostring),
      .elapsed, (.dispatched | length | tostring)] | @tsv
@@ -275,7 +290,7 @@ _render_orchestrator() {
       # Extract dispatched rows for this batch (single jq call per batch)
       local disp_tsv
       disp_tsv=$(printf '%s' "$snapshot" | jq -r --argjson idx "$batch_idx" '
-        .orchestrator[$idx].dispatched[] |
+        (.orchestrators // .orchestrator // [])[$idx].dispatched[] |
         [.issue, .step, (if .alive then "run" else "stop" end),
          .elapsed, (.pr_num | tostring),
          (.sub | if . == null then "" else .type end),

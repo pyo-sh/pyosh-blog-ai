@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # tools/agent-tracker/agent-tracker.sh
-# Real-time tmux agent dashboard — reads from sidecar files (push model).
+# Real-time tmux agent dashboard — reads from Python backend normalized export (#114).
 #
-# Architecture (#72):
-#   collect_snapshot() → JSON → render_dashboard()
-#   No \x1e/\x1f delimiter protocols. All data boundaries are JSON + @tsv.
-#   Layers: collect (lib/collect.sh) → render (lib/render.sh) → util (lib/util.sh)
+# Architecture (#114):
+#   Python backend daemon → current.json → render_dashboard()
+#   No direct collection in the UI layer. All data comes from the normalized export.
+#   Layers: backend/ (Python) → current.json → render (lib/render.sh) → util (lib/util.sh)
 #
 # Claude Code panes: data pushed by hooks → .workspace/agent-tracker/<socket-hash>/<session>/<pane>.json (v2)
 # Codex panes: pane scraping fallback (no hooks support)
@@ -18,20 +18,20 @@ SESSION="lab"
 INTERVAL=1
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PIPELINE_DIR="${PIPELINE_DIR:-"$REPO_ROOT/.workspace/pipeline"}"
-ORCH_DIR="${ORCH_DIR:-"$REPO_ROOT/.workspace/orchestrate"}"
 SIDECAR_DIR="$REPO_ROOT/.workspace/agent-tracker"
+EXPORT_FILE="$REPO_ROOT/.workspace/agent-tracker/state/current.json"
 
 # ── Source library modules ──
 source "$SCRIPT_DIR/lib/util.sh"
-source "$SCRIPT_DIR/lib/collect.sh"
 source "$SCRIPT_DIR/lib/render.sh"
 
 # ── Terminal lifecycle ──
 # Preserve exit code through cleanup (#72).
 # Only trap EXIT — handles normal exit, exit N, SIGINT (130), SIGTERM (143).
+_BACKEND_PID=""
 cleanup() {
   local ec=$?
+  [[ -n "$_BACKEND_PID" ]] && kill "$_BACKEND_PID" 2>/dev/null
   tput cnorm 2>/dev/null
   tput rmcup 2>/dev/null
   exit "$ec"
@@ -58,6 +58,19 @@ if ! [[ "$INTERVAL" =~ ^[0-9]*\.?[0-9]+$ ]] || \
   printf 'Error: -i INTERVAL must be a positive number (got: %s)\n' "$INTERVAL" >&2
   exit 1
 fi
+
+# ── Start Python backend daemon ──
+# Backend writes normalized export to EXPORT_FILE at --interval seconds.
+# Sidecar state dir must exist before backend starts.
+mkdir -p "$(dirname "$EXPORT_FILE")"
+
+PYTHONPATH="$SCRIPT_DIR" python3 -m backend \
+  --root "$REPO_ROOT" \
+  --session "$SESSION" \
+  --interval "$INTERVAL" \
+  --output "$EXPORT_FILE" \
+  2>>"$REPO_ROOT/.workspace/agent-tracker/backend.log" &
+_BACKEND_PID=$!
 
 # ── Sidecar cleanup (safe) ──
 # Runs once at startup. Scoped to the current tmux server + target session only.
@@ -108,7 +121,13 @@ tput smcup 2>/dev/null
 tput civis 2>/dev/null
 
 while true; do
-  snapshot=$(collect_snapshot "$SESSION" "$SIDECAR_DIR" "$ORCH_DIR" "$PIPELINE_DIR")
+  # Read from the normalized export written by the Python backend.
+  # Show an empty snapshot until the first export is ready.
+  if [[ -f "$EXPORT_FILE" ]]; then
+    snapshot=$(cat "$EXPORT_FILE")
+  else
+    snapshot='{}'
+  fi
   render_dashboard "$snapshot" "$SESSION"
   sleep "$INTERVAL"
 done
