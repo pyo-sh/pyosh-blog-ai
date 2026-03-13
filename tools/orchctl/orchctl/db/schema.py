@@ -379,6 +379,41 @@ MIGRATIONS: list[tuple[int, str]] = [
           AND json_extract(value, '$.deterministic_test_failure') IS NULL;
         """,
     ),
+    (
+        14,
+        """
+        -- v14: event log + webhook notification support.
+        --
+        -- events: append-only log of orchestrator lifecycle events.
+        --   area       = area the event belongs to (may be NULL for global events)
+        --   issue_id   = FK to issues.id (nullable; non-issue events omit this)
+        --   event_type = string key, e.g. 'issue_state_changed', 'attempt_started'
+        --   payload    = JSON blob with event-specific details
+        CREATE TABLE IF NOT EXISTS events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            area        TEXT,
+            issue_id    INTEGER REFERENCES issues(id) ON DELETE SET NULL,
+            event_type  TEXT    NOT NULL,
+            payload     TEXT    NOT NULL DEFAULT '{}',
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_events_area       ON events(area);
+        CREATE INDEX IF NOT EXISTS idx_events_event_type ON events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
+
+        -- Webhook config defaults.
+        -- webhook_url:     HTTP(S) URL to POST events to. Empty = disabled.
+        -- webhook_enabled: master switch; 'false' suppresses all outbound calls.
+        -- webhook_events:  JSON array of event_type strings to forward.
+        --                  Empty array = forward all events.
+        INSERT INTO config (key, value) VALUES
+            ('webhook_url',     ''),
+            ('webhook_enabled', 'false'),
+            ('webhook_events',  '[]')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
