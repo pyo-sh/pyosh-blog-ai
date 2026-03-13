@@ -1,5 +1,20 @@
 # Progress 2026-03-13
 
+## orchctl reconcile loop + admission control (#88, PR #184)
+
+- **목적**: observe → diff → act 패턴의 idempotent reconcile 명령 구현 + 기본 admission control
+- **`orchctl reconcile --area {area}`** - lease 획득 후 mark-complete / unblock / dispatch 3단계 act
+- **mark-complete pass** - dispatched 이슈 중 attempt가 terminal 상태(`completed`/`failed`/`timed-out`)인 것을 자동 전환 (`completed` 또는 `failed-terminal`)
+- **unblock pass** - `dependency_type=none` blocked 이슈를 즉시 `pending`으로 전환; soft/hard dep는 deps 테이블 구현 후 처리 예정
+- **dispatch pass** - admission control 4단계: drain mode 체크 → per-area `maxConcurrent` → global `maxOpenPR` → per-issue active attempt dedup
+- **원자적 dispatch** - `_record_dispatch`에서 conditional `INSERT ... SELECT ... WHERE count < max_open_pr` 로 TOCTOU 레이스 방지 (SQLite write serialization 활용); attempt INSERT + issue state 전환을 단일 commit으로 묶음
+- **`apply_issue_transition_tx`** - 기존 `apply_issue_transition`에서 commit 없는 tx 변형 추출, `_record_dispatch`에서 활용
+- **schema migration v4** - `max_open_pr=2`, `drain_mode=false` config 기본값 추가
+- **`db/config.py`** - `get_config_int`/`get_config_bool`/`set_config`/`count_dispatched` 헬퍼 신규; `get_config_int` malformed 값 안전 처리(try/except)
+- **서브패스 lease-loss 전파** - 각 서브패스가 `bool` 반환, lease 손실 시 후속 패스 중단
+- **테스트 13개 신규** (총 132개 통과) - maxConcurrent, maxOpenPR, drain mode, mark-complete(failed/timed-out parametrize), unblock, idempotency, dry-run, lease-loss 전파, concurrent cap 강제
+- **3라운드 리뷰** - R1: lease-loss 전파 + atomic dispatch; R2: TOCTOU maxOpenPR + config int 방어 + transition_tx; R3: rollback 명시 + concurrent cap 테스트 + dead guard 제거
+
 ## Skill Python 호출 경로 + 부수 버그 5건 수정 (#181, PR #182)
 
 - **목적**: dev-pipeline 실행 중 반복 발생한 5가지 오류 수정
