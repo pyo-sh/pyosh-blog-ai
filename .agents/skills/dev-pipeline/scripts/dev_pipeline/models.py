@@ -12,6 +12,7 @@ class PipelineStep(str, Enum):
     REVIEW_PROCESS = "review_process"
     RESOLVE = "resolve"
     MERGE = "merge"
+    CLEANUP_WT = "cleanup_wt"
     LOG = "log"
 
 

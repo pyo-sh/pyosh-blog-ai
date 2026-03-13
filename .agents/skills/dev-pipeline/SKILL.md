@@ -7,7 +7,9 @@ description: Orchestrate /dev-build -> /dev-review -> resolve (direct) -> merge 
 
 Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 
-> CLI: `cd .agents/skills/dev-pipeline/scripts && python3 -m dev_pipeline <cmd>`
+> CLI: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline <cmd>`
+> Prepend the PYTHONPATH above to every `python3 -m dev_pipeline` call below.
+> `MONOREPO_ROOT`: headless → `$PIPELINE_MONOREPO_ROOT` / interactive → `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 > Worktree: `.workspace/worktrees/{area}/issue-{N}` | State: `.workspace/pipeline/{area}/issue-{N}.state.json`
 
 ## Invariants
@@ -20,6 +22,8 @@ Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 6. **Merge lock held inside one CLI call** (`python3 -m dev_pipeline merge`).
 7. **`run`/`cleanup` manage the issue lease internally.** `--owner manual` for interactive; `--owner pipeline` for automated.
 8. **All transient files are area-scoped** (`state`, `logs`, `messages`, `worktrees` under `.workspace/.../{area}/`).
+9. **`gh issue view` must always include `--json number,title,body,state,labels`**. Without `--json`, the GitHub Projects (classic) deprecation error causes exit code 1.
+   Correct: `gh issue view $N -R $REPO --json number,title,body,state,labels`
 
 ## State machine
 
@@ -35,8 +39,9 @@ Orchestrate build -> review -> resolve -> merge -> log for area-scoped issues.
 | `suggestion_decide` | `resolve` or `merge` | AI decision | No |
 | `resolve` | `review_dispatch` | skipReview=false, fixes applied | No |
 | `resolve` | `merge` | skipReview=true | No |
-| `merge` | `log` | PR merged | No |
-| `log` | (done) | dev-log complete + cleanup | No |
+| `merge` | `cleanup_wt` | PR merged | No |
+| `cleanup_wt` | `log` | worktree removed | No |
+| `log` | (done) | dev-log complete + state deleted | No |
 
 Only `review_dispatch -> review_wait` requires a turn break. All other transitions happen within the same turn.
 
@@ -52,12 +57,12 @@ Act: `/dev-build root #$ISSUE`
 Post: `python3 -m dev_pipeline step build --issue $ISSUE --area $AREA --phase finalize` -> review_dispatch
 
 ### 2a. review_dispatch
-`python3 -m dev_pipeline step review-dispatch --issue $ISSUE --area $AREA [--tool $TOOL]`
+`python3 -m dev_pipeline step review-dispatch --issue $ISSUE --area $AREA [--tool $TOOL] [--model $MODEL]`
 
 | action | Next |
 |---|---|
 | `found` | review_process (`data.reviewId`) |
-| `dispatch` | Bash tool with `run_in_background: true`: `cd .agents/skills/dev-pipeline/scripts && python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL [--model $MODEL]` -> **end turn** |
+| `dispatch` | Bash tool with `run_in_background: true`: `python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL [--model $MODEL]` -> **end turn** |
 | `error` | Stop, report |
 
 When action is `found`: extract `REVIEW_ID` from `data.reviewId` before calling Step 3.
@@ -118,11 +123,18 @@ Post: `python3 -m dev_pipeline step resolve --issue $ISSUE --area $AREA --phase 
 
 | action | Next |
 |---|---|
-| `merged` / `already_merged` | log |
+| `merged` / `already_merged` | cleanup_wt |
 | `retry` | merge (re-run) |
 | `closed` / `escalate` | Stop, report |
 
-### 6. log + cleanup
+### 5.5. cleanup-wt
+`python3 -m dev_pipeline step cleanup-wt --issue $ISSUE --area $AREA`
+
+| action | Next |
+|---|---|
+| `continue` | log |
+
+### 6. log + state cleanup
 Pre: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase setup`
 Act: `/dev-log` (standalone - docs go to docs branch via dev-log skill)
 Post: `python3 -m dev_pipeline step log --issue $ISSUE --area $AREA --phase finalize`

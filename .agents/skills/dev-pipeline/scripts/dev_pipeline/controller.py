@@ -126,10 +126,10 @@ def merge_pr(
             )
 
 
-def cleanup(
+def cleanup_worktree(
     issue: int, area: str, branch: str, pr: int, monorepo_root: Path
 ) -> None:
-    """Remove artifacts, worktree, branch, and state file."""
+    """Remove artifacts, worktree, and branch. Preserves state file."""
     from .paths import (
         area_repo_dir,
         pipeline_err_path,
@@ -139,7 +139,6 @@ def cleanup(
         resolve_worktree_path,
     )
     from .git_ops import branch_delete, worktree_remove
-    from .state_store import state_delete
 
     repo_dir = str(area_repo_dir(area, monorepo_root))
 
@@ -158,7 +157,23 @@ def cleanup(
         worktree_remove(repo_dir, str(wt), force=True)
 
     branch_delete(repo_dir, branch)
+
+
+def cleanup_state(
+    issue: int, area: str, monorepo_root: Path
+) -> None:
+    """Delete pipeline state file."""
+    from .state_store import state_delete
+
     state_delete(issue, area, monorepo_root)
+
+
+def cleanup(
+    issue: int, area: str, branch: str, pr: int, monorepo_root: Path
+) -> None:
+    """Remove artifacts, worktree, branch, and state file."""
+    cleanup_worktree(issue, area, branch, pr, monorepo_root)
+    cleanup_state(issue, area, monorepo_root)
 
 
 def list_pipelines(monorepo_root: Path) -> list:

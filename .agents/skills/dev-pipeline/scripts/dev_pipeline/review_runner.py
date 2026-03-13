@@ -483,7 +483,6 @@ def _dispatch_codex(
     log = pipeline_log_path(issue, area, "review", monorepo_root)
     err = pipeline_err_path(issue, area, "review", monorepo_root)
     meta = pipeline_headless_meta_path(issue, area, "review", monorepo_root)
-    schema_path = Path(__file__).parent / "review_schema.json"
     review_json_path = log.with_suffix(".json")
 
     base_ref = get_pr_base_ref(area, pr)
@@ -622,13 +621,21 @@ def _dispatch_codex(
 
     # --- Structured output path ---
     # All failures below are fail-closed: no GitHub post, local artifact only.
-    def _fail_parse(reason: str) -> int:
+    def _fail_parse(reason: str, raw_content: str = "") -> int:
         print(
             f"[review_runner] codex structured output failed for "
             f"issue #{issue} area={area} pr=#{pr}: {reason} - "
             f"setting failed_parse, transcript artifact saved at {log}",
             file=sys.stderr,
         )
+        if raw_content:
+            snippet = raw_content[:500]
+            if len(raw_content) > 500:
+                snippet += f"... ({len(raw_content)} chars total)"
+            print(
+                f"[review_runner] raw output snippet:\n{snippet}",
+                file=sys.stderr,
+            )
         # Update both headless meta and pipeline state so they stay consistent.
         # Without this, meta would read "success" while state reads "failed_parse".
         try:
@@ -660,14 +667,19 @@ def _dispatch_codex(
         return 1
 
     if not review_json_path.exists():
-        return _fail_parse("output JSON file not created")
+        # Log codex stdout/stderr for debugging (stderr=progress, stdout=output)
+        return _fail_parse(
+            "output JSON file not created",
+            raw_content=result.stdout[:1000] if result.stdout else "(empty stdout)",
+        )
 
     # Basic JSON parse check before handing off to publisher
+    raw_json_text = review_json_path.read_text()
     try:
-        json.loads(review_json_path.read_text())
+        json.loads(raw_json_text)
     except json.JSONDecodeError as exc:
         review_json_path.unlink(missing_ok=True)
-        return _fail_parse(f"output JSON parse error: {exc}")
+        return _fail_parse(f"output JSON parse error: {exc}", raw_content=raw_json_text)
 
     # Move codex output to canonical artifact path
     review_dir = monorepo_root / ".workspace" / "dev-review" / f"pr-{pr}"

@@ -7,7 +7,8 @@ description: Respond to PR review comments. Reads review feedback, applies fixes
 
 Read PR review -> fix code -> push -> post response.
 
-> Scripts: `.agents/skills/dev-resolve/scripts/`
+> Scripts: `$MONOREPO_ROOT/.agents/skills/dev-resolve/scripts/`
+> `MONOREPO_ROOT`: use `source .agents/scripts/monorepo-helpers.sh` from monorepo root, or bootstrap with `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 
 ## Invariants
 
@@ -25,7 +26,7 @@ Read PR review -> fix code -> push -> post response.
 ### 1. Read review
 
 ```
-python3 scripts/review_reader.py --repo "$REPO" --pr "$PR" [--review-id $REVIEW_ID]
+python3 $MONOREPO_ROOT/.agents/skills/dev-resolve/scripts/review_reader.py --repo "$REPO" --pr "$PR" [--review-id $REVIEW_ID]
 ```
 
 Output JSON: `{ "title", "state", "reviewBody", "comments" }`.
@@ -53,7 +54,7 @@ Write response per [response-template.md](references/response-template.md).
 Response file: `.workspace/messages/${REPO##*/}-pr-${PR}-response.md`
 
 ```
-python3 scripts/response_poster.py --repo "$REPO" --pr "$PR" --body-file <path> --cleanup
+python3 $MONOREPO_ROOT/.agents/skills/dev-resolve/scripts/response_poster.py --repo "$REPO" --pr "$PR" --body-file <path> --cleanup
 ```
 
 ### 6. Notify user
@@ -63,4 +64,4 @@ Summarize fixed and skipped counts. Advise re-review.
 ## Constraints
 
 - Use `-R "$REPO"` for all `gh` commands.
-- Scripts run from skill base directory (`.agents/skills/dev-resolve/`).
+- Scripts use `$MONOREPO_ROOT`-based absolute paths. Do not run them from a relative working directory.

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from .command_runner import run as run_cmd
-from .controller import MergeConflictError, cleanup, merge_pr
+from .controller import MergeConflictError, cleanup, cleanup_worktree, cleanup_state, merge_pr
 from .git_ops import (
     add_all,
     commit,
@@ -166,7 +166,7 @@ def step_build_finalize(issue: int, area: str, monorepo_root: Path) -> StepResul
 # ---------------------------------------------------------------------------
 
 def step_review_dispatch(
-    issue: int, area: str, monorepo_root: Path, tool: str = "claude",
+    issue: int, area: str, monorepo_root: Path, tool: str = "claude", model: str = "",
 ) -> StepResult:
     """Check for existing review; if none, prepare for background dispatch."""
     state = state_read(issue, area, monorepo_root)
@@ -200,7 +200,7 @@ def step_review_dispatch(
 
     return StepResult(
         action="dispatch",
-        data={"pr": pr, "tool": tool, "issue": issue, "area": area},
+        data={"pr": pr, "tool": tool, "model": model, "issue": issue, "area": area},
         message=f"[step:review_dispatch] ready to dispatch with tool={tool}",
     )
 
@@ -573,8 +573,8 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
 
     if pr_state == "MERGED":
         fetch_prune(str(repo_dir))
-        log_transition(issue, area, monorepo_root, "merge", "log", "PR already merged")
-        state_update(issue, area, monorepo_root, {"step": "log"})
+        log_transition(issue, area, monorepo_root, "merge", "cleanup_wt", "PR already merged")
+        state_update(issue, area, monorepo_root, {"step": "cleanup_wt"})
         return StepResult(action="already_merged", data={"pr": pr})
     if pr_state == "CLOSED":
         return StepResult(action="closed", data={"pr": pr})
@@ -598,14 +598,31 @@ def step_merge(issue: int, area: str, monorepo_root: Path) -> StepResult:
         })
 
     fetch_prune(str(repo_dir))
-    log_transition(issue, area, monorepo_root, "merge", "log", "PR merged")
-    state_update(issue, area, monorepo_root, {"step": "log"})
+    log_transition(issue, area, monorepo_root, "merge", "cleanup_wt", "PR merged")
+    state_update(issue, area, monorepo_root, {"step": "cleanup_wt"})
 
     return StepResult(action="merged", data={"pr": pr})
 
 
 # ---------------------------------------------------------------------------
-# 6. log (setup + finalize) — runs AFTER merge
+# 5.5. cleanup_wt — remove worktree BEFORE log (state preserved for dev-log)
+# ---------------------------------------------------------------------------
+
+def step_cleanup_wt(issue: int, area: str, monorepo_root: Path) -> StepResult:
+    """Remove worktree and branch. State file preserved so dev-log can read it."""
+    state = state_read(issue, area, monorepo_root)
+    pr = state.pr
+    branch = state.branch
+
+    cleanup_worktree(issue, area, branch, pr, monorepo_root)
+    state_update(issue, area, monorepo_root, {"step": "log"})
+    log_transition(issue, area, monorepo_root, "cleanup_wt", "log", "worktree removed")
+
+    return StepResult(action="continue", data={})
+
+
+# ---------------------------------------------------------------------------
+# 6. log (setup + finalize) — runs AFTER cleanup_wt
 # ---------------------------------------------------------------------------
 
 def step_log_setup(issue: int, area: str, monorepo_root: Path) -> StepResult:
@@ -618,12 +635,8 @@ def step_log_setup(issue: int, area: str, monorepo_root: Path) -> StepResult:
 
 
 def step_log_finalize(issue: int, area: str, monorepo_root: Path) -> StepResult:
-    """Cleanup and mark pipeline done."""
-    state = state_read(issue, area, monorepo_root)
-    pr = state.pr
-    branch = state.branch
-
-    cleanup(issue, area, branch, pr, monorepo_root)
+    """Delete state file and mark pipeline done."""
     log_transition(issue, area, monorepo_root, "log", "done", "dev-log complete")
+    cleanup_state(issue, area, monorepo_root)
 
     return StepResult(action="done", data={})

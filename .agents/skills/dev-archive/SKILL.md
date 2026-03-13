@@ -7,7 +7,9 @@ description: Squash-merge accumulated docs branch commits into main via PR. Use 
 
 Merge `docs` -> `main` via squash-merge PR for traceability.
 
-> CLI: `cd .agents/skills/dev-archive/scripts && python3 -m dev_archive <cmd>`
+> CLI: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-archive/scripts python3 -m dev_archive <cmd>`
+> Prepend the PYTHONPATH above to every `python3 -m dev_archive` call below.
+> `MONOREPO_ROOT`: headless → `$PIPELINE_MONOREPO_ROOT` / interactive → `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 
 ## Workflow
 

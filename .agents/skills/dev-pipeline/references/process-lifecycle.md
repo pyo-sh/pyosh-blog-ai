@@ -48,7 +48,7 @@ High-level CLI interface that replaces inline Bash in SKILL.md (v3).
 
 ### Invocation
 
-`python3 -m dev_pipeline step <name> --issue N --area A [--phase setup|finalize] [--review-id N] [--tool T] [--decision D]`
+`PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-pipeline/scripts python3 -m dev_pipeline step <name> --issue N --area A [--phase setup|finalize] [--review-id N] [--tool T] [--model M] [--decision D]`
 
 ### Output contract
 
@@ -60,7 +60,7 @@ stderr emits human-readable log messages.
 
 ### Two patterns
 
-1. **Single call** (fully automated): `review-dispatch`, `review-wait`, `review-process`, `suggestion-decide`, `merge`
+1. **Single call** (fully automated): `review-dispatch`, `review-wait`, `review-process`, `suggestion-decide`, `merge`, `cleanup-wt`
    - Python handles the entire logic, returns action for next step routing
 2. **Two-phase** (AI skill invocation required): `build`, `resolve`, `log`
    - `--phase setup`: preparation before AI skill (fetch, state init, review fetch)

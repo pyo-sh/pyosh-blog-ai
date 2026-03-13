@@ -359,6 +359,7 @@ def cmd_step(args) -> int:
         step_suggestion_decide,
         step_resolve_setup,
         step_resolve_finalize,
+        step_cleanup_wt,
         step_log_setup,
         step_log_finalize,
         step_merge,
@@ -371,7 +372,7 @@ def cmd_step(args) -> int:
         ("build", "setup"): lambda: step_build_setup(args.issue, args.area, monorepo_root),
         ("build", "finalize"): lambda: step_build_finalize(args.issue, args.area, monorepo_root),
         ("review-dispatch", None): lambda: step_review_dispatch(
-            args.issue, args.area, monorepo_root, tool=args.tool,
+            args.issue, args.area, monorepo_root, tool=args.tool, model=args.model,
         ),
         ("review-wait", None): lambda: step_review_wait(args.issue, args.area, monorepo_root),
         ("review-process", None): lambda: step_review_process(
@@ -382,6 +383,7 @@ def cmd_step(args) -> int:
         ),
         ("resolve", "setup"): lambda: step_resolve_setup(args.issue, args.area, monorepo_root),
         ("resolve", "finalize"): lambda: step_resolve_finalize(args.issue, args.area, monorepo_root),
+        ("cleanup-wt", None): lambda: step_cleanup_wt(args.issue, args.area, monorepo_root),
         ("log", "setup"): lambda: step_log_setup(args.issue, args.area, monorepo_root),
         ("log", "finalize"): lambda: step_log_finalize(args.issue, args.area, monorepo_root),
         ("merge", None): lambda: step_merge(args.issue, args.area, monorepo_root),
@@ -548,7 +550,7 @@ def main():
     # step
     _STEP_CHOICES = [
         "build", "review-dispatch", "review-wait", "review-process",
-        "suggestion-decide", "resolve", "merge", "log",
+        "suggestion-decide", "resolve", "merge", "cleanup-wt", "log",
     ]
     p_step = sub.add_parser("step", help="Execute a pipeline step")
     p_step.add_argument("name", choices=_STEP_CHOICES)
@@ -557,6 +559,7 @@ def main():
     p_step.add_argument("--phase", choices=["setup", "finalize"])
     p_step.add_argument("--review-id", type=int, default=0)
     p_step.add_argument("--tool", default="claude")
+    p_step.add_argument("--model", default="")
     p_step.add_argument("--decision", default="", choices=["merge", "resolve-skip", "resolve-review"])
     p_step.set_defaults(func=cmd_step)
 

@@ -7,7 +7,9 @@ description: Manage progress/, findings/, and decisions/ records in the pyosh-bl
 
 Record-only skill. All commits target the `docs` branch. Merge to `main` via `/dev-archive`.
 
-> CLI: `cd .agents/skills/dev-log/scripts && python3 -m dev_log <cmd>`
+> CLI: `PYTHONPATH=$MONOREPO_ROOT/.agents/skills/dev-log/scripts python3 -m dev_log <cmd>`
+> Prepend the PYTHONPATH above to every `python3 -m dev_log` call below.
+> `MONOREPO_ROOT`: headless → `$PIPELINE_MONOREPO_ROOT` / interactive → `source "$(git worktree list --porcelain | awk 'NR==1{print $2}')/.agents/scripts/monorepo-helpers.sh"`
 > Area definitions: [monorepo-layout.md](../../references/monorepo-layout.md) | Templates: [templates.md](references/templates.md)
 
 ## Area selection
