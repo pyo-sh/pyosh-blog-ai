@@ -47,6 +47,17 @@ def get_config_json(conn: sqlite3.Connection, key: str, default: list | dict | N
         return default
 
 
+def get_config_float(conn: sqlite3.Connection, key: str, *, default: float) -> float:
+    """Return a config value as a float, returning default on error."""
+    raw = get_config(conn, key, default=None)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return default
+
+
 def set_config(conn: sqlite3.Connection, key: str, value: str) -> None:
     """Upsert a config value."""
     conn.execute(

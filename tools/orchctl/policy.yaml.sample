@@ -45,3 +45,15 @@ guardrails:
   scheduler_overlap: false
   # Tools that workers must not call (informational - enforced at dispatch layer)
   dangerous_tools: []
+  # Maximum completed issues with unmerged PRs before halting new dispatches.
+  # 0 = no limit (default)
+  max_awaiting_merge: 0
+
+scheduling:
+  # Multiplier for the issue priority field (from fenced orchestrator block).
+  # Higher priority_weight makes explicit priority differences more decisive.
+  priority_weight: 1.0
+  # Multiplier for issue age in days. Older issues get a small boost.
+  age_weight: 0.1
+  # Penalty multiplier for retry_count. Repair attempts are deprioritised.
+  retry_weight: 1.0

@@ -303,6 +303,29 @@ MIGRATIONS: list[tuple[int, str]] = [
             WHERE value = '{}';
         """,
     ),
+    (
+        11,
+        """
+        -- v11: advanced scheduling + admission control
+        -- priority: dispatch order weight from the fenced orchestrator block.
+        -- Higher values are dispatched first (default 0 = normal priority).
+        ALTER TABLE issues ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;
+
+        -- Scheduling policy config defaults.
+        -- priority_weight: multiplier for the priority field in the dispatch score.
+        -- age_weight:      multiplier for issue age (days) in the dispatch score.
+        -- retry_weight:    penalty multiplier for retry_count in the dispatch score.
+        -- max_awaiting_merge: stop new dispatches when this many completed issues
+        --   still have unmerged PRs (merge_state NOT IN ('done', 'rejected')).
+        --   0 = no limit.
+        INSERT INTO config (key, value) VALUES
+            ('scheduling_priority_weight', '1.0'),
+            ('scheduling_age_weight',      '0.1'),
+            ('scheduling_retry_weight',    '1.0'),
+            ('max_awaiting_merge',         '0')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
