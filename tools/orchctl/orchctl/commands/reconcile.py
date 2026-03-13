@@ -638,7 +638,7 @@ def _create_ci_blocker_issue(
         SELECT attempt_id, status, terminal_json, created_at
         FROM attempts
         WHERE issue_id = ?
-          AND status NOT IN ('created', 'running')
+          AND status IN ('failed', 'timed-out', 'completed')
         ORDER BY created_at ASC
         """,
         (issue_id,),
@@ -676,6 +676,10 @@ def _create_ci_blocker_issue(
         f"3. Requeue the original issue: `orchctl control requeue --area {area} --issue {number}`\n"
     )
 
+    # NOTE: the 'blocker' label must exist in the target GitHub repo.
+    # If it is absent, gh issue create exits non-zero, create_issue returns
+    # None, and the failure is logged to stderr.  Create the label once via:
+    #   gh label create blocker -R <owner/repo> --color e11d48
     blocker_number = create_issue(
         repo,
         title=f"[blocker] CI repair failed for #{number}",

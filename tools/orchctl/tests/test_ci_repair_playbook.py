@@ -89,7 +89,7 @@ def test_repair_attempt_scheduled_within_budget(conn: sqlite3.Connection) -> Non
     iid = _issue_id(conn)
     with (
         patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment,
-        patch("orchctl.commands.reconcile._run_ci_repair_playbook"),
+        patch("orchctl.commands.reconcile._run_ci_repair_playbook") as mock_playbook,
     ):
         state = _next_action_to_state(
             conn,
@@ -108,6 +108,8 @@ def test_repair_attempt_scheduled_within_budget(conn: sqlite3.Connection) -> Non
     mock_comment.assert_called_once()
     body = mock_comment.call_args[0][2]
     assert "deterministic_test_failure" in body
+    # Playbook invoked within budget
+    mock_playbook.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
