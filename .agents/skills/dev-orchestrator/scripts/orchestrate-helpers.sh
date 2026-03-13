@@ -94,6 +94,8 @@ orch_init() {
   # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent] [dep_types_json] [cross_area_deps_json]
   # Creates initial batch state file.
   #
+  # Exits 1 if orchctl has taken over for this area (sentinel present).
+  #
   # dep_types_json (optional): {"issue_n": {"dep_m": "hard"|"soft"}}
   #   Dep type per issue->dep pair. Defaults to "hard" when absent.
   #
@@ -104,6 +106,8 @@ orch_init() {
   #
   # Cycle detection: SCCs are isolated (cycle-isolated status) instead of aborting.
   local area=$1
+  # Guard: refuse to start if orchctl has taken over for this area.
+  orch_assert_legacy_active "$area"
   local agent=$2
   local issues_json=$3  # JSON array e.g. '[1,2,3]'
   local dag_json=$4     # JSON object e.g. '{"3":[1,2]}'

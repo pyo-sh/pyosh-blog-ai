@@ -358,7 +358,7 @@ def test_cutover_blocks_on_dispatched(runner, db_path, tmp_path):
         )
 
     assert result.exit_code != 0
-    assert "dispatched" in result.output or "dispatched" in (result.exception or "")
+    assert "dispatched" in result.output
 
 
 def test_cutover_skip_import_check(runner, db_path, tmp_path):

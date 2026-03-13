@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from ..db import get_config, get_config_bool, get_db, set_config
+from ..db import get_config, get_db, set_config
 from ..db.schema import LATEST_VERSION
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
@@ -22,10 +22,15 @@ _SENTINEL_NAME = ".orchctl-active"
 def _sentinel_path(area: str) -> Path:
     """Return the path of the per-area orchctl-active sentinel file.
 
-    The file lives at .workspace/orchestrate/<area>/.orchctl-active
-    relative to the current working directory (monorepo root).
+    Resolves the monorepo root from the MONOREPO_ROOT environment variable
+    (set by monorepo-helpers.sh). Falls back to cwd so that tests and ad-hoc
+    invocations from the monorepo root still work.
+
+    The shell guard in orchestrate-helpers.sh anchors to $MONOREPO_ROOT
+    identically, so Python and bash always agree on the sentinel location.
     """
-    return Path(f".workspace/orchestrate/{area}/{_SENTINEL_NAME}")
+    root = Path(os.environ.get("MONOREPO_ROOT", "."))
+    return root / ".workspace" / "orchestrate" / area / _SENTINEL_NAME
 
 
 def _sentinel_exists(area: str) -> bool:
@@ -285,12 +290,6 @@ def cmd_cutover(ctx: click.Context, area: str, skip_import_check: bool) -> None:
     try:
         _require_ready(conn)
 
-        # Check already cut over.
-        if not get_config_bool(conn, _legacy_mode_key(area), default=True) is False:
-            already = not get_config_bool(conn, _legacy_mode_key(area), default=True)
-        else:
-            already = False
-        # Simpler: check the config value directly.
         raw = get_config(conn, _legacy_mode_key(area), "true")
         if raw == "false":
             click.echo(f"control [{area}]: already cut over to orchctl.")
