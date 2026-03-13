@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -142,8 +141,9 @@ def history_append(monorepo_root: Path, record: AttemptRecord) -> None:
     log_path = history_log_path(monorepo_root)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(record.to_dict(), separators=(",", ":")) + "\n"
-    # Atomic: write to temp, then append via rename is not viable for JSONL;
-    # use O_APPEND which is atomic for single write < PIPE_BUF on POSIX.
+    # O_APPEND mode: the kernel guarantees that concurrent appends to a regular
+    # file do not interleave as long as each write() call is atomic (lines are
+    # short, so this holds in practice).
     with open(log_path, "a") as f:
         f.write(line)
 
@@ -166,7 +166,7 @@ def history_read(
 
     records: List[AttemptRecord] = []
     with open(log_path) as f:
-        for lineno, line in enumerate(f, 1):
+        for line in f:
             line = line.strip()
             if not line:
                 continue
