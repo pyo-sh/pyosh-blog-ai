@@ -25,7 +25,7 @@ from ..db import (
 )
 from ..db.schema import LATEST_VERSION
 from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
-from ..failure_classifier import classify, classify_and_record, next_action_for_class
+from ..failure_classifier import classify, next_action_for_class, record_failure_class
 from ..models import (
     ISSUE_TRANSITIONS,
     FailureClass,
@@ -384,11 +384,11 @@ def _mark_complete_pass(
             attempt_id = latest["attempt_id"]
             terminal_json = latest["terminal_json"]
 
-            # classify() is pure — always call it so dry-run output reflects reality.
+            # classify() is pure — call it once for both dry-run output and DB writes.
             failure_class = classify(status, terminal_json)
             next_action = next_action_for_class(failure_class)
             if not dry_run:
-                classify_and_record(conn, issue_id, attempt_id, status, terminal_json)
+                record_failure_class(conn, issue_id, attempt_id, failure_class)
 
             new_state = _next_action_to_state(
                 conn, area, issue_id, number, retry_count, failure_class, next_action, dry_run

@@ -1,6 +1,6 @@
 """Failure classification for orchestrator attempts.
 
-Classifies a failed or timed-out attempt into one of 10 FailureClass values
+Classifies a failed or timed-out attempt into one of 11 FailureClass values
 based on the attempt status, terminal_json reason, and log text.
 
 The result drives the next_action (retry / repair / escalate / pause) and is
@@ -58,7 +58,8 @@ _PATTERNS: list[tuple[re.Pattern[str], FailureClass]] = [
     ), FailureClass.FLAKY_TEST),
     (re.compile(
         r"test.*fail|assert.*error|assertion.*fail|spec.*fail"
-        r"|jest.*fail|pytest.*fail|pnpm test",
+        r"|jest.*fail|pytest.*fail"
+        r"|pnpm test.*(?:fail|error)|(?:fail|error).*pnpm test",
         re.IGNORECASE,
     ), FailureClass.DETERMINISTIC_TEST_FAILURE),
     (re.compile(
@@ -108,24 +109,20 @@ def next_action_for_class(failure_class: FailureClass) -> NextAction:
     return FAILURE_CLASS_NEXT_ACTION.get(failure_class, NextAction.ESCALATE)
 
 
-def record_attempt_failure_class(
+def record_failure_class(
     conn: sqlite3.Connection,
+    issue_id: int,
     attempt_id: str,
     failure_class: FailureClass,
 ) -> None:
-    """Write failure_class to the attempt row."""
+    """Persist failure_class to both the attempt and issue rows.
+
+    Does NOT commit — caller owns the transaction.
+    """
     conn.execute(
         "UPDATE attempts SET failure_class = ? WHERE attempt_id = ?",
         (failure_class.value, attempt_id),
     )
-
-
-def record_issue_failure_class(
-    conn: sqlite3.Connection,
-    issue_id: int,
-    failure_class: FailureClass,
-) -> None:
-    """Write failure_class to the issue row (reflects the most recent attempt)."""
     conn.execute(
         "UPDATE issues SET failure_class = ? WHERE id = ?",
         (failure_class.value, issue_id),
@@ -141,6 +138,10 @@ def classify_and_record(
 ) -> tuple[FailureClass, NextAction]:
     """Classify the attempt, write results to DB, and return (class, next_action).
 
+    Prefer calling classify() + record_failure_class() separately when the
+    classification result is needed before the DB write (e.g. for dry-run
+    output).  This function is kept for callers that want both in one call.
+
     Does NOT commit — caller owns the transaction.
 
     Note: log_text is not forwarded here because worker log files are not stored
@@ -149,8 +150,7 @@ def classify_and_record(
     """
     fc = classify(attempt_status, terminal_json_text)
     na = next_action_for_class(fc)
-    record_attempt_failure_class(conn, attempt_id, fc)
-    record_issue_failure_class(conn, issue_id, fc)
+    record_failure_class(conn, issue_id, attempt_id, fc)
     return fc, na
 
 
