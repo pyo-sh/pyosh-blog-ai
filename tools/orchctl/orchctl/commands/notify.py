@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urlparse
 
 import click
 
@@ -74,6 +75,8 @@ def cmd_notify_set(
             raise click.ClickException("Database not initialised — run `orchctl init` first.")
 
         if url is not None:
+            if url and urlparse(url).scheme not in ("http", "https"):
+                raise click.BadParameter("URL must use http or https scheme.", param_hint="--url")
             set_config(conn, "webhook_url", url)
             click.echo(f"webhook_url set to: {url or '(cleared)'}")
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 import urllib.error
 import urllib.request
 from typing import Any
@@ -55,9 +56,10 @@ def emit_event(
     )
     conn.commit()
     event_id = cur.lastrowid
+    assert event_id is not None, "INSERT did not return a lastrowid"
 
     _maybe_dispatch_webhook(conn, event_type, area, payload or {})
-    return event_id  # type: ignore[return-value]
+    return event_id
 
 
 # ---------------------------------------------------------------------------
@@ -109,4 +111,6 @@ def _maybe_dispatch_webhook(
         {"event_type": event_type, "area": area, "data": payload},
         ensure_ascii=False,
     )
-    dispatch_webhook(url, body)  # fire-and-forget; errors are silently swallowed
+    ok, detail = dispatch_webhook(url, body)
+    if not ok:
+        print(f"[orchctl] webhook delivery failed: {detail}", file=sys.stderr)

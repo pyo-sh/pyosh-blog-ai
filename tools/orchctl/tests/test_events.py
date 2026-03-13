@@ -136,6 +136,21 @@ class TestEmitEvent:
             mock_wh.assert_not_called()
         conn.close()
 
+    def test_webhook_failure_logged_to_stderr(self, runner, db_path, capsys):
+        _init_db(runner, db_path)
+        conn = get_db(db_path)
+        conn.execute("UPDATE config SET value = 'true' WHERE key = 'webhook_enabled'")
+        conn.execute("UPDATE config SET value = 'http://example.test/hook' WHERE key = 'webhook_url'")
+        conn.commit()
+
+        with patch("orchctl.events.dispatch_webhook", return_value=(False, "connection refused")):
+            emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
+        conn.close()
+
+        captured = capsys.readouterr()
+        assert "webhook delivery failed" in captured.err
+        assert "connection refused" in captured.err
+
 
 # ---------------------------------------------------------------------------
 # dispatch_webhook tests
@@ -299,6 +314,23 @@ class TestNotifyCmd:
         runner.invoke(cli, ["--db", db_path, "notify", "set", "--events", "all"])
         result = runner.invoke(cli, ["--db", db_path, "notify", "status"])
         assert "(all)" in result.output
+
+    def test_set_url_rejects_non_http(self, runner, db_path):
+        _init_db(runner, db_path)
+        result = runner.invoke(cli, ["--db", db_path, "notify", "set", "--url", "ftp://example.test/hook"])
+        assert result.exit_code != 0
+        assert "http or https" in result.output
+
+    def test_set_url_rejects_file_scheme(self, runner, db_path):
+        _init_db(runner, db_path)
+        result = runner.invoke(cli, ["--db", db_path, "notify", "set", "--url", "file:///etc/passwd"])
+        assert result.exit_code != 0
+        assert "http or https" in result.output
+
+    def test_set_url_empty_string_allowed(self, runner, db_path):
+        _init_db(runner, db_path)
+        result = runner.invoke(cli, ["--db", db_path, "notify", "set", "--url", ""])
+        assert result.exit_code == 0
 
     def test_status_json(self, runner, db_path):
         _init_db(runner, db_path)
