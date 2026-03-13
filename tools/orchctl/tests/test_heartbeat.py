@@ -266,7 +266,8 @@ class TestCollectSignals:
 
 
 class TestCheckStall:
-    def test_check_stall_records_heartbeat(self, conn, running_attempt, tmp_path):
+    def test_check_stall_first_cycle_never_stalls(self, conn, running_attempt, tmp_path):
+        """First call (no prior heartbeat) must not trigger a stall."""
         _, attempt_id = running_attempt
         with patch("orchctl.heartbeat.collect_signals") as mock_collect:
             mock_collect.return_value = SignalSnapshot(
@@ -281,14 +282,48 @@ class TestCheckStall:
                 monorepo_root=str(tmp_path),
             )
 
-        assert stalled is True
+        assert stalled is False
         rows = conn.execute(
             "SELECT * FROM heartbeats WHERE attempt_id = ?", (attempt_id,)
         ).fetchall()
         assert len(rows) == 1
 
+    def test_check_stall_second_cycle_detects_stall(self, conn, running_attempt, tmp_path):
+        """Second call (prior heartbeat exists) evaluates stall normally."""
+        _, attempt_id = running_attempt
+        # Seed a prior heartbeat (cpu_jiffies=500 so prev_cpu is not None)
+        record_heartbeat(
+            conn, attempt_id,
+            SignalSnapshot(
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                cpu_jiffies=500,
+            ),
+        )
+        with patch("orchctl.heartbeat.collect_signals") as mock_collect:
+            mock_collect.return_value = SignalSnapshot(
+                pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False
+            )
+            stalled, _ = check_stall(
+                conn,
+                area="workspace",
+                issue_number=42,
+                attempt_id=attempt_id,
+                pid=None,
+                monorepo_root=str(tmp_path),
+            )
+
+        assert stalled is True
+
     def test_check_stall_not_stalled_when_one_absent(self, conn, running_attempt, tmp_path):
         _, attempt_id = running_attempt
+        # Seed prior heartbeat so second cycle runs
+        record_heartbeat(
+            conn, attempt_id,
+            SignalSnapshot(
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                cpu_jiffies=500,
+            ),
+        )
         with patch("orchctl.heartbeat.collect_signals") as mock_collect:
             mock_collect.return_value = SignalSnapshot(
                 pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=False
@@ -377,9 +412,17 @@ class TestHeartbeatPassInReconcile:
 
     def test_stalled_issue_transitions_to_failed_terminal(self, conn, tmp_path):
         from orchctl.commands.reconcile import _heartbeat_pass
-        from collections import defaultdict
 
         issue_id, attempt_id = self._setup_dispatched(conn, number=10)
+
+        # Seed a prior heartbeat so stall evaluation is not skipped (first-cycle protection).
+        record_heartbeat(
+            conn, attempt_id,
+            SignalSnapshot(
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                cpu_jiffies=100,
+            ),
+        )
 
         issues_by_state = {
             "dispatched": [
@@ -416,6 +459,15 @@ class TestHeartbeatPassInReconcile:
 
         issue_id, attempt_id = self._setup_dispatched(conn, number=11)
 
+        # Seed prior heartbeat so stall evaluation runs.
+        record_heartbeat(
+            conn, attempt_id,
+            SignalSnapshot(
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                cpu_jiffies=100,
+            ),
+        )
+
         issues_by_state = {
             "dispatched": [
                 conn.execute(
@@ -436,6 +488,36 @@ class TestHeartbeatPassInReconcile:
 
         assert result is True
 
+        issue_state = conn.execute(
+            "SELECT state FROM issues WHERE id=?", (issue_id,)
+        ).fetchone()["state"]
+        assert issue_state == "dispatched"
+
+    def test_first_cycle_no_stall_even_all_absent(self, conn, tmp_path):
+        """First reconcile cycle must not stall even if all signals are absent."""
+        from orchctl.commands.reconcile import _heartbeat_pass
+
+        issue_id, attempt_id = self._setup_dispatched(conn, number=13)
+
+        issues_by_state = {
+            "dispatched": [
+                conn.execute(
+                    "SELECT id, number FROM issues WHERE id=?", (issue_id,)
+                ).fetchone()
+            ]
+        }
+
+        with patch("orchctl.heartbeat.collect_signals") as mock_collect:
+            mock_collect.return_value = SignalSnapshot(
+                pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False
+            )
+            with patch.dict(os.environ, {"MONOREPO_ROOT": str(tmp_path)}):
+                result = _heartbeat_pass(
+                    conn, "workspace", os.getpid(), False, issues_by_state,
+                    owns_lease=False,
+                )
+
+        assert result is True
         issue_state = conn.execute(
             "SELECT state FROM issues WHERE id=?", (issue_id,)
         ).fetchone()["state"]

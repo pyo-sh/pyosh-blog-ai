@@ -21,6 +21,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 # Seconds within which a signal must show activity to be considered "present".
+# Independent of config.heartbeat_ttl (which governs lease renewal intervals and
+# is stored in the config table).  Operators tuning heartbeat_ttl in the DB do
+# not affect stall-detection sensitivity; adjust SIGNAL_THRESHOLD_S here instead.
 SIGNAL_THRESHOLD_S: int = 600  # 10 minutes
 
 # Stall when this many or more signals are absent.
@@ -302,8 +305,23 @@ def check_stall(
     Collects all four signals, writes a heartbeat row to the DB, then
     evaluates whether the absent signal count meets the stall threshold.
 
+    First-cycle protection: on the very first call for an attempt (no prior
+    heartbeat in the DB), stall evaluation is skipped and (False, snapshot)
+    is returned.  Worker files (state file, log) may not exist yet immediately
+    after dispatch, so three out of four signals can legitimately be absent
+    before the worker has had a chance to start — evaluating stall on that
+    first snapshot would produce false positives.
+
+    Note: record_heartbeat commits its row before the stall transition check in
+    the caller (_heartbeat_pass).  If the state-machine transition fails after
+    record_heartbeat succeeds, the heartbeat row is committed but the issue
+    state is unchanged.  The next reconcile cycle re-evaluates correctly
+    (cpu_jiffies comparison uses the committed row), so this is not a
+    steady-state correctness issue.
+
     Returns:
         (stalled, snapshot) where stalled is True when absent_count >= min_absent.
+        Always False on the first call (no prior heartbeat).
     """
     a_dir = attempt_dir_path(monorepo_root, area, issue_number, attempt_id)
     prev_cpu = get_last_cpu_jiffies(conn, attempt_id)
@@ -317,4 +335,8 @@ def check_stall(
         threshold_s=threshold_s,
     )
     record_heartbeat(conn, attempt_id, snapshot)
+    # Skip stall evaluation on the first heartbeat: worker startup may not yet
+    # have created its log/state files, making absent_count artificially high.
+    if prev_cpu is None:
+        return False, snapshot
     return snapshot.is_stalled(min_absent), snapshot
