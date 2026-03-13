@@ -11,6 +11,7 @@ from click.testing import CliRunner
 
 from orchctl.cli import cli
 from orchctl.db.connection import get_db
+import orchctl.events as events_mod
 from orchctl.events import (
     EVENT_ATTEMPT_COMPLETED,
     EVENT_ISSUE_STATE_CHANGED,
@@ -86,7 +87,7 @@ class TestEmitEvent:
     def test_does_not_fire_webhook_when_disabled(self, runner, db_path):
         _init_db(runner, db_path)
         conn = get_db(db_path)
-        with patch("orchctl.events.dispatch_webhook") as mock_wh:
+        with patch.object(events_mod, "_start_webhook_thread") as mock_wh:
             emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
             mock_wh.assert_not_called()
         conn.close()
@@ -94,12 +95,12 @@ class TestEmitEvent:
     def test_fires_webhook_when_enabled(self, runner, db_path):
         _init_db(runner, db_path)
         conn = get_db(db_path)
-        # Enable webhook
+        # Enable webhook — commit before emit_event (no active transaction allowed)
         conn.execute("UPDATE config SET value = 'true' WHERE key = 'webhook_enabled'")
         conn.execute("UPDATE config SET value = 'http://example.test/hook' WHERE key = 'webhook_url'")
         conn.commit()
 
-        with patch("orchctl.events.dispatch_webhook", return_value=(True, "200")) as mock_wh:
+        with patch.object(events_mod, "_start_webhook_thread") as mock_wh:
             emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
             mock_wh.assert_called_once()
         conn.close()
@@ -115,7 +116,7 @@ class TestEmitEvent:
         )
         conn.commit()
 
-        with patch("orchctl.events.dispatch_webhook", return_value=(True, "200")) as mock_wh:
+        with patch.object(events_mod, "_start_webhook_thread") as mock_wh:
             emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
             mock_wh.assert_called_once()
         conn.close()
@@ -131,7 +132,7 @@ class TestEmitEvent:
         )
         conn.commit()
 
-        with patch("orchctl.events.dispatch_webhook", return_value=(True, "200")) as mock_wh:
+        with patch.object(events_mod, "_start_webhook_thread") as mock_wh:
             emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
             mock_wh.assert_not_called()
         conn.close()
@@ -143,13 +144,28 @@ class TestEmitEvent:
         conn.execute("UPDATE config SET value = 'http://example.test/hook' WHERE key = 'webhook_url'")
         conn.commit()
 
-        with patch("orchctl.events.dispatch_webhook", return_value=(False, "connection refused")):
-            emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
+        # Run _fire synchronously to avoid thread/capsys race
+        def sync_start(url: str, body: str) -> None:
+            events_mod._fire(url, body)
+
+        with patch.object(events_mod, "_start_webhook_thread", side_effect=sync_start):
+            with patch("orchctl.events.dispatch_webhook", return_value=(False, "connection refused")):
+                emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
         conn.close()
 
         captured = capsys.readouterr()
         assert "webhook delivery failed" in captured.err
         assert "connection refused" in captured.err
+
+    def test_raises_when_in_transaction(self, runner, db_path):
+        _init_db(runner, db_path)
+        conn = get_db(db_path)
+        conn.execute("UPDATE config SET value = '0' WHERE key = 'max_concurrent'")
+        # in_transaction is now True — emit_event must raise
+        with pytest.raises(RuntimeError, match="no active transaction"):
+            emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
+        conn.rollback()
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

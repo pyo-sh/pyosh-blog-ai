@@ -4,6 +4,7 @@ Public API
 ----------
 emit_event(conn, event_type, area=None, issue_id=None, payload=None)
     Persist an event row and fire the configured webhook (if enabled).
+    The connection must have no active transaction when called.
 
 dispatch_webhook(url, payload_json)
     POST *payload_json* to *url* with a 5-second timeout.
@@ -15,6 +16,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+import threading
 import urllib.error
 import urllib.request
 from typing import Any
@@ -47,8 +49,18 @@ def emit_event(
 ) -> int:
     """Insert an event row and optionally fire the configured webhook.
 
+    The connection must have no active transaction when called.
+    ``emit_event`` calls ``conn.commit()`` internally; passing a connection
+    with uncommitted DML would prematurely commit that work.
+
     Returns the new event *id*.
     """
+    if conn.in_transaction:
+        raise RuntimeError(
+            "emit_event must be called on a connection with no active transaction; "
+            "call conn.commit() or conn.rollback() first"
+        )
+
     payload_json = json.dumps(payload or {}, ensure_ascii=False)
     cur = conn.execute(
         "INSERT INTO events (area, issue_id, event_type, payload) VALUES (?, ?, ?, ?)",
@@ -89,13 +101,25 @@ def dispatch_webhook(url: str, payload_json: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
+def _fire(url: str, body: str) -> None:
+    """Execute webhook delivery and log failures to stderr."""
+    ok, detail = dispatch_webhook(url, body)
+    if not ok:
+        print(f"[orchctl] webhook delivery failed: {detail}", file=sys.stderr)
+
+
+def _start_webhook_thread(url: str, body: str) -> None:
+    """Start a daemon thread to fire the webhook without blocking the caller."""
+    threading.Thread(target=_fire, args=(url, body), daemon=True).start()
+
+
 def _maybe_dispatch_webhook(
     conn: sqlite3.Connection,
     event_type: str,
     area: str | None,
     payload: dict[str, Any],
 ) -> None:
-    """Fire the webhook if enabled and the event type is in the filter list."""
+    """Fire the webhook in a background thread if enabled and event passes the filter."""
     enabled = get_config_bool(conn, "webhook_enabled", default=False)
     if not enabled:
         return
@@ -112,6 +136,4 @@ def _maybe_dispatch_webhook(
         {"event_type": event_type, "area": area, "data": payload},
         ensure_ascii=False,
     )
-    ok, detail = dispatch_webhook(url, body)
-    if not ok:
-        print(f"[orchctl] webhook delivery failed: {detail}", file=sys.stderr)
+    _start_webhook_thread(url, body)

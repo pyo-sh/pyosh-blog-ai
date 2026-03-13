@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 import click
 
-from ..db import current_version, get_config, get_config_bool, get_config_json, get_db, set_config
+from ..db import current_version, get_config, get_config_bool, get_config_json, get_db
 from ..events import dispatch_webhook
 
 
@@ -68,32 +68,41 @@ def cmd_notify_set(
     events: str | None,
 ) -> None:
     """Update webhook configuration."""
+    # Validate inputs before touching the DB.
+    if url is not None and url and urlparse(url).scheme not in ("http", "https"):
+        raise click.BadParameter("URL must use http or https scheme.", param_hint="--url")
+
+    event_list: list[str] | None = None
+    if events is not None:
+        event_list = [] if events.lower() == "all" else [e.strip() for e in events.split(",") if e.strip()]
+
     db_path = ctx.obj.get("db_path")
     conn = get_db(db_path)
+    _UPSERT = (
+        "INSERT INTO config (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')"
+    )
     try:
         if current_version(conn) == 0:
             raise click.ClickException("Database not initialised — run `orchctl init` first.")
 
         if url is not None:
-            if url and urlparse(url).scheme not in ("http", "https"):
-                raise click.BadParameter("URL must use http or https scheme.", param_hint="--url")
-            set_config(conn, "webhook_url", url)
-            click.echo(f"webhook_url set to: {url or '(cleared)'}")
-
+            conn.execute(_UPSERT, ("webhook_url", url))
         if enable is not None:
-            set_config(conn, "webhook_enabled", "true" if enable else "false")
-            click.echo(f"webhook_enabled set to: {enable}")
-
-        if events is not None:
-            if events.lower() == "all":
-                event_list: list[str] = []
-            else:
-                event_list = [e.strip() for e in events.split(",") if e.strip()]
-            set_config(conn, "webhook_events", json.dumps(event_list))
-            display = ", ".join(event_list) if event_list else "(all)"
-            click.echo(f"webhook_events set to: {display}")
+            conn.execute(_UPSERT, ("webhook_enabled", "true" if enable else "false"))
+        if event_list is not None:
+            conn.execute(_UPSERT, ("webhook_events", json.dumps(event_list)))
+        conn.commit()
     finally:
         conn.close()
+
+    if url is not None:
+        click.echo(f"webhook_url set to: {url or '(cleared)'}")
+    if enable is not None:
+        click.echo(f"webhook_enabled set to: {enable}")
+    if event_list is not None:
+        display = ", ".join(event_list) if event_list else "(all)"
+        click.echo(f"webhook_events set to: {display}")
 
 
 @cmd_notify.command("test")
