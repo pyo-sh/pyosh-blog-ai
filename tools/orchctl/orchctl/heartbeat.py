@@ -23,8 +23,11 @@ from typing import Optional
 # Seconds within which a signal must show activity to be considered "present".
 # Independent of config.heartbeat_ttl (which governs lease renewal intervals and
 # is stored in the config table).  Operators tuning heartbeat_ttl in the DB do
-# not affect stall-detection sensitivity; adjust SIGNAL_THRESHOLD_S here instead.
-SIGNAL_THRESHOLD_S: int = 600  # 10 minutes
+# not affect stall-detection sensitivity.
+#
+# Runtime override: the config table key 'stall_threshold_s' (schema v8) takes
+# precedence over this constant when check_stall reads it via get_config_int.
+SIGNAL_THRESHOLD_S: int = 600  # 10 minutes; matches config default stall_threshold_s
 
 # Stall when this many or more signals are absent.
 STALL_MIN_ABSENT: int = 2
@@ -297,7 +300,7 @@ def check_stall(
     attempt_id: str,
     pid: Optional[int],
     monorepo_root: str,
-    threshold_s: int = SIGNAL_THRESHOLD_S,
+    threshold_s: Optional[int] = None,
     min_absent: int = STALL_MIN_ABSENT,
 ) -> tuple[bool, SignalSnapshot]:
     """Collect signals, record a heartbeat, and return stall status.
@@ -323,8 +326,20 @@ def check_stall(
         (stalled, snapshot) where stalled is True when absent_count >= min_absent.
         Always False on the first call (no prior heartbeat).
     """
+    # Resolve threshold: caller-supplied > DB config > module constant.
+    if threshold_s is None:
+        from .db import get_config_int
+        threshold_s = get_config_int(conn, "stall_threshold_s", default=SIGNAL_THRESHOLD_S)
+
     a_dir = attempt_dir_path(monorepo_root, area, issue_number, attempt_id)
     prev_cpu = get_last_cpu_jiffies(conn, attempt_id)
+    # Detect first cycle by whether any heartbeat row exists — not by whether
+    # cpu_jiffies is non-null.  For PID-less workers cpu_jiffies is always None,
+    # so `prev_cpu is None` would permanently disable stall detection.
+    has_prior = conn.execute(
+        "SELECT 1 FROM heartbeats WHERE attempt_id = ? LIMIT 1",
+        (attempt_id,),
+    ).fetchone() is not None
     snapshot = collect_signals(
         area=area,
         issue_number=issue_number,
@@ -337,6 +352,6 @@ def check_stall(
     record_heartbeat(conn, attempt_id, snapshot)
     # Skip stall evaluation on the first heartbeat: worker startup may not yet
     # have created its log/state files, making absent_count artificially high.
-    if prev_cpu is None:
+    if not has_prior:
         return False, snapshot
     return snapshot.is_stalled(min_absent), snapshot

@@ -340,6 +340,46 @@ class TestCheckStall:
         assert stalled is False
         assert snap.absent_count == 1
 
+    def test_pid_less_worker_stall_detected_on_second_cycle(self, conn, running_attempt, tmp_path):
+        """PID-less workers (pid=None) must still be stall-detected on subsequent cycles.
+
+        Regression: the old guard `if prev_cpu is None` permanently disabled stall
+        detection for pid=None workers because cpu_jiffies is always None for them.
+        """
+        _, attempt_id = running_attempt
+        # First cycle: no prior heartbeat, should NOT stall.
+        with patch("orchctl.heartbeat.collect_signals") as mock_collect:
+            mock_collect.return_value = SignalSnapshot(
+                pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False,
+                cpu_jiffies=None,
+            )
+            stalled_first, _ = check_stall(
+                conn,
+                area="workspace",
+                issue_number=42,
+                attempt_id=attempt_id,
+                pid=None,
+                monorepo_root=str(tmp_path),
+            )
+        assert stalled_first is False
+
+        # Second cycle: prior heartbeat exists (cpu_jiffies=None since pid=None).
+        # All four signals absent — must detect stall.
+        with patch("orchctl.heartbeat.collect_signals") as mock_collect:
+            mock_collect.return_value = SignalSnapshot(
+                pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False,
+                cpu_jiffies=None,
+            )
+            stalled_second, _ = check_stall(
+                conn,
+                area="workspace",
+                issue_number=42,
+                attempt_id=attempt_id,
+                pid=None,
+                monorepo_root=str(tmp_path),
+            )
+        assert stalled_second is True
+
     def test_check_stall_passes_prev_cpu_to_collect(self, conn, running_attempt, tmp_path):
         """get_last_cpu_jiffies result must be forwarded to collect_signals."""
         _, attempt_id = running_attempt
