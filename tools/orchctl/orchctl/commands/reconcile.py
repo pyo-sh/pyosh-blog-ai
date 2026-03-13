@@ -427,13 +427,10 @@ def _mark_complete_pass(
             if not dry_run:
                 record_failure_class(conn, issue_id, attempt_id, failure_class)
 
-            # CI repair playbook: collect logs and post repair context before re-queue.
-            if failure_class == FailureClass.DETERMINISTIC_TEST_FAILURE and not dry_run:
-                _run_ci_repair_playbook(area, number, terminal_json)
-
             new_state = _next_action_to_state(
                 conn, area, issue_id, number, retry_count, failure_class, next_action,
                 dry_run, terminal_json=terminal_json,
+                pid=pid, owns_lease=owns_lease,
             )
             click.echo(
                 f"reconcile [{area}]: issue #{number} attempt {status}"
@@ -457,6 +454,8 @@ def _next_action_to_state(
     dry_run: bool = False,
     *,
     terminal_json: str | None = None,
+    pid: int = 0,
+    owns_lease: bool = False,
 ) -> str:
     """Map next_action to an IssueState string, enforcing per-class retry budgets."""
     if next_action in (NextAction.RETRY, NextAction.REPAIR):
@@ -473,6 +472,15 @@ def _next_action_to_state(
                     (issue_id,),
                 )
                 _post_retry_comment(area, number, retry_count + 1, budget, failure_class)
+                # CI repair playbook: collect logs and post repair context.
+                # Called here (within-budget branch) so the comment is only sent
+                # when a repair attempt will actually be re-queued, not on the
+                # final exhausted failure.
+                if failure_class == FailureClass.DETERMINISTIC_TEST_FAILURE:
+                    _run_ci_repair_playbook(
+                        conn, area, number, terminal_json,
+                        pid=pid, owns_lease=owns_lease,
+                    )
             click.echo(
                 f"reconcile [{area}]: issue #{number}"
                 f" retry {retry_count + 1}/{budget} scheduled{' (dry-run)' if dry_run else ''}."
@@ -542,9 +550,13 @@ def _post_budget_exhausted_comment(
 
 
 def _run_ci_repair_playbook(
+    conn: sqlite3.Connection,
     area: str,
     number: int,
     terminal_json: str | None,
+    *,
+    pid: int = 0,
+    owns_lease: bool = False,
 ) -> None:
     """Collect CI logs and post a repair context comment on the issue.
 
@@ -554,8 +566,10 @@ def _run_ci_repair_playbook(
     Steps:
     1. Parse PR number from terminal_json.
     2. Resolve the PR's head branch via gh CLI.
-    3. Fetch the latest failed workflow run logs for that branch.
-    4. Post a repair context comment with the log tail.
+    3. Renew the area lease before the log-fetch gh call (prevents expiry
+       from the cumulative timeout of sequential gh subprocesses).
+    4. Fetch the latest failed workflow run logs for that branch.
+    5. Post a repair context comment with the log tail.
     """
     repo = AREA_REPOS.get(area)
     if not repo:
@@ -575,6 +589,11 @@ def _run_ci_repair_playbook(
     ci_logs: str | None = None
     if pr_number:
         branch = get_pr_branch(repo, pr_number)
+        # Renew lease before the second blocking gh call (log fetch) so that
+        # the cumulative timeout of get_pr_branch + fetch_ci_logs does not
+        # push the total elapsed time past the lease TTL.
+        if owns_lease and pid:
+            renew(conn, area, pid)
         if branch:
             ci_logs = fetch_ci_logs(repo, branch)
 

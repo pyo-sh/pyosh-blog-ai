@@ -87,7 +87,10 @@ def test_deterministic_test_failure_routes_to_repair() -> None:
 
 def test_repair_attempt_scheduled_within_budget(conn: sqlite3.Connection) -> None:
     iid = _issue_id(conn)
-    with patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment:
+    with (
+        patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment,
+        patch("orchctl.commands.reconcile._run_ci_repair_playbook"),
+    ):
         state = _next_action_to_state(
             conn,
             area="workspace",
@@ -156,6 +159,7 @@ def test_blocker_issue_not_created_within_budget(conn: sqlite3.Connection) -> No
     iid = _issue_id(conn)
     with (
         patch("orchctl.commands.reconcile.post_issue_comment"),
+        patch("orchctl.commands.reconcile._run_ci_repair_playbook"),
         patch("orchctl.commands.reconcile.create_issue") as mock_create,
     ):
         state = _next_action_to_state(
@@ -173,19 +177,42 @@ def test_blocker_issue_not_created_within_budget(conn: sqlite3.Connection) -> No
     mock_create.assert_not_called()
 
 
+def test_repair_playbook_not_called_on_budget_exhaustion(conn: sqlite3.Connection) -> None:
+    """_run_ci_repair_playbook must NOT be called when budget is already exhausted."""
+    iid = _issue_id(conn)
+    with (
+        patch("orchctl.commands.reconcile.post_issue_comment"),
+        patch("orchctl.commands.reconcile.create_issue", return_value=99),
+        patch("orchctl.commands.reconcile._run_ci_repair_playbook") as mock_playbook,
+    ):
+        state = _next_action_to_state(
+            conn,
+            area="workspace",
+            issue_id=iid,
+            number=42,
+            retry_count=2,  # budget=2, exhausted
+            failure_class=FailureClass.DETERMINISTIC_TEST_FAILURE,
+            next_action=NextAction.REPAIR,
+            dry_run=False,
+        )
+
+    assert state == "needs-human"
+    mock_playbook.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Unit: _run_ci_repair_playbook — posts repair context comment with CI logs
 # ---------------------------------------------------------------------------
 
 
-def test_repair_playbook_posts_comment_with_logs() -> None:
+def test_repair_playbook_posts_comment_with_logs(conn: sqlite3.Connection) -> None:
     terminal_json = json.dumps({"prNumber": 7, "reason": "test failed"})
     with (
         patch("orchctl.commands.reconcile.get_pr_branch", return_value="feat/issue-42-foo"),
         patch("orchctl.commands.reconcile.fetch_ci_logs", return_value="FAIL: test_bar\n  AssertionError"),
         patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment,
     ):
-        _run_ci_repair_playbook("workspace", 42, terminal_json)
+        _run_ci_repair_playbook(conn, "workspace", 42, terminal_json)
 
     mock_comment.assert_called_once()
     body = mock_comment.call_args[0][2]
@@ -193,26 +220,26 @@ def test_repair_playbook_posts_comment_with_logs() -> None:
     assert "AssertionError" in body
 
 
-def test_repair_playbook_posts_comment_without_logs_when_unavailable() -> None:
+def test_repair_playbook_posts_comment_without_logs_when_unavailable(conn: sqlite3.Connection) -> None:
     terminal_json = json.dumps({"prNumber": 7, "reason": "test failed"})
     with (
         patch("orchctl.commands.reconcile.get_pr_branch", return_value="feat/issue-42-foo"),
         patch("orchctl.commands.reconcile.fetch_ci_logs", return_value=None),
         patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment,
     ):
-        _run_ci_repair_playbook("workspace", 42, terminal_json)
+        _run_ci_repair_playbook(conn, "workspace", 42, terminal_json)
 
     mock_comment.assert_called_once()
     body = mock_comment.call_args[0][2]
     assert "unavailable" in body
 
 
-def test_repair_playbook_skips_log_when_no_pr_number() -> None:
+def test_repair_playbook_skips_log_when_no_pr_number(conn: sqlite3.Connection) -> None:
     with (
         patch("orchctl.commands.reconcile.get_pr_branch") as mock_branch,
         patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment,
     ):
-        _run_ci_repair_playbook("workspace", 42, None)
+        _run_ci_repair_playbook(conn, "workspace", 42, None)
 
     mock_branch.assert_not_called()
     mock_comment.assert_called_once()
