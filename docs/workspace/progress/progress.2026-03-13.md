@@ -1,5 +1,25 @@
 # Progress 2026-03-13
 
+## orchctl crash/timeout/flaky auto-retry playbook (#97, PR #193)
+
+- **목적**: FailureClass 기반 자동 재시도 - 실패 분류 후 클래스별 budget 내에서 재큐, 소진 시 needs-human 전이 (Stage 4)
+- **`db/schema.py` v10 마이그레이션**: `retry_budget_by_class` 기본값 설정 (`infra_crash:3, timeout:3, flaky_test:2, default:1`); v9가 origin/main(stall_threshold_s)과 충돌하여 v10으로 번호 재조정
+- **`db/config.py` `get_config_json()` 버그 수정**: `isinstance(parsed, list)` 가드가 dict 반환 차단 - `isinstance(parsed, (list, dict))`로 확장
+- **`models.py`**: `DISPATCHED → PENDING` 전이 추가 (자동 재시도 경로)
+- **`github.py` `post_issue_comment()`**: 재시도/소진 GitHub 코멘트 게시; `subprocess.TimeoutExpired` 외 `Exception` broad catch 추가(gh 미설치 시 reconcile 중단 방지)
+- **`commands/reconcile.py`**:
+  - `_next_action_to_state()`: per-class budget 조회(`get_config_json`), `retry_count < budget` → `PENDING` + retry 코멘트; 소진 → `NEEDS_HUMAN` + exhaustion 코멘트; `int()` null guard
+  - `_post_retry_comment()` / `_post_budget_exhausted_comment()` 헬퍼 추가
+- **테스트 339개 통과**:
+  - `test_retry_playbook_schema_v10_default_budgets` - v10 마이그레이션 기본값 검증
+  - `test_retry_playbook_timeout_re_enqueues` - timed-out → TIMEOUT → RETRY → pending
+  - `test_retry_playbook_budget_exhausted_escalates_to_needs_human` - budget 소진 → needs-human
+  - `test_retry_playbook_dry_run_does_not_mutate` - dry-run 불변성
+  - `test_retry_playbook_first_attempt_routing` - parametrize by expected_state (infra_crash→pending, unknown→needs-human)
+  - `test_state_machine.py::test_dispatched_can_retry_to_pending` - 새 전이 검증
+- **리뷰 3라운드**: R1 broad exception catch + isinstance guard; R2 unused budget param + contradictory comment; R3 parametrize by outcome (skip re-review)
+- **충돌 해결**: v9 번호 충돌(origin/main stall detection) → 재시도 budget migration v10으로 renumber
+
 ## orchctl multi-signal heartbeat + stall detection (#96, PR #192)
 
 - **목적**: 단일 PID keepalive 대신 4가지 신호 기반 stall 감지로 false positive/negative 방지 (Stage 3)

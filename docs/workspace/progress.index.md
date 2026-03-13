@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | orchctl crash/timeout/flaky auto-retry playbook (#97, PR #193) - per-class budget(v10 migration), get_config_json dict fix, DISPATCHED→PENDING 전이, post_issue_comment broad exception catch, retry/exhaustion GitHub comment, 3라운드 리뷰, v9 충돌 → v10 renumber | done |
 | 2026-03-13 | orchctl multi-signal heartbeat + stall detection (#96, PR #192) - pr_activity/state_mtime/log_mtime/cpu_delta 4신호, absent>=2 stall, 첫 사이클 EXISTS 기반 보호(PID-less 워커 regression fix), 원자적 timed-out/failed-terminal 전이, schema v9(stall_threshold_s), 35 tests, 4라운드 리뷰 | done |
 | 2026-03-13 | orchctl failure classification system (#95, PR #191) - FailureClass(11) + NextAction(4) enum, failure_classifier.py(regex pattern table, timed-out short-circuit, INFRA_CRASH/oom word-boundary fixes), schema v8(attempts.failure_class), reconcile retry budget routing, int() null guard, 45 tests, 6라운드 리뷰 | done |
 | 2026-03-13 | legacy cutover / shell compatibility migration (#94, PR #190) - orchctl import-state(13 state 매핑), schema v7 legacy_mode, control cutover/rollback, orch_assert_legacy_active sentinel 가드, 3라운드 리뷰, 287 tests | done |
