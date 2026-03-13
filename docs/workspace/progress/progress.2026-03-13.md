@@ -1,5 +1,18 @@
 # Progress 2026-03-13
 
+## Skill Python 호출 경로 + 부수 버그 5건 수정 (#181, PR #182)
+
+- **목적**: dev-pipeline 실행 중 반복 발생한 5가지 오류 수정
+- **Bug A-1** - 패키지 모듈 경로: `cd ... && python3 -m <pkg>` 패턴에서 에이전트가 `cd` 누락 시 `No module named` 오류. CLI hint를 `PYTHONPATH=$MONOREPO_ROOT/...` 방식으로 변경, MONOREPO_ROOT 판단 방법 명시 (headless: `$PIPELINE_MONOREPO_ROOT` / interactive: `monorepo-helpers.sh`). dev-archive, dev-log, dev-pipeline SKILL.md + references 적용
+- **Bug A-2** - 상대경로 standalone 스크립트: dev-build, dev-resolve SKILL.md의 `python3 .agents/...` 상대경로를 `$MONOREPO_ROOT/...` 절대경로로 변경
+- **Bug B** - `step review-dispatch --model` 미지원: `cli.py` p_step에 `--model` 인수 추가, `steps.py` `step_review_dispatch()` 시그니처에 `model` 파라미터 추가, dispatch action data에 `model` 포함
+- **Bug C** - `gh issue view` exit 1: GitHub Projects (classic) deprecated 오류. dev-pipeline, dev-build SKILL.md Invariants에 `--json number,title,body,state,labels` 필수 제약 추가
+- **Bug D** - worktree 제거 실패 pipeline crash: `merge → log` 구조에서 `merge → cleanup_wt → log → finalize` 3단계로 분리. `controller.py`에서 `cleanup()` → `cleanup_worktree()` + `cleanup_state()` 분리, `models.py`에 `CLEANUP_WT` step 추가, `steps.py`에 `step_cleanup_wt()` 추가
+- **Bug E** - codex review_runner 데드코드: `schema_path` 변수 삭제 (`codex exec review`는 `--output-schema` 미지원), `_fail_parse()`에 `raw_content` 파라미터 추가하여 파싱 실패 시 원본 출력 snippet stderr 기록
+- **SKILL 압축 최적화**: PYTHONPATH prefix 18회 반복 → CLI hint 1회 + "Prepend" 지시 1줄로 압축 (dev-pipeline, dev-archive, dev-log). process-lifecycle.md에 `cleanup-wt` single-call 등록
+- **테스트**: `test_steps.py` 업데이트 - merge→cleanup_wt 전이, step_cleanup_wt coverage, log_finalize cleanup_state 분리. 47 tests pass
+- 1라운드 리뷰 (CRITICAL 1 - 테스트 미갱신), resolve 후 merge 완료
+
 ## 확장 terminal states + claim/hold 라벨 (#91, PR #179)
 
 - **목적**: orchestrator 상태 머신에 신규 terminal state 4종 추가 + GitHub issue 라벨 자동 관리
