@@ -347,6 +347,12 @@ class TestNotifyCmd:
         assert result.exit_code != 0
         assert "No webhook URL" in result.output
 
+    def test_test_rejects_non_http_url(self, runner, db_path):
+        _init_db(runner, db_path)
+        result = runner.invoke(cli, ["--db", db_path, "notify", "test", "--url", "ftp://example.test/hook"])
+        assert result.exit_code != 0
+        assert "http or https" in result.output
+
     def test_test_success(self, runner, db_path):
         _init_db(runner, db_path)
         runner.invoke(

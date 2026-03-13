@@ -399,6 +399,7 @@ MIGRATIONS: list[tuple[int, str]] = [
         );
 
         CREATE INDEX IF NOT EXISTS idx_events_area       ON events(area);
+        CREATE INDEX IF NOT EXISTS idx_events_issue_id   ON events(issue_id);
         CREATE INDEX IF NOT EXISTS idx_events_event_type ON events(event_type);
         CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
 

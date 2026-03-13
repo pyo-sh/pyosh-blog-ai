@@ -56,7 +56,8 @@ def emit_event(
     )
     conn.commit()
     event_id = cur.lastrowid
-    assert event_id is not None, "INSERT did not return a lastrowid"
+    if event_id is None:
+        raise RuntimeError("INSERT INTO events did not return a lastrowid")
 
     _maybe_dispatch_webhook(conn, event_type, area, payload or {})
     return event_id

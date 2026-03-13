@@ -121,6 +121,9 @@ def cmd_notify_test(ctx: click.Context, url: str | None) -> None:
             "Set one with `orchctl notify set --url <url>` or pass --url."
         )
 
+    if urlparse(target).scheme not in ("http", "https"):
+        raise click.BadParameter("URL must use http or https scheme.", param_hint="--url")
+
     payload = json.dumps(
         {"event_type": "test", "area": None, "data": {"message": "orchctl test notification"}},
         ensure_ascii=False,
