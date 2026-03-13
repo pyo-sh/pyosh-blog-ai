@@ -1247,7 +1247,15 @@ _RATE_LIMIT_RE = re.compile(r"rate.?limit|\b429\b", re.IGNORECASE)
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
-    """Return True if the exception message matches a rate-limit pattern."""
+    """Return True if the exception message matches a rate-limit pattern.
+
+    Scope: rate-limit detection is currently wired only in ``_discovery_pass``
+    (GitHub issue listing via ``gh issue list``).  Dispatch and heartbeat callers
+    use ``gh worktree``/shell invocations that surface transient errors as
+    non-zero exit codes without a parseable 429 body, so a generic backoff there
+    would produce false positives.  If dispatch-path rate limits become a
+    recurring issue a follow-up task should add per-path detection.
+    """
     return bool(_RATE_LIMIT_RE.search(str(exc)))
 
 
@@ -1409,7 +1417,13 @@ def _cycle_quarantine_pass(
         if not dry_run:
             apply_issue_transition(conn, issue_id, "cycle-isolated")
             if repo:
-                _post_cycle_quarantine_comment(repo, number, area, cycle_numbers)
+                try:
+                    _post_cycle_quarantine_comment(repo, number, area, cycle_numbers)
+                except Exception as exc:  # noqa: BLE001
+                    click.echo(
+                        f"reconcile [{area}]: cycle comment failed (#{number}): {exc}",
+                        err=True,
+                    )
 
     return True
 
@@ -1423,6 +1437,13 @@ def _tarjan_cycle_members(nodes: set[int], adj_fwd: dict[int, list[int]]) -> set
     Args:
         nodes: All node IDs to consider.
         adj_fwd: Forward adjacency (node → its dependencies).
+
+    Note — recursion depth: the recursive ``strongconnect`` helper uses Python's
+    call stack.  The default ``sys.setrecursionlimit`` (1000) supports dependency
+    graphs up to ~900 nodes deep before hitting ``RecursionError``.  In practice
+    a single area's dependency graph is expected to be at most a few dozen nodes,
+    so this is not a concern in production.  If very deep graphs become possible
+    an iterative Tarjan implementation should be substituted.
     """
     index_counter = [0]
     stack: list[int] = []
