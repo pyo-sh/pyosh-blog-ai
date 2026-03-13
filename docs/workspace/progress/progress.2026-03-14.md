@@ -1,5 +1,37 @@
 # Progress 2026-03-14
 
+## orchctl dashboard / webhook / notification (#105, PR #200)
+
+Stage 4 observability feature: event log, webhook dispatch, and CLI commands so operators can query orchestrator lifecycle events in real time and receive HTTP notifications on key state changes.
+
+### Changes merged
+
+- **`db/schema.py`** - migration v15: `events` append-only table (`area`, `issue_id` FK nullable, `event_type`, `payload` JSON, `created_at`); indexes on `area`, `issue_id`, `event_type`, `created_at`; webhook config defaults (`webhook_url`, `webhook_enabled`, `webhook_events`)
+- **`events.py`** (new) - `emit_event(conn, event_type, ...)`: guards `conn.in_transaction` to prevent premature commit, inserts event row, fires `_maybe_dispatch_webhook`; `dispatch_webhook(url, payload_json)`: urllib POST with 5-second timeout; `_fire` / `_start_webhook_thread`: non-daemon thread (process stays alive up to 5 s) with stderr notice and failure logging; `_maybe_dispatch_webhook`: enabled/URL/event-type filter before dispatch; five `EVENT_*` constants
+- **`commands/events.py`** (new) - `orchctl events list`: area/type/limit filters with paired `(predicate, value)` tuple structure to keep WHERE clause safe; JSON output flag
+- **`commands/notify.py`** (new) - `orchctl notify status` (JSON or text), `orchctl notify set` (atomic single-commit upsert for url/enable/events), `orchctl notify test` (scheme-validated POST with dispatch_webhook)
+- **`cli.py`** - registered `events` and `notify` command groups
+- **`tests/test_events.py`** (new) - 33 tests: emit_event row insertion, nullable fields, webhook enable/filter/block, failure stderr logging (sync `_start_webhook_thread` patch for capsys), `in_transaction` guard, `dispatch_webhook` success/HTTP error/network error, CLI `events list` filters/limit/JSON, `notify status/set/test` including scheme validation and atomicity
+- **`tests/test_multi_area.py`** - `test_latest_version_is_15` (rebased from 14 after upstream conflict with v14 cycle-quarantine migration)
+- **554 tests** passing
+
+### Key design decisions
+
+- `emit_event` takes a shared `conn` and calls `conn.commit()` internally; callers must not pass a connection with pending DML (`in_transaction` guard fails fast). Design note documented: atomic state-change + event emission is not possible with this interface - future integration into the orchestrator hot path should accept `db_path` for an independent connection.
+- Non-daemon webhook thread chosen over daemon to prevent silent notification loss in short-lived CLI processes; documented 5-second exit delay tradeoff.
+- `_start_webhook_thread` extracted as a module-level function for test patching (avoids threading/capsys race in unit tests).
+- WHERE clause in `events list` uses paired `(predicate_literal, value)` tuples so only fixed string constants are composed into the query string - all values are bound via `?` parameters.
+- Schema conflict with upstream v14 (cycle-quarantine) resolved by renumbering events migration to v15.
+
+### Review rounds
+
+- Round 1 (WARNING x2, SUGGESTION x1): webhook delivery silently swallowed, `--url` accepted any scheme, `# type: ignore` on `lastrowid` - stderr logging, scheme validation, explicit RuntimeError guard added
+- Round 2 (WARNING x1, SUGGESTION x2): `notify test --url` skipped scheme validation, `assert` stripped by `-O`, missing `idx_events_issue_id` - consistent validation, `if/raise`, index added
+- Round 3 (WARNING x2, SUGGESTION x2): `conn.commit()` premature-commit risk, synchronous webhook blocks hot path - `in_transaction` guard added, daemon thread → non-daemon thread with `_start_webhook_thread`/`_fire` extraction; `notify set` made atomic (single commit)
+- Round 4 (WARNING x2, SUGGESTION x2): daemon thread killed on exit, f-string WHERE injection risk - non-daemon thread, paired-tuple WHERE builder, design-limitation docstring
+- Round 5 (WARNING x3, SUGGESTION x1): `issue_id` absent from webhook body, atomicity gap re-raised for visibility, exit delay undocumented - `issue_id` added to body, dispatch notice printed to stderr, docstring updated
+- Round 6 (CLEAN): approved and merged
+
 ## orchctl git conflict rebase playbook (#99, PR #201)
 
 Stage 3 self-healing playbook: `git_conflict` failures now trigger automated rebase repair attempts with PR/branch/conflict context, and create a blocker GitHub issue after the rebase budget is exhausted.
