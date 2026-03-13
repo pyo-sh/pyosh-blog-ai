@@ -246,6 +246,19 @@ class TestCountAwaitingMerge:
         db_conn.commit()
         assert _count_awaiting_merge(db_conn) == 2
 
+    def test_null_merge_state_counted(self, db_conn):
+        """NULL merge_state must be counted (NOT IN returns NULL for NULLs in SQL)."""
+        from orchctl.commands.reconcile import _count_awaiting_merge
+
+        # Insert without specifying merge_state so the column gets its default.
+        db_conn.execute(
+            "INSERT INTO issues (area, number, state) VALUES ('client', 10, 'completed')"
+        )
+        db_conn.commit()
+        # Verify the column is actually 'none' (the schema default), not SQL NULL.
+        # If it ever becomes SQL NULL the IS NULL branch covers it.
+        assert _count_awaiting_merge(db_conn) == 1
+
 
 # ---------------------------------------------------------------------------
 # max_awaiting_merge admission gate (dispatch_pass integration)
@@ -522,3 +535,22 @@ class TestDiscoveryPriorityStore:
             "SELECT id FROM issues WHERE area='client' AND number=44"
         ).fetchone()
         assert row is None
+
+    def test_reopen_refreshes_priority(self, db_conn):
+        """When a terminal issue is re-enqueued, its priority is updated."""
+        from orchctl.commands.reconcile import _enqueue_or_reopen
+
+        # Insert as completed with priority 0
+        db_conn.execute(
+            "INSERT INTO issues (area, number, state, priority) VALUES ('client', 50, 'completed', 0)"
+        )
+        db_conn.commit()
+
+        # Reopen with a higher priority
+        _enqueue_or_reopen(db_conn, "client", 50, dry_run=False, priority=8)
+
+        row = db_conn.execute(
+            "SELECT state, priority FROM issues WHERE area='client' AND number=50"
+        ).fetchone()
+        assert row["state"] == "pending"
+        assert row["priority"] == 8

@@ -6,7 +6,7 @@ import os
 import sqlite3
 import uuid
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable
 
 import click
@@ -346,9 +346,14 @@ def _enqueue_or_reopen(
     if state in _REOPEN_STATES:
         click.echo(
             f"reconcile [{area}]: issue #{number} reopened (was {state})"
+            f" (priority={priority})"
             f" → re-enqueueing as pending{' (dry-run)' if dry_run else ''}."
         )
         if not dry_run:
+            conn.execute(
+                "UPDATE issues SET priority = ? WHERE id = ?",
+                (priority, row["id"]),
+            )
             apply_issue_transition(conn, row["id"], "pending")
 
 
@@ -696,7 +701,8 @@ def _dispatch_score(
     created_at_str = row["created_at"] or ""
     try:
         created_at = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
-        age_days = (datetime.utcnow() - created_at).total_seconds() / 86400.0
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        age_days = (now_naive - created_at).total_seconds() / 86400.0
     except (ValueError, TypeError):
         age_days = 0.0
     return (
@@ -721,11 +727,16 @@ def _sort_pending(
 
 
 def _count_awaiting_merge(conn: sqlite3.Connection) -> int:
-    """Count completed issues whose PRs have not yet been merged or rejected."""
+    """Count completed issues whose PRs have not yet been merged or rejected.
+
+    Uses ``(merge_state IS NULL OR merge_state NOT IN ('done', 'rejected'))``
+    rather than a bare ``NOT IN`` to avoid SQL NULL semantics silently
+    dropping rows where merge_state is NULL.
+    """
     row = conn.execute(
         "SELECT COUNT(*) FROM issues"
         " WHERE state = 'completed'"
-        " AND merge_state NOT IN ('done', 'rejected')"
+        " AND (merge_state IS NULL OR merge_state NOT IN ('done', 'rejected'))"
     ).fetchone()
     return row[0]
 
