@@ -114,11 +114,35 @@ def cmd_cleanup(args) -> int:
         return 1
 
 
+def _derive_failure_class(state) -> str:
+    """Return failure_class for a state: review_job status for review/resolve stages, else ''."""
+    step_val = state.step.value if hasattr(state.step, "value") else str(state.step)
+    if step_val in ("review_dispatch", "review_wait", "review_process", "resolve"):
+        rj = state.review_job
+        if rj:
+            return rj.status.value if hasattr(rj.status, "value") else str(rj.status)
+    return ""
+
+
 def cmd_escalation(args) -> int:
     monorepo_root = _get_monorepo_root()
     from .controller import format_escalation
 
     print(format_escalation(args.issue, args.area, args.stage, monorepo_root))
+
+    # Auto-record the escalation in history so failure patterns are captured
+    # without relying on callers to invoke history-record manually.
+    try:
+        from .history import AttemptRecord, history_append
+        from .state_store import state_exists, state_read
+        if state_exists(args.issue, args.area, monorepo_root):
+            state = state_read(args.issue, args.area, monorepo_root)
+            failure_class = _derive_failure_class(state)
+            record = AttemptRecord.from_state(state, outcome="escalated", failure_class=failure_class)
+            history_append(monorepo_root, record)
+    except Exception as e:
+        print(f"[escalation] warning: could not append history: {e}", file=sys.stderr)
+
     return 0
 
 
@@ -422,6 +446,90 @@ def cmd_check_commits(args) -> int:
         return 2
 
 
+def cmd_history(args) -> int:
+    """Query attempt history: list, stats, or pattern analysis."""
+    monorepo_root = _get_monorepo_root()
+    from .history import (
+        history_read,
+        history_stats,
+        history_patterns,
+        format_table,
+        format_stats_table,
+        format_patterns_table,
+    )
+
+    records = history_read(
+        monorepo_root,
+        area=args.area or None,
+        issue=args.issue,
+        since=args.since or None,
+        until=args.until or None,
+    )
+
+    mode = args.mode
+    fmt = args.format
+
+    if mode == "list":
+        if fmt == "json":
+            print(json.dumps([r.to_dict() for r in records], indent=2))
+        else:
+            print(format_table(records))
+
+    elif mode == "stats":
+        stats = history_stats(records)
+        if fmt == "json":
+            print(json.dumps(stats, indent=2))
+        else:
+            print(format_stats_table(stats))
+
+    elif mode == "patterns":
+        patterns = history_patterns(records)
+        if fmt == "json":
+            print(json.dumps(patterns, indent=2))
+        else:
+            print(format_patterns_table(patterns))
+
+    return 0
+
+
+def cmd_history_record(args) -> int:
+    """Append a failure/escalation attempt record to the history log."""
+    monorepo_root = _get_monorepo_root()
+    from .history import AttemptRecord, history_append
+    from .state_store import state_exists, state_read
+
+    if state_exists(args.issue, args.area, monorepo_root):
+        try:
+            state = state_read(args.issue, args.area, monorepo_root)
+            # Explicit --failure-class takes priority; fall back to state's review_job status.
+            failure_class = args.failure_class if args.failure_class else _derive_failure_class(state)
+            record = AttemptRecord.from_state(
+                state,
+                outcome=args.outcome,
+                failure_class=failure_class if args.outcome != "success" else "",
+            )
+        except Exception as e:
+            print(f"[history-record] error reading state: {e}", file=sys.stderr)
+            return 1
+    else:
+        # Minimal record from CLI args when state is already gone.
+        from datetime import datetime, timezone
+        record = AttemptRecord(
+            area=args.area,
+            issue=args.issue,
+            pr=args.pr or 0,
+            branch="",
+            outcome=args.outcome,
+            failure_class=args.failure_class or "",
+            step=args.step or "",
+            review_round=0,
+            finished_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+
+    history_append(monorepo_root, record)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="dev_pipeline",
@@ -569,6 +677,31 @@ def main():
     p_cl.add_argument("--area", required=True, choices=_AREA_CHOICES)
     p_cl.add_argument("--expected-owner", default="")
     p_cl.set_defaults(func=cmd_check_lease)
+
+    # history
+    p_hist = sub.add_parser("history", help="Query attempt history (list/stats/patterns)")
+    p_hist.add_argument("--area", default="", choices=[""] + _AREA_CHOICES,
+                        help="Filter by area (default: all areas)")
+    p_hist.add_argument("--issue", type=int, default=None, help="Filter by issue number")
+    p_hist.add_argument("--since", default="", metavar="ISO_DATE",
+                        help="Include records at or after this date (ISO8601 prefix)")
+    p_hist.add_argument("--until", default="", metavar="ISO_DATE",
+                        help="Include records at or before this date (ISO8601 prefix)")
+    p_hist.add_argument("--mode", default="list", choices=["list", "stats", "patterns"],
+                        help="Output mode: list (default), stats, or patterns")
+    p_hist.add_argument("--format", default="table", choices=["table", "json"],
+                        help="Output format: table (default) or json")
+    p_hist.set_defaults(func=cmd_history)
+
+    # history-record
+    p_hr = sub.add_parser("history-record", help="Append a failure/escalation record to history")
+    p_hr.add_argument("--issue", type=int, required=True)
+    p_hr.add_argument("--area", required=True, choices=_AREA_CHOICES)
+    p_hr.add_argument("--outcome", required=True, choices=["success", "failed", "escalated"])
+    p_hr.add_argument("--failure-class", default="", help="ReviewJobStatus value (for failures)")
+    p_hr.add_argument("--step", default="", help="Pipeline step where outcome occurred")
+    p_hr.add_argument("--pr", type=int, default=0)
+    p_hr.set_defaults(func=cmd_history_record)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
