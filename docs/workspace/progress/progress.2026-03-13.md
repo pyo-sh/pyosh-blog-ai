@@ -1,5 +1,40 @@
 # Progress 2026-03-13
 
+## orchctl multi-signal heartbeat + stall detection (#96, PR #192)
+
+- **목적**: 단일 PID keepalive 대신 4가지 신호 기반 stall 감지로 false positive/negative 방지 (Stage 3)
+- **`heartbeat.py` 신규** (`tools/orchctl/orchctl/heartbeat.py`):
+  - `SIGNAL_THRESHOLD_S = 600` - 활동 판정 윈도우(초). `heartbeat_ttl`(리스 갱신)과 독립적
+  - `STALL_MIN_ABSENT = 2` - 부재 신호 2개 이상이면 stall 선언
+  - `SignalSnapshot` dataclass: `pr_activity`(GitHub API updatedAt), `state_mtime`(pipeline state 파일), `log_mtime`(worker.log), `cpu_delta`(/proc/{pid}/stat jiffies 변화량); `.absent_count`, `.is_stalled()`, `.to_json()`
+  - `_read_cpu_jiffies(pid)`: comm 필드 공백 처리를 위해 `rfind(')')` 사용; fields[11]+fields[12] 합산
+  - `_check_pr_activity()`: state 파일에서 PR 번호 읽기 → `gh pr view --json updatedAt` → elapsed < threshold_s
+  - `collect_signals()`: 4가지 신호 수집 조합
+  - `record_heartbeat()`: heartbeats 테이블에 snapshot INSERT + commit
+  - `get_last_cpu_jiffies()`: 직전 heartbeat에서 `cpu_jiffies` 읽기
+  - `attempt_dir_path()`: `.workspace/orchestrate/{area}/issues/{N}/attempts/{attempt_id}/` 컨벤션
+  - `check_stall()`: `has_prior = EXISTS(heartbeats WHERE attempt_id=?)` 로 첫 사이클 판별 (PID-less 워커 regression 방지); `stall_threshold_s` DB config 우선, fallback `SIGNAL_THRESHOLD_S`; 첫 사이클은 `(False, snapshot)` 반환
+- **첫 사이클 보호 설계**: `pid is None` 기반 판별이 아닌 heartbeats 행 존재 여부 사용 - PID-less 워커에서 `cpu_jiffies`가 항상 None이므로 기존 방식은 stall 감지 영구 비활성화 버그 발생
+- **`reconcile.py` `_heartbeat_pass` 추가** (`tools/orchctl/orchctl/commands/reconcile.py`):
+  - `_mark_complete_pass` 이전에 실행; dispatched 이슈 순회
+  - `check_stall()` 예외 per-issue try/except/continue (단일 오류가 전체 pass 중단 방지)
+  - stall 감지 시: `with conn:` 블록 내에서 `apply_attempt_transition_tx(... "timed-out")` + `apply_issue_transition_tx(... "failed-terminal")` 원자적 처리
+- **`state_machine.py` `apply_attempt_transition_tx` 추가**: commit 없는 tx 변형 추출 (원자적 multi-step 트랜잭션 지원)
+- **Schema v9** (`tools/orchctl/orchctl/db/schema.py`): `stall_threshold_s = '600'` config 기본값 추가 (v8은 PR #191 failure classification이 선점)
+- **테스트 35개 신규** (`tools/orchctl/tests/test_heartbeat.py`) - 322개 전체 pass:
+  - `TestSignalSnapshot`: absent_count, is_stalled, custom min_absent
+  - `TestHeartbeatDB`: record/retrieve cpu_jiffies, null 처리, 최신값 반환
+  - `TestCollectSignals`: 신호별 독립 조합, CPU delta 로직, PID-less
+  - `TestCheckStall`: 첫 사이클 보호, 두 번째 사이클 stall 감지, **PID-less 워커 regression** (연속 2호출에서 두 번째가 stall 반환 확인)
+  - `TestHeartbeatPassInReconcile`: stall → failed-terminal 전이, not-stalled → dispatched 유지, dry-run, first-cycle
+- **4라운드 리뷰**:
+  - R1: 비원자 stall 전이 (apply_attempt_transition_tx 추가), check_stall 예외 미처리 (try/except/continue)
+  - R1 (Suggestion): `/proc/{pid}/stat` comm 공백 문제 (rfind 사용), `pr_commit` → `pr_activity` rename (updatedAt은 PR 전체 활동)
+  - R2: 첫 사이클 false-stall (worker 파일 미생성 시 신호 3개 부재), `SIGNAL_THRESHOLD_S` 미문서화 분리
+  - R3 (Critical): `prev_cpu is None` 기반 첫 사이클 판별 - PID-less 워커에서 영구 비활성화. EXISTS 쿼리로 교체, `stall_threshold_s` DB config 추가
+  - R4: suggestion-only 4개 → resolve-skip → merge
+- **schema 충돌**: PR #191이 먼저 main merge되어 v8 선점. 충돌 해소 후 v9로 renumber
+
 ## orchctl failure classification system (#95, PR #191)
 
 - **목적**: 실패를 단일 `failed-terminal` 대신 10개 유형으로 분류하여 playbook 기반 자동 대응의 기반 마련
