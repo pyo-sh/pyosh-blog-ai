@@ -460,16 +460,16 @@ def _setup_dispatched_issue(conn, area: str, number: int, attempt_status: str, t
 
 
 @pytest.mark.parametrize(
-    "failure_reason, expected_class",
+    "failure_reason, expected_state, expected_retry_count",
     [
-        ('{"reason": "segmentation fault"}', "infra_crash"),
-        ('{"reason": "pipeline exited with rc=1"}', "unknown"),
+        ('{"reason": "segmentation fault"}', "pending", 1),      # infra_crash → retry
+        ('{"reason": "pipeline exited with rc=1"}', "needs-human", 0),  # unknown → escalate
     ],
 )
-def test_retry_playbook_first_attempt_re_enqueues(
-    runner, db_path, failure_reason, expected_class
+def test_retry_playbook_first_attempt_routing(
+    runner, db_path, failure_reason, expected_state, expected_retry_count
 ):
-    """First failure within budget re-enqueues issue as pending with retry_count=1."""
+    """First failure routes to pending (retry) or needs-human (escalate) per failure class."""
     import unittest.mock as mock
     from orchctl.db.connection import get_db
 
@@ -490,13 +490,8 @@ def test_retry_playbook_first_attempt_re_enqueues(
     ).fetchone()
     conn.close()
 
-    if expected_class in ("infra_crash", "timeout", "flaky_test"):
-        # retry budget > 0 → re-enqueue
-        assert row["state"] == "pending"
-        assert row["retry_count"] == 1
-    else:
-        # unknown class → ESCALATE → needs-human (no budget check)
-        assert row["state"] == "needs-human"
+    assert row["state"] == expected_state
+    assert row["retry_count"] == expected_retry_count
 
 
 def test_retry_playbook_timeout_re_enqueues(runner, db_path):
