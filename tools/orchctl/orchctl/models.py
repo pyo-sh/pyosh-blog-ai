@@ -29,6 +29,43 @@ class DependencyType(str, Enum):
     HARD = "hard"
 
 
+class FailureClass(str, Enum):
+    INFRA_CRASH = "infra_crash"
+    TIMEOUT = "timeout"
+    GIT_CONFLICT = "git_conflict"
+    FLAKY_TEST = "flaky_test"
+    DETERMINISTIC_TEST_FAILURE = "deterministic_test_failure"
+    PERMISSION_AUTH = "permission_auth"
+    DEPENDENCY_UNRESOLVED = "dependency_unresolved"
+    ISSUE_SPEC_AMBIGUOUS = "issue_spec_ambiguous"
+    CI_EXTERNAL_OUTAGE = "ci_external_outage"
+    RATE_LIMIT = "rate_limit"
+    UNKNOWN = "unknown"
+
+
+class NextAction(str, Enum):
+    RETRY = "retry"
+    REPAIR = "repair"
+    ESCALATE = "escalate"
+    PAUSE = "pause"
+
+
+# Default next_action per failure class.
+FAILURE_CLASS_NEXT_ACTION: dict[FailureClass, NextAction] = {
+    FailureClass.INFRA_CRASH: NextAction.RETRY,
+    FailureClass.TIMEOUT: NextAction.RETRY,
+    FailureClass.GIT_CONFLICT: NextAction.REPAIR,
+    FailureClass.FLAKY_TEST: NextAction.RETRY,
+    FailureClass.DETERMINISTIC_TEST_FAILURE: NextAction.ESCALATE,
+    FailureClass.PERMISSION_AUTH: NextAction.ESCALATE,
+    FailureClass.DEPENDENCY_UNRESOLVED: NextAction.REPAIR,
+    FailureClass.ISSUE_SPEC_AMBIGUOUS: NextAction.ESCALATE,
+    FailureClass.CI_EXTERNAL_OUTAGE: NextAction.PAUSE,
+    FailureClass.RATE_LIMIT: NextAction.PAUSE,
+    FailureClass.UNKNOWN: NextAction.ESCALATE,
+}
+
+
 # Valid transitions: from_state -> set of reachable to_states
 ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
     IssueState.PENDING: frozenset({

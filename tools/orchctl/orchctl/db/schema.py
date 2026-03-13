@@ -268,6 +268,16 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        8,
+        """
+        -- v8: failure classification system
+        -- Adds failure_class to attempts so each attempt records its own class.
+        -- The issues.failure_class column (added in v1) already tracks the most
+        -- recent failure class at the issue level.
+        ALTER TABLE attempts ADD COLUMN failure_class TEXT;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)

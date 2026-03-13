@@ -25,7 +25,14 @@ from ..db import (
 )
 from ..db.schema import LATEST_VERSION
 from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
-from ..models import ISSUE_TRANSITIONS, IssueState, TERMINAL_ISSUE_STATES
+from ..failure_classifier import classify_and_record
+from ..models import (
+    ISSUE_TRANSITIONS,
+    FailureClass,
+    IssueState,
+    NextAction,
+    TERMINAL_ISSUE_STATES,
+)
 from ..policy import apply_policy, find_policy_file, load_policy
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
@@ -331,7 +338,14 @@ def _mark_complete_pass(
     issues_by_state: dict,
     owns_lease: bool = True,
 ) -> bool:
-    """Transition dispatched issues to completed/failed-terminal based on attempt status.
+    """Transition dispatched issues based on attempt outcome.
+
+    Successful attempts move to completed.  Failed/timed-out attempts are
+    classified into one of 10 FailureClass values; the resulting NextAction
+    determines the new issue state:
+      - retry / repair: re-enqueue as pending (if retry budget allows)
+      - escalate:       needs-human
+      - pause:          blocked-external
 
     Returns True on success, False if the lease was lost (caller should abort).
     """
@@ -343,10 +357,11 @@ def _mark_complete_pass(
 
         issue_id = issue["id"]
         number = issue["number"]
+        retry_count = issue["retry_count"]
 
         latest = conn.execute(
             """
-            SELECT status FROM attempts
+            SELECT attempt_id, status, terminal_json FROM attempts
             WHERE issue_id = ?
             ORDER BY created_at DESC
             LIMIT 1
@@ -366,14 +381,63 @@ def _mark_complete_pass(
             if not dry_run:
                 apply_issue_transition(conn, issue_id, "completed")
         elif status in ("failed", "timed-out"):
+            attempt_id = latest["attempt_id"]
+            terminal_json = latest["terminal_json"]
+
+            failure_class, next_action = (
+                (FailureClass.UNKNOWN, NextAction.ESCALATE)
+                if dry_run
+                else classify_and_record(conn, issue_id, attempt_id, status, terminal_json)
+            )
+
+            new_state = _next_action_to_state(
+                conn, area, issue_id, number, retry_count, failure_class, next_action
+            )
             click.echo(
                 f"reconcile [{area}]: issue #{number} attempt {status}"
-                f" → marking failed-terminal{' (dry-run)' if dry_run else ''}."
+                f" (class={failure_class.value}, next={next_action.value})"
+                f" → {new_state}{' (dry-run)' if dry_run else ''}."
             )
             if not dry_run:
-                apply_issue_transition(conn, issue_id, "failed-terminal")
+                apply_issue_transition(conn, issue_id, new_state)
 
     return True
+
+
+def _next_action_to_state(
+    conn: sqlite3.Connection,
+    area: str,
+    issue_id: int,
+    number: int,
+    retry_count: int,
+    failure_class: FailureClass,
+    next_action: NextAction,
+) -> str:
+    """Map next_action to an IssueState string, enforcing per-class retry budgets."""
+    if next_action in (NextAction.RETRY, NextAction.REPAIR):
+        budget_by_class = get_config_json(conn, "retry_budget_by_class", default={})
+        budget = int(budget_by_class.get(failure_class.value, budget_by_class.get("default", 1)))
+        if retry_count < budget:
+            conn.execute(
+                "UPDATE issues SET retry_count = retry_count + 1 WHERE id = ?",
+                (issue_id,),
+            )
+            click.echo(
+                f"reconcile [{area}]: issue #{number}"
+                f" retry {retry_count + 1}/{budget} scheduled."
+            )
+            return IssueState.PENDING.value
+        click.echo(
+            f"reconcile [{area}]: issue #{number}"
+            f" retry budget exhausted ({retry_count}/{budget}) — escalating."
+        )
+        return IssueState.FAILED_TERMINAL.value
+
+    if next_action == NextAction.PAUSE:
+        return IssueState.BLOCKED_EXTERNAL.value
+
+    # ESCALATE (default)
+    return IssueState.NEEDS_HUMAN.value
 
 
 # ---------------------------------------------------------------------------
