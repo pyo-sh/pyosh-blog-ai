@@ -637,6 +637,16 @@ def step_log_setup(issue: int, area: str, monorepo_root: Path) -> StepResult:
 def step_log_finalize(issue: int, area: str, monorepo_root: Path) -> StepResult:
     """Delete state file and mark pipeline done."""
     log_transition(issue, area, monorepo_root, "log", "done", "dev-log complete")
+
+    # Record successful attempt in history log before state is deleted.
+    try:
+        from .history import AttemptRecord, history_append
+        state = state_read(issue, area, monorepo_root)
+        record = AttemptRecord.from_state(state, outcome="success")
+        history_append(monorepo_root, record)
+    except Exception as e:
+        print(f"[step:log:finalize] warning: could not append history: {e}", file=sys.stderr)
+
     cleanup_state(issue, area, monorepo_root)
 
     return StepResult(action="done", data={})
