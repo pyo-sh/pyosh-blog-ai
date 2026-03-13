@@ -151,15 +151,19 @@ def can_dispatch(conn: sqlite3.Connection, issue_id: int) -> bool:
     return row["state"] == IssueState.PENDING.value
 
 
-def apply_issue_transition(
+def apply_issue_transition_tx(
     conn: sqlite3.Connection,
     issue_id: int,
     new_state: str,
 ) -> str:
-    """Validate and apply an issue state transition in the DB.
+    """Validate and apply an issue state transition without committing.
+
+    Identical to apply_issue_transition but does not call conn.commit().
+    Use this when the caller needs to batch multiple operations (e.g. an
+    attempt INSERT + issue state update) into one atomic commit.
 
     Returns the new state string.
-    Raises InvalidTransitionError or ValueError if issue not found.
+    Raises InvalidTransitionError, StaleStateError, or ValueError if issue not found.
     """
     row = conn.execute(
         "SELECT state FROM issues WHERE id = ?", (issue_id,)
@@ -177,6 +181,20 @@ def apply_issue_transition(
             f"Issue id={issue_id} state changed concurrently "
             f"(read {old_state!r}, attempted transition to {new_state!r})"
         )
+    return validated
+
+
+def apply_issue_transition(
+    conn: sqlite3.Connection,
+    issue_id: int,
+    new_state: str,
+) -> str:
+    """Validate and apply an issue state transition in the DB.
+
+    Returns the new state string.
+    Raises InvalidTransitionError or ValueError if issue not found.
+    """
+    validated = apply_issue_transition_tx(conn, issue_id, new_state)
     conn.commit()
     return validated
 
