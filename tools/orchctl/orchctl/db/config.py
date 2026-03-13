@@ -1,5 +1,6 @@
 """Config table accessors for orchctl."""
 
+import json
 import sqlite3
 
 
@@ -26,6 +27,24 @@ def get_config_bool(conn: sqlite3.Connection, key: str, default: bool = False) -
     """Return a config value as a boolean (true/1/yes → True)."""
     val = get_config(conn, key, str(default)).lower()
     return val in ("1", "true", "yes")
+
+
+def get_config_json(conn: sqlite3.Connection, key: str, default: list | None = None) -> list:
+    """Return a config value parsed as a JSON array.
+
+    Falls back to *default* (or []) when the key is missing or the stored
+    value is not valid JSON.
+    """
+    if default is None:
+        default = []
+    raw = get_config(conn, key, "")
+    if not raw:
+        return default
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else default
+    except (ValueError, TypeError):
+        return default
 
 
 def set_config(conn: sqlite3.Connection, key: str, value: str) -> None:

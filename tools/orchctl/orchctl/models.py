@@ -52,16 +52,15 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
         IssueState.PENDING,
         IssueState.CANCELLED,
     }),
-    # Terminal states — no outgoing transitions by default.
-    # failed-terminal: retry logic (failed-terminal -> pending) is intentionally
-    #   deferred; the retry_budget column is reserved for a future retry PR.
-    # needs-human / blocked-failed-dependency: operator-intervention re-entry
-    #   edges are also deferred to a future PR.
-    IssueState.COMPLETED: frozenset(),
-    IssueState.FAILED_TERMINAL: frozenset(),
+    # Re-openable terminal states: a GitHub issue re-open event drives these
+    # back to pending so the orchestrator picks them up in the next cycle.
+    IssueState.COMPLETED: frozenset({IssueState.PENDING}),
+    IssueState.FAILED_TERMINAL: frozenset({IssueState.PENDING}),
+    IssueState.CANCELLED: frozenset({IssueState.PENDING}),
+    # Operator-intervention states remain closed until a human unblocks them.
+    # needs-human / blocked-failed-dependency re-entry edges deferred to a future PR.
     IssueState.NEEDS_HUMAN: frozenset(),
     IssueState.BLOCKED_FAILED_DEP: frozenset(),
-    IssueState.CANCELLED: frozenset(),
 }
 
 ATTEMPT_TRANSITIONS: dict[AttemptStatus, frozenset[AttemptStatus]] = {
