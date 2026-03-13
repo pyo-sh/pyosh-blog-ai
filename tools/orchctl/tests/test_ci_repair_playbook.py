@@ -147,7 +147,7 @@ def test_blocker_issue_created_on_budget_exhaustion(conn: sqlite3.Connection) ->
     body = create_kwargs[1]["body"] if create_kwargs[1] else create_kwargs[0][2]
     assert "#42" in body
     assert "deterministic_test_failure" in body
-    assert "a-001" in body or "jest failed" in body
+    assert "jest failed" in body  # reason from attempt a-001
 
     # Blocker reference comment posted on original issue
     comment_calls = mock_comment.call_args_list
@@ -265,8 +265,8 @@ def test_blocker_issue_body_contains_failure_history(conn: sqlite3.Connection) -
 
     mock_create.assert_called_once()
     body = mock_create.call_args[1]["body"]
-    assert "AssertionError in test_foo" in body
-    assert "AssertionError again" in body
+    assert "AssertionError in test_foo" in body  # reason from attempt a-001
+    assert "AssertionError again" in body         # reason from attempt a-002
     assert "#42" in body
     assert "workspace" in body
 

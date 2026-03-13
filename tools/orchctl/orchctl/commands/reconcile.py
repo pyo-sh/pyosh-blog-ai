@@ -632,12 +632,13 @@ def _create_ci_blocker_issue(
     if not repo:
         return
 
-    # Collect failure history from the DB.
+    # Collect failure history from the DB (terminal attempts only).
     attempt_rows = conn.execute(
         """
         SELECT attempt_id, status, terminal_json, created_at
         FROM attempts
         WHERE issue_id = ?
+          AND status NOT IN ('created', 'running')
         ORDER BY created_at ASC
         """,
         (issue_id,),
