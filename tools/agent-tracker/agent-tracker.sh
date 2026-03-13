@@ -72,6 +72,14 @@ PYTHONPATH="$SCRIPT_DIR" python3 -m backend \
   2>>"$REPO_ROOT/.workspace/agent-tracker/backend.log" &
 _BACKEND_PID=$!
 
+# Brief liveness check — catch immediate startup failures (missing module, bad flag, etc.)
+# before entering the main loop where a dead backend silently yields empty snapshots.
+sleep 0.5
+if ! kill -0 "$_BACKEND_PID" 2>/dev/null; then
+  printf '[agent-tracker] WARNING: backend exited early — check %s\n' \
+    "$REPO_ROOT/.workspace/agent-tracker/backend.log" >&2
+fi
+
 # ── Sidecar cleanup (safe) ──
 # Runs once at startup. Scoped to the current tmux server + target session only.
 # 1. Remove stale v1 flat sidecars (immediate cutover, #109).
