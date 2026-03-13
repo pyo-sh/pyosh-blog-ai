@@ -240,7 +240,7 @@ def cmd_requeue(ctx: click.Context, area: str, issue_number: int) -> None:
                 f"Issue #{issue_number} not found in area '{area}'."
             )
         state = issue_row["state"]
-        _REQUEUEABLE = {"failed-terminal", "cancelled", "needs-human", "blocked-failed-dependency"}
+        _REQUEUEABLE = {"failed-terminal", "cancelled", "needs-human", "blocked-failed-dependency", "cycle-isolated"}
         if state not in _REQUEUEABLE:
             raise click.ClickException(
                 f"Issue #{issue_number} is in state '{state}'; "
