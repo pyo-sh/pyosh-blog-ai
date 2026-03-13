@@ -129,6 +129,11 @@ def post_issue_comment(repo: str, issue_number: int, body: str) -> None:
             f"github: issue comment timed out (#{issue_number}) after {_GH_TIMEOUT}s",
             err=True,
         )
+    except Exception as exc:  # noqa: BLE001
+        click.echo(
+            f"github: issue comment error (#{issue_number}): {exc}",
+            err=True,
+        )
 
 
 def _parse_issue(item: dict) -> GitHubIssue:

@@ -41,7 +41,8 @@ def get_config_json(conn: sqlite3.Connection, key: str, default: list | dict | N
     if not raw:
         return default
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, (list, dict)) else default
     except (ValueError, TypeError):
         return default
 
