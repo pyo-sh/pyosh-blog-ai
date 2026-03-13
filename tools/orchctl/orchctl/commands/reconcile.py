@@ -14,14 +14,18 @@ from ..db import (
     acquire,
     count_dispatched,
     current_version,
+    get_config,
     get_config_bool,
     get_config_int,
+    get_config_json,
     get_db,
     has_active_attempt,
     release,
     renew,
 )
 from ..db.schema import LATEST_VERSION
+from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
+from ..models import ISSUE_TRANSITIONS, IssueState, TERMINAL_ISSUE_STATES
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
 
@@ -82,6 +86,7 @@ def _run_pass(
     pid: int,
     dry_run: bool,
     dispatch_fn: Callable[[str, int, int, str], None] | None = None,
+    gh_list_fn: Callable[..., list[GitHubIssue]] | None = None,
 ) -> None:
     """Execute one full reconciliation pass under the area lease.
 
@@ -96,10 +101,17 @@ def _run_pass(
         dispatch_fn: Optional callback invoked when an issue is dispatched.
             Signature: (area, issue_id, issue_number, attempt_id) -> None.
             Used in tests to observe or replace the actual launch logic.
+        gh_list_fn: Optional override for the GitHub issue list call.
+            Signature matches ``list_open_issues``.  Used in tests to inject
+            a fake issue list without hitting the network.
     """
     issues_by_state = _observe_issues(conn, area)
     config = _observe_config(conn)
 
+    if not _discovery_pass(conn, area, pid, dry_run, config, gh_list_fn):
+        return
+    # Re-read after discovery so newly-enqueued issues appear in pending.
+    issues_by_state = _observe_issues(conn, area)
     if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state):
         return
     if not _unblock_pass(conn, area, pid, dry_run, issues_by_state):
@@ -131,7 +143,113 @@ def _observe_config(conn: sqlite3.Connection) -> dict:
         "max_concurrent": get_config_int(conn, "max_concurrent", default=4),
         "max_open_pr": get_config_int(conn, "max_open_pr", default=2),
         "drain_mode": get_config_bool(conn, "drain_mode", default=False),
+        "discovery_enabled": get_config_bool(conn, "discovery_enabled", default=False),
+        "scope_include_labels": get_config_json(conn, "scope_include_labels", default=[]),
+        "scope_exclude_labels": get_config_json(conn, "scope_exclude_labels", default=[]),
+        "scope_milestone": get_config(conn, "scope_milestone", default=""),
+        "scope_allow_unassigned": get_config_bool(conn, "scope_allow_unassigned", default=True),
     }
+
+
+# ---------------------------------------------------------------------------
+# Discovery pass
+# ---------------------------------------------------------------------------
+
+# Derived from ISSUE_TRANSITIONS: terminal states with a -> pending outgoing edge.
+# Computed at import time so it stays automatically in sync with models.py.
+_REOPEN_STATES: frozenset[str] = frozenset(
+    s.value
+    for s, targets in ISSUE_TRANSITIONS.items()
+    if s in TERMINAL_ISSUE_STATES and IssueState.PENDING in targets
+)
+
+
+def _discovery_pass(
+    conn: sqlite3.Connection,
+    area: str,
+    pid: int,
+    dry_run: bool,
+    config: dict,
+    gh_list_fn: Callable[..., list[GitHubIssue]] | None = None,
+) -> bool:
+    """Query GitHub for open issues and enqueue new or re-opened ones.
+
+    Skipped when ``discovery_enabled`` is False.
+
+    Returns True on success, False if the lease was lost (caller should abort).
+    """
+    if not config["discovery_enabled"]:
+        return True
+
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        click.echo(
+            f"reconcile [{area}]: discovery skipped — no GitHub repo mapping.",
+            err=True,
+        )
+        return True
+
+    _list_fn = gh_list_fn or list_open_issues
+    try:
+        gh_issues = _list_fn(
+            repo,
+            include_labels=config["scope_include_labels"],
+            exclude_labels=config["scope_exclude_labels"],
+            milestone=config["scope_milestone"],
+            allow_unassigned=config["scope_allow_unassigned"],
+        )
+    except GitHubError as exc:
+        click.echo(f"reconcile [{area}]: discovery error — {exc}", err=True)
+        return True  # non-fatal; continue with existing queue
+
+    # Renew lease every 50 issues rather than on every iteration to limit
+    # lease-table write churn when processing large backlogs.
+    _RENEW_EVERY = 50
+    for idx, gh_issue in enumerate(gh_issues):
+        if idx % _RENEW_EVERY == 0 and not renew(conn, area, pid):
+            click.echo(
+                f"reconcile [{area}]: lease lost during discovery — aborting.",
+                err=True,
+            )
+            return False
+        _enqueue_or_reopen(conn, area, gh_issue.number, dry_run)
+
+    return True
+
+
+def _enqueue_or_reopen(
+    conn: sqlite3.Connection,
+    area: str,
+    number: int,
+    dry_run: bool,
+) -> None:
+    """Insert a new issue as pending, or re-enqueue a reopened terminal issue."""
+    row = conn.execute(
+        "SELECT id, state FROM issues WHERE area = ? AND number = ?",
+        (area, number),
+    ).fetchone()
+
+    if row is None:
+        click.echo(
+            f"reconcile [{area}]: discovered issue #{number}"
+            f" → enqueueing as pending{' (dry-run)' if dry_run else ''}."
+        )
+        if not dry_run:
+            conn.execute(
+                "INSERT INTO issues (area, number, state) VALUES (?, ?, 'pending')",
+                (area, number),
+            )
+            conn.commit()
+        return
+
+    state = row["state"]
+    if state in _REOPEN_STATES:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} reopened (was {state})"
+            f" → re-enqueueing as pending{' (dry-run)' if dry_run else ''}."
+        )
+        if not dry_run:
+            apply_issue_transition(conn, row["id"], "pending")
 
 
 # ---------------------------------------------------------------------------

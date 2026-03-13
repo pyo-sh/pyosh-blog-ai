@@ -215,6 +215,19 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        5,
+        """
+        -- v5: issue discovery + configurable scope
+        INSERT INTO config (key, value) VALUES
+            ('discovery_enabled',    'false'),
+            ('scope_include_labels', '[]'),
+            ('scope_exclude_labels', '[]'),
+            ('scope_milestone',      ''),
+            ('scope_allow_unassigned', 'true')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
