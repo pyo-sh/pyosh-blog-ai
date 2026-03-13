@@ -138,7 +138,7 @@ def test_oom_word_boundary_no_false_positive() -> None:
         (FailureClass.FLAKY_TEST, NextAction.RETRY),
         (FailureClass.GIT_CONFLICT, NextAction.REPAIR),
         (FailureClass.DEPENDENCY_UNRESOLVED, NextAction.REPAIR),
-        (FailureClass.DETERMINISTIC_TEST_FAILURE, NextAction.ESCALATE),
+        (FailureClass.DETERMINISTIC_TEST_FAILURE, NextAction.REPAIR),
         (FailureClass.PERMISSION_AUTH, NextAction.ESCALATE),
         (FailureClass.ISSUE_SPEC_AMBIGUOUS, NextAction.ESCALATE),
         (FailureClass.UNKNOWN, NextAction.ESCALATE),

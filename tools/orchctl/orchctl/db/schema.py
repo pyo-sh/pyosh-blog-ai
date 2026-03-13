@@ -355,6 +355,21 @@ MIGRATIONS: list[tuple[int, str]] = [
         CREATE INDEX IF NOT EXISTS idx_dependencies_issue_id ON dependencies(issue_id);
         """,
     ),
+    (
+        13,
+        """
+        -- v13: CI failure repair + blocker issue playbook.
+        -- Sets the repair budget for deterministic_test_failure to 2 (two repair
+        -- attempts before a blocker issue is created and the issue escalates to
+        -- needs-human).  Only updates when the existing value does not already
+        -- include a deterministic_test_failure entry, so operator customisations
+        -- are preserved.
+        UPDATE config
+        SET value = json_set(value, '$.deterministic_test_failure', 2)
+        WHERE key = 'retry_budget_by_class'
+          AND json_extract(value, '$.deterministic_test_failure') IS NULL;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
