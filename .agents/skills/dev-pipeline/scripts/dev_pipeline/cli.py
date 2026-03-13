@@ -114,6 +114,16 @@ def cmd_cleanup(args) -> int:
         return 1
 
 
+def _derive_failure_class(state) -> str:
+    """Return failure_class for a state: review_job status for review/resolve stages, else ''."""
+    step_val = state.step.value if hasattr(state.step, "value") else str(state.step)
+    if step_val in ("review_dispatch", "review_wait", "review_process", "resolve"):
+        rj = state.review_job
+        if rj:
+            return rj.status.value if hasattr(rj.status, "value") else str(rj.status)
+    return ""
+
+
 def cmd_escalation(args) -> int:
     monorepo_root = _get_monorepo_root()
     from .controller import format_escalation
@@ -127,17 +137,7 @@ def cmd_escalation(args) -> int:
         from .state_store import state_exists, state_read
         if state_exists(args.issue, args.area, monorepo_root):
             state = state_read(args.issue, args.area, monorepo_root)
-            # Only use review_job.status as failure_class for review/resolve-stage
-            # escalations; build or push failures use the step name instead.
-            step_val = state.step.value if hasattr(state.step, "value") else str(state.step)
-            if step_val in ("review_dispatch", "review_wait", "review_process", "resolve"):
-                failure_class = (
-                    state.review_job.status.value
-                    if hasattr(state.review_job.status, "value")
-                    else str(state.review_job.status)
-                )
-            else:
-                failure_class = ""
+            failure_class = _derive_failure_class(state)
             record = AttemptRecord.from_state(state, outcome="escalated", failure_class=failure_class)
             history_append(monorepo_root, record)
     except Exception as e:
@@ -502,14 +502,7 @@ def cmd_history_record(args) -> int:
         try:
             state = state_read(args.issue, args.area, monorepo_root)
             # Explicit --failure-class takes priority; fall back to state's review_job status.
-            if args.failure_class:
-                failure_class = args.failure_class
-            else:
-                failure_class = (
-                    state.review_job.status.value
-                    if hasattr(state.review_job.status, "value")
-                    else str(state.review_job.status)
-                )
+            failure_class = args.failure_class if args.failure_class else _derive_failure_class(state)
             record = AttemptRecord.from_state(
                 state,
                 outcome=args.outcome,

@@ -115,8 +115,8 @@ class AttemptRecord:
             recovery_count=len(getattr(state, "recovery_log", [])),
             started_at=started_at,
             finished_at=_now_iso(),
-            tool=state.review_job.tool,
-            model=state.review_job.model,
+            tool=getattr(state.review_job, "tool", "") if state.review_job else "",
+            model=getattr(state.review_job, "model", "") if state.review_job else "",
         )
 
 
