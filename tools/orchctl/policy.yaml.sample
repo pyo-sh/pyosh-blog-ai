@@ -1,0 +1,47 @@
+# Orchestrator policy configuration
+# Changes to this file take effect on the next reconcile pass.
+# Apply immediately with: orchctl apply-policy
+
+concurrency:
+  # Maximum issues dispatched concurrently per area
+  area_max: 4
+  # Maximum open PRs across all areas (global cap)
+  global_max: 8
+
+merge:
+  # Enable automatic merge via the merge gate
+  # When false, all merge-gate checks fail (no automatic merges)
+  enabled: false
+  # Require all CI checks to pass before merge
+  require_checks: true
+  # Require a clean rebase onto the target branch
+  require_clean_rebase: true
+
+retry:
+  budget_by_class:
+    # Retry budget per failure class (number of re-dispatch attempts)
+    transient: 2
+    build_failure: 1
+    default: 1
+
+scope:
+  # Only dispatch issues with these labels (empty = no filter)
+  include_labels: []
+  # Never dispatch issues with these labels
+  exclude_labels: []
+  # Only dispatch issues in this milestone (empty = no filter)
+  milestone: ""
+
+guardrails:
+  # Only orchestrate against repos in this list (empty = no restriction)
+  repo_allowlist: []
+  # Merging into these branches requires the merge gate to explicitly allow it
+  protected_branches:
+    - main
+  # Maximum concurrently dispatched repair (retry) attempts per area
+  max_concurrent_repair: 1
+  # Allow multiple reconciler processes for the same area simultaneously
+  # false = second reconciler exits immediately (recommended)
+  scheduler_overlap: false
+  # Tools that workers must not call (informational - enforced at dispatch layer)
+  dangerous_tools: []

@@ -52,16 +52,13 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
         IssueState.PENDING,
         IssueState.CANCELLED,
     }),
-    # Terminal states — no outgoing transitions by default.
-    # failed-terminal: retry logic (failed-terminal -> pending) is intentionally
-    #   deferred; the retry_budget column is reserved for a future retry PR.
-    # needs-human / blocked-failed-dependency: operator-intervention re-entry
-    #   edges are also deferred to a future PR.
+    # Operator-override re-entry: requeue allows returning terminal issues to pending.
+    # completed is the only irreversible terminal state.
     IssueState.COMPLETED: frozenset(),
-    IssueState.FAILED_TERMINAL: frozenset(),
-    IssueState.NEEDS_HUMAN: frozenset(),
-    IssueState.BLOCKED_FAILED_DEP: frozenset(),
-    IssueState.CANCELLED: frozenset(),
+    IssueState.FAILED_TERMINAL: frozenset({IssueState.PENDING}),
+    IssueState.NEEDS_HUMAN: frozenset({IssueState.PENDING}),
+    IssueState.BLOCKED_FAILED_DEP: frozenset({IssueState.PENDING}),
+    IssueState.CANCELLED: frozenset({IssueState.PENDING}),
 }
 
 ATTEMPT_TRANSITIONS: dict[AttemptStatus, frozenset[AttemptStatus]] = {

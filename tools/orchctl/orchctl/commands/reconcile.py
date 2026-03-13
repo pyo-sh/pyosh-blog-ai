@@ -14,6 +14,7 @@ from ..db import (
     acquire,
     count_dispatched,
     current_version,
+    get_config,
     get_config_bool,
     get_config_int,
     get_db,
@@ -22,6 +23,7 @@ from ..db import (
     renew,
 )
 from ..db.schema import LATEST_VERSION
+from ..policy import apply_policy, find_policy_file, load_policy
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
 
@@ -33,16 +35,26 @@ from ..state_machine import apply_issue_transition, apply_issue_transition_tx
     help="Area to reconcile.",
 )
 @click.option("--dry-run", is_flag=True, help="Print actions without executing.")
+@click.option(
+    "--policy-file",
+    "policy_file",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Override policy YAML file path (default: auto-detect).",
+)
 @click.pass_context
-def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
+def cmd_reconcile(
+    ctx: click.Context, area: str, dry_run: bool, policy_file: str | None
+) -> None:
     """Run one idempotent reconciliation pass for an area.
 
     Observe → Diff → Act:
-      1. Acquire area lease (scheduler-overlap safety).
-      2. Observe: read issue/attempt state + config from DB.
-      3. Diff: determine actions needed (dispatch, mark-complete, unblock, cleanup).
-      4. Act: execute actions under admission control.
-      5. Release lease.
+      1. Load policy.yaml if present (syncs config from file).
+      2. Acquire area lease (scheduler-overlap safety).
+      3. Observe: read issue/attempt state + config from DB.
+      4. Diff: determine actions needed (dispatch, mark-complete, unblock, cleanup).
+      5. Act: execute actions under admission control.
+      6. Release lease.
 
     Safe to call from systemd timer or cron — concurrent invocations for the
     same area exit immediately if the lease is already held.
@@ -59,9 +71,19 @@ def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
                 "— run `orchctl init` to migrate."
             )
 
+        # Load policy.yaml on every reconcile pass so changes take effect immediately.
+        _load_policy_if_present(conn, area, policy_file, dry_run)
+
         pid = os.getpid()
         if not acquire(conn, area, pid):
-            click.echo(f"reconcile [{area}]: lease held by another process — skipping.")
+            overlap_ok = get_config_bool(conn, "scheduler_overlap", default=False)
+            if not overlap_ok:
+                click.echo(
+                    f"reconcile [{area}]: lease held by another process"
+                    " (scheduler_overlap=false) — skipping."
+                )
+            else:
+                click.echo(f"reconcile [{area}]: lease held by another process — skipping.")
             return
 
         try:
@@ -73,8 +95,41 @@ def cmd_reconcile(ctx: click.Context, area: str, dry_run: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Policy loading
+# ---------------------------------------------------------------------------
+
+
+def _load_policy_if_present(
+    conn: sqlite3.Connection,
+    area: str,
+    policy_file: str | None,
+    dry_run: bool,
+) -> None:
+    """Attempt to load policy.yaml and sync to DB config."""
+    from pathlib import Path
+
+    path = Path(policy_file) if policy_file else find_policy_file()
+    if path is None:
+        return
+    try:
+        policy = load_policy(path)
+        changed = apply_policy(conn, policy) if not dry_run else []
+        if changed:
+            click.echo(
+                f"reconcile [{area}]: policy '{path}' applied"
+                f" — {len(changed)} config key(s) updated."
+            )
+    except Exception as exc:  # noqa: BLE001 — policy errors must not abort reconcile
+        click.echo(
+            f"reconcile [{area}]: warning — could not load policy '{path}': {exc}",
+            err=True,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Reconcile pass
 # ---------------------------------------------------------------------------
+
 
 def _run_pass(
     conn: sqlite3.Connection,
@@ -98,7 +153,7 @@ def _run_pass(
             Used in tests to observe or replace the actual launch logic.
     """
     issues_by_state = _observe_issues(conn, area)
-    config = _observe_config(conn)
+    config = _observe_config(conn, area)
 
     if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state):
         return
@@ -111,12 +166,13 @@ def _run_pass(
 # Observe helpers
 # ---------------------------------------------------------------------------
 
+
 def _observe_issues(
     conn: sqlite3.Connection, area: str
 ) -> dict[str, list[sqlite3.Row]]:
     """Return all issues for the area grouped by state."""
     rows = conn.execute(
-        "SELECT id, number, state, dependency_type FROM issues WHERE area = ?",
+        "SELECT id, number, state, dependency_type, retry_count FROM issues WHERE area = ?",
         (area,),
     ).fetchall()
     by_state: dict[str, list[sqlite3.Row]] = defaultdict(list)
@@ -125,18 +181,23 @@ def _observe_issues(
     return dict(by_state)
 
 
-def _observe_config(conn: sqlite3.Connection) -> dict:
+def _observe_config(conn: sqlite3.Connection, area: str) -> dict:
     """Read relevant config keys from the DB."""
     return {
         "max_concurrent": get_config_int(conn, "max_concurrent", default=4),
         "max_open_pr": get_config_int(conn, "max_open_pr", default=2),
         "drain_mode": get_config_bool(conn, "drain_mode", default=False),
+        "area_paused": get_config_bool(conn, f"{area}.paused", default=False),
+        "repo_allowlist": get_config(conn, "repo_allowlist", default=""),
+        "area_repo": get_config(conn, f"{area}.repo", default=""),
+        "max_concurrent_repair": get_config_int(conn, "max_concurrent_repair", default=1),
     }
 
 
 # ---------------------------------------------------------------------------
 # Mark-complete pass
 # ---------------------------------------------------------------------------
+
 
 def _mark_complete_pass(
     conn: sqlite3.Connection,
@@ -194,6 +255,7 @@ def _mark_complete_pass(
 # Unblock pass
 # ---------------------------------------------------------------------------
 
+
 def _unblock_pass(
     conn: sqlite3.Connection,
     area: str,
@@ -238,6 +300,7 @@ def _unblock_pass(
 # Dispatch pass (admission control)
 # ---------------------------------------------------------------------------
 
+
 def _dispatch_pass(
     conn: sqlite3.Connection,
     area: str,
@@ -250,19 +313,39 @@ def _dispatch_pass(
     """Dispatch pending issues subject to admission control.
 
     Admission gates (first failure stops dispatch for remaining issues):
-      1. Drain mode: no new dispatches when enabled.
-      2. maxConcurrent: per-area limit on issues in 'dispatched' state.
-      3. maxOpenPR: global limit on issues in 'dispatched' state across all areas.
+      1. Drain mode: no new dispatches when enabled globally.
+      2. Area pause: no new dispatches when area is paused.
+      3. Repo allowlist guardrail: area repo must be in the allowlist.
+      4. maxConcurrent: per-area limit on issues in 'dispatched' state.
+      5. maxOpenPR: global limit on issues in 'dispatched' state across all areas.
          Enforced atomically inside _record_dispatch to prevent TOCTOU races
          when multiple area reconcilers run concurrently.
-      4. Per-issue: skip if an active attempt already exists.
+      6. maxConcurrentRepair: cap on concurrently dispatched retry attempts.
+      7. Per-issue: skip if an active attempt already exists.
     """
     if config["drain_mode"]:
         click.echo(f"reconcile [{area}]: drain mode active — no new dispatches.")
         return
 
+    if config["area_paused"]:
+        click.echo(f"reconcile [{area}]: area is paused — no new dispatches.")
+        return
+
+    # Repo allowlist guardrail: if configured, area repo must be in the list.
+    repo_allowlist_raw = config["repo_allowlist"]
+    if repo_allowlist_raw:
+        allowed_repos = {r.strip() for r in repo_allowlist_raw.split(",") if r.strip()}
+        area_repo = config["area_repo"].strip()
+        if area_repo and area_repo not in allowed_repos:
+            click.echo(
+                f"reconcile [{area}]: guardrail — repo '{area_repo}' not in allowlist"
+                " — no dispatches."
+            )
+            return
+
     max_concurrent = config["max_concurrent"]
     max_open_pr = config["max_open_pr"]
+    max_repair = config["max_concurrent_repair"]
 
     pending = issues_by_state.get("pending", [])
     if not pending:
@@ -292,6 +375,18 @@ def _dispatch_pass(
             )
             return
 
+        # maxConcurrentRepair: limit simultaneously dispatched retry attempts.
+        retry_count = issue["retry_count"] if "retry_count" in issue.keys() else 0
+        if retry_count > 0:
+            active_repairs = _count_active_repairs(conn, area)
+            if active_repairs >= max_repair:
+                click.echo(
+                    f"reconcile [{area}]: issue #{issue['number']} is a repair attempt"
+                    f" (retry_count={retry_count}); maxConcurrentRepair={max_repair} reached"
+                    " — skipping."
+                )
+                continue
+
         issue_id = issue["id"]
         number = issue["number"]
 
@@ -319,6 +414,15 @@ def _dispatch_pass(
                 return
             if dispatch_fn is not None:
                 dispatch_fn(area, issue_id, number, attempt_id)
+
+
+def _count_active_repairs(conn: sqlite3.Connection, area: str) -> int:
+    """Count dispatched issues in the area that have retry_count > 0."""
+    row = conn.execute(
+        "SELECT COUNT(*) FROM issues WHERE area = ? AND state = 'dispatched' AND retry_count > 0",
+        (area,),
+    ).fetchone()
+    return row[0]
 
 
 def _record_dispatch(

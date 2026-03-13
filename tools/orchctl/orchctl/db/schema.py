@@ -215,6 +215,35 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        5,
+        """
+        -- v5: policy config + merge gate + guardrails
+
+        -- retry_count tracks how many times an issue has been re-dispatched
+        ALTER TABLE issues ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
+
+        -- merge_state tracks per-issue merge gate status
+        ALTER TABLE issues ADD COLUMN merge_state TEXT NOT NULL DEFAULT 'none'
+            CHECK(merge_state IN ('none', 'eligible', 'pending', 'done', 'rejected'));
+
+        -- Policy config defaults
+        INSERT INTO config (key, value) VALUES
+            ('merge_enabled',              'false'),
+            ('merge_require_checks',       'true'),
+            ('merge_require_clean_rebase', 'true'),
+            ('scope_include_labels',       ''),
+            ('scope_exclude_labels',       ''),
+            ('scope_milestone',            ''),
+            ('repo_allowlist',             ''),
+            ('protected_branches',         'main'),
+            ('max_concurrent_repair',      '1'),
+            ('scheduler_overlap',          'false'),
+            ('dangerous_tools',            ''),
+            ('retry_budget_by_class',      '{}')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
