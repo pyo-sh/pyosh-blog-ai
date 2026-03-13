@@ -271,7 +271,17 @@ MIGRATIONS: list[tuple[int, str]] = [
     (
         8,
         """
-        -- v8: stall detection threshold
+        -- v8: failure classification system
+        -- Adds failure_class to attempts so each attempt records its own class.
+        -- The issues.failure_class column (added in v1) already tracks the most
+        -- recent failure class at the issue level.
+        ALTER TABLE attempts ADD COLUMN failure_class TEXT;
+        """,
+    ),
+    (
+        9,
+        """
+        -- v9: stall detection threshold
         -- stall_threshold_s: activity window in seconds for multi-signal stall detection.
         -- Independent of heartbeat_ttl (which governs lease renewal).
         -- Default matches the SIGNAL_THRESHOLD_S constant in orchctl.heartbeat.
