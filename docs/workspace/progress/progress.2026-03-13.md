@@ -1,5 +1,42 @@
 # Progress 2026-03-13
 
+## orchctl failure classification system (#95, PR #191)
+
+- **목적**: 실패를 단일 `failed-terminal` 대신 10개 유형으로 분류하여 playbook 기반 자동 대응의 기반 마련
+- **`FailureClass` + `NextAction` enum** (`tools/orchctl/orchctl/models.py`):
+  - 11개 값: `infra_crash`, `timeout`, `git_conflict`, `flaky_test`, `deterministic_test_failure`, `permission_auth`, `dependency_unresolved`, `issue_spec_ambiguous`, `ci_external_outage`, `rate_limit`, `unknown`
+  - `NextAction` 4개 값: `retry`, `repair`, `escalate`, `pause`
+  - `FAILURE_CLASS_NEXT_ACTION` dict - 각 class별 기본 next_action 매핑
+- **`failure_classifier.py` 신규** (`tools/orchctl/orchctl/failure_classifier.py`):
+  - `classify(attempt_status, terminal_json_text, log_text)` - 순수 함수, `timed-out` 단축 + 정렬된 regex 패턴 매칭
+  - `next_action_for_class(fc)` - `FAILURE_CLASS_NEXT_ACTION` 조회
+  - `record_failure_class(conn, issue_id, attempt_id, fc)` - `attempts` + `issues` 양쪽에 기록
+  - `classify_and_record(...)` - 분류 + 기록 일괄 처리 (편의 함수)
+  - INFRA_CRASH를 DETERMINISTIC_TEST_FAILURE보다 앞에 배치 - OOM/signal 신호가 test failure로 오분류 방지
+  - `\boom\b` 단어 경계 사용 - `bloom`/`room` 등 부분 문자열 false positive 방지
+- **Schema v8** (`tools/orchctl/orchctl/db/schema.py`):
+  - `attempts.failure_class TEXT` 컬럼 추가 (per-attempt 분류 기록용)
+  - `issues.failure_class` (v1부터 존재) - 최신 attempt 분류를 issue 레벨에도 기록
+- **`reconcile.py` `_mark_complete_pass` 수정**:
+  - `failed`/`timed-out` attempt 발생 시 `classify()` 호출 (dry-run 포함 - 순수 함수이므로 무조건 호출)
+  - `record_failure_class()` - `not dry_run`일 때만 DB 기록
+  - `_next_action_to_state()` 신규 헬퍼 - `retry_budget_by_class` 정책 조회, 예산 소진 시 `failed-terminal`, `pause` → `blocked-external`, `escalate` → `needs-human`
+  - `retry_count` 증가도 `dry_run` guard 적용
+  - budget-exhausted 로그 메시지를 `'escalating'` → `'marking failed-terminal'`으로 수정 (실제 상태와 일치)
+  - `int()` null guard 추가 - `budget_by_class[key] = null` 설정 시 `TypeError` 방지
+- **테스트 45개 신규** (`tools/orchctl/tests/test_failure_classifier.py`):
+  - 28개 parametrize - 11개 class 전체 경로, `timed-out` 단축, invalid JSON, INFRA_CRASH/DETERMINISTIC 순서 검증
+  - `test_oom_word_boundary_no_false_positive` - `bloom`/`room` false positive + `out of memory`/`oom` 정상 매칭 검증
+  - `test_infra_crash_not_shadowed_by_test_failure` - `pytest failed: process killed by signal 9` → INFRA_CRASH
+  - DB 기록 검증 2개
+- **6라운드 리뷰**:
+  - R1: dry-run에서 UNKNOWN/ESCALATE 하드코딩 → 실제 `classify()` 호출로 수정, `_next_action_to_state` dry-run guard 누락
+  - R2: `classify()` 이중 호출 → `record_failure_class()` 분리, 테스트 추가, docstring 수정, `pnpm test` 패턴 축소
+  - R3: dry-run 지표 누락 (`(dry-run)` suffix), INFRA_CRASH < DETERMINISTIC_TEST_FAILURE 순서 버그
+  - R4: budget-exhausted 로그 오해(`escalating` vs `failed-terminal`), 미사용 `import json` 제거
+  - R5: bare `\boom\b` false positive, `int(None)` TypeError 가드
+  - R6: clean (Critical 0, Warning 0)
+
 ## Legacy cutover / shell compatibility migration (#94, PR #190)
 
 - **목적**: 기존 shell orchestrator(`batch.state.json`)에서 orchctl/SQLite로 안전하게 전환하는 migration 도구, cutover flag, single-writer 보장, rollback 절차 구현

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | orchctl failure classification system (#95, PR #191) - FailureClass(11) + NextAction(4) enum, failure_classifier.py(regex pattern table, timed-out short-circuit, INFRA_CRASH/oom word-boundary fixes), schema v8(attempts.failure_class), reconcile retry budget routing, int() null guard, 45 tests, 6라운드 리뷰 | done |
 | 2026-03-13 | legacy cutover / shell compatibility migration (#94, PR #190) - orchctl import-state(13 state 매핑), schema v7 legacy_mode, control cutover/rollback, orch_assert_legacy_active sentinel 가드, 3라운드 리뷰, 287 tests | done |
 | 2026-03-13 | dev-orchestrator SKILL.md thin wrapper over orchctl (#93, PR #189) - 240줄→210줄 shell-helper 제거, start/resume/status/doctor/reconcile/pause/drain/stop orchctl 매핑, Poll loop 1h 타임아웃, Invariants/Policy/References 복원, 5라운드 리뷰 APPROVE | done |
 | 2026-03-13 | orchctl policy config + operational commands + merge gate (#92, PR #187) - YAML policy 로더, control(pause/resume/drain/undrain/stop/cancel-attempt/requeue), 5-check merge gate, repo allowlist/scheduler_overlap/owns_lease guardrails, schema v6(retry_count/merge_state), 262 tests | done |
