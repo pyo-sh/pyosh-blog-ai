@@ -1,6 +1,15 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #45 Admin 글 목록 페이지 PR #137 머지
+  - PR: `feat: add admin posts page (#45)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/posts/page.tsx`
+  - supporting fix: `src/entities/post/api.ts`에서 관리자 단건/목록 조회가 클라이언트 컴포넌트에서도 `clientFetch`를 사용하도록 보완
+  - review fix: 존재하지 않는 `/dashboard/posts/new`, `/dashboard/posts/[id]` 링크를 제거하고 후속 이슈 연결 전까지 비활성 안내로 전환
+  - verification: `pnpm lint && pnpm build && pnpm compile:types`
+  - merge: squash merge, merge commit `382e2bc6ada1c69dfa9a8a012e52343c651d9bf2`
+  - branch: `feat/issue-45-admin-posts` (remote branch deleted, local issue worktree cleanup pending at log time)
 - [x] #44 Admin Post API functions PR #135 머지
   - PR: `feat: add admin post api functions (#44)`
   - merge target: `main`
@@ -40,6 +49,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- Admin list UI could not call the existing admin read helpers from a client component until `fetchAdminPost` and `fetchAdminPosts` supported a browser `clientFetch` path when no server cookie header is provided.
+- The initial `#45` UI matched the issue text but exposed `/dashboard/posts/new` and `/dashboard/posts/[id]` targets that do not exist yet in this branch, so the review required removing those navigation links instead of advertising broken flows.
 - Admin post mutations are not usable with the current shared client fetch path unless empty `204/205` responses are handled before unconditional JSON parsing.
 - For this repo, a fresh issue worktree can reuse `/workspace/client/node_modules` via symlink to run verification without a second full dependency install.
 - The initial `CategoryNav` widget matched the issue text but still needed a real `src/app/categories/[slug]` route in this app tree; otherwise every category pill except "전체" would land on a 404.
@@ -59,6 +70,10 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: `#45` needed to fetch admin posts inside a `use client` page, but the existing admin read helpers only used `serverFetch`, which expects a server-side cookie header.
+- **Resolution**: updated `src/entities/post/api.ts` so admin read helpers use `clientFetch` in browser contexts and keep `serverFetch` for server-side callers.
+- **Issue**: The first review on PR #137 identified that the list page linked to `/dashboard/posts/new` and `/dashboard/posts/[id]`, but those routes are not implemented yet and caused immediate 404s.
+- **Resolution**: removed the broken links, kept the list page read-only for navigation, and changed the header CTA to a non-interactive `준비 중` indicator until the actual create/edit routes land.
 - **Issue**: Admin post delete endpoints return `204 No Content`, but the shared `clientFetch` path always attempted `response.json()` on success.
 - **Resolution**: added an early return for `204/205` responses in `src/shared/api/client.ts` so `deletePost` and `hardDeletePost` can resolve safely.
 - **Issue**: The fresh `issue-44` worktree had no local `node_modules`, so `pnpm compile:types` initially failed with `tsc: not found`.
@@ -77,9 +92,12 @@
 - **Resolution**: created a fresh issue branch from `main`, cherry-picked only the `#30` feature commit, opened PR #132, then addressed the review warning with project-owned markdown styles before merge.
 
 ## Next Steps
+- [ ] Add actual `/dashboard/posts/new` and `/dashboard/posts/[id]` admin routes, then reconnect the create/edit navigation removed during PR #137 review.
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #137
+- Related Issue: #45
 - Related PR: #135
 - Related Issue: #44
 - Related PR: #134
