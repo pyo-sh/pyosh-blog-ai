@@ -1,5 +1,29 @@
 # Progress 2026-03-14
 
+## Agent tracker: read-only UI + footer semantics (#114, PR #198)
+
+Stage 3 of the agent-tracker series. The tmux dashboard now consumes the Python backend normalized export instead of calling `lib/collect.sh` directly, and footer status aggregation correctly separates fault/unknown/stale from idle.
+
+### Changes merged
+
+- **`agent-tracker.sh`** - spawns Python backend daemon on startup (`python3 -m backend --interval $INTERVAL`); main loop reads from `current.json` export file; PYTHONPATH prepended (not overwritten); cleanup() waits for backend PID; startup liveness poll (5x100 ms) warns on early exit
+- **`lib/render.sh`** - separate `n_fault` / `n_unknown` counters (no longer merged into `n_idle`); footer shows dead-orch count; `.orchestrators` key supported (Python backend v1 export); `.orchestrator` legacy key fallback retained via `// .orchestrator // []`; null-area guard in dead-orch jq filter
+- **`lib/collect.sh`** - unchanged; preserved for reference but no longer called by the UI
+- **`tests/test-footer-semantics.sh`** (new) - 23 tests covering fault/unknown/stale separation, null-area filtering, and both key names for dead-orch counting
+
+### Key design decisions
+
+- **Daemon model**: `agent-tracker.sh` starts the backend as a child process and reads from its output file; coupling `--interval` to `$INTERVAL` keeps display refresh and export cadence in sync
+- **Backward compat**: render.sh accepts both `.orchestrators` (Python backend) and `.orchestrator` (legacy bash snapshot) via jq `//` fallback, applied consistently at all three call sites
+- **Pre-increment vs post-increment**: `(( ++var ))` required in tests under `set -euo pipefail` since `(( 0 ))` exits with code 1
+
+### Review rounds
+
+- Round 1 (SUGGESTION): silent backend failure with no user warning - added startup liveness check
+- Round 2 (WARNING): PYTHONPATH clobber, hardcoded 0.5 s sleep, cleanup not waiting for backend - all fixed
+- Round 3 (WARNING): `(( n_total++ ))` post-increment breaks tests under set -e; `grep -c .` counting null jq output - fixed with pre-increment and null-area jq guard
+- Round 4 (SUGGESTION only): test filter inconsistency, `if ! $_alive` idiom, interval comment - all applied; auto-merged
+
 ## orchctl history / audit query (#103, PR #194)
 
 Implemented Stage 4 observability feature: persistent attempt history log and `orchctl history` query command for failure pattern analysis.
