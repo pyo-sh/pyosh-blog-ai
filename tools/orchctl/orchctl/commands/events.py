@@ -34,19 +34,19 @@ def cmd_events_list(
         if current_version(conn) == 0:
             raise click.ClickException("Database not initialised — run `orchctl init` first.")
 
-        conditions: list[str] = []
-        params: list[object] = []
+        # Each filter is a (predicate_literal, value) pair so the WHERE
+        # structure is always composed from fixed string constants and user
+        # values are bound via parameters — never interpolated into SQL.
+        filters: list[tuple[str, object]] = []
         if area:
-            conditions.append("area = ?")
-            params.append(area)
+            filters.append(("area = ?", area))
         if event_type:
-            conditions.append("event_type = ?")
-            params.append(event_type)
+            filters.append(("event_type = ?", event_type))
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        params.append(limit)
+        where = ("WHERE " + " AND ".join(p for p, _ in filters)) if filters else ""
+        params: list[object] = [v for _, v in filters] + [limit]
         rows = conn.execute(
-            f"SELECT id, area, issue_id, event_type, payload, created_at "
+            f"SELECT id, area, issue_id, event_type, payload, created_at "  # noqa: S608
             f"FROM events {where} ORDER BY id DESC LIMIT ?",
             params,
         ).fetchall()

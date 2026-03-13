@@ -53,6 +53,14 @@ def emit_event(
     ``emit_event`` calls ``conn.commit()`` internally; passing a connection
     with uncommitted DML would prematurely commit that work.
 
+    Design note: because this function issues its own ``conn.commit()``, the
+    event insert cannot be made atomic with a preceding state-change on the
+    same connection. A crash between the state-change commit and this call
+    will lose the event row. This tradeoff is acceptable for the current
+    CLI/observer use-case. If ``emit_event`` is later wired into the
+    orchestrator's hot path, consider accepting a ``db_path`` so it can open
+    an independent connection.
+
     Returns the new event *id*.
     """
     if conn.in_transaction:
@@ -109,8 +117,13 @@ def _fire(url: str, body: str) -> None:
 
 
 def _start_webhook_thread(url: str, body: str) -> None:
-    """Start a daemon thread to fire the webhook without blocking the caller."""
-    threading.Thread(target=_fire, args=(url, body), daemon=True).start()
+    """Start a non-daemon thread to fire the webhook without blocking the caller.
+
+    Non-daemon so the process stays alive (up to the 5-second HTTP timeout)
+    until delivery completes. Daemon threads are killed on process exit and
+    would silently drop notifications in short-lived CLI invocations.
+    """
+    threading.Thread(target=_fire, args=(url, body), daemon=False).start()
 
 
 def _maybe_dispatch_webhook(
