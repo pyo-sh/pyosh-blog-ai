@@ -24,7 +24,7 @@ from ..db import (
     renew,
 )
 from ..db.schema import LATEST_VERSION
-from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
+from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues, post_issue_comment
 from ..failure_classifier import classify, next_action_for_class, record_failure_class
 from ..models import (
     ISSUE_TRANSITIONS,
@@ -436,6 +436,7 @@ def _next_action_to_state(
                     "UPDATE issues SET retry_count = retry_count + 1 WHERE id = ?",
                     (issue_id,),
                 )
+                _post_retry_comment(area, number, retry_count + 1, budget, failure_class)
             click.echo(
                 f"reconcile [{area}]: issue #{number}"
                 f" retry {retry_count + 1}/{budget} scheduled{' (dry-run)' if dry_run else ''}."
@@ -443,16 +444,57 @@ def _next_action_to_state(
             return IssueState.PENDING.value
         click.echo(
             f"reconcile [{area}]: issue #{number}"
-            f" retry budget exhausted ({retry_count}/{budget}) — marking failed-terminal"
+            f" retry budget exhausted ({retry_count}/{budget}) — escalating to needs-human"
             f"{' (dry-run)' if dry_run else ''}."
         )
-        return IssueState.FAILED_TERMINAL.value
+        if not dry_run:
+            _post_budget_exhausted_comment(area, number, retry_count, budget, failure_class)
+        return IssueState.NEEDS_HUMAN.value
 
     if next_action == NextAction.PAUSE:
         return IssueState.BLOCKED_EXTERNAL.value
 
     # ESCALATE (default)
     return IssueState.NEEDS_HUMAN.value
+
+
+def _post_retry_comment(
+    area: str,
+    number: int,
+    attempt_num: int,
+    budget: int,
+    failure_class: FailureClass,
+) -> None:
+    """Post a retry-scheduled comment to the GitHub issue. Non-fatal on error."""
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+    body = (
+        f"**Auto-retry scheduled** (attempt {attempt_num}/{budget})\n\n"
+        f"- Failure class: `{failure_class.value}`\n"
+        f"- Remaining budget: {budget - attempt_num}"
+    )
+    post_issue_comment(repo, number, body)
+
+
+def _post_budget_exhausted_comment(
+    area: str,
+    number: int,
+    retry_count: int,
+    budget: int,
+    failure_class: FailureClass,
+) -> None:
+    """Post a budget-exhausted escalation comment to the GitHub issue. Non-fatal on error."""
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+    body = (
+        f"**Retry budget exhausted** — escalating to `needs-human`\n\n"
+        f"- Failure class: `{failure_class.value}`\n"
+        f"- Attempts made: {retry_count}/{budget}\n\n"
+        "Human review required."
+    )
+    post_issue_comment(repo, number, body)
 
 
 # ---------------------------------------------------------------------------

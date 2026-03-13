@@ -113,9 +113,13 @@ class TestTransitionIssuePure:
         with pytest.raises(InvalidTransitionError):
             transition_issue("pending", "completed")
 
-    def test_dispatched_cannot_go_to_pending(self):
+    def test_dispatched_can_retry_to_pending(self):
+        # auto-retry: dispatched → pending is valid (failure within budget)
+        assert transition_issue("dispatched", "pending") == "pending"
+
+    def test_dispatched_cannot_go_to_blocked_failed_dep(self):
         with pytest.raises(InvalidTransitionError):
-            transition_issue("dispatched", "pending")
+            transition_issue("dispatched", "blocked-failed-dependency")
 
     def test_dispatched_cannot_go_to_blocked(self):
         with pytest.raises(InvalidTransitionError):

@@ -79,6 +79,7 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
         IssueState.NEEDS_HUMAN,
         IssueState.BLOCKED_EXTERNAL,
         IssueState.CANCELLED,
+        IssueState.PENDING,  # auto-retry: attempt failed within budget
     }),
     IssueState.BLOCKED: frozenset({
         IssueState.PENDING,
