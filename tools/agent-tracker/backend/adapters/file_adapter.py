@@ -17,7 +17,7 @@ def read_json(path: str | Path) -> dict | None:
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
 

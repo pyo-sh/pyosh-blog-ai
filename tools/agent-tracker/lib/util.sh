@@ -24,11 +24,15 @@ make_line() {
 }
 
 # display_width <string> — terminal display columns (CJK=2, ASCII=1)
-# ASCII fast path avoids subshell for pure-ASCII strings
+# ASCII fast path avoids subshell for pure-ASCII strings.
+# For non-ASCII: prefers Python (cross-platform), falls back to wc -L (GNU/Linux only).
+_DISPLAY_WIDTH_PY="${BASH_SOURCE[0]%/*}/display_width.py"
 display_width() {
   local s="$1"
   if [[ "$s" != *[^[:ascii:]]* ]]; then
     printf '%d' "${#s}"
+  elif command -v python3 >/dev/null 2>&1 && [[ -f "$_DISPLAY_WIDTH_PY" ]]; then
+    printf '%s' "$s" | python3 "$_DISPLAY_WIDTH_PY"
   else
     printf '%s' "$s" | wc -L
   fi
