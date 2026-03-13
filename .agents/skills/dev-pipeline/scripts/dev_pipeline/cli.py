@@ -127,11 +127,17 @@ def cmd_escalation(args) -> int:
         from .state_store import state_exists, state_read
         if state_exists(args.issue, args.area, monorepo_root):
             state = state_read(args.issue, args.area, monorepo_root)
-            failure_class = (
-                state.review_job.status.value
-                if hasattr(state.review_job.status, "value")
-                else str(state.review_job.status)
-            )
+            # Only use review_job.status as failure_class for review/resolve-stage
+            # escalations; build or push failures use the step name instead.
+            step_val = state.step.value if hasattr(state.step, "value") else str(state.step)
+            if step_val in ("review_dispatch", "review_wait", "review_process", "resolve"):
+                failure_class = (
+                    state.review_job.status.value
+                    if hasattr(state.review_job.status, "value")
+                    else str(state.review_job.status)
+                )
+            else:
+                failure_class = ""
             record = AttemptRecord.from_state(state, outcome="escalated", failure_class=failure_class)
             history_append(monorepo_root, record)
     except Exception as e:

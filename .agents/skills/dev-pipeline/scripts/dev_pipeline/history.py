@@ -166,7 +166,7 @@ def history_read(
         return []
 
     records: List[AttemptRecord] = []
-    with open(log_path) as f:
+    with open(log_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -294,11 +294,10 @@ def history_patterns(records: List[AttemptRecord]) -> dict:
     )
 
     # --- repeated issue failures ---
-    issue_key = lambda r: (r.area, r.issue)
     issue_counts: Dict[tuple, int] = defaultdict(int)
     issue_classes: Dict[tuple, list] = defaultdict(list)
     for r in failed:
-        k = issue_key(r)
+        k = (r.area, r.issue)
         issue_counts[k] += 1
         issue_classes[k].append(r.failure_class or "(unknown)")
 
