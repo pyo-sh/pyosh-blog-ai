@@ -27,7 +27,12 @@ from ..db.schema import LATEST_VERSION
 from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
 from ..models import ISSUE_TRANSITIONS, IssueState, TERMINAL_ISSUE_STATES
 from ..policy import apply_policy, find_policy_file, load_policy
-from ..state_machine import apply_issue_transition, apply_issue_transition_tx
+from ..heartbeat import check_stall
+from ..state_machine import (
+    apply_attempt_transition,
+    apply_issue_transition,
+    apply_issue_transition_tx,
+)
 
 
 @click.command("reconcile")
@@ -174,6 +179,8 @@ def _run_pass(
     # Re-read after discovery so newly-enqueued issues appear in pending.
     issues_by_state = _observe_issues(conn, area)
     if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
+        return
+    if not _heartbeat_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
     if not _unblock_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
@@ -372,6 +379,105 @@ def _mark_complete_pass(
             )
             if not dry_run:
                 apply_issue_transition(conn, issue_id, "failed-terminal")
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat pass
+# ---------------------------------------------------------------------------
+
+
+def _heartbeat_pass(
+    conn: sqlite3.Connection,
+    area: str,
+    pid: int,
+    dry_run: bool,
+    issues_by_state: dict,
+    owns_lease: bool = True,
+) -> bool:
+    """Collect multi-signal heartbeats for dispatched issues; stall detection.
+
+    For each dispatched issue with a running attempt:
+      1. Collect 4 signals: PR commit activity, pipeline state file mtime,
+         worker log mtime, CPU jiffies delta.
+      2. Record the snapshot in the heartbeats table.
+      3. If 2 or more signals are absent, the attempt is marked 'timed-out'
+         and the issue transitions to 'failed-terminal'.
+
+    A single absent signal is ignored (transient network hiccup, brief I/O
+    pause, pre-PR state).  Two or more absent signals indicate a genuine stall.
+
+    Returns True on success, False if the lease was lost (caller should abort).
+    """
+    dispatched = issues_by_state.get("dispatched", [])
+    if not dispatched:
+        return True
+
+    monorepo_root = os.environ.get("MONOREPO_ROOT", os.getcwd())
+
+    for issue in dispatched:
+        if owns_lease and not renew(conn, area, pid):
+            click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
+            return False
+
+        issue_id = issue["id"]
+        number = issue["number"]
+
+        attempt = conn.execute(
+            """
+            SELECT attempt_id, pid FROM attempts
+            WHERE issue_id = ? AND status = 'running'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (issue_id,),
+        ).fetchone()
+
+        if attempt is None:
+            continue
+
+        attempt_id = attempt["attempt_id"]
+        worker_pid = attempt["pid"]
+
+        if dry_run:
+            click.echo(
+                f"reconcile [{area}]: issue #{number} heartbeat check (dry-run)."
+            )
+            continue
+
+        stalled, snapshot = check_stall(
+            conn,
+            area=area,
+            issue_number=number,
+            attempt_id=attempt_id,
+            pid=worker_pid,
+            monorepo_root=monorepo_root,
+        )
+
+        click.echo(
+            f"reconcile [{area}]: issue #{number} heartbeat:"
+            f" pr_commit={snapshot.pr_commit},"
+            f" state_mtime={snapshot.state_mtime},"
+            f" log_mtime={snapshot.log_mtime},"
+            f" cpu_delta={snapshot.cpu_delta}"
+            f" (absent={snapshot.absent_count})"
+        )
+
+        if stalled:
+            click.echo(
+                f"reconcile [{area}]: issue #{number} stalled"
+                f" ({snapshot.absent_count}/4 signals absent)"
+                " → marking timed-out."
+            )
+            try:
+                apply_attempt_transition(conn, attempt_id, "timed-out")
+                apply_issue_transition(conn, issue_id, "failed-terminal")
+            except Exception as exc:  # noqa: BLE001
+                click.echo(
+                    f"reconcile [{area}]: issue #{number} stall transition failed: {exc}",
+                    err=True,
+                )
 
     return True
 
