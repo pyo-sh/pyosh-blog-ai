@@ -13,6 +13,7 @@ class IssueState(str, Enum):
     CANCELLED = "cancelled"
     BLOCKED = "blocked"
     BLOCKED_FAILED_DEP = "blocked-failed-dependency"
+    CYCLE_ISOLATED = "cycle-isolated"
 
 
 class AttemptStatus(str, Enum):
@@ -85,6 +86,7 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
         IssueState.PENDING,
         IssueState.BLOCKED_FAILED_DEP,
         IssueState.CANCELLED,
+        IssueState.CYCLE_ISOLATED,  # cycle quarantine
     }),
     IssueState.BLOCKED_EXTERNAL: frozenset({
         IssueState.PENDING,
@@ -98,6 +100,7 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
     IssueState.NEEDS_HUMAN: frozenset({IssueState.PENDING}),
     IssueState.BLOCKED_FAILED_DEP: frozenset({IssueState.PENDING}),
     IssueState.CANCELLED: frozenset({IssueState.PENDING}),
+    IssueState.CYCLE_ISOLATED: frozenset({IssueState.PENDING}),  # operator requeue
 }
 
 ATTEMPT_TRANSITIONS: dict[AttemptStatus, frozenset[AttemptStatus]] = {
@@ -119,6 +122,7 @@ TERMINAL_ISSUE_STATES: frozenset[IssueState] = frozenset({
     IssueState.NEEDS_HUMAN,
     IssueState.BLOCKED_FAILED_DEP,
     IssueState.CANCELLED,
+    IssueState.CYCLE_ISOLATED,
 })
 
 TERMINAL_ATTEMPT_STATUSES: frozenset[AttemptStatus] = frozenset({

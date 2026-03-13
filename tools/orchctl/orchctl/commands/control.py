@@ -98,11 +98,19 @@ def cmd_pause(ctx: click.Context, area: str) -> None:
 @click.argument("area")
 @click.pass_context
 def cmd_resume(ctx: click.Context, area: str) -> None:
-    """Resume dispatches for AREA."""
+    """Resume dispatches for AREA.
+
+    Also clears any rate-limit backoff state (backoff_count, backoff_until,
+    infra_degraded) so the area re-enters normal exponential-backoff on the
+    next rate-limit event rather than immediately re-entering infra-degraded.
+    """
     conn = get_db(ctx.obj.get("db_path"))
     try:
         _require_ready(conn)
         set_config(conn, _pause_key(area), "false")
+        set_config(conn, f"{area}.infra_degraded", "false")
+        set_config(conn, f"{area}.backoff_count", "0")
+        set_config(conn, f"{area}.backoff_until", "")
         click.echo(f"control [{area}]: resumed.")
     finally:
         conn.close()
@@ -240,7 +248,7 @@ def cmd_requeue(ctx: click.Context, area: str, issue_number: int) -> None:
                 f"Issue #{issue_number} not found in area '{area}'."
             )
         state = issue_row["state"]
-        _REQUEUEABLE = {"failed-terminal", "cancelled", "needs-human", "blocked-failed-dependency"}
+        _REQUEUEABLE = {"failed-terminal", "cancelled", "needs-human", "blocked-failed-dependency", "cycle-isolated"}
         if state not in _REQUEUEABLE:
             raise click.ClickException(
                 f"Issue #{issue_number} is in state '{state}'; "

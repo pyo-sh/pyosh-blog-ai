@@ -111,8 +111,8 @@ def test_global_quota_config_is_max_open_pr(conn):
     assert val == 2
 
 
-def test_latest_version_is_14():
-    assert LATEST_VERSION == 14
+def test_latest_version_is_15():
+    assert LATEST_VERSION == 15
 
 
 # ---------------------------------------------------------------------------

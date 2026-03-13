@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 import click
@@ -25,6 +26,7 @@ from ..db import (
     has_active_attempt,
     release,
     renew,
+    set_config,
 )
 from ..db.schema import LATEST_VERSION
 from ..github import (
@@ -192,6 +194,9 @@ def _run_pass(
             Signature matches ``list_open_issues``.  Used in tests to inject
             a fake issue list without hitting the network.
     """
+    # Auto-resume area if a rate-limit backoff window has elapsed.
+    _check_and_release_backoff(conn, area, dry_run)
+
     issues_by_state = _observe_issues(conn, area)
     config = _observe_config(conn, area)
 
@@ -202,6 +207,8 @@ def _run_pass(
     if not _mark_complete_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
     if not _heartbeat_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
+        return
+    if not _cycle_quarantine_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
     if not _unblock_pass(conn, area, pid, dry_run, issues_by_state, owns_lease):
         return
@@ -303,7 +310,10 @@ def _discovery_pass(
             allow_unassigned=config["scope_allow_unassigned"],
         )
     except GitHubError as exc:
-        click.echo(f"reconcile [{area}]: discovery error — {exc}", err=True)
+        if _is_rate_limit_error(exc):
+            _handle_rate_limit_error(conn, area, exc, dry_run)
+        else:
+            click.echo(f"reconcile [{area}]: discovery error — {exc}", err=True)
         return True  # non-fatal; continue with existing queue
 
     # Renew lease every 50 issues rather than on every iteration to limit
@@ -482,6 +492,11 @@ def _next_action_to_state(
                         conn, area, number, terminal_json,
                         pid=pid, owns_lease=owns_lease,
                     )
+                if failure_class == FailureClass.GIT_CONFLICT:
+                    _run_git_rebase_playbook(
+                        conn, area, number, terminal_json,
+                        pid=pid, owns_lease=owns_lease,
+                    )
             click.echo(
                 f"reconcile [{area}]: issue #{number}"
                 f" retry {retry_count + 1}/{budget} scheduled{' (dry-run)' if dry_run else ''}."
@@ -497,6 +512,9 @@ def _next_action_to_state(
             # CI repair playbook: create blocker issue on repeated test failure.
             if failure_class == FailureClass.DETERMINISTIC_TEST_FAILURE:
                 _create_ci_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)
+            # Git conflict playbook: create blocker issue on exhausted rebase budget.
+            if failure_class == FailureClass.GIT_CONFLICT:
+                _create_git_rebase_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)
         return IssueState.NEEDS_HUMAN.value
 
     if next_action == NextAction.PAUSE:
@@ -710,6 +728,169 @@ def _create_ci_blocker_issue(
 
 
 # ---------------------------------------------------------------------------
+# Git conflict rebase playbook helpers
+# ---------------------------------------------------------------------------
+
+
+def _run_git_rebase_playbook(
+    conn: sqlite3.Connection,
+    area: str,
+    number: int,
+    terminal_json: str | None,
+    *,
+    pid: int = 0,
+    owns_lease: bool = False,
+) -> None:
+    """Post a rebase-attempt context comment on the issue.
+
+    Called when a ``git_conflict`` attempt is about to be re-queued as a
+    rebase repair attempt.  Errors are non-fatal.
+
+    Steps:
+    1. Parse PR number from terminal_json.
+    2. Resolve the PR's head branch via gh CLI.
+    3. Renew the area lease before the second gh call (prevents expiry).
+    4. Post a rebase-attempt context comment including the conflict reason
+       and the branch to rebase, so the re-dispatched worker has full context.
+    """
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+
+    pr_number: int | None = None
+    conflict_reason: str | None = None
+    if terminal_json:
+        try:
+            tj = json.loads(terminal_json)
+            raw_pr = tj.get("prNumber")
+            if raw_pr and raw_pr != "null":
+                pr_number = int(raw_pr)
+            conflict_reason = tj.get("reason") or None
+        except (ValueError, TypeError, AttributeError):
+            pass
+
+    branch: str | None = None
+    if pr_number:
+        branch = get_pr_branch(repo, pr_number)
+        if owns_lease and pid:
+            renew(conn, area, pid)
+
+    conflict_section = (
+        f"\n\n**Conflict reason:** `{conflict_reason}`"
+        if conflict_reason
+        else "\n\n*(Conflict details unavailable — check the PR directly)*"
+    )
+    branch_section = (
+        f"\n**Branch to rebase:** `{branch}`"
+        if branch
+        else ""
+    )
+    pr_ref = f" (PR #{pr_number})" if pr_number else ""
+    body = (
+        f"**Git rebase attempt scheduled**{pr_ref}\n\n"
+        f"- Failure class: `git_conflict`\n"
+        f"- The re-dispatched worker should fetch the latest base branch,"
+        f" rebase the PR branch, resolve conflicts, and re-run tests."
+        f"{conflict_section}"
+        f"{branch_section}"
+    )
+    try:
+        post_issue_comment(repo, number, body)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"reconcile [{area}]: rebase comment failed (#{number}): {exc}", err=True)
+
+
+def _create_git_rebase_blocker_issue(
+    conn: sqlite3.Connection,
+    area: str,
+    issue_id: int,
+    number: int,
+    retry_count: int,
+    terminal_json: str | None,
+) -> None:
+    """Create a blocker GitHub issue after repeated unresolvable git conflicts.
+
+    The blocker issue includes the conflict history and a reference to the
+    original issue.  Non-fatal on error.
+    """
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+
+    attempt_rows = conn.execute(
+        """
+        SELECT attempt_id, status, terminal_json, created_at
+        FROM attempts
+        WHERE issue_id = ?
+          AND status IN ('failed', 'timed-out')
+        ORDER BY created_at ASC
+        """,
+        (issue_id,),
+    ).fetchall()
+
+    history_lines: list[str] = []
+    for i, row in enumerate(attempt_rows, 1):
+        try:
+            tj = json.loads(row["terminal_json"] or "{}")
+        except (ValueError, TypeError):
+            tj = {}
+        pr = tj.get("prNumber")
+        reason = tj.get("reason", row["status"])
+        pr_ref = f" · PR #{pr}" if pr and pr != "null" else ""
+        history_lines.append(
+            f"{i}. `{row['status']}`{pr_ref} — {reason} _(at {row['created_at']})_"
+        )
+
+    history_md = "\n".join(history_lines) if history_lines else "_No attempt records found._"
+
+    body = (
+        f"## Git conflict rebase blocker: #{number}\n\n"
+        f"Automated rebase attempts for #{number} failed {retry_count + 1} time(s).\n"
+        f"Human review required.\n\n"
+        f"### Conflict history\n\n"
+        f"{history_md}\n\n"
+        f"### Context\n\n"
+        f"- Original issue: #{number}\n"
+        f"- Area: `{area}`\n"
+        f"- Failure class: `git_conflict`\n"
+        f"- Total rebase attempts: {retry_count + 1}\n\n"
+        f"### Next steps\n\n"
+        f"1. Manually rebase the PR branch against the latest base branch.\n"
+        f"2. Resolve all merge conflicts and push the rebased branch.\n"
+        f"3. Requeue the original issue: `orchctl control requeue --area {area} --issue {number}`\n"
+        f"4. Close this blocker once resolved.\n"
+    )
+
+    blocker_number = create_issue(
+        repo,
+        title=f"[blocker] Git rebase failed for #{number}",
+        body=body,
+        labels=["blocker"],
+    )
+    if blocker_number:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} git rebase blocker created: #{blocker_number}."
+        )
+        try:
+            post_issue_comment(
+                repo,
+                number,
+                f"**Blocker issue created:** #{blocker_number}\n\n"
+                f"Rebase attempts exhausted after {retry_count + 1} tries. "
+                f"See #{blocker_number} for conflict history and next steps.",
+            )
+        except Exception as exc:  # noqa: BLE001
+            click.echo(
+                f"reconcile [{area}]: rebase blocker comment failed (#{number}): {exc}", err=True
+            )
+    else:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} git rebase blocker creation failed.",
+            err=True,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Heartbeat pass
 # ---------------------------------------------------------------------------
 
@@ -850,6 +1031,14 @@ def _unblock_pass(
 
         number = issue["number"]
         issue_id = issue["id"]
+
+        # Skip issues already transitioned by _cycle_quarantine_pass in this pass.
+        current = conn.execute(
+            "SELECT state FROM issues WHERE id = ?", (issue_id,)
+        ).fetchone()
+        if current is None or current["state"] != "blocked":
+            continue
+
         # dep_type is only used as a none vs non-none gate here; for non-'none' issues
         # the per-edge dep_type stored in dependencies.dep_type drives resolution.
         dep_type = issue["dependency_type"]
@@ -1043,7 +1232,20 @@ def _dispatch_pass(
         return
 
     if config["area_paused"]:
-        click.echo(f"reconcile [{area}]: area is paused — no new dispatches.")
+        infra_degraded = get_config_bool(conn, f"{area}.infra_degraded", default=False)
+        backoff_until = get_config(conn, f"{area}.backoff_until", default="")
+        if infra_degraded:
+            click.echo(
+                f"reconcile [{area}]: area is paused (infra-degraded)"
+                f" — run 'orchctl control resume {area}' to clear."
+            )
+        elif backoff_until:
+            click.echo(
+                f"reconcile [{area}]: area is paused (rate-limit backoff until {backoff_until})"
+                " — no new dispatches."
+            )
+        else:
+            click.echo(f"reconcile [{area}]: area is paused — no new dispatches.")
         return
 
     # Repo allowlist guardrail: if configured, area repo must be set and in the list.
@@ -1206,3 +1408,282 @@ def _record_dispatch(
         raise
     conn.commit()
     return True
+
+
+# ---------------------------------------------------------------------------
+# Rate-limit / infra-degraded helpers
+# ---------------------------------------------------------------------------
+
+_RATE_LIMIT_RE = re.compile(r"rate.?limit|\b429\b", re.IGNORECASE)
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Return True if the exception message matches a rate-limit pattern.
+
+    Scope: rate-limit detection is currently wired only in ``_discovery_pass``
+    (GitHub issue listing via ``gh issue list``).  Dispatch and heartbeat callers
+    use ``gh worktree``/shell invocations that surface transient errors as
+    non-zero exit codes without a parseable 429 body, so a generic backoff there
+    would produce false positives.  If dispatch-path rate limits become a
+    recurring issue a follow-up task should add per-path detection.
+    """
+    return bool(_RATE_LIMIT_RE.search(str(exc)))
+
+
+def _handle_rate_limit_error(
+    conn: sqlite3.Connection,
+    area: str,
+    exc: Exception,
+    dry_run: bool,
+) -> None:
+    """Apply exponential backoff and update rate-limit state for the area.
+
+    Steps:
+    1. Increment backoff counter for the area.
+    2. Compute next backoff window: base_s * 2^(count-1), capped at 3600s.
+    3. Set {area}.paused=true, record backoff_count and backoff_until.
+    4. If count >= infra_degraded_threshold, set {area}.infra_degraded=true
+       (requires operator 'orchctl control resume' to clear).
+    """
+    backoff_base = get_config_int(conn, "rate_limit_backoff_base_s", default=60)
+    threshold = get_config_int(conn, "infra_degraded_threshold", default=5)
+
+    backoff_count = get_config_int(conn, f"{area}.backoff_count", default=0) + 1
+    backoff_delay = min(backoff_base * (2 ** (backoff_count - 1)), 3600)
+    backoff_until = (
+        datetime.now(timezone.utc) + timedelta(seconds=backoff_delay)
+    ).isoformat()
+
+    click.echo(
+        f"reconcile [{area}]: rate limit — pausing area for {backoff_delay}s"
+        f" (backoff #{backoff_count}){' (dry-run)' if dry_run else ''}."
+    )
+    if not dry_run:
+        set_config(conn, f"{area}.paused", "true")
+        set_config(conn, f"{area}.backoff_count", str(backoff_count))
+        set_config(conn, f"{area}.backoff_until", backoff_until)
+
+        if backoff_count >= threshold:
+            set_config(conn, f"{area}.infra_degraded", "true")
+            click.echo(
+                f"reconcile [{area}]: infra-degraded threshold reached"
+                f" ({backoff_count}/{threshold})"
+                f" — run 'orchctl control resume {area}' to clear."
+            )
+
+
+def _check_and_release_backoff(
+    conn: sqlite3.Connection,
+    area: str,
+    dry_run: bool,
+) -> None:
+    """Auto-resume area pause when the rate-limit backoff window has elapsed.
+
+    No-op when:
+    - No active backoff (backoff_until is unset).
+    - Area is infra-degraded (requires operator 'orchctl control resume').
+    - Backoff window has not yet elapsed.
+
+    On success: clears paused, backoff_count, and backoff_until.
+    """
+    backoff_until_str = get_config(conn, f"{area}.backoff_until", default="")
+    if not backoff_until_str:
+        return
+
+    if get_config_bool(conn, f"{area}.infra_degraded", default=False):
+        return  # Operator must clear this manually.
+
+    try:
+        backoff_until = datetime.fromisoformat(backoff_until_str)
+        if backoff_until.tzinfo is None:
+            backoff_until = backoff_until.replace(tzinfo=timezone.utc)
+    except ValueError:
+        # Unparseable timestamp — clear all backoff state so the area is not
+        # left permanently paused with no auto-recovery path.
+        click.echo(
+            f"reconcile [{area}]: unparseable backoff_until — clearing all backoff state"
+            f"{' (dry-run)' if dry_run else ''}.",
+            err=True,
+        )
+        if not dry_run:
+            set_config(conn, f"{area}.paused", "false")
+            set_config(conn, f"{area}.backoff_count", "0")
+            set_config(conn, f"{area}.backoff_until", "")
+        return
+
+    if datetime.now(timezone.utc) < backoff_until:
+        return  # Still in backoff window.
+
+    click.echo(
+        f"reconcile [{area}]: rate-limit backoff elapsed"
+        f" — auto-resuming area{' (dry-run)' if dry_run else ''}."
+    )
+    if not dry_run:
+        set_config(conn, f"{area}.paused", "false")
+        set_config(conn, f"{area}.backoff_count", "0")
+        set_config(conn, f"{area}.backoff_until", "")
+
+
+# ---------------------------------------------------------------------------
+# Cycle quarantine pass
+# ---------------------------------------------------------------------------
+
+
+def _cycle_quarantine_pass(
+    conn: sqlite3.Connection,
+    area: str,
+    pid: int,
+    dry_run: bool,
+    issues_by_state: dict,
+    owns_lease: bool = True,
+) -> bool:
+    """Detect and quarantine issues that participate in dependency cycles.
+
+    Uses Tarjan's SCC algorithm on the blocked-issues subgraph.  Only issues
+    that are themselves in a cycle (SCC size > 1, or self-loop) are quarantined.
+    Issues that merely depend on cycle members are left as 'blocked' and will
+    receive 'blocked-failed-dependency' in the next unblock pass once the
+    cycle members are quarantined.
+
+    A GitHub comment is posted to each quarantined issue with the cycle
+    members and the requeue command.
+
+    Returns True on success, False if the lease was lost (caller should abort).
+    """
+    blocked = issues_by_state.get("blocked", [])
+    if not blocked:
+        return True
+
+    blocked_ids = {issue["id"] for issue in blocked}
+    blocked_by_id = {issue["id"]: issue for issue in blocked}
+
+    # Build forward adjacency: adj_fwd[issue_id] = [dep_ids in blocked subgraph].
+    # "issue depends on dep" → edge issue → dep in the dependency graph.
+    adj_fwd: dict[int, list[int]] = {iid: [] for iid in blocked_ids}
+
+    for issue in blocked:
+        issue_id = issue["id"]
+        dep_rows = conn.execute(
+            """
+            SELECT i.id AS dep_id
+            FROM dependencies d
+            LEFT JOIN issues i ON i.area = d.dep_area AND i.number = d.dep_number
+            WHERE d.issue_id = ?
+            """,
+            (issue_id,),
+        ).fetchall()
+        for dep_row in dep_rows:
+            dep_id = dep_row["dep_id"]
+            if dep_id is not None and dep_id in blocked_ids:
+                adj_fwd[issue_id].append(dep_id)
+
+    cycle_ids = _tarjan_cycle_members(blocked_ids, adj_fwd)
+    if not cycle_ids:
+        return True
+
+    repo = AREA_REPOS.get(area)
+    cycle_numbers = sorted(blocked_by_id[iid]["number"] for iid in cycle_ids)
+
+    for issue_id in sorted(cycle_ids):
+        if owns_lease and not renew(conn, area, pid):
+            click.echo(f"reconcile [{area}]: lease lost mid-pass — aborting.", err=True)
+            return False
+        number = blocked_by_id[issue_id]["number"]
+        click.echo(
+            f"reconcile [{area}]: issue #{number} participates in a dependency cycle"
+            f" — quarantining{' (dry-run)' if dry_run else ''}."
+        )
+        if not dry_run:
+            apply_issue_transition(conn, issue_id, "cycle-isolated")
+            if repo:
+                try:
+                    _post_cycle_quarantine_comment(repo, number, area, cycle_numbers)
+                except Exception as exc:  # noqa: BLE001
+                    click.echo(
+                        f"reconcile [{area}]: cycle comment failed (#{number}): {exc}",
+                        err=True,
+                    )
+
+    return True
+
+
+def _tarjan_cycle_members(nodes: set[int], adj_fwd: dict[int, list[int]]) -> set[int]:
+    """Return nodes that are members of a cycle using Tarjan's SCC algorithm.
+
+    Only nodes in SCCs with more than one member, or with a self-loop, are
+    returned.  Nodes that merely depend on cycle members are excluded.
+
+    Args:
+        nodes: All node IDs to consider.
+        adj_fwd: Forward adjacency (node → its dependencies).
+
+    Note — recursion depth: the recursive ``strongconnect`` helper uses Python's
+    call stack.  The default ``sys.setrecursionlimit`` (1000) supports dependency
+    graphs up to ~900 nodes deep before hitting ``RecursionError``.  In practice
+    a single area's dependency graph is expected to be at most a few dozen nodes,
+    so this is not a concern in production.  If very deep graphs become possible
+    an iterative Tarjan implementation should be substituted.
+    """
+    index_counter = [0]
+    stack: list[int] = []
+    lowlink: dict[int, int] = {}
+    index: dict[int, int] = {}
+    on_stack: set[int] = set()
+    cycle_members: set[int] = set()
+
+    def strongconnect(v: int) -> None:
+        index[v] = lowlink[v] = index_counter[0]
+        index_counter[0] += 1
+        stack.append(v)
+        on_stack.add(v)
+
+        for w in adj_fwd.get(v, []):
+            if w not in index:
+                strongconnect(w)
+                lowlink[v] = min(lowlink[v], lowlink[w])
+            elif w in on_stack:
+                lowlink[v] = min(lowlink[v], index[w])
+
+        if lowlink[v] == index[v]:
+            scc: list[int] = []
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                scc.append(w)
+                if w == v:
+                    break
+            # A cycle: SCC size > 1, or a single node with a self-loop.
+            if len(scc) > 1 or (len(scc) == 1 and scc[0] in (adj_fwd.get(scc[0]) or [])):
+                cycle_members.update(scc)
+
+    for v in nodes:
+        if v not in index:
+            strongconnect(v)
+
+    return cycle_members
+
+
+def _post_cycle_quarantine_comment(
+    repo: str,
+    issue_number: int,
+    area: str,
+    cycle_numbers: list[int],
+) -> None:
+    """Post a cycle-quarantine resolution comment to the GitHub issue.
+
+    Non-fatal on error — a comment failure must never abort a reconcile pass.
+    """
+    others = [f"#{n}" for n in cycle_numbers if n != issue_number]
+    members_str = ", ".join(f"#{n}" for n in cycle_numbers)
+    other_str = f" (along with {', '.join(others)})" if others else ""
+    body = (
+        f"**Dependency cycle detected — quarantined**\n\n"
+        f"This issue participates in a dependency cycle{other_str}. "
+        f"It has been quarantined so the rest of the batch can drain normally.\n\n"
+        f"**Cycle members:** {members_str}\n\n"
+        f"To resolve: break the cycle by removing a dependency, then requeue:\n"
+        f"```\n"
+        f"orchctl control requeue --area {area} --issue {issue_number}\n"
+        f"```"
+    )
+    post_issue_comment(repo, issue_number, body)
