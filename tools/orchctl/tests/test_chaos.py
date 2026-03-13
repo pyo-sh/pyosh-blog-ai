@@ -588,13 +588,24 @@ class TestRetryBudgetExhaustion:
 
 class TestDependencyCycle:
     """Issue A is blocked waiting for B; B is blocked waiting for A.
-    Both have dependency_type='hard'.  Neither should get unblocked across
-    multiple reconcile passes (the unblock pass defers hard/soft deps).
+    Both have dependency_type='hard' and explicit dependency rows pointing at
+    each other.  Neither reaches a terminal state, so both stay blocked.
     """
+
+    def _insert_dep(self, conn, issue_id: int, dep_area: str, dep_number: int) -> None:
+        conn.execute(
+            "INSERT INTO dependencies (issue_id, dep_area, dep_number, dep_type)"
+            " VALUES (?, ?, ?, 'hard')",
+            (issue_id, dep_area, dep_number),
+        )
+        conn.commit()
 
     def test_cycle_both_stay_blocked_after_unblock_pass(self, conn):
         id_a = _insert_issue(conn, number=101, state="blocked", dependency_type="hard")
         id_b = _insert_issue(conn, number=102, state="blocked", dependency_type="hard")
+        # Mutual dependency: A waits for B, B waits for A.
+        self._insert_dep(conn, id_a, "workspace", 102)
+        self._insert_dep(conn, id_b, "workspace", 101)
 
         pid = os.getpid()
         acquire(conn, "workspace", pid)
@@ -603,6 +614,7 @@ class TestDependencyCycle:
             issues_by_state = _observe_issues(conn, "workspace")
             _unblock_pass(conn, "workspace", pid, False, issues_by_state)
 
+        # Both stay blocked: dep is 'blocked' (non-terminal) so resolution returns 'blocked'.
         assert _issue_state(conn, id_a) == "blocked"
         assert _issue_state(conn, id_b) == "blocked"
 
@@ -611,6 +623,9 @@ class TestDependencyCycle:
         id_cycle_a = _insert_issue(conn, number=201, state="blocked", dependency_type="hard")
         id_cycle_b = _insert_issue(conn, number=202, state="blocked", dependency_type="hard")
         id_free = _insert_issue(conn, number=203, state="blocked", dependency_type="none")
+        # Mutual dependency between the two cycle issues.
+        self._insert_dep(conn, id_cycle_a, "workspace", 202)
+        self._insert_dep(conn, id_cycle_b, "workspace", 201)
 
         pid = os.getpid()
         acquire(conn, "workspace", pid)
@@ -618,10 +633,10 @@ class TestDependencyCycle:
         issues_by_state = _observe_issues(conn, "workspace")
         _unblock_pass(conn, "workspace", pid, False, issues_by_state)
 
-        # The two cyclic issues stay blocked
+        # The two cyclic issues stay blocked (dep is non-terminal).
         assert _issue_state(conn, id_cycle_a) == "blocked"
         assert _issue_state(conn, id_cycle_b) == "blocked"
-        # The dependency-free issue is unblocked
+        # The dependency-free issue is unblocked.
         assert _issue_state(conn, id_free) == "pending"
 
 

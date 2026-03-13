@@ -326,6 +326,35 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        12,
+        """
+        -- v12: cross-area dependency table.
+        --
+        -- dependencies: explicit cross-area (and same-area) dependency edges.
+        --   issue_id    = the blocked issue
+        --   dep_area    = area of the dependency
+        --   dep_number  = issue number of the dependency
+        --   dep_type    = hard (must complete) | soft (any terminal state unblocks)
+        --
+        -- The global concurrent-dispatch ceiling was historically stored as
+        -- 'max_open_pr'.  Policy YAML accepts both 'global_max' and 'global_quota'
+        -- as synonyms; both write to the same 'max_open_pr' config key so that
+        -- existing reconcile code continues to work unchanged.
+        CREATE TABLE IF NOT EXISTS dependencies (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            issue_id    INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+            dep_area    TEXT    NOT NULL,
+            dep_number  INTEGER NOT NULL,
+            dep_type    TEXT    NOT NULL DEFAULT 'hard'
+                                CHECK(dep_type IN ('hard', 'soft')),
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+            UNIQUE (issue_id, dep_area, dep_number)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_dependencies_issue_id ON dependencies(issue_id);
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)

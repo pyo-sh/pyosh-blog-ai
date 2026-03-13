@@ -12,6 +12,7 @@ from .commands.import_state import cmd_import_state
 from .commands.init import cmd_init
 from .commands.merge_gate import cmd_merge_gate
 from .commands.reconcile import cmd_reconcile
+from .commands.reconcile_all import cmd_reconcile_all
 from .commands.status import cmd_status
 
 
@@ -34,6 +35,7 @@ def cli(ctx: click.Context, db_path: Path | None) -> None:
 
 cli.add_command(cmd_init)
 cli.add_command(cmd_reconcile)
+cli.add_command(cmd_reconcile_all)
 cli.add_command(cmd_status)
 cli.add_command(cmd_doctor)
 cli.add_command(cmd_control)

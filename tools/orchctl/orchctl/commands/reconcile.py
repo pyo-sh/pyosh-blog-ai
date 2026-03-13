@@ -219,9 +219,14 @@ def _observe_issues(
 
 def _observe_config(conn: sqlite3.Connection, area: str) -> dict:
     """Read relevant config keys from the DB."""
+    # max_open_pr is the stored config key for the global concurrent-dispatch cap.
+    # Policy YAML accepts both 'global_max' and 'global_quota' as synonyms;
+    # both write to max_open_pr so the single source of truth is preserved.
+    global_quota = get_config_int(conn, "max_open_pr", default=2)
     return {
         "max_concurrent": get_config_int(conn, "max_concurrent", default=4),
-        "max_open_pr": get_config_int(conn, "max_open_pr", default=2),
+        "global_quota": global_quota,
+        "max_open_pr": global_quota,  # legacy alias kept for callers
         "drain_mode": get_config_bool(conn, "drain_mode", default=False),
         "area_paused": get_config_bool(conn, f"{area}.paused", default=False),
         "repo_allowlist": get_config(conn, "repo_allowlist", default=""),
@@ -633,9 +638,12 @@ def _unblock_pass(
 ) -> bool:
     """Transition blocked issues to pending when their dependencies are done.
 
-    Issues with dependency_type='none' are unblocked immediately (no deps to
-    check).  Issues with soft or hard deps require a dedicated deps table for
-    cross-area resolution, which is deferred to a future PR.
+    For issues with dependency_type='none': unblocked immediately (no deps).
+    For issues with hard/soft deps: the dependencies table is queried.
+      - Hard dep: all deps must be 'completed'; any other terminal state → blocked-failed-dependency.
+      - Soft dep: all deps must reach any terminal state; failure does not propagate.
+    Cross-area deps are resolved by looking up (dep_area, dep_number) in issues.
+    If a dep is not yet in the DB (unknown), the issue stays blocked.
 
     Returns True on success, False if the lease was lost (caller should abort).
     """
@@ -646,6 +654,7 @@ def _unblock_pass(
             return False
 
         number = issue["number"]
+        issue_id = issue["id"]
         dep_type = issue["dependency_type"]
 
         if dep_type == "none":
@@ -654,14 +663,65 @@ def _unblock_pass(
                 f" → unblocking{' (dry-run)' if dry_run else ''}."
             )
             if not dry_run:
-                apply_issue_transition(conn, issue["id"], "pending")
-        else:
+                apply_issue_transition(conn, issue_id, "pending")
+            continue
+
+        # Resolve via dependencies table (supports cross-area deps).
+        dep_rows = conn.execute(
+            """
+            SELECT d.dep_area, d.dep_number, d.dep_type, i.state
+            FROM dependencies d
+            LEFT JOIN issues i ON i.area = d.dep_area AND i.number = d.dep_number
+            WHERE d.issue_id = ?
+            """,
+            (issue_id,),
+        ).fetchall()
+
+        if not dep_rows:
+            # Has a dep_type but no recorded deps — unblock optimistically.
             click.echo(
-                f"reconcile [{area}]: issue #{number} blocked"
-                f" (dependency check deferred — requires deps table)."
+                f"reconcile [{area}]: issue #{number} has dep_type='{dep_type}'"
+                f" but no dependency rows — unblocking{' (dry-run)' if dry_run else ''}."
             )
+            if not dry_run:
+                apply_issue_transition(conn, issue_id, "pending")
+            continue
+
+        unknown = [(r["dep_area"], r["dep_number"]) for r in dep_rows if r["state"] is None]
+        if unknown:
+            click.echo(
+                f"reconcile [{area}]: issue #{number} waiting on unregistered deps:"
+                f" {unknown} — keeping blocked."
+            )
+            continue
+
+        dep_states = [r["state"] for r in dep_rows]
+        new_state = _resolve_deps(dep_states, dep_type)
+
+        if new_state == "blocked":
+            click.echo(
+                f"reconcile [{area}]: issue #{number} deps still running — keeping blocked."
+            )
+            continue
+
+        click.echo(
+            f"reconcile [{area}]: issue #{number} deps resolved"
+            f" → {new_state}{' (dry-run)' if dry_run else ''}."
+        )
+        if not dry_run:
+            apply_issue_transition(conn, issue_id, new_state)
 
     return True
+
+
+def _resolve_deps(dep_states: list[str], dep_type: str) -> str:
+    """Determine the new state for a blocked issue given its dependency states.
+
+    Returns 'pending', 'blocked', or 'blocked-failed-dependency'.
+    Delegates to state_machine.resolve_blocked_issue for the actual logic.
+    """
+    from ..state_machine import resolve_blocked_issue
+    return resolve_blocked_issue(dep_states, dep_type)
 
 
 # ---------------------------------------------------------------------------
@@ -758,7 +818,7 @@ def _dispatch_pass(
       2. Area pause: no new dispatches when area is paused.
       3. Repo allowlist guardrail: area repo must be in the allowlist.
       4. maxConcurrent: per-area limit on issues in 'dispatched' state.
-      5. maxOpenPR: global limit on issues in 'dispatched' state across all areas.
+      5. globalQuota: global limit on issues in 'dispatched' state across all areas.
          Enforced atomically inside _record_dispatch to prevent TOCTOU races
          when multiple area reconcilers run concurrently.
       6. maxConcurrentRepair: cap on concurrently dispatched retry attempts.
@@ -798,7 +858,8 @@ def _dispatch_pass(
             return
 
     max_concurrent = config["max_concurrent"]
-    max_open_pr = config["max_open_pr"]
+    global_quota = config["global_quota"]
+    max_open_pr = global_quota  # legacy alias
     max_repair = config["max_concurrent_repair"]
     max_awaiting = config["max_awaiting_merge"]
 
@@ -845,9 +906,9 @@ def _dispatch_pass(
             return
 
         active_global = count_dispatched(conn, None)
-        if active_global >= max_open_pr:
+        if active_global >= global_quota:
             click.echo(
-                f"reconcile [{area}]: maxOpenPR={max_open_pr} reached"
+                f"reconcile [{area}]: globalQuota={global_quota} reached"
                 " — no more dispatches."
             )
             return
@@ -878,12 +939,12 @@ def _dispatch_pass(
             f"{' (dry-run)' if dry_run else ''}."
         )
         if not dry_run:
-            dispatched = _record_dispatch(conn, issue_id, attempt_id, max_open_pr)
+            dispatched = _record_dispatch(conn, issue_id, attempt_id, global_quota)
             if not dispatched:
                 # A concurrent reconciler filled the global cap between our
                 # optimistic check and the atomic insert.
                 click.echo(
-                    f"reconcile [{area}]: maxOpenPR={max_open_pr} reached"
+                    f"reconcile [{area}]: globalQuota={global_quota} reached"
                     " — global cap enforced concurrently, stopping."
                 )
                 return
@@ -903,12 +964,12 @@ def _count_active_repairs(conn: sqlite3.Connection, area: str) -> int:
 
 
 def _record_dispatch(
-    conn: sqlite3.Connection, issue_id: int, attempt_id: str, max_open_pr: int
+    conn: sqlite3.Connection, issue_id: int, attempt_id: str, global_quota: int
 ) -> bool:
     """Create a running attempt and transition the issue to 'dispatched' atomically.
 
     The attempt INSERT is conditional on the global dispatched count being below
-    max_open_pr.  SQLite serializes writers, so this check-and-insert is
+    global_quota.  SQLite serializes writers, so this check-and-insert is
     race-free: a concurrent reconciler's INSERT will either precede or follow
     this one — never interleave — ensuring the cap is never silently exceeded.
 
@@ -926,7 +987,7 @@ def _record_dispatch(
         SELECT ?, ?, 'running'
         WHERE (SELECT COUNT(*) FROM issues WHERE state = 'dispatched') < ?
         """,
-        (attempt_id, issue_id, max_open_pr),
+        (attempt_id, issue_id, global_quota),
     )
     if cur.rowcount == 0:
         return False
