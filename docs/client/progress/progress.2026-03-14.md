@@ -9,11 +9,12 @@
   - PR: `feat: Pagination 공통 컴포넌트 (#32)`
   - merge: squash merge, merge commit `da8901d7ab14efbf3bfd97daa7bd6e7e57e0dd00`
   - branch: `feat/pagination-component` (remote branch deleted attempt completed, local branch deletion skipped because the branch is still attached to `/workspace/.workspace/worktrees/client/feat-pagination-component`)
-- [x] #30 PostContent + PostNavigation PR #130 머지
+- [x] #30 PostContent + PostNavigation PR #132 머지
   - PR: `feat: PostContent + PostNavigation 컴포넌트 (#30)`
-  - merge target: `feat/issue-24-markdown-renderer`
-  - merge: manual conflict resolution followed by push, merge commit `24c1e6d`
-  - conflict file: `src/shared/lib/markdown.ts`
+  - merge target: `main`
+  - review fix: replace undefined `prose` usage with project-owned `markdown-content` styles in `src/app-layer/style/typography.css`
+  - merge: squash merge, merge commit `d2067fcd6fb88fb9b3b2b343329b4f2fcebb6f19`
+  - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
 - Public post reads fit cleanly into the existing `src/entities/post/api.ts` module; a separate public/admin split was unnecessary for this scope.
@@ -21,25 +22,25 @@
 - The Codex review on PR #131 reported `[CRITICAL]=0`, `[WARNING]=0`, `[SUGGESTION]=0`, so the pipeline advanced directly to merge without a resolve round.
 - Pagination UI was already re-reviewed after the token-name fix and had no remaining CRITICAL/WARNING/SUGGESTION findings before merge.
 - GitHub merged the PR at `2026-03-13T19:02:47Z`, which is `2026-03-14 04:02:47` in KST.
-- PR #130 was initially `CONFLICTING` because both branches added `src/shared/lib/markdown.ts`.
-- The stable resolution was to keep the module-scoped markdown processor from #24 and merge in the PostContent/PostNavigation files from #30.
-- Local `client/node_modules` was out of sync with `package.json`; after `pnpm install`, both `pnpm lint` and `pnpm compile:types` passed.
-- GitHub marked PR #130 as merged at `2026-03-13T19:05:28Z`, which is `2026-03-14 04:05:28` in KST.
+- The original `#30` implementation existed on a stacked branch that had been merged into `feat/issue-24-markdown-renderer`, but not opened as a clean PR against `main`.
+- Replaying only the isolated `#30` commit onto a fresh `main` branch produced a clean PR path and avoided carrying stale stacked-branch changes.
+- The review on PR #132 surfaced a real styling gap: this repo does not define Tailwind Typography’s `prose` class, so markdown rendering needed project-owned CSS utilities instead.
+- The verification flow in both the fresh issue worktree and the resolve worktree required `pnpm install` before `pnpm compile:types && pnpm lint && pnpm build`.
+- GitHub marked PR #132 as merged at `2026-03-13T20:48:25Z`, which is `2026-03-14 05:48:25` in KST.
 
 ## Issues & Resolutions
 - **Issue**: `gh pr merge --delete-branch` could not remove the local branch because `feat/pagination-component` is checked out in an existing client worktree.
 - **Resolution**: kept the active worktree branch intact and verified that the PR itself was merged successfully on GitHub.
-- **Issue**: GitHub could not merge PR #130 automatically because `feat/issue-24-markdown-renderer` and `feat/issue-30-post-content-navigation` conflicted in `src/shared/lib/markdown.ts`.
-- **Resolution**: merged locally on top of `feat/issue-24-markdown-renderer`, preserved the shared sanitize schema and module-level processor optimization, verified with `pnpm lint` and `pnpm compile:types`, then pushed the merge commit so GitHub marked the PR as merged.
+- **Issue**: The original `#30` branch was stacked on top of `#24`, so the already-merged feature work was not represented by a clean PR to `main`.
+- **Resolution**: created a fresh issue branch from `main`, cherry-picked only the `#30` feature commit, opened PR #132, then addressed the review warning with project-owned markdown styles before merge.
 
 ## Next Steps
-- [ ] Remove `/workspace/.workspace/worktrees/client/feat-pagination-component` or switch it off `feat/pagination-component`, then delete the leftover local branch if cleanup is still needed.
+- [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
 - Related PR: #131
 - Related Issue: #26
 - Related PR: #128
-- Related PR: #130
+- Related PR: #132
 - Related Issue: #32
 - Related Issue: #30
-- Related Issue: #24
