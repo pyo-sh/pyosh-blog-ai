@@ -364,6 +364,15 @@ MIGRATIONS: list[tuple[int, str]] = [
         -- needs-human).  Only updates when the existing value does not already
         -- include a deterministic_test_failure entry, so operator customisations
         -- are preserved.
+        --
+        -- Prerequisite: each target GitHub repo must have a 'blocker' label.
+        -- Create it with: gh label create blocker -R <owner/repo> --color e11d48
+        --
+        -- Ensure the key exists before patching (safe for fresh installs where
+        -- retry_budget_by_class was never written to the config table).
+        INSERT OR IGNORE INTO config (key, value)
+        VALUES ('retry_budget_by_class', '{}');
+
         UPDATE config
         SET value = json_set(value, '$.deterministic_test_failure', 2)
         WHERE key = 'retry_budget_by_class'

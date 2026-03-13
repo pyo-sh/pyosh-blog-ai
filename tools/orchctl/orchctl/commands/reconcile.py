@@ -638,7 +638,7 @@ def _create_ci_blocker_issue(
         SELECT attempt_id, status, terminal_json, created_at
         FROM attempts
         WHERE issue_id = ?
-          AND status IN ('failed', 'timed-out', 'completed')
+          AND status IN ('failed', 'timed-out')
         ORDER BY created_at ASC
         """,
         (issue_id,),
