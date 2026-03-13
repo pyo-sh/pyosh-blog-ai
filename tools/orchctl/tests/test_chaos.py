@@ -550,7 +550,7 @@ class TestRetryBudgetExhaustion:
         issue_id = _insert_issue(conn, state="dispatched", retry_count=0)
         _insert_failed_attempt(
             conn, issue_id, "att-budget-3",
-            terminal_json='{"reason": "segfault detected"}',
+            terminal_json='{"reason": "process killed rc=137"}',
         )
 
         self._run_mark_complete(conn)
@@ -709,46 +709,53 @@ class TestSchedulerOverlap:
     prevents double-dispatch when maxOpenPR is reached.
     """
 
-    def test_second_reconciler_skips_when_overlap_disabled(self, conn, tmp_path: Path):
-        """Second reconciler without lease should dispatch nothing."""
-        set_config(conn, "scheduler_overlap", "false")
+    def test_second_reconciler_skips_when_overlap_disabled(self, tmp_path: Path):
+        """Second reconciler exits early when scheduler_overlap=false and lease is held.
 
-        _insert_issue(conn, number=1, state="pending")
-        _insert_issue(conn, number=2, state="pending")
+        The early-exit is enforced by the reconcile *command*, not by _dispatch_pass.
+        This test uses the CLI runner to verify that the command emits the expected
+        message and performs no dispatches when another process holds the lease.
+        """
+        from click.testing import CliRunner
+        from orchctl.cli import cli
 
-        # First reconciler acquires lease
-        pid1 = os.getpid()
-        acquire(conn, "workspace", pid1)
+        db_path = str(tmp_path / "overlap.db")
+        runner = CliRunner()
+        # Init DB
+        runner.invoke(cli, ["--db", db_path, "init"])
 
-        # Second reconciler uses a different PID (simulate concurrent process)
-        pid2 = pid1 + 1
-        dispatched_by_second: list[int] = []
-
-        config = _observe_config(conn, "workspace")
-        issues_by_state = _observe_issues(conn, "workspace")
-
-        # Try to acquire as second reconciler — should fail
-        owns_second = conn.execute(
-            "SELECT holder_pid FROM leases WHERE area = 'workspace'"
-        ).fetchone()
-        assert owns_second["holder_pid"] == pid1  # first holds it
-
-        # Dispatch pass for second reconciler (does not hold lease)
-        _dispatch_pass(
-            conn, "workspace", pid2, False, issues_by_state, config,
-            dispatch_fn=lambda *a: dispatched_by_second.append(a[2]),
-            owns_lease=False,
+        # Insert pending issues
+        from orchctl.db.connection import get_db
+        db = get_db(db_path)
+        db.execute("INSERT INTO issues (area, number, state) VALUES ('workspace', 1, 'pending')")
+        db.execute("INSERT INTO issues (area, number, state) VALUES ('workspace', 2, 'pending')")
+        db.execute(
+            "UPDATE config SET value = 'false' WHERE key = 'scheduler_overlap'"
         )
+        # Pre-acquire the lease as PID 1 (init/systemd — always alive on Linux) so our
+        # reconcile cannot acquire it and cleanup_stale does not evict the lease.
+        foreign_pid = 1
+        future_exp = "2099-01-01 00:00:00"
+        db.execute(
+            "INSERT INTO leases (area, holder_pid, acquired_at, heartbeat_at, expires_at)"
+            " VALUES ('workspace', ?, datetime('now'), datetime('now'), ?)",
+            (foreign_pid, future_exp),
+        )
+        db.commit()
+        db.close()
 
-        # Even without owns_lease=False guarding, the issue should only be dispatched once.
-        # The first reconciler dispatches; the second runs _dispatch_pass but the
-        # per-issue active-attempt guard prevents double-dispatch.
-        # Here we assert the second reconciler's callback is invoked at most once per issue.
-        issue_numbers = [row["number"] for row in conn.execute(
-            "SELECT number FROM issues WHERE state = 'pending'"
-        ).fetchall()]
-        # Pending issues not dispatched by second reconciler (first holds state)
-        assert len(dispatched_by_second) <= 2
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "workspace"])
+
+        assert result.exit_code == 0
+        assert "lease held by another process" in result.output
+
+        # No issues should have been dispatched
+        db2 = get_db(db_path)
+        dispatched_count = db2.execute(
+            "SELECT COUNT(*) FROM issues WHERE state = 'dispatched'"
+        ).fetchone()[0]
+        db2.close()
+        assert dispatched_count == 0
 
     def test_atomic_record_dispatch_prevents_exceeding_max_open_pr(self, conn):
         """maxOpenPR is enforced atomically; a second concurrent dispatch cannot exceed it."""
