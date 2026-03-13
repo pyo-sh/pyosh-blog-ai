@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 
@@ -21,6 +22,16 @@ AREA_REPOS: dict[str, str] = {
 _GH_TIMEOUT = 30
 
 
+# Regex to extract the fenced ```orchestrator ... ``` block from an issue body.
+_ORCH_BLOCK_RE = re.compile(
+    r"```orchestrator\s*\n(.*?)\n```",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Regex to match a `priority: <int>` line inside the orchestrator block.
+_PRIORITY_LINE_RE = re.compile(r"^\s*priority\s*:\s*(\d+)\s*$", re.MULTILINE)
+
+
 @dataclass
 class GitHubIssue:
     number: int
@@ -28,6 +39,8 @@ class GitHubIssue:
     labels: list[str] = field(default_factory=list)
     milestone: str = ""
     assignees: list[str] = field(default_factory=list)
+    body: str = ""
+    priority: int = 0
 
 
 class GitHubError(Exception):
@@ -69,7 +82,9 @@ def list_open_issues(
         "gh", "issue", "list",
         "-R", repo,
         "--state", "open",
-        "--json", "number,title,labels,milestone,assignees",
+        # body is required to parse `priority:` from the fenced orchestrator block.
+        # Kept on every reconcile so that reopened issues pick up priority changes.
+        "--json", "number,title,labels,milestone,assignees,body",
         "--limit", str(limit),
     ]
     if milestone:
@@ -136,14 +151,39 @@ def post_issue_comment(repo: str, issue_number: int, body: str) -> None:
         )
 
 
+def parse_priority_from_body(body: str) -> int:
+    """Extract the priority value from a fenced orchestrator block in an issue body.
+
+    Looks for a ``priority: <int>`` line inside a fenced ``orchestrator`` block.
+    Returns 0 if the block or line is absent, or if the value cannot be parsed.
+
+    Only non-negative integers are supported via the fenced block (the regex
+    matches ``\\d+``).  To assign a priority below 0, set the ``priority``
+    column directly in the database.
+    """
+    block_match = _ORCH_BLOCK_RE.search(body)
+    if not block_match:
+        return 0
+    priority_match = _PRIORITY_LINE_RE.search(block_match.group(1))
+    if not priority_match:
+        return 0
+    try:
+        return int(priority_match.group(1))
+    except (ValueError, TypeError):
+        return 0
+
+
 def _parse_issue(item: dict) -> GitHubIssue:
     ms = item.get("milestone") or {}
+    body = item.get("body", "") or ""
     return GitHubIssue(
         number=item["number"],
         title=item.get("title", ""),
         labels=[lb["name"] for lb in item.get("labels", [])],
         milestone=ms.get("title", "") if ms else "",
         assignees=[a["login"] for a in item.get("assignees", [])],
+        body=body,
+        priority=parse_priority_from_body(body),
     )
 
 

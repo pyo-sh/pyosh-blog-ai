@@ -57,7 +57,12 @@ def apply_policy(conn: sqlite3.Connection, policy: dict) -> list[str]:
     concurrency = policy.get("concurrency") or {}
     if "area_max" in concurrency:
         _maybe_set(conn, "max_concurrent", str(int(concurrency["area_max"])), changed)
-    if "global_max" in concurrency:
+    # global_max and global_quota are synonyms for the max_open_pr config key.
+    # When both are present, global_quota wins; skip global_max to avoid a
+    # duplicate append to changed.
+    if "global_quota" in concurrency:
+        _maybe_set(conn, "max_open_pr", str(int(concurrency["global_quota"])), changed)
+    elif "global_max" in concurrency:
         _maybe_set(conn, "max_open_pr", str(int(concurrency["global_max"])), changed)
 
     merge = policy.get("merge") or {}
@@ -104,6 +109,36 @@ def apply_policy(conn: sqlite3.Connection, policy: dict) -> list[str]:
     if "dangerous_tools" in guardrails:
         _maybe_set(
             conn, "dangerous_tools", _list_str(guardrails["dangerous_tools"]), changed
+        )
+    if "max_awaiting_merge" in guardrails:
+        _maybe_set(
+            conn,
+            "max_awaiting_merge",
+            str(max(0, int(guardrails["max_awaiting_merge"]))),
+            changed,
+        )
+
+    scheduling = policy.get("scheduling") or {}
+    if "priority_weight" in scheduling:
+        _maybe_set(
+            conn,
+            "scheduling_priority_weight",
+            str(float(scheduling["priority_weight"])),
+            changed,
+        )
+    if "age_weight" in scheduling:
+        _maybe_set(
+            conn,
+            "scheduling_age_weight",
+            str(float(scheduling["age_weight"])),
+            changed,
+        )
+    if "retry_weight" in scheduling:
+        _maybe_set(
+            conn,
+            "scheduling_retry_weight",
+            str(float(scheduling["retry_weight"])),
+            changed,
         )
 
     return changed
