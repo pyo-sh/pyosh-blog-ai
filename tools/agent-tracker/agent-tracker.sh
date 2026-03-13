@@ -67,6 +67,7 @@ fi
 # Sidecar state dir must exist before backend starts.
 mkdir -p "$(dirname "$EXPORT_FILE")"
 
+# --interval is intentionally tied to $INTERVAL: backend export cadence = display refresh rate.
 PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m backend \
   --root "$REPO_ROOT" \
   --session "$SESSION" \
@@ -84,7 +85,7 @@ for _i in 1 2 3 4 5; do
   kill -0 "$_BACKEND_PID" 2>/dev/null && { _alive=true; break; }
 done
 unset _i
-if ! $_alive; then
+if [[ "$_alive" == false ]]; then
   printf '[agent-tracker] WARNING: backend exited early — check %s\n' \
     "$REPO_ROOT/.workspace/agent-tracker/backend.log" >&2
 fi

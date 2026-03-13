@@ -121,7 +121,7 @@ snapshot5=$(jq -nc '{
 
 n_dead_orch=$(printf '%s' "$snapshot5" | jq -r '
   (.orchestrators // .orchestrator // [])[] |
-  select(.batch_status == "dead") | .area
+  select(.batch_status == "dead" and (.area | type == "string") and .area != "") | .area
 ' 2>/dev/null | grep -c .)
 
 assert_eq "dead orch: count via .orchestrators" "1" "$n_dead_orch"
@@ -137,7 +137,7 @@ snapshot6=$(jq -nc '{
 
 n_dead_leg=$(printf '%s' "$snapshot6" | jq -r '
   (.orchestrators // .orchestrator // [])[] |
-  select(.batch_status == "dead") | .area
+  select(.batch_status == "dead" and (.area | type == "string") and .area != "") | .area
 ' 2>/dev/null | grep -c .)
 
 assert_eq "dead orch: count via .orchestrator (legacy)" "2" "$n_dead_leg"
@@ -152,7 +152,7 @@ snapshot7=$(jq -nc '{
 
 dead_tsv7=$(printf '%s' "$snapshot7" | jq -r '
   (.orchestrators // .orchestrator // [])[] |
-  select(.batch_status == "dead") | .area
+  select(.batch_status == "dead" and (.area | type == "string") and .area != "") | .area
 ' 2>/dev/null)
 
 n_dead_ok=0
