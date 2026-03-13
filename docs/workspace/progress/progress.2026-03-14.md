@@ -1,5 +1,36 @@
 # Progress 2026-03-14
 
+## orchctl CI failure repair + blocker issue playbook (#98, PR #199)
+
+Stage 3 self-healing playbook: `deterministic_test_failure` now triggers automated repair attempts with CI log context rather than immediate escalation, and creates a blocker GitHub issue after the repair budget is exhausted.
+
+### Changes merged
+
+- **`models.py`** - `DETERMINISTIC_TEST_FAILURE` next action changed from `ESCALATE` to `REPAIR`
+- **`github.py`** - added `fetch_ci_logs(repo, branch)` (gh run list + gh run view --log-failed), `get_pr_branch(repo, pr_number)` (gh pr view), `create_issue(repo, title, body, labels)` (gh issue create)
+- **`reconcile.py`** - `_run_ci_repair_playbook(conn, area, number, terminal_json, *, pid, owns_lease)`: collects CI logs from the PR head branch, renews lease before the second sequential gh call, posts repair context comment (with log tail) only when a repair will actually be re-queued (within-budget branch of `_next_action_to_state`); `_create_ci_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)`: queries terminal attempts (`status IN ('failed','timed-out')`), builds failure history, creates blocker issue (with 'blocker' label), posts blocker reference comment on original issue; module-level `import json`; `post_issue_comment` calls wrapped in try/except; `_next_action_to_state` accepts `terminal_json`, `pid`, `owns_lease` keyword args
+- **`db/schema.py`** - v13 migration: `INSERT OR IGNORE` ensures key exists on fresh installs, then `json_set` patches `deterministic_test_failure: 2` into `retry_budget_by_class`; migration comment documents 'blocker' label prerequisite and `gh label create` command
+- **`tests/test_ci_repair_playbook.py`** (new) - 10 tests: next_action routing, within-budget repair scheduling (assert_called_once for playbook), budget exhaustion (blocker created + referenced in comment), playbook not called on exhaustion, CI log comment with/without logs, no-PR-number fallback, blocker body failure history, dry-run skip
+- **`tests/test_failure_classifier.py`** - `DETERMINISTIC_TEST_FAILURE` expected action updated to `REPAIR`
+- **`tests/test_multi_area.py`** - schema version assertion updated to 13
+- **474 tests** passing
+
+### Key design decisions
+
+- Repair playbook called only inside the within-budget branch - no misleading "repair scheduled" comment when budget is already exhausted
+- Lease renewal placed between `get_pr_branch` and `fetch_ci_logs` calls - prevents expiry from cumulative gh subprocess timeouts (each up to 30 s)
+- `create_issue` returns None on gh failure; `post_issue_comment` wrapped in try/except - all GitHub side-effects are non-fatal, reconcile pass never aborted
+- Attempt history query restricted to `status IN ('failed', 'timed-out')` - excludes both non-terminal and successful `completed` rows
+- v13 migration uses `INSERT OR IGNORE` before UPDATE to handle fresh installs where `retry_budget_by_class` was never seeded
+
+### Review rounds
+
+- Round 1 (codex, failed_parse - CRITICAL x2): repair playbook called after budget exhausted (misleading comment), no lease renewal around sequential gh calls - both fixed
+- Round 2 (WARNING x1 + SUGGESTION x1): `post_issue_comment` not wrapped in try/except; `import json as _json` inline - module-level import added, both calls wrapped
+- Round 3 (SUGGESTION x1 + INFO x1): attempt history query used NOT IN excluding only 'created'/'running'; misleading OR assertion in test - positive IN filter and test assertion fixed
+- Round 4 (WARNING x2 + SUGGESTION x1): `assert_called_once` missing for playbook within budget; 'blocker' label undocumented; query included 'completed' success rows - all fixed
+- Round 5 (CLEAN): approved and merged
+
 ## Agent tracker: read-only UI + footer semantics (#114, PR #198)
 
 Stage 3 of the agent-tracker series. The tmux dashboard now consumes the Python backend normalized export instead of calling `lib/collect.sh` directly, and footer status aggregation correctly separates fault/unknown/stale from idle.
