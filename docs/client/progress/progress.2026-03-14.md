@@ -3,7 +3,7 @@
 ## Completed
 - [x] #26 Public Post API functions PR #131 머지
   - PR: `feat: add post API functions (#26)`
-  - merge: squash merge, merge commit `0835bfe`
+  - merge: squash merge, merge commit `b56d8d2d9e25e095c8bfe1f81876ce5f779e3e05`
   - branch: `feat/issue-26-post-api-functions` (issue worktree cleaned up after merge)
 - [x] #32 Pagination 공통 컴포넌트 PR #128 머지
   - PR: `feat: Pagination 공통 컴포넌트 (#32)`
