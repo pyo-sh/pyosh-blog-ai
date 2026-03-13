@@ -52,9 +52,10 @@ ISSUE_TRANSITIONS: dict[IssueState, frozenset[IssueState]] = {
         IssueState.PENDING,
         IssueState.CANCELLED,
     }),
-    # Operator-override re-entry: requeue allows returning terminal issues to pending.
-    # completed is the only irreversible terminal state.
-    IssueState.COMPLETED: frozenset(),
+    # Re-openable terminal states: a GitHub issue re-open event drives these
+    # back to pending so the orchestrator picks them up in the next cycle.
+    # Operator requeue also allows returning operator-intervention states to pending.
+    IssueState.COMPLETED: frozenset({IssueState.PENDING}),
     IssueState.FAILED_TERMINAL: frozenset({IssueState.PENDING}),
     IssueState.NEEDS_HUMAN: frozenset({IssueState.PENDING}),
     IssueState.BLOCKED_FAILED_DEP: frozenset({IssueState.PENDING}),

@@ -121,14 +121,19 @@ class TestTransitionIssuePure:
         with pytest.raises(InvalidTransitionError):
             transition_issue("dispatched", "blocked")
 
-    def test_completed_is_truly_terminal(self):
-        """completed has no outgoing transitions — it is the only fully irreversible state."""
-        with pytest.raises(InvalidTransitionError):
-            transition_issue("completed", "pending")
+    # completed / failed-terminal / cancelled now allow re-open to pending
+    def test_completed_can_reopen_to_pending(self):
+        assert transition_issue("completed", "pending") == "pending"
 
-    def test_failed_terminal_can_requeue_to_pending(self):
-        """Operator requeue: failed-terminal -> pending is allowed."""
+    def test_failed_terminal_can_reopen_to_pending(self):
         assert transition_issue("failed-terminal", "pending") == "pending"
+
+    def test_cancelled_can_reopen_to_pending(self):
+        assert transition_issue("cancelled", "pending") == "pending"
+
+    def test_completed_cannot_go_to_dispatched(self):
+        with pytest.raises(InvalidTransitionError):
+            transition_issue("completed", "dispatched")
 
     def test_failed_terminal_cannot_go_to_dispatched(self):
         with pytest.raises(InvalidTransitionError):
@@ -168,10 +173,10 @@ class TestTransitionIssuePure:
 
     def test_error_message_contains_states(self):
         with pytest.raises(InvalidTransitionError) as exc_info:
-            transition_issue("completed", "pending")
+            transition_issue("completed", "dispatched")
         msg = str(exc_info.value)
         assert "completed" in msg
-        assert "pending" in msg
+        assert "dispatched" in msg
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +313,7 @@ class TestApplyIssueTransition:
     def test_invalid_transition_raises_and_does_not_mutate(self, conn):
         issue_id = _insert_issue(conn, state="completed")
         with pytest.raises(InvalidTransitionError):
-            apply_issue_transition(conn, issue_id, "pending")
+            apply_issue_transition(conn, issue_id, "dispatched")
         row = conn.execute("SELECT state FROM issues WHERE id = ?", (issue_id,)).fetchone()
         assert row["state"] == "completed"
 

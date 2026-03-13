@@ -218,7 +218,20 @@ MIGRATIONS: list[tuple[int, str]] = [
     (
         5,
         """
-        -- v5: policy config + merge gate + guardrails
+        -- v5: issue discovery + configurable scope
+        INSERT INTO config (key, value) VALUES
+            ('discovery_enabled',    'false'),
+            ('scope_include_labels', '[]'),
+            ('scope_exclude_labels', '[]'),
+            ('scope_milestone',      ''),
+            ('scope_allow_unassigned', 'true')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
+    (
+        6,
+        """
+        -- v6: policy config + merge gate + guardrails
 
         -- retry_count tracks how many times an issue has been re-dispatched
         ALTER TABLE issues ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
@@ -227,14 +240,11 @@ MIGRATIONS: list[tuple[int, str]] = [
         ALTER TABLE issues ADD COLUMN merge_state TEXT NOT NULL DEFAULT 'none'
             CHECK(merge_state IN ('none', 'eligible', 'pending', 'done', 'rejected'));
 
-        -- Policy config defaults
+        -- Policy config defaults (scope keys already in v5)
         INSERT INTO config (key, value) VALUES
             ('merge_enabled',              'false'),
             ('merge_require_checks',       'true'),
             ('merge_require_clean_rebase', 'true'),
-            ('scope_include_labels',       ''),
-            ('scope_exclude_labels',       ''),
-            ('scope_milestone',            ''),
             ('repo_allowlist',             ''),
             ('protected_branches',         'main'),
             ('max_concurrent_repair',      '1'),

@@ -7,6 +7,7 @@ import click
 from .commands.apply_policy import cmd_apply_policy
 from .commands.control import cmd_control
 from .commands.doctor import cmd_doctor
+from .commands.export import cmd_export
 from .commands.init import cmd_init
 from .commands.merge_gate import cmd_merge_gate
 from .commands.reconcile import cmd_reconcile
@@ -37,3 +38,4 @@ cli.add_command(cmd_doctor)
 cli.add_command(cmd_control)
 cli.add_command(cmd_merge_gate)
 cli.add_command(cmd_apply_policy)
+cli.add_command(cmd_export)

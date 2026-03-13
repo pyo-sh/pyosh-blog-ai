@@ -83,3 +83,27 @@ TOKEN_FIELDS = frozenset({
 
 # Status staleness threshold in seconds
 STALE_THRESHOLD_SECS = 30
+
+# ---------------------------------------------------------------------------
+# orchctl normalized export contract (tracker-side view)
+# Full contract lives in tools/orchctl/orchctl/contract.py.
+# These constants let the tracker validate exports it receives without
+# importing from the orchctl package.
+# ---------------------------------------------------------------------------
+
+# Schema version produced by orchctl export (must match orchctl.contract)
+ORCHCTL_EXPORT_SCHEMA_VERSION = "v1"
+
+# Default export directory relative to monorepo root
+ORCHCTL_EXPORT_DIR = ".workspace/orchestrate/export"
+
+# Required top-level fields in the orchctl per-area export
+ORCHCTL_EXPORT_TOP_FIELDS: frozenset[str] = frozenset({
+    "schema_version",
+    "generated_at",
+    "area",
+    "issues",
+    "batches",
+    "active_workers",
+    "diagnostics",
+})
