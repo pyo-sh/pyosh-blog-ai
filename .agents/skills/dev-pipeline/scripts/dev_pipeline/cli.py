@@ -119,6 +119,24 @@ def cmd_escalation(args) -> int:
     from .controller import format_escalation
 
     print(format_escalation(args.issue, args.area, args.stage, monorepo_root))
+
+    # Auto-record the escalation in history so failure patterns are captured
+    # without relying on callers to invoke history-record manually.
+    try:
+        from .history import AttemptRecord, history_append
+        from .state_store import state_exists, state_read
+        if state_exists(args.issue, args.area, monorepo_root):
+            state = state_read(args.issue, args.area, monorepo_root)
+            failure_class = (
+                state.review_job.status.value
+                if hasattr(state.review_job.status, "value")
+                else str(state.review_job.status)
+            )
+            record = AttemptRecord.from_state(state, outcome="escalated", failure_class=failure_class)
+            history_append(monorepo_root, record)
+    except Exception as e:
+        print(f"[escalation] warning: could not append history: {e}", file=sys.stderr)
+
     return 0
 
 

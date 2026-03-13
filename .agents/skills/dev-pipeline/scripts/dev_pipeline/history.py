@@ -112,7 +112,7 @@ class AttemptRecord:
             step=state.step.value if hasattr(state.step, "value") else str(state.step),
             review_round=state.review_resolve_round,
             stage_retries=dict(state.stage_retries),
-            recovery_count=len(state.recovery_log),
+            recovery_count=len(getattr(state, "recovery_log", [])),
             started_at=started_at,
             finished_at=_now_iso(),
             tool=state.review_job.tool,
@@ -141,9 +141,10 @@ def history_append(monorepo_root: Path, record: AttemptRecord) -> None:
     log_path = history_log_path(monorepo_root)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(record.to_dict(), separators=(",", ":")) + "\n"
-    # O_APPEND mode: the kernel guarantees that concurrent appends to a regular
-    # file do not interleave as long as each write() call is atomic (lines are
-    # short, so this holds in practice).
+    # O_APPEND mode: on Linux, short writes to a regular file via O_APPEND do
+    # not interleave in practice (kernel i_mutex serialises them), but this is
+    # not a portable POSIX guarantee. JSONL lines are short, so this is safe
+    # for the expected single-host usage of this tool.
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(line)
 
