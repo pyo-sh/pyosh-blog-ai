@@ -60,7 +60,7 @@ _PATTERNS: list[tuple[re.Pattern[str], FailureClass]] = [
     # or "killed by signal 9" in a test log should be retried, not escalated.
     (re.compile(
         r"segfault|segmentation fault|killed.*signal|signal \d+|out of memory"
-        r"|oom|process crash|core dump|rc=139|rc=137",
+        r"|\boom\b|process crash|core dump|rc=139|rc=137",
         re.IGNORECASE,
     ), FailureClass.INFRA_CRASH),
     (re.compile(

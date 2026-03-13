@@ -117,6 +117,14 @@ def test_infra_crash_not_shadowed_by_test_failure() -> None:
     assert result == FailureClass.INFRA_CRASH
 
 
+def test_oom_word_boundary_no_false_positive() -> None:
+    """Substrings like 'bloom' and 'room' must not match INFRA_CRASH."""
+    assert classify("failed", '{"reason": "bloom filter error"}') == FailureClass.UNKNOWN
+    assert classify("failed", '{"reason": "looming deadline missed"}') == FailureClass.UNKNOWN
+    assert classify("failed", '{"reason": "out of memory: rc=137"}') == FailureClass.INFRA_CRASH
+    assert classify("failed", '{"reason": "oom killer invoked"}') == FailureClass.INFRA_CRASH
+
+
 # ---------------------------------------------------------------------------
 # next_action_for_class()
 # ---------------------------------------------------------------------------

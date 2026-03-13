@@ -417,7 +417,11 @@ def _next_action_to_state(
     """Map next_action to an IssueState string, enforcing per-class retry budgets."""
     if next_action in (NextAction.RETRY, NextAction.REPAIR):
         budget_by_class = get_config_json(conn, "retry_budget_by_class", default={})
-        budget = int(budget_by_class.get(failure_class.value, budget_by_class.get("default", 1)))
+        raw_budget = budget_by_class.get(failure_class.value, budget_by_class.get("default", 1))
+        try:
+            budget = int(raw_budget)
+        except (TypeError, ValueError):
+            budget = 1
         if retry_count < budget:
             if not dry_run:
                 conn.execute(
