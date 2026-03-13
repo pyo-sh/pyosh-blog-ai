@@ -475,17 +475,25 @@ def cmd_history_record(args) -> int:
     from .state_store import state_exists, state_read
 
     if state_exists(args.issue, args.area, monorepo_root):
-        state = state_read(args.issue, args.area, monorepo_root)
-        failure_class = (
-            state.review_job.status.value
-            if hasattr(state.review_job.status, "value")
-            else str(state.review_job.status)
-        )
-        record = AttemptRecord.from_state(
-            state,
-            outcome=args.outcome,
-            failure_class=failure_class if args.outcome != "success" else "",
-        )
+        try:
+            state = state_read(args.issue, args.area, monorepo_root)
+            # Explicit --failure-class takes priority; fall back to state's review_job status.
+            if args.failure_class:
+                failure_class = args.failure_class
+            else:
+                failure_class = (
+                    state.review_job.status.value
+                    if hasattr(state.review_job.status, "value")
+                    else str(state.review_job.status)
+                )
+            record = AttemptRecord.from_state(
+                state,
+                outcome=args.outcome,
+                failure_class=failure_class if args.outcome != "success" else "",
+            )
+        except Exception as e:
+            print(f"[history-record] error reading state: {e}", file=sys.stderr)
+            return 1
     else:
         # Minimal record from CLI args when state is already gone.
         from datetime import datetime, timezone
