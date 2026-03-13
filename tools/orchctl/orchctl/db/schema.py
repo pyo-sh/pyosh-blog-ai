@@ -379,6 +379,80 @@ MIGRATIONS: list[tuple[int, str]] = [
           AND json_extract(value, '$.deterministic_test_failure') IS NULL;
         """,
     ),
+    (
+        14,
+        """
+        -- v14: cycle quarantine + rate limit / infra-degraded playbooks.
+        --
+        -- Adds 'cycle-isolated' to the issues state vocabulary so that issues
+        -- participating in a dependency cycle can be quarantined individually
+        -- without aborting the whole batch.  Non-cycle issues drain normally.
+        --
+        -- Adds rate-limit backoff config keys so the reconcile loop can apply
+        -- exponential backoff and enter an infra-degraded state on repeated
+        -- GitHub API failures.
+
+        -- Recreate issues table with 'cycle-isolated' in the state CHECK constraint.
+        CREATE TABLE issues_v14 (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            area            TEXT    NOT NULL,
+            number          INTEGER NOT NULL,
+            state           TEXT    NOT NULL DEFAULT 'pending'
+                                    CHECK(state IN (
+                                        'pending',
+                                        'dispatched',
+                                        'completed',
+                                        'failed-terminal',
+                                        'needs-human',
+                                        'blocked-external',
+                                        'cancelled',
+                                        'blocked',
+                                        'blocked-failed-dependency',
+                                        'cycle-isolated'
+                                    )),
+            dependency_type TEXT    NOT NULL DEFAULT 'none'
+                                    CHECK(dependency_type IN ('none','soft','hard')),
+            retry_budget    INTEGER NOT NULL DEFAULT 3,
+            failure_class   TEXT,
+            escalation      TEXT,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            retry_count     INTEGER NOT NULL DEFAULT 0,
+            merge_state     TEXT    NOT NULL DEFAULT 'none'
+                                CHECK(merge_state IN ('none', 'eligible', 'pending', 'done', 'rejected')),
+            priority        INTEGER NOT NULL DEFAULT 0,
+            UNIQUE (area, number)
+        );
+
+        INSERT INTO issues_v14 (id, area, number, state, dependency_type, retry_budget,
+                                failure_class, escalation, created_at, updated_at,
+                                retry_count, merge_state, priority)
+        SELECT id, area, number, state, dependency_type, retry_budget,
+               failure_class, escalation, created_at, updated_at,
+               retry_count, merge_state, priority
+        FROM issues;
+
+        DROP TRIGGER IF EXISTS issues_updated_at;
+        DROP TABLE issues;
+        ALTER TABLE issues_v14 RENAME TO issues;
+
+        CREATE TRIGGER issues_updated_at
+        AFTER UPDATE ON issues
+        BEGIN
+            UPDATE issues SET updated_at = datetime('now') WHERE id = NEW.id;
+        END;
+
+        CREATE INDEX IF NOT EXISTS idx_issues_state ON issues(state);
+
+        -- Rate limit / infra-degraded config defaults.
+        -- rate_limit_backoff_base_s: base seconds for exponential backoff on rate limit.
+        -- infra_degraded_threshold: consecutive rate-limit events before infra-degraded.
+        INSERT INTO config (key, value) VALUES
+            ('rate_limit_backoff_base_s', '60'),
+            ('infra_degraded_threshold',  '5')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
