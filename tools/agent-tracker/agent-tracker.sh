@@ -78,21 +78,28 @@ done
 unset _f
 
 if tmux has-session -t "$SESSION" 2>/dev/null; then
-  declare -A _active_panes=()
-  while IFS= read -r _pid; do
-    _active_panes["$_pid"]=1
-  done < <(tmux list-panes -s -t "$SESSION" -F '#{pane_id}' 2>/dev/null | sed 's/^%//')
-  # Remove orphan v2 sidecars for this server + session
-  _v2_dir="$SIDECAR_DIR/${_socket_hash}/${SESSION}"
-  if [[ -d "$_v2_dir" ]]; then
-    for _f in "$_v2_dir"/*.json; do
-      [[ -f "$_f" ]] || continue
-      _fname="${_f##*/}"
-      _pane="${_fname%.json}"
-      [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
-    done
+  # Guard: if list-panes fails (race: session vanished after has-session),
+  # skip orphan cleanup entirely. An empty _active_panes would delete ALL
+  # sidecars, which is worse than leaving stale ones behind (#113).
+  _pane_ids=$(tmux list-panes -s -t "$SESSION" -F '#{pane_id}' 2>/dev/null) || _pane_ids=""
+  if [[ -n "$_pane_ids" ]]; then
+    declare -A _active_panes=()
+    while IFS= read -r _pid; do
+      [[ -n "$_pid" ]] && _active_panes["${_pid#%}"]=1
+    done <<< "$_pane_ids"
+    # Remove orphan v2 sidecars for this server + session
+    _v2_dir="$SIDECAR_DIR/${_socket_hash}/${SESSION}"
+    if [[ -d "$_v2_dir" ]]; then
+      for _f in "$_v2_dir"/*.json; do
+        [[ -f "$_f" ]] || continue
+        _fname="${_f##*/}"
+        _pane="${_fname%.json}"
+        [[ -z "${_active_panes[$_pane]+x}" ]] && rm -f "$_f"
+      done
+    fi
+    unset _active_panes _fname _pane _f _v2_dir _pid
   fi
-  unset _active_panes _fname _pane _f _v2_dir _pid
+  unset _pane_ids
 fi
 unset _tmux_socket _socket_hash
 
