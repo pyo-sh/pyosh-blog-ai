@@ -333,8 +333,8 @@ class TestRepoAllowlistGuardrail:
         assert result.exit_code == 0, result.output
         assert "ready to dispatch" in result.output
 
-    def test_dispatch_allowed_when_area_repo_not_configured(self, runner, db_path):
-        """If area repo is not set, skip the allowlist check (permissive)."""
+    def test_dispatch_blocked_when_area_repo_not_configured(self, runner, db_path):
+        """If repo_allowlist is set but area repo is not configured, fail closed."""
         conn = get_db(db_path)
         set_config(conn, "repo_allowlist", "pyo-sh/pyosh-blog-fe")
         # workspace.repo is NOT set
@@ -346,8 +346,9 @@ class TestRepoAllowlistGuardrail:
 
         result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "workspace"])
         assert result.exit_code == 0, result.output
-        # No allowlist error — area_repo not configured, check skipped
-        assert "not in allowlist" not in result.output
+        # Fails closed: area_repo not configured → no dispatches
+        assert "workspace.repo is not configured" in result.output
+        assert "ready to dispatch" not in result.output
 
 
 # ---------------------------------------------------------------------------

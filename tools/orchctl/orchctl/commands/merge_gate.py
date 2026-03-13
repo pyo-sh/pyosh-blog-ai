@@ -5,8 +5,9 @@ Checks (all must pass for merge to be allowed):
   2. sha_match       — PR head SHA matches the pipeline's last commit SHA
   3. no_conflict     — PR has no merge conflicts (MERGEABLE state)
   4. no_blocking_labels — no forbidden labels on the issue/PR
-  5. branch_protection  — target branch is in the protected_branches allowlist
-                          (merge allowed only if merge_enabled config is true)
+  5. branch_protection  — target branch must NOT be in protected_branches
+                          (blocks auto-merge to main / release branches;
+                          also fails when merge_enabled=false)
 
 Input:  latest completed attempt's terminal_json for the issue.
 Output: per-check pass/fail + overall eligibility.

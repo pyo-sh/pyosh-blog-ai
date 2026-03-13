@@ -195,8 +195,3 @@ def _require_ready(conn: object) -> None:
             f"Database schema is out of date (v{ver} < v{LATEST_VERSION}) "
             "— run `orchctl init` to migrate."
         )
-
-
-def is_area_paused(conn: object, area: str) -> bool:
-    """Return True if the given area has been paused via 'control pause'."""
-    return get_config_bool(conn, _pause_key(area), default=False)

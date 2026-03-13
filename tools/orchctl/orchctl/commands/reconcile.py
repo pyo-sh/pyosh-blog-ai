@@ -82,9 +82,10 @@ def cmd_reconcile(
                     f"reconcile [{area}]: lease held by another process"
                     " (scheduler_overlap=false) — skipping."
                 )
-            else:
-                click.echo(f"reconcile [{area}]: lease held by another process — skipping.")
-            return
+                return
+            click.echo(
+                f"reconcile [{area}]: scheduler_overlap=true — continuing despite active lease."
+            )
 
         try:
             _run_pass(conn, area, pid, dry_run)
@@ -331,12 +332,20 @@ def _dispatch_pass(
         click.echo(f"reconcile [{area}]: area is paused — no new dispatches.")
         return
 
-    # Repo allowlist guardrail: if configured, area repo must be in the list.
+    # Repo allowlist guardrail: if configured, area repo must be set and in the list.
+    # Fails closed: if the allowlist is non-empty and the area's repo is not configured,
+    # dispatch is refused rather than silently permitted.
     repo_allowlist_raw = config["repo_allowlist"]
     if repo_allowlist_raw:
         allowed_repos = {r.strip() for r in repo_allowlist_raw.split(",") if r.strip()}
         area_repo = config["area_repo"].strip()
-        if area_repo and area_repo not in allowed_repos:
+        if not area_repo:
+            click.echo(
+                f"reconcile [{area}]: guardrail — repo_allowlist is set"
+                f" but {area}.repo is not configured — no dispatches."
+            )
+            return
+        if area_repo not in allowed_repos:
             click.echo(
                 f"reconcile [{area}]: guardrail — repo '{area_repo}' not in allowlist"
                 " — no dispatches."

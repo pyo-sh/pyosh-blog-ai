@@ -72,8 +72,6 @@ def apply_policy(conn: sqlite3.Connection, policy: dict) -> list[str]:
 
     retry = policy.get("retry") or {}
     budgets = retry.get("budget_by_class") or {}
-    if "default" in budgets:
-        _maybe_set(conn, "retry_budget", str(int(budgets["default"])), changed)
     if budgets:
         _maybe_set(conn, "retry_budget_by_class", json.dumps(budgets), changed)
 

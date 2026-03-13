@@ -148,10 +148,12 @@ def test_apply_policy_merge(conn):
 def test_apply_policy_retry_budget(conn):
     policy = {"retry": {"budget_by_class": {"default": 2, "transient": 4}}}
     changed = apply_policy(conn, policy)
-    assert "retry_budget" in changed
-    assert get_config(conn, "retry_budget") == "2"
+    assert "retry_budget_by_class" in changed
+    # retry_budget is not written — only the full budget_by_class map is stored
+    assert "retry_budget" not in changed
     budget_map = json.loads(get_config(conn, "retry_budget_by_class"))
     assert budget_map["transient"] == 4
+    assert budget_map["default"] == 2
 
 
 def test_apply_policy_scope(conn):
