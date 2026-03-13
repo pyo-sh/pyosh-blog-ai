@@ -36,6 +36,9 @@ orchctl status
 Then enter the continuous loop (poll every 30 s):
 
 ```bash
+# orchctl status --json shape: {"issues": {"<state>": <count>, ...}, "active_attempts": [...]}
+MAX_POLLS=120  # 1 hour at 30s intervals
+POLL=0
 while true; do
   sleep 30
   orchctl reconcile --area <area>
@@ -46,6 +49,10 @@ active = {'pending', 'dispatched', 'blocked'}
 print(sum(v for k, v in d.get('issues', {}).items() if k in active))
 ")
   [ "$REMAINING" -eq 0 ] && break
+  (( ++POLL >= MAX_POLLS )) && {
+    echo "Timeout: issues still active after 1h — check with orchctl status"
+    break
+  }
 done
 orchctl status
 ```
@@ -177,6 +184,11 @@ Key settings:
 | `protected_branches` | `main` | Branches blocked from auto-merge |
 
 Sample file: `tools/orchctl/policy.yaml.sample`
+
+## Invariants
+
+- **Never merge PRs** - workers stop at ready-to-merge; merging is handled externally via `merge-gate`.
+- **Never modify code** - all code changes happen inside dispatched worker processes.
 
 ## Exception reporting
 
