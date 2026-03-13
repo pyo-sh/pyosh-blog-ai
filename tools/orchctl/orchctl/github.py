@@ -82,6 +82,8 @@ def list_open_issues(
         "gh", "issue", "list",
         "-R", repo,
         "--state", "open",
+        # body is required to parse `priority:` from the fenced orchestrator block.
+        # Kept on every reconcile so that reopened issues pick up priority changes.
         "--json", "number,title,labels,milestone,assignees,body",
         "--limit", str(limit),
     ]

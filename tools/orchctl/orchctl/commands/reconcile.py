@@ -726,8 +726,11 @@ def _sort_pending(
     )
 
 
-def _count_awaiting_merge(conn: sqlite3.Connection) -> int:
-    """Count completed issues whose PRs have not yet been merged or rejected.
+def _count_awaiting_merge(conn: sqlite3.Connection, area: str) -> int:
+    """Count completed issues in *area* whose PRs have not yet been merged or rejected.
+
+    Scoped to *area* for consistency with all other per-area admission controls
+    (max_concurrent, max_open_pr, max_concurrent_repair).
 
     Uses ``(merge_state IS NULL OR merge_state NOT IN ('done', 'rejected'))``
     rather than a bare ``NOT IN`` to avoid SQL NULL semantics silently
@@ -736,7 +739,9 @@ def _count_awaiting_merge(conn: sqlite3.Connection) -> int:
     row = conn.execute(
         "SELECT COUNT(*) FROM issues"
         " WHERE state = 'completed'"
-        " AND (merge_state IS NULL OR merge_state NOT IN ('done', 'rejected'))"
+        " AND area = ?"
+        " AND (merge_state IS NULL OR merge_state NOT IN ('done', 'rejected'))",
+        (area,),
     ).fetchone()
     return row[0]
 
@@ -814,7 +819,7 @@ def _dispatch_pass(
 
     # maxAwaitingMerge: gate on unmerged completed PRs (0 = disabled).
     if max_awaiting > 0:
-        awaiting = _count_awaiting_merge(conn)
+        awaiting = _count_awaiting_merge(conn, area)
         if awaiting >= max_awaiting:
             click.echo(
                 f"reconcile [{area}]: maxAwaitingMerge={max_awaiting} reached"

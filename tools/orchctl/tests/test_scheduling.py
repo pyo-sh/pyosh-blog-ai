@@ -182,7 +182,7 @@ class TestCountAwaitingMerge:
     def test_empty_db_returns_zero(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
 
-        assert _count_awaiting_merge(db_conn) == 0
+        assert _count_awaiting_merge(db_conn, "client") == 0
 
     def test_completed_none_merge_state_counted(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
@@ -191,7 +191,7 @@ class TestCountAwaitingMerge:
             "INSERT INTO issues (area, number, state, merge_state) VALUES ('client', 1, 'completed', 'none')"
         )
         db_conn.commit()
-        assert _count_awaiting_merge(db_conn) == 1
+        assert _count_awaiting_merge(db_conn, "client") == 1
 
     def test_completed_eligible_merge_state_counted(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
@@ -200,7 +200,7 @@ class TestCountAwaitingMerge:
             "INSERT INTO issues (area, number, state, merge_state) VALUES ('client', 2, 'completed', 'eligible')"
         )
         db_conn.commit()
-        assert _count_awaiting_merge(db_conn) == 1
+        assert _count_awaiting_merge(db_conn, "client") == 1
 
     def test_completed_done_merge_state_not_counted(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
@@ -209,7 +209,7 @@ class TestCountAwaitingMerge:
             "INSERT INTO issues (area, number, state, merge_state) VALUES ('client', 3, 'completed', 'done')"
         )
         db_conn.commit()
-        assert _count_awaiting_merge(db_conn) == 0
+        assert _count_awaiting_merge(db_conn, "client") == 0
 
     def test_completed_rejected_not_counted(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
@@ -218,7 +218,7 @@ class TestCountAwaitingMerge:
             "INSERT INTO issues (area, number, state, merge_state) VALUES ('client', 4, 'completed', 'rejected')"
         )
         db_conn.commit()
-        assert _count_awaiting_merge(db_conn) == 0
+        assert _count_awaiting_merge(db_conn, "client") == 0
 
     def test_non_completed_state_not_counted(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
@@ -227,7 +227,7 @@ class TestCountAwaitingMerge:
             "INSERT INTO issues (area, number, state, merge_state) VALUES ('client', 5, 'dispatched', 'none')"
         )
         db_conn.commit()
-        assert _count_awaiting_merge(db_conn) == 0
+        assert _count_awaiting_merge(db_conn, "client") == 0
 
     def test_mixed_states_only_counts_unmerged_completed(self, db_conn):
         from orchctl.commands.reconcile import _count_awaiting_merge
@@ -244,7 +244,7 @@ class TestCountAwaitingMerge:
             ],
         )
         db_conn.commit()
-        assert _count_awaiting_merge(db_conn) == 2
+        assert _count_awaiting_merge(db_conn, "client") == 2
 
     def test_null_merge_state_counted(self, db_conn):
         """NULL merge_state must be counted (NOT IN returns NULL for NULLs in SQL)."""
@@ -257,7 +257,19 @@ class TestCountAwaitingMerge:
         db_conn.commit()
         # Verify the column is actually 'none' (the schema default), not SQL NULL.
         # If it ever becomes SQL NULL the IS NULL branch covers it.
-        assert _count_awaiting_merge(db_conn) == 1
+        assert _count_awaiting_merge(db_conn, "client") == 1
+
+    def test_other_area_not_counted(self, db_conn):
+        """Issues in a different area must not affect another area's gate count."""
+        from orchctl.commands.reconcile import _count_awaiting_merge
+
+        db_conn.executemany(
+            "INSERT INTO issues (area, number, state, merge_state) VALUES (?, ?, 'completed', 'eligible')",
+            [("client", 1), ("server", 2), ("server", 3)],
+        )
+        db_conn.commit()
+        assert _count_awaiting_merge(db_conn, "client") == 1
+        assert _count_awaiting_merge(db_conn, "server") == 2
 
 
 # ---------------------------------------------------------------------------
