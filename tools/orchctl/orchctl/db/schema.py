@@ -281,7 +281,19 @@ MIGRATIONS: list[tuple[int, str]] = [
     (
         9,
         """
-        -- v9: per-class retry budgets for crash/timeout/flaky auto-retry playbook.
+        -- v9: stall detection threshold
+        -- stall_threshold_s: activity window in seconds for multi-signal stall detection.
+        -- Independent of heartbeat_ttl (which governs lease renewal).
+        -- Default matches the SIGNAL_THRESHOLD_S constant in orchctl.heartbeat.
+        INSERT INTO config (key, value) VALUES
+            ('stall_threshold_s', '600')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
+    (
+        10,
+        """
+        -- v10: per-class retry budgets for crash/timeout/flaky auto-retry playbook.
         -- Sets default budgets only when the operator has not yet customised the
         -- value (i.e. it is still the empty-dict default from v6).
         INSERT INTO config (key, value) VALUES

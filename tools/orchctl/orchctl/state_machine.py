@@ -199,12 +199,16 @@ def apply_issue_transition(
     return validated
 
 
-def apply_attempt_transition(
+def apply_attempt_transition_tx(
     conn: sqlite3.Connection,
     attempt_id: str,
     new_status: str,
 ) -> str:
-    """Validate and apply an attempt status transition in the DB.
+    """Validate and apply an attempt status transition without committing.
+
+    Identical to apply_attempt_transition but does not call conn.commit().
+    Use this when the caller needs to batch multiple operations into one
+    atomic commit (e.g. transitioning both the attempt and its parent issue).
 
     Returns the new status string.
     Raises InvalidTransitionError, StaleStateError, or ValueError if not found.
@@ -225,5 +229,19 @@ def apply_attempt_transition(
             f"Attempt id={attempt_id!r} status changed concurrently "
             f"(read {old_status!r}, attempted transition to {new_status!r})"
         )
+    return validated
+
+
+def apply_attempt_transition(
+    conn: sqlite3.Connection,
+    attempt_id: str,
+    new_status: str,
+) -> str:
+    """Validate and apply an attempt status transition in the DB.
+
+    Returns the new status string.
+    Raises InvalidTransitionError, StaleStateError, or ValueError if not found.
+    """
+    validated = apply_attempt_transition_tx(conn, attempt_id, new_status)
     conn.commit()
     return validated

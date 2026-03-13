@@ -566,8 +566,8 @@ def test_retry_playbook_budget_exhausted_escalates_to_needs_human(runner, db_pat
     assert "Retry budget exhausted" in body
 
 
-def test_retry_playbook_schema_v9_default_budgets(runner, db_path):
-    """After init (schema v9), retry_budget_by_class has per-class defaults."""
+def test_retry_playbook_schema_v10_default_budgets(runner, db_path):
+    """After init (schema v10), retry_budget_by_class has per-class defaults."""
     import json
     from orchctl.db.connection import get_db
     from orchctl.db.config import get_config_json
