@@ -84,11 +84,20 @@ def _is_running_proc(pid: int, create_time: float | None) -> bool:
 
 
 def _get_create_time_proc(pid: int) -> float | None:
-    """Read process creation time from /proc/<pid>/stat (field 22, clock ticks since boot)."""
+    """Read process creation time from /proc/<pid>/stat (field 22, clock ticks since boot).
+
+    Parses past the (comm) field by locating the last ')' to handle process
+    names that contain spaces (e.g. threads or processes named with spaces).
+    Field 22 (starttime) is at index 19 in the post-comm remainder.
+    """
     try:
         with open(f"/proc/{pid}/stat") as f:
-            fields = f.read().split()
-        starttime_ticks = int(fields[21])
+            content = f.read()
+        comm_end = content.rfind(")")
+        if comm_end < 0:
+            return None
+        after = content[comm_end + 2:].split()
+        starttime_ticks = int(after[19])  # field 22 (1-indexed) = index 19 after comm
         hz = os.sysconf("SC_CLK_TCK")
         boot_time = _boot_time_proc()
         if boot_time is None:

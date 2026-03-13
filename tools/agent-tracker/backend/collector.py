@@ -294,7 +294,17 @@ def _parse_batch(
             continue
 
         pid = _safe_int(dispatch_info.get("pid"))
-        alive = process_adapter.is_running(pid) if pid else False
+        # Use dispatchedAt as reference create_time for PID-reuse protection,
+        # consistent with how orchestratorStartedAt is used for the batch process.
+        dispatched_at_str = dispatch_info.get("dispatchedAt") or ""
+        stored_pid_create_time = None
+        if dispatched_at_str:
+            try:
+                dt = datetime.fromisoformat(dispatched_at_str.replace("Z", "+00:00"))
+                stored_pid_create_time = dt.timestamp()
+            except (ValueError, TypeError):
+                pass
+        alive = process_adapter.is_running(pid, stored_pid_create_time) if pid else False
 
         ps = file_adapter.read_pipeline_state(pipeline_dir, area, issue_key)
         step = (ps.get("step") or "-") if ps else "-"

@@ -19,7 +19,6 @@ class PaneInfo:
     command: str    # pane_current_command
 
 
-
 def socket_hash() -> str:
     """Compute the socket hash used in sidecar v2 namespace.
 
