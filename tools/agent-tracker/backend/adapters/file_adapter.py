@@ -15,7 +15,7 @@ from pathlib import Path
 def read_json(path: str | Path) -> dict | None:
     """Read and parse a JSON file. Returns None on any error."""
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
@@ -64,9 +64,10 @@ def atomic_write(path: str | Path, data: str | bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     mode = "w" if isinstance(data, str) else "wb"
+    encoding = "utf-8" if mode == "w" else None
     fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     try:
-        with os.fdopen(fd, mode) as f:
+        with os.fdopen(fd, mode, encoding=encoding) as f:
             f.write(data)
         os.replace(tmp_path, path)
     except Exception:

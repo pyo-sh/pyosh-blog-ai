@@ -148,9 +148,9 @@ def _collect_claude_pane(
 
     # Tokens
     tokens_data = data.get("tokens") or {}
-    tok_used = int(tokens_data.get("used") or 0)
-    tok_total = int(tokens_data.get("max") or tokens_data.get("total") or 0)
-    tok_pct = int(tokens_data.get("pct") or 0)
+    tok_used = _safe_int(tokens_data.get("used"))
+    tok_total = _safe_int(tokens_data.get("max") or tokens_data.get("total"))
+    tok_pct = _safe_int(tokens_data.get("pct"))
     tok_source = TokenSource.SIDECAR if (tok_used > 0 or tok_total > 0) else TokenSource.UNKNOWN
 
     # Token freshness: prefer tokens_updated_at, fall back to updated_at
@@ -287,12 +287,12 @@ def _parse_batch(
         if status_map.get(issue_key) != "dispatched":
             continue
 
-        pid = int(dispatch_info.get("pid") or 0)
+        pid = _safe_int(dispatch_info.get("pid"))
         alive = process_adapter.is_running(pid) if pid else False
 
         ps = file_adapter.read_pipeline_state(pipeline_dir, area, issue_key)
         step = (ps.get("step") or "-") if ps else "-"
-        pr_num = int((ps.get("pr") or 0)) if ps else 0
+        pr_num = _safe_int(ps.get("pr")) if ps else 0
 
         issue_elapsed = _elapsed_from_iso(dispatch_info.get("dispatchedAt") or "", now)
 
@@ -318,6 +318,14 @@ def _parse_batch(
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _safe_int(v: object, default: int = 0) -> int:
+    """Cast v to int, returning default on any error."""
+    try:
+        return int(v or default)
+    except (ValueError, TypeError):
+        return default
+
 
 def _normalize_text(s: str) -> str:
     if not s:

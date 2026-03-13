@@ -6,6 +6,8 @@ No tmux, no file I/O, no business logic.
 
 from __future__ import annotations
 
+import os
+
 try:
     import psutil
     _PSUTIL_AVAILABLE = True
@@ -68,7 +70,6 @@ def _get_create_time_psutil(pid: int) -> float | None:
 # ── /proc fallback (Linux only) ───────────────────────────────────────────────
 
 def _is_running_proc(pid: int, create_time: float | None) -> bool:
-    import os
     try:
         os.kill(pid, 0)
     except OSError:
@@ -84,7 +85,6 @@ def _is_running_proc(pid: int, create_time: float | None) -> bool:
 
 def _get_create_time_proc(pid: int) -> float | None:
     """Read process creation time from /proc/<pid>/stat (field 22, clock ticks since boot)."""
-    import os
     try:
         with open(f"/proc/{pid}/stat") as f:
             fields = f.read().split()
