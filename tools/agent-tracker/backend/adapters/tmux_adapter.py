@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 
 
@@ -47,6 +48,9 @@ def list_panes(session: str) -> list[PaneInfo]:
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return []
+
+    if result.returncode != 0 and result.stderr:
+        print(f"[tmux] list-panes error: {result.stderr.strip()}", file=sys.stderr)
 
     panes = []
     for line in result.stdout.strip().splitlines():

@@ -141,7 +141,9 @@ def _collect_claude_pane(
         return state
 
     state.model = data.get("model") or "unknown"
-    state.status = data.get("status") or AgentStatus.IDLE
+    _status_values = {s.value: s for s in AgentStatus}
+    raw_status = data.get("status") or ""
+    state.status = _status_values.get(raw_status, AgentStatus.UNKNOWN) if raw_status else AgentStatus.IDLE
     state.task = _normalize_text(data.get("task") or "-")
     raw_activity = _normalize_text(data.get("activity") or "")
     state.activity = raw_activity if raw_activity else None
