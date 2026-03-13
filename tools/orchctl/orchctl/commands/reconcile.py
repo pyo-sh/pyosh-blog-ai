@@ -30,6 +30,7 @@ from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues, pos
 from ..failure_classifier import classify, next_action_for_class, record_failure_class
 from ..models import (
     ISSUE_TRANSITIONS,
+    DependencyType,
     FailureClass,
     IssueState,
     NextAction,
@@ -42,7 +43,6 @@ from ..state_machine import (
     apply_attempt_transition_tx,
     apply_issue_transition,
     apply_issue_transition_tx,
-    resolve_blocked_issue,
 )
 
 
@@ -641,8 +641,10 @@ def _unblock_pass(
 
     For issues with dependency_type='none': unblocked immediately (no deps).
     For issues with hard/soft deps: the dependencies table is queried.
-      - Hard dep: all deps must be 'completed'; any other terminal state → blocked-failed-dependency.
-      - Soft dep: all deps must reach any terminal state; failure does not propagate.
+      Resolution uses per-edge dep_type stored in the dependencies table:
+      - hard edge: dep must be 'completed'; any other terminal state fails the issue.
+      - soft edge: dep must reach any terminal state; failure does not propagate.
+    All edges must be terminal before any transition is made.
     Cross-area deps are resolved by looking up (dep_area, dep_number) in issues.
     If a dep is not yet in the DB (unknown), the issue stays blocked.
 
@@ -668,6 +670,7 @@ def _unblock_pass(
             continue
 
         # Resolve via dependencies table (supports cross-area deps).
+        # dep_type per edge is read from dependencies.dep_type (not issue.dependency_type).
         dep_rows = conn.execute(
             """
             SELECT d.dep_area, d.dep_number, d.dep_type, i.state
@@ -696,8 +699,8 @@ def _unblock_pass(
             )
             continue
 
-        dep_states = [r["state"] for r in dep_rows]
-        new_state = _resolve_deps(dep_states, dep_type)
+        # Per-edge resolution: each edge carries its own dep_type.
+        new_state = _resolve_per_edge(dep_rows)
 
         if new_state == "blocked":
             click.echo(
@@ -715,12 +718,25 @@ def _unblock_pass(
     return True
 
 
-def _resolve_deps(dep_states: list[str], dep_type: str) -> str:
-    """Determine the new state for a blocked issue given its dependency states.
+def _resolve_per_edge(dep_rows: list) -> str:
+    """Resolve blocked state using per-edge dep_type from the dependencies table.
 
+    Each row must have 'state' (issue state string) and 'dep_type' ('hard'|'soft').
     Returns 'pending', 'blocked', or 'blocked-failed-dependency'.
     """
-    return resolve_blocked_issue(dep_states, dep_type)
+    terminal_values = {st.value for st in TERMINAL_ISSUE_STATES}
+
+    if not all(r["state"] in terminal_values for r in dep_rows):
+        return IssueState.BLOCKED.value
+
+    if any(
+        r["dep_type"] == DependencyType.HARD.value
+        and r["state"] != IssueState.COMPLETED.value
+        for r in dep_rows
+    ):
+        return IssueState.BLOCKED_FAILED_DEP.value
+
+    return IssueState.PENDING.value
 
 
 # ---------------------------------------------------------------------------

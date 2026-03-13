@@ -341,3 +341,12 @@ def test_policy_global_quota_key_sets_max_open_pr(conn):
     changed = apply_policy(conn, policy)
     assert "max_open_pr" in changed
     assert get_config(conn, "max_open_pr") == "8"
+
+
+def test_policy_global_quota_wins_over_global_max(conn):
+    """When both global_quota and global_max are present, global_quota takes precedence."""
+    from orchctl.policy import apply_policy
+
+    policy = {"concurrency": {"global_max": 3, "global_quota": 7}}
+    apply_policy(conn, policy)
+    assert get_config(conn, "max_open_pr") == "7"
