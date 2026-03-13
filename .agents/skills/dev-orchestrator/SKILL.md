@@ -52,6 +52,8 @@ orchctl status
 
 Stop the loop when all issues are `completed`, `failed-terminal`, or `skipped`.
 
+Run `/dev-log` to record batch completion.
+
 ### resume area=\<area\>
 
 Resume an interrupted run without reinitializing.
@@ -61,7 +63,7 @@ orchctl reconcile --area <area>
 orchctl status
 ```
 
-Then enter the continuous loop (same pattern as `start`).
+Then enter the continuous loop (same pattern as `start`). Run `/dev-log` after completion.
 
 ### status
 
@@ -143,6 +145,12 @@ Evaluate whether a completed issue is eligible for merge.
 orchctl merge-gate --area <area> --issue <N>
 # Exits 0 = eligible, 1 = blocked, 2 = error
 ```
+
+## Agent selection
+
+The pipeline runner is always `claude -p` (Claude Code is required for pipeline skills). The review subprocess tool and model are configured per issue dispatch.
+
+Native agent/model selection in `orchctl` is planned for a future stage. Until then, the values are passed to `/dev-pipeline` outside of orchctl (for example, via the `/dev-pipeline` skill directly or via pipeline state). Supported tool values: `claude`, `claude:<model>`, `codex`, `codex:<model>`.
 
 ## Policy
 
