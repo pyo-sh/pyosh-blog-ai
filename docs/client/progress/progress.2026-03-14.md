@@ -1,6 +1,10 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #26 Public Post API functions PR #131 머지
+  - PR: `feat: add post API functions (#26)`
+  - merge: squash merge, merge commit `0835bfe`
+  - branch: `feat/issue-26-post-api-functions` (issue worktree cleaned up after merge)
 - [x] #32 Pagination 공통 컴포넌트 PR #128 머지
   - PR: `feat: Pagination 공통 컴포넌트 (#32)`
   - merge: squash merge, merge commit `da8901d7ab14efbf3bfd97daa7bd6e7e57e0dd00`
@@ -12,6 +16,9 @@
   - conflict file: `src/shared/lib/markdown.ts`
 
 ## Discoveries
+- Public post reads fit cleanly into the existing `src/entities/post/api.ts` module; a separate public/admin split was unnecessary for this scope.
+- A fresh issue worktree did not have dependencies installed, so `pnpm install --frozen-lockfile` was required before `pnpm compile:types && pnpm lint && pnpm build` could run.
+- The Codex review on PR #131 reported `[CRITICAL]=0`, `[WARNING]=0`, `[SUGGESTION]=0`, so the pipeline advanced directly to merge without a resolve round.
 - Pagination UI was already re-reviewed after the token-name fix and had no remaining CRITICAL/WARNING/SUGGESTION findings before merge.
 - GitHub merged the PR at `2026-03-13T19:02:47Z`, which is `2026-03-14 04:02:47` in KST.
 - PR #130 was initially `CONFLICTING` because both branches added `src/shared/lib/markdown.ts`.
@@ -29,6 +36,8 @@
 - [ ] Remove `/workspace/.workspace/worktrees/client/feat-pagination-component` or switch it off `feat/pagination-component`, then delete the leftover local branch if cleanup is still needed.
 
 ## Notes
+- Related PR: #131
+- Related Issue: #26
 - Related PR: #128
 - Related PR: #130
 - Related Issue: #32
