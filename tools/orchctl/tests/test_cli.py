@@ -460,14 +460,14 @@ def _setup_dispatched_issue(conn, area: str, number: int, attempt_status: str, t
 
 
 @pytest.mark.parametrize(
-    "failure_reason, expected_class, budget",
+    "failure_reason, expected_class",
     [
-        ('{"reason": "segmentation fault"}', "infra_crash", 3),
-        ('{"reason": "pipeline exited with rc=1"}', "unknown", 1),
+        ('{"reason": "segmentation fault"}', "infra_crash"),
+        ('{"reason": "pipeline exited with rc=1"}', "unknown"),
     ],
 )
 def test_retry_playbook_first_attempt_re_enqueues(
-    runner, db_path, failure_reason, expected_class, budget
+    runner, db_path, failure_reason, expected_class
 ):
     """First failure within budget re-enqueues issue as pending with retry_count=1."""
     import unittest.mock as mock
@@ -495,8 +495,7 @@ def test_retry_playbook_first_attempt_re_enqueues(
         assert row["state"] == "pending"
         assert row["retry_count"] == 1
     else:
-        # unknown → escalate → needs-human (default budget=1, retry_count starts at 0, 0<1 so retry once)
-        # Actually for unknown: next_action=ESCALATE → needs-human directly (no budget check)
+        # unknown class → ESCALATE → needs-human (no budget check)
         assert row["state"] == "needs-human"
 
 
