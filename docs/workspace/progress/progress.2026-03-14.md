@@ -1,5 +1,20 @@
 # Progress 2026-03-14
 
+## orchctl git conflict rebase playbook (#99, PR #201)
+
+Stage 3 self-healing playbook: `git_conflict` failures now trigger automated rebase repair attempts with PR/branch/conflict context, and create a blocker GitHub issue after the rebase budget is exhausted.
+
+### Changes merged
+
+- **`reconcile.py`** - `_run_git_rebase_playbook(conn, area, number, terminal_json, *, pid, owns_lease)`: parses PR number and conflict reason from terminal_json, resolves PR head branch via `get_pr_branch()`, renews lease before the second sequential gh call, posts rebase-attempt context comment (with conflict reason and branch name) in the within-budget branch; `_create_git_rebase_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)`: queries terminal attempts, builds conflict history, creates blocker issue (with 'blocker' label and requeue instructions), posts blocker reference comment on original issue; `_next_action_to_state()` now calls both functions for `FailureClass.GIT_CONFLICT` in the within-budget and budget-exhausted branches respectively
+- **`tests/test_git_rebase_playbook.py`** (new) - 14 tests: next_action routing, within-budget rebase scheduling, budget exhaustion (blocker created + referenced in comment), playbook not called on exhaustion, comment with PR+reason/branch/no-reason/no-PR, lease renewal gating, blocker body conflict history, dry-run skip, requeue instructions in body
+- **488 tests** passing
+
+### Key design decisions
+
+- Follows the same pattern as `_run_ci_repair_playbook` / `_create_ci_blocker_issue` (#98): orchestrator posts context + re-queues; re-dispatched worker performs the actual git rebase and test re-execution
+- Lease renewal placed between `get_pr_branch()` and `post_issue_comment()` to prevent expiry from cumulative sequential gh call latency
+
 ## orchctl CI failure repair + blocker issue playbook (#98, PR #199)
 
 Stage 3 self-healing playbook: `deterministic_test_failure` now triggers automated repair attempts with CI log context rather than immediate escalation, and creates a blocker GitHub issue after the repair budget is exhausted.

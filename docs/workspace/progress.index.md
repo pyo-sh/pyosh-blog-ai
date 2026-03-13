@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-14 | orchctl git conflict rebase playbook (#99, PR #201) - GIT_CONFLICT→REPAIR, rebase context comment (PR/branch/conflict reason), lease renewal, blocker issue on budget exhaustion, 14 tests, 488 tests total | done |
 | 2026-03-14 | orchctl CI failure repair + blocker issue playbook (#98, PR #199) - DETERMINISTIC_TEST_FAILURE→REPAIR, CI log collection (gh run view --log-failed), lease renewal between gh calls, blocker issue on budget exhaustion, v13 migration (INSERT OR IGNORE), 5라운드 리뷰, 474 tests | done |
 | 2026-03-14 | Agent tracker: read-only UI + footer semantics (#114, PR #198) - Python backend daemon replaces direct collect.sh call; fault/unknown/stale separate from idle in footer; .orchestrators/.orchestrator dual-key support; 23 new tests, 4 review rounds | done |
 | 2026-03-14 | orchctl history / audit query (#103, PR #194) - JSONL attempt log, history list/stats/patterns, auto-record on success+escalation, _derive_failure_class helper, null guards, 7라운드 리뷰 | done |
