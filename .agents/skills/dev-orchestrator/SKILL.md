@@ -5,236 +5,185 @@ description: Orchestrate multiple GitHub issues in parallel via headless `claude
 
 # Dev-Orchestrator
 
-Batch orchestration: build dependency DAG from issues -> dispatch headless `claude -p` processes via `/dev-pipeline` -> monitor completion -> auto-unblock dependents.
+Thin wrapper over `orchctl`. All operational logic runs inside the controller; this skill handles user interaction, command routing, and exception reporting.
 
-> Area definitions, directory/repo mappings: [monorepo-layout.md](../../references/monorepo-layout.md)
-> Source helpers at start: `source scripts/orchestrate-helpers.sh`
+> `orchctl` install: `pip install -e tools/orchctl` from monorepo root
+> DB path: `ORCHCTL_DB` env var, or default `~/.orchctl/orchctl.db`
+> Area definitions: [monorepo-layout.md](../../references/monorepo-layout.md)
 
-## Agent selection
+## Commands
 
-**Ask the user** which AI agent/model to use for dispatched processes:
+Parse the user's request into one of the commands below and call `orchctl` accordingly. Report CLI output verbatim; add a brief summary when the output is long.
 
-| Agent value | Pipeline runner | Review subprocess |
-|-------------|----------------|-------------------|
-| `claude` | `claude -p` (default model) | `claude -p` with `/dev-review` skill |
-| `claude:<model>` | `claude -p --model <model>` | `claude -p --model <model>` with `/dev-review` skill |
-| `codex` | `claude -p` (default model) | `codex exec review --base origin/main` |
-| `codex:<model>` | `claude -p` (default model) | `codex exec review --model <model> --base origin/main` |
+### start area=\<area\>
 
-Examples: `"claude"`, `"claude:sonnet"`, `"codex"`, `"codex:o3"`.
-
-The outer pipeline runner is always `claude -p` because the pipeline requires Claude Code skills. The tool value (`claude`/`codex`) controls which CLI runs the review subprocess. When tool is `codex`, the outer pipeline uses the default Claude model (the model applies to the review subprocess only).
-
-Store in state as `"agent": "codex:o3"` etc.
-
-## State files
-
-```
-.workspace/orchestrate/{area}/batch.state.json                          # batch-level DAG + status + provider health
-.workspace/orchestrate/{area}/gh-errors.log                             # captured stderr from failed gh calls
-.workspace/orchestrate/{area}/issues/{N}/attempts/{attemptId}/          # per-attempt artifact directory
-  terminal.json   # completion contract (attemptId, status, prNumber, merged, headSha)
-  worker.log      # stdout from headless process
-  worker.err      # stderr from headless process
-  heartbeat       # epoch timestamp, updated every 60s
-  pid             # wrapper PID (= PGID), transient
-.workspace/orchestrate/{area}/archive/{batchId}/                        # archived batch (batch.state.json + issues/ + gh-errors.log)
-```
-
-`attemptId` format: `issue-{N}-a{M}` where M is the retry count (0-based).
-
-Each retry creates a new attempt directory. Previous attempt artifacts are preserved for debugging. Stale artifact confusion is eliminated because paths are unique per attempt.
-
-After batch completion, `orch_archive_batch` moves the active area content into `archive/{batchId}/`. Up to 5 archives are kept per area (rotation policy); older archives are deleted automatically.
-
-## PR identity
-
-PRs created by the orchestrator are identified by deterministic branch names and labels.
-
-### Branch naming
-
-```
-orch/{area}/issue-{N}/{attemptId}
-```
-
-Example: `orch/workspace/issue-84/issue-84-a0`
-
-The branch name is passed to the pipeline prompt and stored in `dispatched[issue].branch` and `issueMetadata[issue].branch`.
-
-### Labels
-
-When a PR is detected (via `terminal.json`), the orchestrator applies identity labels:
-
-| Label | Purpose |
-|-------|---------|
-| `orch` | Marks PR as orchestrator-dispatched |
-| `area:{area}` | Area scope (e.g., `area:workspace`) |
-| `issue:{N}` | Issue number (e.g., `issue:84`) |
-| `attempt:{attemptId}` | Attempt identifier (e.g., `attempt:issue-84-a0`) |
-
-### PR lookup order
-
-`_orch_pr_list` searches in this order:
-
-1. **Branch-based** (primary) - deterministic, no false positives
-2. **Label-based** (secondary) - covers PRs created before branch naming
-3. **Body search** (fallback) - for pre-migration PRs
-
-### Issue metadata
-
-`issueMetadata[issue]` in batch state stores durable PR identity that survives dispatch cleanup:
-
-```json
-{
-  "issueMetadata": {
-    "84": { "branch": "orch/workspace/issue-84/issue-84-a0", "attemptId": "issue-84-a0", "pr": 145 }
-  }
-}
-```
-
-Pipeline state at `.workspace/pipeline/{area}/issue-{N}.state.json` is read-only from the orchestrator's perspective.
-
-State file updates use `flock` for mutual exclusion.
-
-## Workflow
-
-### 0. Check existing state
+Initialize and start the reconciliation loop for an area.
 
 ```bash
-STATE_FILE=".workspace/orchestrate/{area}/batch.state.json"
+# 1. Initialize DB (idempotent)
+orchctl init
+
+# 2. Apply policy if file is available (auto-discovers path)
+orchctl apply-policy
+
+# 3. Run first reconcile pass (discovery enqueues open issues when enabled)
+orchctl reconcile --area <area>
+
+# 4. Show current state
+orchctl status
 ```
 
-Exists -> **resume** ([recovery.md](references/recovery.md)). Not exists -> Step 1.
-
-### 1. Area detection
-
-Determine area from user input or context (issue labels, current directory).
-
-| Context | Area |
-|---------|------|
-| Issue has `client` label | `client` |
-| Issue has `server` label | `server` |
-| User specifies | as given |
-
-Area dir: monorepo root (e.g., `/workspace`) for `workspace`, or `{monorepo}/{area}` for client/server.
-
-### 2. Fetch & filter issues
-
-Always use `-R` to target the correct GitHub repo:
+Then enter the continuous loop (poll every 30 s):
 
 ```bash
-REPO=$(monorepo_area_repo "$AREA")
-gh issue list -R "$REPO" --assignee @me --state open \
-  --json number,title,body,labels \
-  --jq '.[] | select(.labels[].name == "{area}")'
-```
-
-Exclude issues already in pipeline state (`.workspace/pipeline/{area}/issue-*.state.json`).
-
-Present list to user for confirmation before proceeding.
-
-### 3. Build dependency DAG
-
-Parse each issue body with `--parse-typed` to get typed deps (fenced block preferred, `### Dependencies` fallback). Build `dag`, `dep_types`, and `cross_area_deps` structures. See [dependency-resolution.md](references/dependency-resolution.md).
-
-Cycle detection runs inside `orch_init` (SCC isolation - cycle issues get `cycle-isolated`, batch continues). Do NOT pre-abort on cycles.
-
-Write initial state via `orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent] [dep_types_json] [cross_area_deps_json]`. Schema: `area`, `batchId`, `issues[]`, `dag{}`, `dagTypes{}`, `crossAreaDeps{}`, `status{}`, `dispatched{}`, `agent`, `maxConcurrent` (default 4), `providers` (GitHub circuit breaker), timestamps.
-
-### 4. Enter poll cycle (dispatch + monitor)
-
-**Do NOT dispatch issues manually.** Use `orch_poll_cycle` for both initial and subsequent dispatches. The poll cycle handles dispatch atomically (launch + state recording in one call), respects `maxConcurrent`, and prevents orphan processes.
-
-`orch_dispatch` is atomic: it launches the background process AND records it in state. If state recording fails, it kills the orphan process automatically.
-
-```bash
-# Run first poll cycle immediately (dispatches initial pending issues)
-orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"
-
-# Then loop every 30 seconds
 while true; do
   sleep 30
-  orch_poll_cycle "$AREA" "$AREA_DIR" "$AGENT"
-
-  REMAINING=$(orch_state_read "$AREA" | jq \
-    '[.status | to_entries[] | select(.value == "pending" or .value == "dispatched" or .value == "blocked")] | length')
+  orchctl reconcile --area <area>
+  REMAINING=$(orchctl status --json | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+active = {'pending', 'dispatched', 'blocked'}
+print(sum(v for k, v in d.get('issues', {}).items() if k in active))
+")
   [ "$REMAINING" -eq 0 ] && break
 done
+orchctl status
 ```
 
-Each cycle: check completion, detect stalls, unblock dependents, dispatch newly-pending issues (up to `maxConcurrent`), and print status. See [state-detection.md](references/state-detection.md) for detection logic.
+Stop the loop when all issues are `completed`, `failed-terminal`, or `skipped`.
 
-### 6. Batch completion
+### resume area=\<area\>
 
-All issues `completed`, `failed`, or `skipped_dep_failed`:
+Resume an interrupted run without reinitializing.
 
 ```bash
-orch_print_summary "$AREA"
+orchctl reconcile --area <area>
+orchctl status
 ```
 
-Show table: issue -> status -> PR URL. For failed issues, ask user to handle manually.
+Then enter the continuous loop (same pattern as `start`).
 
-Archive the batch (preserves state, logs, and artifacts for audit):
+### status
 
 ```bash
-orch_archive_batch "$AREA"
+orchctl status
+# Machine-readable:
+orchctl status --json
 ```
 
-This moves `.workspace/orchestrate/{area}/` content to `.workspace/orchestrate/{area}/archive/{batchId}/` and applies the rotation policy (keeps last 5 by default).
-
-To view previous batches:
+### doctor
 
 ```bash
-orch_archive_list "$AREA"
+orchctl doctor
+# Machine-readable:
+orchctl doctor --json
 ```
 
-### 7. Record progress
+Checks: schema version, orphan attempts, stale leases. Returns 0 if healthy, 1 if issues found.
 
-Run `/dev-log` to record batch completion.
+### reconcile area=\<area\>
 
-## Constraints
-
-- **Never merge PRs** - workers stop at ready-to-merge; merge gate is the orchestrator's responsibility (Stage 2)
-- **Never modify code** - code changes happen only inside dispatched processes
-- **Max concurrency** controlled by `maxConcurrent` (default: 4)
-- Always use `-R <owner/repo>` or `cd {area_dir}` for `gh` commands - never run from the wrong repo
-- Avoid deprecated `gh` fields (`projectCards` etc.) - use `number,title,state,body,url`
-- On unrecoverable error: save state, report to user
-
-## Worktree lifecycle
-
-Each dispatched worker runs inside a dedicated worktree at `.workspace/worktrees/{area}/issue-{N}/`. The orchestrator manages the full lifecycle:
-
-- **Dispatch** - `orch_worktree_prepare` quarantines any stale worktree before launching the new attempt, preventing `git worktree add` failures on retry.
-- **Completion** - `orch_worktree_gc` removes the worktree on `completed` and quarantines it on `failed` or abnormal exit (retry exhausted / stall kill).
-- **Orphan GC** - `orch_orphan_gc` runs at the start of each poll cycle and quarantines worktrees belonging to issues not in the active batch.
-- **Disk budget** - `orch_disk_budget_gc` enforces a 500 MB ceiling on the quarantine directory, removing the oldest entries when exceeded.
-
-Quarantine path: `.workspace/worktrees/{area}/quarantine/issue-{N}-{timestamp}/`
-
-## Doctor
-
-Run `orch_doctor` to validate state consistency and diagnose issues:
+Run one idempotent reconcile pass.
 
 ```bash
-orch_doctor "$AREA"
+orchctl reconcile --area <area>
+# Preview without side effects:
+orchctl reconcile --area <area> --dry-run
 ```
 
-Checks performed:
+### pause area=\<area\>
 
-| Check | Description |
-|-------|-------------|
-| State file integrity | JSON validity, required keys, batchId presence |
-| Status consistency | Valid status values, dispatched/status agreement |
-| Process health | PGID/PID liveness for dispatched issues |
-| Lock files | Stale flock detection |
-| Worktree state | Orphan worktrees, missing worktrees, quarantine budget |
-| PR/issue consistency | PR state vs issue status mismatch (provider health aware) |
+Stop new dispatches for the area (running workers continue to completion).
 
-Returns 0 if healthy, 1 if issues found. Does not modify state - read-only diagnostic.
+```bash
+orchctl control pause <area>
+```
 
-## References
+Undo:
 
-- [Dependency resolution](references/dependency-resolution.md) - DAG construction, cycle detection, edge cases
-- [State detection](references/state-detection.md) - completion/stall detection, status state machine
-- [Recovery strategy](references/recovery.md) - crash recovery, auto-retry policy
+```bash
+orchctl control resume <area>
+```
+
+### drain
+
+Stop all new dispatches globally (running workers finish normally).
+
+```bash
+orchctl control drain
+```
+
+Undo:
+
+```bash
+orchctl control undrain
+```
+
+### stop area=\<area\>
+
+Cancel all dispatched issues for the area. **Confirm with the user before running.**
+
+```bash
+orchctl control stop <area> --confirm
+```
+
+### requeue area=\<area\> issue=\<N\>
+
+Move a `failed-terminal`, `cancelled`, or `needs-human` issue back to `pending`.
+
+```bash
+orchctl control requeue --area <area> --issue <N>
+```
+
+### merge-gate area=\<area\> issue=\<N\>
+
+Evaluate whether a completed issue is eligible for merge.
+
+```bash
+orchctl merge-gate --area <area> --issue <N>
+# Exits 0 = eligible, 1 = blocked, 2 = error
+```
+
+## Policy
+
+`orchctl` reads `policy.yaml` automatically on every reconcile pass, or apply it explicitly:
+
+```bash
+orchctl apply-policy
+# Override path:
+orchctl apply-policy --policy-file path/to/policy.yaml
+```
+
+Key settings:
+
+| Key | Default | Effect |
+|-----|---------|--------|
+| `discovery_enabled` | `false` | Query GitHub and auto-enqueue open issues on each reconcile pass |
+| `max_concurrent` | `4` | Max issues in `dispatched` state per area |
+| `max_open_pr` | `2` | Global limit on simultaneously dispatched issues |
+| `max_concurrent_repair` | `1` | Max concurrent retry attempts |
+| `drain_mode` | `false` | Pause all new dispatches globally |
+| `scope_include_labels` | `[]` | Only enqueue issues with these labels |
+| `scope_exclude_labels` | `[]` | Skip issues with these labels |
+| `merge_enabled` | `false` | Allow auto-merge via `merge-gate` |
+| `protected_branches` | `main` | Branches blocked from auto-merge |
+
+Sample file: `tools/orchctl/policy.yaml.sample`
+
+## Exception reporting
+
+When `orchctl` exits non-zero, report to the user:
+
+1. The command that failed.
+2. The exit code and captured stderr.
+3. The appropriate resolution:
+
+| Error message | Resolution |
+|---------------|------------|
+| `Database not initialised` | Run `orchctl init` |
+| `Database schema is out of date` | Run `orchctl init` to migrate |
+| `lease held by another process` | Another reconcile is running - wait and retry, or check with `orchctl doctor` |
+| `issue not found in area` | Verify area and issue number; run `orchctl status --json` to list known issues |
+| Issue stuck in `needs-human` | Review the issue manually, then `orchctl control requeue --area <area> --issue <N>` |
+
+For unrecognised errors, show the full stderr to the user and ask whether to continue.
