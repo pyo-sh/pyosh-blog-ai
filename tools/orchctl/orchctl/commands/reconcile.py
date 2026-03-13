@@ -482,6 +482,11 @@ def _next_action_to_state(
                         conn, area, number, terminal_json,
                         pid=pid, owns_lease=owns_lease,
                     )
+                if failure_class == FailureClass.GIT_CONFLICT:
+                    _run_git_rebase_playbook(
+                        conn, area, number, terminal_json,
+                        pid=pid, owns_lease=owns_lease,
+                    )
             click.echo(
                 f"reconcile [{area}]: issue #{number}"
                 f" retry {retry_count + 1}/{budget} scheduled{' (dry-run)' if dry_run else ''}."
@@ -497,6 +502,9 @@ def _next_action_to_state(
             # CI repair playbook: create blocker issue on repeated test failure.
             if failure_class == FailureClass.DETERMINISTIC_TEST_FAILURE:
                 _create_ci_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)
+            # Git conflict playbook: create blocker issue on exhausted rebase budget.
+            if failure_class == FailureClass.GIT_CONFLICT:
+                _create_git_rebase_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)
         return IssueState.NEEDS_HUMAN.value
 
     if next_action == NextAction.PAUSE:
@@ -705,6 +713,169 @@ def _create_ci_blocker_issue(
     else:
         click.echo(
             f"reconcile [{area}]: issue #{number} blocker issue creation failed.",
+            err=True,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Git conflict rebase playbook helpers
+# ---------------------------------------------------------------------------
+
+
+def _run_git_rebase_playbook(
+    conn: sqlite3.Connection,
+    area: str,
+    number: int,
+    terminal_json: str | None,
+    *,
+    pid: int = 0,
+    owns_lease: bool = False,
+) -> None:
+    """Post a rebase-attempt context comment on the issue.
+
+    Called when a ``git_conflict`` attempt is about to be re-queued as a
+    rebase repair attempt.  Errors are non-fatal.
+
+    Steps:
+    1. Parse PR number from terminal_json.
+    2. Resolve the PR's head branch via gh CLI.
+    3. Renew the area lease before the second gh call (prevents expiry).
+    4. Post a rebase-attempt context comment including the conflict reason
+       and the branch to rebase, so the re-dispatched worker has full context.
+    """
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+
+    pr_number: int | None = None
+    conflict_reason: str | None = None
+    if terminal_json:
+        try:
+            tj = json.loads(terminal_json)
+            raw_pr = tj.get("prNumber")
+            if raw_pr and raw_pr != "null":
+                pr_number = int(raw_pr)
+            conflict_reason = tj.get("reason") or None
+        except (ValueError, TypeError, AttributeError):
+            pass
+
+    branch: str | None = None
+    if pr_number:
+        branch = get_pr_branch(repo, pr_number)
+        if owns_lease and pid:
+            renew(conn, area, pid)
+
+    conflict_section = (
+        f"\n\n**Conflict reason:** `{conflict_reason}`"
+        if conflict_reason
+        else "\n\n*(Conflict details unavailable — check the PR directly)*"
+    )
+    branch_section = (
+        f"\n**Branch to rebase:** `{branch}`"
+        if branch
+        else ""
+    )
+    pr_ref = f" (PR #{pr_number})" if pr_number else ""
+    body = (
+        f"**Git rebase attempt scheduled**{pr_ref}\n\n"
+        f"- Failure class: `git_conflict`\n"
+        f"- The re-dispatched worker should fetch the latest base branch,"
+        f" rebase the PR branch, resolve conflicts, and re-run tests."
+        f"{conflict_section}"
+        f"{branch_section}"
+    )
+    try:
+        post_issue_comment(repo, number, body)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"reconcile [{area}]: rebase comment failed (#{number}): {exc}", err=True)
+
+
+def _create_git_rebase_blocker_issue(
+    conn: sqlite3.Connection,
+    area: str,
+    issue_id: int,
+    number: int,
+    retry_count: int,
+    terminal_json: str | None,
+) -> None:
+    """Create a blocker GitHub issue after repeated unresolvable git conflicts.
+
+    The blocker issue includes the conflict history and a reference to the
+    original issue.  Non-fatal on error.
+    """
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+
+    attempt_rows = conn.execute(
+        """
+        SELECT attempt_id, status, terminal_json, created_at
+        FROM attempts
+        WHERE issue_id = ?
+          AND status IN ('failed', 'timed-out')
+        ORDER BY created_at ASC
+        """,
+        (issue_id,),
+    ).fetchall()
+
+    history_lines: list[str] = []
+    for i, row in enumerate(attempt_rows, 1):
+        try:
+            tj = json.loads(row["terminal_json"] or "{}")
+        except (ValueError, TypeError):
+            tj = {}
+        pr = tj.get("prNumber")
+        reason = tj.get("reason", row["status"])
+        pr_ref = f" · PR #{pr}" if pr and pr != "null" else ""
+        history_lines.append(
+            f"{i}. `{row['status']}`{pr_ref} — {reason} _(at {row['created_at']})_"
+        )
+
+    history_md = "\n".join(history_lines) if history_lines else "_No attempt records found._"
+
+    body = (
+        f"## Git conflict rebase blocker: #{number}\n\n"
+        f"Automated rebase attempts for #{number} failed {retry_count + 1} time(s).\n"
+        f"Human review required.\n\n"
+        f"### Conflict history\n\n"
+        f"{history_md}\n\n"
+        f"### Context\n\n"
+        f"- Original issue: #{number}\n"
+        f"- Area: `{area}`\n"
+        f"- Failure class: `git_conflict`\n"
+        f"- Total rebase attempts: {retry_count + 1}\n\n"
+        f"### Next steps\n\n"
+        f"1. Manually rebase the PR branch against the latest base branch.\n"
+        f"2. Resolve all merge conflicts and push the rebased branch.\n"
+        f"3. Requeue the original issue: `orchctl control requeue --area {area} --issue {number}`\n"
+        f"4. Close this blocker once resolved.\n"
+    )
+
+    blocker_number = create_issue(
+        repo,
+        title=f"[blocker] Git rebase failed for #{number}",
+        body=body,
+        labels=["blocker"],
+    )
+    if blocker_number:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} git rebase blocker created: #{blocker_number}."
+        )
+        try:
+            post_issue_comment(
+                repo,
+                number,
+                f"**Blocker issue created:** #{blocker_number}\n\n"
+                f"Rebase attempts exhausted after {retry_count + 1} tries. "
+                f"See #{blocker_number} for conflict history and next steps.",
+            )
+        except Exception as exc:  # noqa: BLE001
+            click.echo(
+                f"reconcile [{area}]: rebase blocker comment failed (#{number}): {exc}", err=True
+            )
+    else:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} git rebase blocker creation failed.",
             err=True,
         )
 
