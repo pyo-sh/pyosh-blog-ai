@@ -1,5 +1,38 @@
 # Progress 2026-03-13
 
+## Legacy cutover / shell compatibility migration (#94, PR #190)
+
+- **목적**: 기존 shell orchestrator(`batch.state.json`)에서 orchctl/SQLite로 안전하게 전환하는 migration 도구, cutover flag, single-writer 보장, rollback 절차 구현
+- **`orchctl import-state` 신규 커맨드** (`tools/orchctl/orchctl/commands/import_state.py`):
+  - `batch.state.json` → SQLite 13가지 legacy state 매핑 (dispatched→pending, needs-spec→needs-human, cycle-isolated→cancelled, skipped_dep_failed→blocked-failed-dependency)
+  - `--dry-run` - DB 쓰기 없이 매핑 결과 미리보기
+  - `--overwrite` - 기존 DB 레코드 덮어쓰기
+  - `--state-file` - 기본 경로 `$MONOREPO_ROOT/.workspace/orchestrate/{area}/batch.state.json` (MONOREPO_ROOT env 기반)
+  - DAG/dagTypes에서 per-issue `dependency_type` 자동 추출 (all-soft→soft, otherwise→hard)
+  - `area` 필드 불일치 시 stderr 경고
+- **Schema v7** (`tools/orchctl/orchctl/db/schema.py`): 에어리어별 `legacy_mode` config 키 3개 (`client.legacy_mode`, `server.legacy_mode`, `workspace.legacy_mode`) 기본값 `true`
+- **`orchctl control cutover <area>`** - orchctl 전환 활성화:
+  - DB `{area}.legacy_mode` → `false` 설정
+  - `.workspace/orchestrate/{area}/.orchctl-active` sentinel 파일 생성 (MONOREPO_ROOT 기반 경로)
+  - import-state 없이 호출 시 오류 (--skip-import-check로 우회 가능)
+  - 이미 cutover된 경우 멱등 처리
+- **`orchctl control rollback <area> --confirm`** - legacy 모드 복귀:
+  - DB `{area}.legacy_mode` → `true` 설정
+  - sentinel 파일 제거 (`missing_ok=True` TOCTOU 안전)
+  - legacy shell orchestrator 즉시 시작 가능 상태 복구
+- **`orch_assert_legacy_active()` + `orch_init()` 가드** (`.agents/skills/dev-orchestrator/scripts/orchestrate-helpers.sh`):
+  - `orch_assert_legacy_active <area>`: sentinel 파일 존재 시 exit 1 + 오류 메시지 (단일 writer 보장)
+  - `orch_init()` 첫 번째 실행 단계로 가드 호출 (dispatch 진입 전 차단)
+- **전환 절차** (5단계): shell batch 완료 대기 → `orchctl init` → `orchctl import-state --area <area>` → `orchctl control cutover <area>` → `orchctl doctor && orchctl status`
+- **테스트 25개 신규** (`tools/orchctl/tests/test_import_state.py`):
+  - 13가지 legacy state 매핑 parametrize, dep type 도출, skip/overwrite, dry-run, sentinel 생성/제거 검증
+  - `test_cutover_sets_flag_and_creates_sentinel`: MONOREPO_ROOT env 설정으로 sentinel 경로 결정론적 검증
+  - 전체 287 tests pass
+- **3라운드 리뷰**:
+  - R1: `orch_assert_legacy_active()` 미호출(Critical) - `orch_init()` 가드 추가, `_sentinel_path()` cwd-relative→MONOREPO_ROOT 기반으로 수정, dead code 제거, 테스트 assertion 수정
+  - R2: dispatched 이슈 가드 한계 명확화(WARNING) - import 후 dispatched→pending 매핑으로 가드 효과 없음 주석 추가, sentinel 테스트 실제 파일 생성 검증, default state-file 경로 MONOREPO_ROOT 기반 통일
+  - R3: suggestion-only 4개 (MONOREPO_ROOT 미설정 경고, TOCTOU, area 불일치 경고, orch_poll_cycle 가드) → count=4 초과 → merge
+
 ## dev-orchestrator SKILL.md thin wrapper over orchctl (#93, PR #189)
 
 - **목적**: SKILL.md를 orchctl 호출 인터페이스로 축소 - 운영 로직은 controller에, 사용자 상호작용은 skill에 담당
