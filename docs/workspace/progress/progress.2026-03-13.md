@@ -1,5 +1,18 @@
 # Progress 2026-03-13
 
+## dev-orchestrator SKILL.md thin wrapper over orchctl (#93, PR #189)
+
+- **목적**: SKILL.md를 orchctl 호출 인터페이스로 축소 - 운영 로직은 controller에, 사용자 상호작용은 skill에 담당
+- **변경 내용**: `SKILL.md` 240줄 → 210줄, shell-helper(`orchestrate-helpers.sh`) 의존성 완전 제거
+- **명령 매핑**: start/resume/status/doctor/reconcile/pause/drain/stop/requeue/merge-gate → 각각 orchctl 서브커맨드 호출
+- **Agent selection 섹션 추가**: native orchctl 지원은 계획 단계, 현재 비기본 라우팅은 /dev-pipeline 직접 호출로 안내
+- **Policy 섹션 추가**: 9개 policy.yaml 키 설명 테이블 (discovery_enabled, max_concurrent, merge_enabled 등)
+- **Invariants 섹션 복원**: "never merge PRs", "never modify code" 안전 불변식 재적용
+- **References 복원**: dependency-resolution.md, state-detection.md, recovery.md 링크 유지
+- **Poll loop 개선**: MAX_POLLS=120(1시간 타임아웃), REMAINING 에러 핸들링(`|| continue`), JSON 스키마 주석
+- **resume 개선**: `orchctl doctor` pre-flight 체크 추가 (crash 후 상태 일관성 검증)
+- **5라운드 리뷰** - 최종 APPROVE (Critical 0, Warning 0, Suggestion 0)
+
 ## orchctl policy config + operational commands + merge gate (#92, PR #187)
 
 - **목적**: orchctl Stage 2 - YAML policy 로더, operational control 커맨드, 5-check merge gate, 안전장치
