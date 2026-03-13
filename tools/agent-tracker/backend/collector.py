@@ -288,8 +288,11 @@ def _parse_batch(
     dispatched: list[DispatchedIssue] = []
 
     for issue_key, dispatch_info in dispatched_raw.items():
+        # Scope to issue_keys (consistent with n_done/n_failed/n_total counting)
+        # so orphaned dispatch entries from a previous batch are excluded.
+        if issue_key not in issue_keys:
+            continue
         # Only include issues currently in the "dispatched" state (actively running pipelines).
-        # Issues in other states (completed, failed, pending, blocked) are excluded here.
         if status_map.get(issue_key) != "dispatched":
             continue
 
