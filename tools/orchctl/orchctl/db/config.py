@@ -55,4 +55,4 @@ def count_dispatched(conn: sqlite3.Connection, area: str | None = None) -> int:
             "SELECT COUNT(*) FROM issues WHERE area = ? AND state = 'dispatched'",
             (area,),
         ).fetchone()
-    return row[0] if row else 0
+    return row[0]

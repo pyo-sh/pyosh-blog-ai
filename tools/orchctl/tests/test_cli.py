@@ -545,3 +545,29 @@ def test_reconcile_lease_loss_in_mark_complete_aborts_subsequent_passes(runner, 
     ).fetchone()["state"]
     conn.close()
     assert state == "pending"
+
+
+def test_reconcile_concurrent_cap_enforcement_stops_dispatch(runner, db_path):
+    """When _record_dispatch returns False (concurrent cap), dispatch stops with a message."""
+    from unittest.mock import patch
+    from orchctl.db.connection import get_db
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+    conn = get_db(db_path)
+    conn.execute("INSERT INTO issues (area, number, state) VALUES ('client', 19, 'pending')")
+    conn.commit()
+    conn.close()
+
+    with patch("orchctl.commands.reconcile._record_dispatch", return_value=False):
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+
+    assert result.exit_code == 0, result.output
+    assert "global cap enforced concurrently" in result.output
+    # Issue must remain pending since _record_dispatch returned False
+    conn = get_db(db_path)
+    state = conn.execute(
+        "SELECT state FROM issues WHERE area='client' AND number=19"
+    ).fetchone()["state"]
+    conn.close()
+    assert state == "pending"

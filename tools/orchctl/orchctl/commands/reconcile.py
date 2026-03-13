@@ -349,6 +349,10 @@ def _record_dispatch(
     )
     if cur.rowcount == 0:
         return False
-    apply_issue_transition_tx(conn, issue_id, "dispatched")
+    try:
+        apply_issue_transition_tx(conn, issue_id, "dispatched")
+    except Exception:
+        conn.rollback()
+        raise
     conn.commit()
     return True
