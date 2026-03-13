@@ -57,12 +57,13 @@ def apply_policy(conn: sqlite3.Connection, policy: dict) -> list[str]:
     concurrency = policy.get("concurrency") or {}
     if "area_max" in concurrency:
         _maybe_set(conn, "max_concurrent", str(int(concurrency["area_max"])), changed)
-    if "global_max" in concurrency:
-        # global_max and global_quota are both synonyms for the max_open_pr config key.
-        _maybe_set(conn, "max_open_pr", str(int(concurrency["global_max"])), changed)
+    # global_max and global_quota are synonyms for the max_open_pr config key.
+    # When both are present, global_quota wins; skip global_max to avoid a
+    # duplicate append to changed.
     if "global_quota" in concurrency:
-        # Explicit global_quota takes precedence when both are present in the same policy.
         _maybe_set(conn, "max_open_pr", str(int(concurrency["global_quota"])), changed)
+    elif "global_max" in concurrency:
+        _maybe_set(conn, "max_open_pr", str(int(concurrency["global_max"])), changed)
 
     merge = policy.get("merge") or {}
     if "enabled" in merge:

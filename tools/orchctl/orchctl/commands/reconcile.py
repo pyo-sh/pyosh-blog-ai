@@ -42,6 +42,7 @@ from ..state_machine import (
     apply_attempt_transition_tx,
     apply_issue_transition,
     apply_issue_transition_tx,
+    resolve_blocked_issue,
 )
 
 
@@ -718,9 +719,7 @@ def _resolve_deps(dep_states: list[str], dep_type: str) -> str:
     """Determine the new state for a blocked issue given its dependency states.
 
     Returns 'pending', 'blocked', or 'blocked-failed-dependency'.
-    Delegates to state_machine.resolve_blocked_issue for the actual logic.
     """
-    from ..state_machine import resolve_blocked_issue
     return resolve_blocked_issue(dep_states, dep_type)
 
 
@@ -859,7 +858,6 @@ def _dispatch_pass(
 
     max_concurrent = config["max_concurrent"]
     global_quota = config["global_quota"]
-    max_open_pr = global_quota  # legacy alias
     max_repair = config["max_concurrent_repair"]
     max_awaiting = config["max_awaiting_merge"]
 

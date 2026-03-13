@@ -10,7 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from orchctl.cli import cli
-from orchctl.db.connection import init_db
+from orchctl.db.connection import get_db, init_db
 from orchctl.db.config import count_dispatched, get_config, get_config_int, set_config
 from orchctl.db.schema import LATEST_VERSION
 from orchctl.commands.reconcile import _run_pass
@@ -293,7 +293,7 @@ def test_reconcile_all_global_quota_shared_across_areas(runner, db_path):
     runner.invoke(cli, ["--db", db_path, "init"])
 
     db = Path(db_path)
-    conn = __import__("orchctl.db.connection", fromlist=["get_db"]).get_db(db)
+    conn = get_db(db)
     # Set global quota (max_open_pr) to 1.
     set_config(conn, "max_open_pr", "1")
 
@@ -314,7 +314,7 @@ def test_reconcile_all_global_quota_shared_across_areas(runner, db_path):
     assert result.exit_code == 0, result.output
 
     # Only one total should have been dispatched (globalQuota=1).
-    conn2 = __import__("orchctl.db.connection", fromlist=["get_db"]).get_db(db)
+    conn2 = get_db(db)
     total = count_dispatched(conn2, None)
     conn2.close()
     assert total == 1, f"Expected 1 dispatched, got {total}. Output:\n{result.output}"
