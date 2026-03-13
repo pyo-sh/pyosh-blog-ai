@@ -1,5 +1,22 @@
 # Progress 2026-03-13
 
+## orchctl integration / chaos test suite (#102, PR #195)
+
+- **목적**: 운영 환경 실패 시나리오 10개에 대한 자동화 resilience 테스트 구현 (Stage 4)
+- **`tools/orchctl/tests/test_chaos.py`**: 28개 테스트, 10개 시나리오 전체 커버
+  1. Post-dispatch controller crash - 고아 dispatched+running 행 idempotent 처리
+  2. Stale terminal file - `state_mtime` 신호 부재 시 threshold 초과 검증
+  3. PID reuse - 재활용된 PID가 살아있는 것처럼 보일 때 lease 유지(문서화된 한계)
+  4. GitHub API timeout - discovery pass 비치명 오류; 기존 이슈 미변경
+  5. PR open, worker dead - 2개 신호 부재 시 두 번째 heartbeat cycle에서 stall 감지
+  6. Worker alive, log frozen - 1개 신호 부재 → stall 미감지
+  7. Retry budget exhaustion - `infra_crash` 클래스 budget 내 재시도, 소진 후 needs-human
+  8. Dependency cycle - hard dep 양방향 blocked 이슈들이 reconcile 통과 후에도 blocked 유지
+  9. Manual hold before dispatch - `area_paused` / `drain_mode`로 신규 dispatch 차단
+  10. Scheduler overlap - CLI 수준 lease 검사(overlap=false) + `_record_dispatch` 원자적 maxOpenPR 가드
+- **3라운드 리뷰**: R1 - 자명한 assertion + dead code 수정; R2 - log file 경로(attempt_dir_path), _pid_alive mock, 동일 pid 재사용으로 원자적 가드 검증; R3 - APPROVE
+- **결과**: 402 tests pass (374 기존 + 28 신규)
+
 ## orchctl crash/timeout/flaky auto-retry playbook (#97, PR #193)
 
 - **목적**: FailureClass 기반 자동 재시도 - 실패 분류 후 클래스별 budget 내에서 재큐, 소진 시 needs-human 전이 (Stage 4)
