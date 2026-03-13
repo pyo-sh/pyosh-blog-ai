@@ -42,6 +42,16 @@ def cmd_merge_gate(ctx: click.Context, area: str, issue_number: int, as_json: bo
 
         result = evaluate_merge_gate(conn, area, issue_number)
 
+        # Persist merge_state back to the issue row so external tools can read
+        # eligibility without re-evaluating terminal_json.
+        if result.get("issue_id") is not None:
+            new_state = "eligible" if result["eligible"] else "rejected"
+            conn.execute(
+                "UPDATE issues SET merge_state = ? WHERE id = ?",
+                (new_state, result["issue_id"]),
+            )
+            conn.commit()
+
         if as_json:
             click.echo(json.dumps(result, indent=2))
         else:
@@ -70,6 +80,7 @@ def evaluate_merge_gate(
     Returns:
         {
           "eligible": bool,
+          "issue_id": int | None,
           "checks": {
             "checks_pass":        True | False | None,
             "sha_match":          True | False | None,
@@ -91,11 +102,11 @@ def evaluate_merge_gate(
 
     # Load issue + latest completed attempt
     issue_row = conn.execute(
-        "SELECT id, state FROM issues WHERE area = ? AND number = ?",
+        "SELECT id FROM issues WHERE area = ? AND number = ?",
         (area, issue_number),
     ).fetchone()
     if issue_row is None:
-        return _result(checks, eligible=False, reason="issue_not_found", terminal=None)
+        return _result(checks, eligible=False, reason="issue_not_found", terminal=None, issue_id=None)
 
     attempt_row = conn.execute(
         """
@@ -127,9 +138,11 @@ def evaluate_merge_gate(
     # Short-circuit immediately when merge_enabled=false so the reason is
     # unambiguous ("merge_disabled"), not whichever check happens to be first.
     merge_enabled = get_config_bool(conn, "merge_enabled", default=False)
+    issue_id: int = issue_row["id"]
+
     if not merge_enabled:
         checks["branch_protection"] = False
-        return _result(checks, eligible=False, reason="merge_disabled", terminal=terminal)
+        return _result(checks, eligible=False, reason="merge_disabled", terminal=terminal, issue_id=issue_id)
 
     protected_raw = get_config(conn, "protected_branches", default="main")
     protected = {b.strip() for b in protected_raw.split(",") if b.strip()}
@@ -142,7 +155,7 @@ def evaluate_merge_gate(
     eligible = len(failing) == 0
     reason = failing[0] if failing else None
 
-    return _result(checks, eligible=eligible, reason=reason, terminal=terminal)
+    return _result(checks, eligible=eligible, reason=reason, terminal=terminal, issue_id=issue_id)
 
 
 # ---------------------------------------------------------------------------
@@ -155,9 +168,11 @@ def _result(
     eligible: bool,
     reason: str | None,
     terminal: dict | None,
+    issue_id: int | None = None,
 ) -> dict:
     return {
         "eligible": eligible,
+        "issue_id": issue_id,
         "checks": checks,
         "reason": reason,
         "terminal_json": terminal,

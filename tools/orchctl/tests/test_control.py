@@ -95,6 +95,17 @@ def test_drain_enables_drain_mode(runner, db_path):
     conn.close()
 
 
+def test_undrain_disables_drain_mode(runner, db_path):
+    runner.invoke(cli, ["--db", db_path, "control", "drain"])
+    result = runner.invoke(cli, ["--db", db_path, "control", "undrain"])
+    assert result.exit_code == 0, result.output
+    assert "drain mode disabled" in result.output
+
+    conn = get_db(db_path)
+    assert get_config_bool(conn, "drain_mode") is False
+    conn.close()
+
+
 # ---------------------------------------------------------------------------
 # stop
 # ---------------------------------------------------------------------------

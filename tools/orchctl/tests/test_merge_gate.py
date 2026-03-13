@@ -283,6 +283,64 @@ class TestMergeGateCLI:
         assert result.exit_code != 0
         assert "not initialised" in result.output
 
+    def test_merge_gate_persists_merge_state_eligible(self, runner, db_path):
+        conn = get_db(db_path)
+        set_config(conn, "merge_enabled", "true")
+        set_config(conn, "protected_branches", "main")
+        conn.commit()
+        cur = conn.execute(
+            "INSERT INTO issues (area, number, state) VALUES ('client', 7, 'completed')"
+        )
+        conn.commit()
+        issue_id = cur.lastrowid
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, issue_id, status, terminal_json) "
+            "VALUES ('att-7', ?, 'completed', ?)",
+            (issue_id, json.dumps(_FULL_PASS_TERMINAL)),
+        )
+        conn.commit()
+        conn.close()
+
+        runner.invoke(
+            cli,
+            ["--db", db_path, "merge-gate", "--area", "client", "--issue", "7"],
+        )
+
+        conn = get_db(db_path)
+        row = conn.execute(
+            "SELECT merge_state FROM issues WHERE area = 'client' AND number = 7"
+        ).fetchone()
+        conn.close()
+        assert row["merge_state"] == "eligible"
+
+    def test_merge_gate_persists_merge_state_rejected(self, runner, db_path):
+        conn = get_db(db_path)
+        # merge_enabled defaults to false
+        cur = conn.execute(
+            "INSERT INTO issues (area, number, state) VALUES ('client', 8, 'completed')"
+        )
+        conn.commit()
+        issue_id = cur.lastrowid
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, issue_id, status, terminal_json) "
+            "VALUES ('att-8', ?, 'completed', ?)",
+            (issue_id, json.dumps(_FULL_PASS_TERMINAL)),
+        )
+        conn.commit()
+        conn.close()
+
+        runner.invoke(
+            cli,
+            ["--db", db_path, "merge-gate", "--area", "client", "--issue", "8"],
+        )
+
+        conn = get_db(db_path)
+        row = conn.execute(
+            "SELECT merge_state FROM issues WHERE area = 'client' AND number = 8"
+        ).fetchone()
+        conn.close()
+        assert row["merge_state"] == "rejected"
+
 
 # ---------------------------------------------------------------------------
 # Guardrail integration: repo allowlist blocks dispatch

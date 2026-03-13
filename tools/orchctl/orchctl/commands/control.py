@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from ..db import get_db, get_config_bool, set_config
+from ..db import get_db, set_config
 from ..db.schema import LATEST_VERSION
 from ..state_machine import apply_issue_transition, apply_issue_transition_tx
 
@@ -70,6 +70,19 @@ def cmd_drain(ctx: click.Context) -> None:
         _require_ready(conn)
         set_config(conn, "drain_mode", "true")
         click.echo("control: drain mode enabled — no new dispatches globally.")
+    finally:
+        conn.close()
+
+
+@cmd_control.command("undrain")
+@click.pass_context
+def cmd_undrain(ctx: click.Context) -> None:
+    """Disable drain mode globally (resume normal dispatches)."""
+    conn = get_db(ctx.obj.get("db_path"))
+    try:
+        _require_ready(conn)
+        set_config(conn, "drain_mode", "false")
+        click.echo("control: drain mode disabled — dispatches will resume on next reconcile.")
     finally:
         conn.close()
 
