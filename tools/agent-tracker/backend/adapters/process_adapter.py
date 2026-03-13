@@ -42,20 +42,6 @@ def get_create_time(pid: int) -> float | None:
     return _get_create_time_proc(pid)
 
 
-def children(pid: int) -> list[int]:
-    """Return list of direct child PIDs. Returns [] on error."""
-    if not pid or pid <= 0:
-        return []
-
-    if not _PSUTIL_AVAILABLE:
-        return []
-
-    try:
-        return [c.pid for c in psutil.Process(pid).children(recursive=False)]
-    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-        return []
-
-
 # ── psutil implementations ────────────────────────────────────────────────────
 
 def _is_running_psutil(pid: int, create_time: float | None) -> bool:

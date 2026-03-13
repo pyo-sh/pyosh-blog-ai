@@ -19,10 +19,6 @@ class PaneInfo:
     command: str    # pane_current_command
 
 
-@dataclass
-class SessionInfo:
-    name: str
-
 
 def socket_hash() -> str:
     """Compute the socket hash used in sidecar v2 namespace.
@@ -59,25 +55,6 @@ def list_panes(session: str) -> list[PaneInfo]:
         if len(parts) == 3:
             panes.append(PaneInfo(addr=parts[0], pane_id=parts[1], command=parts[2]))
     return panes
-
-
-def list_sessions() -> list[SessionInfo]:
-    """List all tmux sessions on the current server."""
-    try:
-        result = subprocess.run(
-            ["tmux", "list-sessions", "-F", "#{session_name}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return []
-
-    return [
-        SessionInfo(name=name)
-        for name in result.stdout.strip().splitlines()
-        if name
-    ]
 
 
 def capture_pane(pane_id: str, lines: int = 8) -> str:

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from .adapters.file_adapter import atomic_write
+from .collector import collect
 from .models import Snapshot
 
 
@@ -23,7 +24,6 @@ def run_once(
     output_path: str | Path,
 ) -> Snapshot:
     """Collect a snapshot and export it. Returns the snapshot."""
-    from .collector import collect
     snap = collect(session, sidecar_dir, orch_dir, pipeline_dir)
     export(snap, output_path)
     return snap

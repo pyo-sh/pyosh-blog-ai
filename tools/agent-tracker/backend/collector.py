@@ -120,6 +120,8 @@ def _collect_claude_pane(
         pane_id=pane.pane_id,
         pane_addr=f"{pane.addr} {pane.pane_id}",
         engine=Engine.CLAUDE,
+        # Pane is confirmed alive by tmux list-panes returning it.
+        liveness=Liveness(is_alive=True),
     )
 
     if not sidecar_path.exists():
