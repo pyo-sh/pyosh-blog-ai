@@ -1,6 +1,14 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #39 글 상세 페이지 SSR PR #139 머지
+  - PR: `feat: add post detail page (#39)`
+  - merge target: `main`
+  - 구현: `src/app/posts/[slug]/page.tsx`, `next.config.js`
+  - review fix: `/tags/[slug]` route가 아직 없어서 태그를 링크에서 비상호작용 배지로 전환
+  - verification: `pnpm lint && pnpm compile:types`
+  - merge: squash merge, merge commit `4e00e3ea036d115b83a6c6e8398c4988aa70c897`
+  - branch: `feat/issue-39-post-detail-ssr` (remote branch deleted, local issue worktree cleaned up)
 - [x] #43 Admin 대시보드 페이지 PR #136 머지
   - PR: `feat: implement dashboard page (#43)`
   - merge target: `main`
@@ -59,6 +67,7 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- The post detail page could render safely without a tag route only if tags stayed non-interactive; linking them before `src/app/tags/[slug]/page.tsx` exists creates a guaranteed 404 path from the new SSR page.
 - Admin landing pages should not advertise unavailable routes as primary CTAs or shortcut cards; if the backing route is missing, the dashboard needs explicit status/coming-soon presentation instead of broken or dead navigation.
 - In this repo, `text-heading-md` is referenced in app code but is not defined in `src/app-layer/style/typography.css`; dashboard headings need to use the existing `text-h*` or `text-body-*` utility set.
 - Admin list UI could not call the existing admin read helpers from a client component until `fetchAdminPost` and `fetchAdminPosts` supported a browser `clientFetch` path when no server cookie header is provided.
@@ -82,6 +91,8 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: The first `#39` review found that the new post detail page linked tags to `/tags/[slug]`, but this app tree does not implement that route yet, so every tag click would land on a 404.
+- **Resolution**: removed the tag links in `src/app/posts/[slug]/page.tsx` and kept tags as static pills until a real tag page is implemented.
 - **Issue**: The first `#43` dashboard implementation exposed `/dashboard/stats` and several admin shortcuts before those app routes existed, which made the new landing page send users directly into 404 states.
 - **Resolution**: replaced the broken CTA/shortcut links with explicit ready-state messaging and reframed the lower section as `관리 메뉴 준비 현황` until real admin routes are implemented.
 - **Issue**: The original `최신 댓글` panel in `#43` rendered hard-coded sample entries as if they were real moderation data.
@@ -108,10 +119,13 @@
 - **Resolution**: created a fresh issue branch from `main`, cherry-picked only the `#30` feature commit, opened PR #132, then addressed the review warning with project-owned markdown styles before merge.
 
 ## Next Steps
+- [ ] Add `src/app/tags/[slug]/page.tsx` so post tags can become real navigation targets again.
 - [ ] Add actual `/dashboard/posts/new` and `/dashboard/posts/[id]` admin routes, then reconnect the create/edit navigation removed during PR #137 review.
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #139
+- Related Issue: #39
 - Related PR: #137
 - Related Issue: #45
 - Related PR: #135
