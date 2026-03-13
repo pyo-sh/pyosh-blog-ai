@@ -7,10 +7,12 @@ import click
 from .commands.apply_policy import cmd_apply_policy
 from .commands.control import cmd_control
 from .commands.doctor import cmd_doctor
+from .commands.events import cmd_events
 from .commands.export import cmd_export
 from .commands.import_state import cmd_import_state
 from .commands.init import cmd_init
 from .commands.merge_gate import cmd_merge_gate
+from .commands.notify import cmd_notify
 from .commands.reconcile import cmd_reconcile
 from .commands.reconcile_all import cmd_reconcile_all
 from .commands.status import cmd_status
@@ -43,3 +45,5 @@ cli.add_command(cmd_merge_gate)
 cli.add_command(cmd_apply_policy)
 cli.add_command(cmd_export)
 cli.add_command(cmd_import_state)
+cli.add_command(cmd_events)
+cli.add_command(cmd_notify)
