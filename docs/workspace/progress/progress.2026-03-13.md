@@ -1,5 +1,35 @@
 # Progress 2026-03-13
 
+## orchctl issue discovery + auto-enqueue + configurable scope (#89, PR #185)
+
+- **목적**: orchctl reconcile 사이클에 discovery phase 추가 - GitHub open 이슈를 자동 감지하여 큐에 추가하고, scope를 설정으로 제어
+- **`tools/orchctl/orchctl/github.py` 신규 모듈**:
+  - `list_open_issues(repo, *, include_labels, exclude_labels, milestone, allow_unassigned, limit)` - `gh issue list` subprocess 래핑
+  - OR-semantics include_labels: `gh` CLI의 AND-only 제약을 Python 후처리로 우회
+  - `timeout=30`: subprocess stall 시 lease TTL(60s) 초과 방지, `TimeoutExpired` → `GitHubError` 변환
+  - limit 도달 시 stderr 경고 (`hit issue limit ({limit}) for {repo}`)
+  - 필터 비대칭 주석: milestone은 gh CLI 전달, label은 Python 처리 (이유 문서화)
+  - `AREA_REPOS` - `.agents/references/monorepo-layout.md`와 동기화 필요 주석 포함
+- **`orchctl/commands/reconcile.py` discovery pass 추가**:
+  - `_discovery_pass()` - `_mark_complete_pass` 이전 실행, `discovery_enabled=false`이면 skip
+  - `_enqueue_or_reopen()` - 신규 이슈: `pending`으로 INSERT; 재오픈(`completed`/`failed-terminal`/`cancelled`): `apply_issue_transition(... "pending")`
+  - `_REOPEN_STATES` - `ISSUE_TRANSITIONS`에서 programmatic 도출 (수동 유지 제거, 자동 동기화)
+  - lease renew 배치화: 이슈당 1회 → 50개마다 1회 (lease-table write churn 감소)
+  - discovery 후 `issues_by_state` 재조회 - 동일 사이클에서 새 이슈 즉시 dispatch 가능
+  - GitHub 오류 non-fatal: `GitHubError` catch 후 existing queue로 계속 진행
+- **`orchctl/models.py` re-open 전이 추가**:
+  - `completed`, `failed-terminal`, `cancelled` → `pending` 전이 허용 (GitHub re-open 이벤트 모델)
+  - `needs-human`, `blocked-failed-dependency`는 여전히 완전 terminal (operator 개입 필요)
+- **schema migration v5**: `discovery_enabled=false`, `scope_include_labels=[]`, `scope_exclude_labels=[]`, `scope_milestone=""`, `scope_allow_unassigned=true` config 기본값
+- **`db/config.py` - `get_config_json()`** 신규: JSON array 저장값 파싱, malformed 시 default 반환
+- **테스트 174개** (신규 +41 + 기존 4개 re-open 전이 반영 업데이트):
+  - `test_discovery.py` 신규 (43개) - scope filter 유닛, enqueue/reopen DB, discovery pass 통합 (scope forwarding, lease loss, dry-run, GitHub 오류 non-fatal, unmapped area skip, AREA_REPOS drift guard, _REOPEN_STATES 동기화 smoke test), timeout/limit warning, 미매핑 area skip
+  - `test_state_machine.py` 업데이트 - `completed`/`failed-terminal`/`cancelled` terminal 재정의 반영
+- **3라운드 리뷰**:
+  - R1: subprocess timeout 30s 추가, limit warning, AREA_REPOS 주석
+  - R2: `_REOPEN_STATES` programmatic 도출, AREA_REPOS drift test, renew 배치화(50/iter), 필터 비대칭 주석
+  - R3: suggestion-only (unmapped area test + limit 설정 가능성 follow-up) → resolve-skip 후 merge
+
 ## agent-tracker Python backend + normalized domain model (#111, PR #183)
 
 - **목적**: Python 기반 tracker backend 구축, normalized domain model 정의. 장기적으로 이 backend가 tracker의 truth source
