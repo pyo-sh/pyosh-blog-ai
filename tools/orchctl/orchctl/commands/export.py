@@ -137,6 +137,15 @@ def _build_export(conn: sqlite3.Connection, area: str) -> dict:
     n_pending = state_counts.get("pending", 0)
     n_dispatched = state_counts.get("dispatched", 0)
 
+    # batch started_at: earliest created_at across all issues in this area.
+    # Provides a stable batch start time for UI elapsed calculations.
+    batch_started_at: str | None = None
+    if issues:
+        batch_started_at = min(
+            (row["created_at"] for row in issues if row["created_at"]),
+            default=None,
+        )
+
     batch_rows = [{
         "area": area,
         "n_total": n_total,
@@ -144,6 +153,7 @@ def _build_export(conn: sqlite3.Connection, area: str) -> dict:
         "n_failed": n_failed,
         "n_pending": n_pending,
         "n_dispatched": n_dispatched,
+        "started_at": batch_started_at,
     }] if n_total > 0 else []
 
     # active_workers: dispatched issues with a running attempt
@@ -176,7 +186,7 @@ def _build_export(conn: sqlite3.Connection, area: str) -> dict:
 
 def _read_issues(conn: sqlite3.Connection, area: str) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT id, number, state, dependency_type FROM issues WHERE area = ?",
+        "SELECT id, number, state, dependency_type, created_at FROM issues WHERE area = ?",
         (area,),
     ).fetchall()
 

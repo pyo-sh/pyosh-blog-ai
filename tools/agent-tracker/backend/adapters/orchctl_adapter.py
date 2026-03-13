@@ -36,18 +36,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..contract import (
-    EXPORT_SCHEMA_VERSION,
+    ORCHCTL_EXPORT_SCHEMA_VERSION as EXPORT_SCHEMA_VERSION,
     BatchStatus,
 )
 from ..models import BatchState, DispatchedIssue
-
-# Active issue states (mirrors orchctl.contract.ACTIVE_ISSUE_STATES)
-_ACTIVE_STATES: frozenset[str] = frozenset({
-    "pending",
-    "dispatched",
-    "blocked",
-    "blocked-external",
-})
 
 # Built-in fixture path
 _FIXTURE_PATH = Path(__file__).parent.parent / "fixtures" / "orchctl_export.json"
@@ -169,9 +161,11 @@ def _parse_one(data: dict, pipeline_dir: str | Path | None) -> BatchState:
     else:
         batch_status = BatchStatus.DEAD
 
-    # --- Elapsed / created_at ---
-    generated_at = float(data.get("generated_at") or now)
-    elapsed = _format_elapsed(int(now - generated_at)) if generated_at else ""
+    # --- Elapsed (batch running time) ---
+    # Use batch.started_at when available; it represents when the first issue
+    # was created (i.e. batch start time), giving accurate running duration.
+    batch_started_at = (batch_list[0].get("started_at") or "") if batch_list else ""
+    elapsed = _elapsed_from_iso(batch_started_at, now) if batch_started_at else ""
 
     # --- Dispatched issues (active workers only) ---
     dispatched: list[DispatchedIssue] = []

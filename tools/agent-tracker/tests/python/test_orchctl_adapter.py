@@ -104,7 +104,7 @@ class TestBatchStatus:
             }],
             batches=[{
                 "area": "workspace", "n_total": 1, "n_done": 0,
-                "n_failed": 0, "n_pending": 0, "n_dispatched": 1,
+                "n_failed": 0, "n_pending": 0, "n_dispatched": 1, "started_at": None,
             }],
             active_workers=[{
                 "attempt_id": "a-1", "issue_number": 1, "area": "workspace",
@@ -124,7 +124,7 @@ class TestBatchStatus:
             }],
             batches=[{
                 "area": "workspace", "n_total": 1, "n_done": 1,
-                "n_failed": 0, "n_pending": 0, "n_dispatched": 0,
+                "n_failed": 0, "n_pending": 0, "n_dispatched": 0, "started_at": None,
             }],
             active_workers=[],
         )
@@ -141,7 +141,7 @@ class TestBatchStatus:
             }],
             batches=[{
                 "area": "workspace", "n_total": 2, "n_done": 0,
-                "n_failed": 1, "n_pending": 1, "n_dispatched": 0,
+                "n_failed": 1, "n_pending": 1, "n_dispatched": 0, "started_at": None,
             }],
             active_workers=[],
         )
@@ -159,7 +159,7 @@ class TestCounts:
         data = _make_export(
             batches=[{
                 "area": "workspace", "n_total": 10, "n_done": 3,
-                "n_failed": 2, "n_pending": 4, "n_dispatched": 1,
+                "n_failed": 2, "n_pending": 4, "n_dispatched": 1, "started_at": None,
             }],
         )
         _write_export(tmp_path, "workspace", data)
@@ -202,7 +202,7 @@ class TestDispatchedIssues:
             }],
             batches=[{
                 "area": "workspace", "n_total": 1, "n_done": 0,
-                "n_failed": 0, "n_pending": 0, "n_dispatched": 1,
+                "n_failed": 0, "n_pending": 0, "n_dispatched": 1, "started_at": None,
             }],
             active_workers=[{
                 "attempt_id": "a-5", "issue_number": 5, "area": "workspace",
@@ -245,7 +245,7 @@ class TestFixtureFallback:
             "server",
             batches=[{
                 "area": "server", "n_total": 99, "n_done": 0,
-                "n_failed": 0, "n_pending": 99, "n_dispatched": 0,
+                "n_failed": 0, "n_pending": 99, "n_dispatched": 0, "started_at": None,
             }],
         )
         _write_export(tmp_path, "server", data)

@@ -41,7 +41,8 @@
       "n_done": 1,
       "n_failed": 0,
       "n_pending": 1,
-      "n_dispatched": 1
+      "n_dispatched": 1,
+      "started_at": "2024-03-12T22:00:00Z"
     }
   ],
   "active_workers": [

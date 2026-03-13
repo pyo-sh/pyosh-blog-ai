@@ -176,6 +176,7 @@ class TestCmdExport:
         assert batch["n_total"] == 2
         assert batch["n_done"] == 1
         assert batch["n_pending"] == 1
+        assert batch["started_at"] is not None  # earliest issue created_at
 
     def test_export_active_worker_for_dispatched(self, runner, db_path, tmp_path):
         from orchctl.db.connection import get_db

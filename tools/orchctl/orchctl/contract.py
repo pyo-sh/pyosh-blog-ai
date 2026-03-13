@@ -56,6 +56,7 @@ EXPORT_BATCH_FIELDS: frozenset[str] = frozenset({
     "n_failed",
     "n_pending",
     "n_dispatched",
+    "started_at",
 })
 
 EXPORT_WORKER_FIELDS: frozenset[str] = frozenset({
