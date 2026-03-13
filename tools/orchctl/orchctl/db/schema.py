@@ -205,6 +205,16 @@ MIGRATIONS: list[tuple[int, str]] = [
         WHERE status = 'running';
         """,
     ),
+    (
+        4,
+        """
+        -- v4: add max_open_pr and drain_mode config defaults
+        INSERT INTO config (key, value) VALUES
+            ('max_open_pr', '2'),
+            ('drain_mode',  'false')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
