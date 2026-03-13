@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
 import click
@@ -110,7 +109,8 @@ def cmd_import_state(
     db_path = ctx.obj.get("db_path")
 
     if state_file is None:
-        state_file = Path(f".workspace/orchestrate/{area}/batch.state.json")
+        root = Path(os.environ.get("MONOREPO_ROOT", "."))
+        state_file = root / ".workspace" / "orchestrate" / area / "batch.state.json"
 
     if not state_file.exists():
         raise click.ClickException(

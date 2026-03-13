@@ -274,8 +274,8 @@ def cmd_cutover(ctx: click.Context, area: str, skip_import_check: bool) -> None:
     \b
       1. At least one issue exists in the DB for this area (imported via
          'orchctl import-state').
-      2. No dispatched issues for this area (active shell batch must complete
-         first or be cancelled).
+      2. No dispatched issues in the DB (only catches non-import code paths;
+         operators must drain the shell batch before running import-state).
 
     After cutover:
 
@@ -309,7 +309,12 @@ def cmd_cutover(ctx: click.Context, area: str, skip_import_check: bool) -> None:
                     "or pass --skip-import-check to proceed anyway."
                 )
 
-        # Ensure no currently dispatched issues (active shell batch).
+        # Check for dispatched issues in the DB.
+        # NOTE: after a normal 'import-state' run, no 'dispatched' rows exist
+        # in the DB (legacy dispatched → pending during import).  This guard
+        # only catches direct DB inserts made outside of the import path.
+        # Operators are solely responsible for draining the shell batch
+        # (waiting for it to finish) before running 'import-state'.
         dispatched = conn.execute(
             "SELECT number FROM issues WHERE area = ? AND state = 'dispatched'",
             (area,),
@@ -318,8 +323,8 @@ def cmd_cutover(ctx: click.Context, area: str, skip_import_check: bool) -> None:
             nums = ", ".join(f"#{r['number']}" for r in dispatched)
             raise click.ClickException(
                 f"Issues still dispatched for area '{area}': {nums}.\n"
-                "Wait for the active batch to complete, or cancel them with "
-                "'orchctl control stop <area> --confirm' before cutting over."
+                "Cancel them with 'orchctl control stop <area> --confirm' "
+                "before cutting over."
             )
 
         # Flip the flag and create the sentinel.

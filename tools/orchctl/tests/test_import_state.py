@@ -319,17 +319,20 @@ def test_cutover_sets_flag_and_creates_sentinel(runner, db_path, tmp_path):
          "--state-file", str(state_file)],
     )
 
-    sentinel = _sentinel_path("workspace")
-    assert not sentinel.exists()
+    expected_sentinel = (
+        tmp_path / ".workspace" / "orchestrate" / "workspace" / ".orchctl-active"
+    )
+    assert not expected_sentinel.exists()
 
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(
-            cli,
-            ["--db", db_path, "control", "cutover", "workspace"],
-        )
+    result = runner.invoke(
+        cli,
+        ["--db", db_path, "control", "cutover", "workspace"],
+        env={"MONOREPO_ROOT": str(tmp_path)},
+    )
 
     assert result.exit_code == 0, result.output
     assert "cutover complete" in result.output
+    assert expected_sentinel.exists(), "Sentinel file was not created by cutover"
 
     from orchctl.db import get_db, get_config
     conn = get_db(db_path)
