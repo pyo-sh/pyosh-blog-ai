@@ -1,6 +1,14 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #44 Admin Post API functions PR #135 머지
+  - PR: `feat: add admin post api functions (#44)`
+  - merge target: `main`
+  - 구현: `src/entities/post/api.ts`, `src/entities/post/model.ts`, `src/entities/post/index.ts`
+  - supporting fix: `src/shared/api/client.ts`에서 `204/205 No Content` 응답을 허용하도록 보완
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - merge: squash merge, merge commit `05f05395c74b2185d033c807d71242cc312509a8`
+  - branch: `feat/issue-44-admin-post-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #28 CategoryNav 위젯 PR #134 머지
   - PR: `feat: add category nav widget (#28)`
   - merge target: `main`
@@ -32,6 +40,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- Admin post mutations are not usable with the current shared client fetch path unless empty `204/205` responses are handled before unconditional JSON parsing.
+- For this repo, a fresh issue worktree can reuse `/workspace/client/node_modules` via symlink to run verification without a second full dependency install.
 - The initial `CategoryNav` widget matched the issue text but still needed a real `src/app/categories/[slug]` route in this app tree; otherwise every category pill except "전체" would land on a 404.
 - In this repo, `pnpm compile:types` can fail in a fresh worktree before a build because `tsconfig.json` includes `.next/types/**/*.ts`; running `pnpm build` first generates the missing route type files, after which `tsc --noEmit` succeeds.
 - Next.js App Router에서 `app/error.tsx`는 root layout 위에서 발생한 실패를 잡지 않으므로, 진짜 전역 런타임 에러 화면이 필요하면 `app/global-error.tsx`를 별도로 둬야 한다.
@@ -46,8 +56,13 @@
 - The review on PR #132 surfaced a real styling gap: this repo does not define Tailwind Typography’s `prose` class, so markdown rendering needed project-owned CSS utilities instead.
 - The verification flow in both the fresh issue worktree and the resolve worktree required `pnpm install` before `pnpm compile:types && pnpm lint && pnpm build`.
 - GitHub marked PR #132 as merged at `2026-03-13T20:48:25Z`, which is `2026-03-14 05:48:25` in KST.
+- GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: Admin post delete endpoints return `204 No Content`, but the shared `clientFetch` path always attempted `response.json()` on success.
+- **Resolution**: added an early return for `204/205` responses in `src/shared/api/client.ts` so `deletePost` and `hardDeletePost` can resolve safely.
+- **Issue**: The fresh `issue-44` worktree had no local `node_modules`, so `pnpm compile:types` initially failed with `tsc: not found`.
+- **Resolution**: linked the existing `/workspace/client/node_modules` into the worktree and reran `pnpm compile:types && pnpm lint && pnpm build` successfully.
 - **Issue**: `CategoryNav` 위젯의 `/categories/[slug]` 링크가 실제 app router 경로와 맞지 않아 PR review에서 즉시 404 위험이 지적되었다.
 - **Resolution**: `src/app/categories/[slug]/page.tsx`를 추가하고, visible category slug를 검증한 뒤 유효하지 않은 slug에는 `notFound()`를 반환하도록 보완했다.
 - **Issue**: review fix 검증 시 fresh worktree의 `pnpm compile:types`가 `.next/types/app/...` 파일이 없다는 이유로 먼저 실패했다.
@@ -65,6 +80,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #135
+- Related Issue: #44
 - Related PR: #134
 - Related Issue: #28
 - Related PR: #133
