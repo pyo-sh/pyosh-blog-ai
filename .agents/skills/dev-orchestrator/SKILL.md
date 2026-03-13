@@ -50,7 +50,7 @@ import json, sys
 d = json.load(sys.stdin)
 active = {'pending', 'dispatched', 'blocked'}
 print(sum(v for k, v in d.get('issues', {}).items() if k in active))
-")
+" 2>/dev/null) || { echo "Status read failed, retrying..."; continue; }
   [ "$REMAINING" -eq 0 ] && break
   (( ++POLL >= MAX_POLLS )) && {
     echo "Timeout: issues still active after 1h — check with orchctl status"
@@ -69,6 +69,8 @@ Run `/dev-log` to record batch completion.
 Resume an interrupted run without reinitializing.
 
 ```bash
+# Verify state consistency before resuming (exit code 1 means issues found — resolve before proceeding)
+orchctl doctor
 orchctl reconcile --area <area>
 orchctl status
 ```
@@ -210,3 +212,9 @@ When `orchctl` exits non-zero, report to the user:
 | Issue stuck in `needs-human` | Review the issue manually, then `orchctl control requeue --area <area> --issue <N>` |
 
 For unrecognised errors, show the full stderr to the user and ask whether to continue.
+
+## References
+
+- [Dependency resolution](references/dependency-resolution.md) - DAG construction, cycle detection, edge cases
+- [State detection](references/state-detection.md) - completion/stall detection, status state machine
+- [Recovery strategy](references/recovery.md) - crash recovery, auto-retry policy
