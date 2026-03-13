@@ -1,5 +1,32 @@
 # Progress 2026-03-14
 
+## orchctl history / audit query (#103, PR #194)
+
+Implemented Stage 4 observability feature: persistent attempt history log and `orchctl history` query command for failure pattern analysis.
+
+### Changes merged
+
+- **`history.py`** (new) - `AttemptRecord` dataclass, append-only JSONL log at `.workspace/pipeline/history.jsonl`, `history_read()` with area/issue/since/until filters, `history_stats()` (outcome/failure_class/area/tool breakdowns), `history_patterns()` (repeated failure_class frequency, repeated issue failures, hourly failure distribution), table and JSON formatters
+- **`steps.py`** - `step_log_finalize` appends success record before state deletion; `getattr` guard for `recovery_log`
+- **`cli.py`** - `history` subcommand (`--mode list|stats|patterns`, `--format table|json`, `--area`, `--issue`, `--since`, `--until`); `history-record` subcommand for manual failure/escalation recording; `cmd_escalation` auto-records escalated outcomes; `_derive_failure_class()` shared helper extracts failure class conditionally based on pipeline step (review/resolve stages only)
+
+### Key design decisions
+
+- **JSONL append-only**: no lock needed for reads; O_APPEND writes are safe for short lines on Linux
+- **Auto-record on success and escalation**: `step_log_finalize` (success) and `cmd_escalation` (escalated) are the two terminal outcome paths; `history-record` command available for manual recording
+- **Failure class scoped to review stages**: `_derive_failure_class` returns `review_job.status` only for `review_dispatch/review_wait/review_process/resolve` steps; build/push stage escalations record `""` to avoid misleading data
+- **Date filter boundary**: `--until YYYY-MM-DD` normalizes to `T23:59:59Z` to include the full boundary day
+
+### Review rounds
+
+- Round 1 (WARNING): unused `import tempfile`, misleading PIPE_BUF comment, unused `lineno` in `history_read` - all removed/fixed
+- Round 2 (WARNING): `cmd_history_record` missing try/except around `state_exists` branch; `--failure-class` silently ignored when state exists - both fixed
+- Round 3 (WARNING): `history_read` missing `encoding="utf-8"`; `--until YYYY-MM-DD` excluded boundary date - fixed
+- Round 4 (WARNING): escalation auto-record added; O_APPEND comment softened; `recovery_log` getattr guard added; lambda E731 removed
+- Round 5 (WARNING): `review_job.tool/model` null guard in `from_state`; `_derive_failure_class` extracted; `history_read` encoding fix; lambda cleanup
+- Round 6 (round_limit, user approved continue): applied null guard + shared helper; further fixes
+- Round 7 (SUGGESTION only): `format_table` `finished_at[:19]` cosmetic clip; stateless `history-record` success outcome clears failure_class - auto-merged
+
 ## orchctl advanced scheduling + admission control (#101, PR #196)
 
 Implemented Stage 3 of the orchestrator redesign: priority-based dispatch ordering, configurable scheduling weights, and the `max_awaiting_merge` admission gate.

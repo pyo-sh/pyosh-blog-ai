@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-14 | orchctl history / audit query (#103, PR #194) - JSONL attempt log, history list/stats/patterns, auto-record on success+escalation, _derive_failure_class helper, null guards, 7라운드 리뷰 | done |
 | 2026-03-14 | orchctl multi-area coordination (#104, PR #197) - dependencies 테이블(v12 migration), per-edge dep_type 해석(_resolve_per_edge), global quota(max_open_pr DB키 단일화+policy YAML synonym), reconcile-all 명령어(단일 SQLite 커넥션 공유 원자적 글로벌 쿼터), 3라운드 리뷰+rebase 충돌 해결, 396 tests | done |
 | 2026-03-14 | orchctl advanced scheduling + admission control (#101, PR #196) - priority 기반 dispatch 정렬(fenced block priority 필드), age/retry 가중치, per-area max_awaiting_merge 게이트, get_config_float db/config.py 이동, 3라운드 리뷰, 414 tests | done |
 | 2026-03-13 | orchctl integration / chaos test suite (#102, PR #195) - 10개 fault-injection 시나리오 28개 테스트, 3라운드 리뷰 APPROVE | done |
