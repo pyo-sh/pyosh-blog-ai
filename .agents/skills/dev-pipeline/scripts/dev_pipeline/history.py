@@ -144,7 +144,7 @@ def history_append(monorepo_root: Path, record: AttemptRecord) -> None:
     # O_APPEND mode: the kernel guarantees that concurrent appends to a regular
     # file do not interleave as long as each write() call is atomic (lines are
     # short, so this holds in practice).
-    with open(log_path, "a") as f:
+    with open(log_path, "a", encoding="utf-8") as f:
         f.write(line)
 
 
@@ -184,7 +184,10 @@ def history_read(
     if since:
         records = [r for r in records if r.finished_at >= since]
     if until:
-        records = [r for r in records if r.finished_at <= until]
+        # Normalize a bare date ("YYYY-MM-DD") to end-of-day so the boundary
+        # date is included in the result set.
+        _until = until + "T23:59:59Z" if "T" not in until else until
+        records = [r for r in records if r.finished_at <= _until]
 
     records.sort(key=lambda r: r.finished_at, reverse=True)
     return records
