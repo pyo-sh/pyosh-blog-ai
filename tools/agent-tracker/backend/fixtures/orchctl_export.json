@@ -1,0 +1,58 @@
+{
+  "schema_version": "v1",
+  "generated_at": 1710288000.0,
+  "area": "workspace",
+  "issues": [
+    {
+      "number": 88,
+      "area": "workspace",
+      "state": "dispatched",
+      "dependency_type": "none",
+      "attempt_id": "issue-88-a1a2b3c4",
+      "pid": 12345,
+      "started_at": "2024-03-13T00:00:00Z",
+      "liveness": "alive"
+    },
+    {
+      "number": 91,
+      "area": "workspace",
+      "state": "completed",
+      "dependency_type": "none",
+      "attempt_id": "issue-91-a9b8c7d6",
+      "pid": null,
+      "started_at": "2024-03-12T22:00:00Z",
+      "liveness": "dead"
+    },
+    {
+      "number": 110,
+      "area": "workspace",
+      "state": "pending",
+      "dependency_type": "soft",
+      "attempt_id": null,
+      "pid": null,
+      "started_at": null,
+      "liveness": "unknown"
+    }
+  ],
+  "batches": [
+    {
+      "area": "workspace",
+      "n_total": 3,
+      "n_done": 1,
+      "n_failed": 0,
+      "n_pending": 1,
+      "n_dispatched": 1
+    }
+  ],
+  "active_workers": [
+    {
+      "attempt_id": "issue-88-a1a2b3c4",
+      "issue_number": 88,
+      "area": "workspace",
+      "pid": 12345,
+      "alive": true,
+      "started_at": "2024-03-13T00:00:00Z"
+    }
+  ],
+  "diagnostics": []
+}
