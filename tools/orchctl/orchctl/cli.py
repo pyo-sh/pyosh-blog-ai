@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from .commands.doctor import cmd_doctor
+from .commands.export import cmd_export
 from .commands.init import cmd_init
 from .commands.reconcile import cmd_reconcile
 from .commands.status import cmd_status
@@ -31,3 +32,4 @@ cli.add_command(cmd_init)
 cli.add_command(cmd_reconcile)
 cli.add_command(cmd_status)
 cli.add_command(cmd_doctor)
+cli.add_command(cmd_export)
