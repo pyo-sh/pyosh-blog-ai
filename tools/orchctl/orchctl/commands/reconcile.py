@@ -658,6 +658,8 @@ def _unblock_pass(
 
         number = issue["number"]
         issue_id = issue["id"]
+        # dep_type is only used as a none vs non-none gate here; for non-'none' issues
+        # the per-edge dep_type stored in dependencies.dep_type drives resolution.
         dep_type = issue["dependency_type"]
 
         if dep_type == "none":
@@ -923,7 +925,7 @@ def _dispatch_pass(
         if active_global >= global_quota:
             click.echo(
                 f"reconcile [{area}]: globalQuota={global_quota} reached"
-                " — no more dispatches."
+                " (config key: max_open_pr) — no more dispatches."
             )
             return
 

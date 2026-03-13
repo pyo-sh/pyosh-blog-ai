@@ -274,6 +274,7 @@ def test_reconcile_max_open_pr_blocks_dispatch(runner, db_path):
     result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
     assert result.exit_code == 0, result.output
     assert "globalQuota=1 reached" in result.output
+    assert "max_open_pr" in result.output
 
 
 def test_reconcile_drain_mode_blocks_dispatch(runner, db_path):

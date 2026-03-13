@@ -94,9 +94,6 @@ def _reconcile_area(
     policy_file: str | None,
 ) -> None:
     """Run one reconciliation pass for *area* under its own lease."""
-    # Load policy before acquiring the lease so the pass sees fresh config.
-    _load_policy_if_present(conn, area, policy_file, dry_run)
-
     pid = os.getpid()
     owns_lease = acquire(conn, area, pid)
     if not owns_lease:
@@ -112,7 +109,10 @@ def _reconcile_area(
             " — continuing despite active lease."
         )
 
+    # Load policy only after we hold (or are allowed to proceed without) the lease
+    # so operators can correlate policy updates with an active pass in the logs.
     try:
+        _load_policy_if_present(conn, area, policy_file, dry_run)
         click.echo(f"reconcile-all [{area}]: starting pass.")
         _run_pass(conn, area, pid, dry_run, owns_lease=owns_lease)
         click.echo(f"reconcile-all [{area}]: pass complete.")
