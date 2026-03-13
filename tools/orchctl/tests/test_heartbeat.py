@@ -61,43 +61,43 @@ def running_attempt(conn):
 
 class TestSignalSnapshot:
     def test_absent_count_all_present(self):
-        s = SignalSnapshot(pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=True)
+        s = SignalSnapshot(pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True)
         assert s.absent_count == 0
 
     def test_absent_count_all_absent(self):
-        s = SignalSnapshot(pr_commit=False, state_mtime=False, log_mtime=False, cpu_delta=False)
+        s = SignalSnapshot(pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False)
         assert s.absent_count == 4
 
     def test_absent_count_mixed(self):
-        s = SignalSnapshot(pr_commit=True, state_mtime=False, log_mtime=False, cpu_delta=True)
+        s = SignalSnapshot(pr_activity=True, state_mtime=False, log_mtime=False, cpu_delta=True)
         assert s.absent_count == 2
 
     def test_is_stalled_below_threshold(self):
-        s = SignalSnapshot(pr_commit=False, state_mtime=True, log_mtime=True, cpu_delta=True)
+        s = SignalSnapshot(pr_activity=False, state_mtime=True, log_mtime=True, cpu_delta=True)
         assert s.absent_count == 1
         assert not s.is_stalled()
 
     def test_is_stalled_at_threshold(self):
-        s = SignalSnapshot(pr_commit=False, state_mtime=False, log_mtime=True, cpu_delta=True)
+        s = SignalSnapshot(pr_activity=False, state_mtime=False, log_mtime=True, cpu_delta=True)
         assert s.absent_count == STALL_MIN_ABSENT
         assert s.is_stalled()
 
     def test_is_stalled_above_threshold(self):
-        s = SignalSnapshot(pr_commit=False, state_mtime=False, log_mtime=False, cpu_delta=False)
+        s = SignalSnapshot(pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False)
         assert s.is_stalled()
 
     def test_to_json_round_trips(self):
         s = SignalSnapshot(
-            pr_commit=True, state_mtime=False, log_mtime=True, cpu_delta=False,
+            pr_activity=True, state_mtime=False, log_mtime=True, cpu_delta=False,
             cpu_jiffies=12345,
         )
         data = json.loads(s.to_json())
-        assert data["pr_commit"] is True
+        assert data["pr_activity"] is True
         assert data["state_mtime"] is False
         assert data["cpu_jiffies"] == 12345
 
     def test_custom_min_absent(self):
-        s = SignalSnapshot(pr_commit=False, state_mtime=True, log_mtime=True, cpu_delta=True)
+        s = SignalSnapshot(pr_activity=False, state_mtime=True, log_mtime=True, cpu_delta=True)
         assert not s.is_stalled(min_absent=2)
         assert s.is_stalled(min_absent=1)
 
@@ -111,7 +111,7 @@ class TestHeartbeatDB:
     def test_record_and_retrieve_cpu_jiffies(self, conn, running_attempt):
         _, attempt_id = running_attempt
         snap = SignalSnapshot(
-            pr_commit=True, state_mtime=True, log_mtime=False, cpu_delta=True,
+            pr_activity=True, state_mtime=True, log_mtime=False, cpu_delta=True,
             cpu_jiffies=9876,
         )
         record_heartbeat(conn, attempt_id, snap)
@@ -125,7 +125,7 @@ class TestHeartbeatDB:
     def test_get_last_cpu_jiffies_null_value(self, conn, running_attempt):
         _, attempt_id = running_attempt
         snap = SignalSnapshot(
-            pr_commit=False, state_mtime=False, log_mtime=False, cpu_delta=False,
+            pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False,
             cpu_jiffies=None,
         )
         record_heartbeat(conn, attempt_id, snap)
@@ -135,7 +135,7 @@ class TestHeartbeatDB:
         _, attempt_id = running_attempt
         for jiffies in [100, 200, 300]:
             snap = SignalSnapshot(
-                pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
                 cpu_jiffies=jiffies,
             )
             record_heartbeat(conn, attempt_id, snap)
@@ -145,7 +145,7 @@ class TestHeartbeatDB:
     def test_heartbeat_row_written_to_db(self, conn, running_attempt):
         _, attempt_id = running_attempt
         snap = SignalSnapshot(
-            pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+            pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
         )
         record_heartbeat(conn, attempt_id, snap)
 
@@ -154,7 +154,7 @@ class TestHeartbeatDB:
         ).fetchall()
         assert len(rows) == 1
         signals = json.loads(rows[0]["signals"])
-        assert signals["pr_commit"] is True
+        assert signals["pr_activity"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ class TestCollectSignals:
         if file_kw.get("log_file_recent"):
             (tmp_path / "attempt" / "worker.log").write_text("output")
 
-        with patch("orchctl.heartbeat._check_pr_commit", return_value=file_kw.get("pr_commit", False)):
+        with patch("orchctl.heartbeat._check_pr_activity", return_value=file_kw.get("pr_activity", False)):
             return collect_signals(
                 area="workspace",
                 issue_number=42,
@@ -191,7 +191,7 @@ class TestCollectSignals:
 
     def test_all_signals_absent_no_files(self, tmp_path):
         snap = self._call(tmp_path)
-        assert snap.pr_commit is False
+        assert snap.pr_activity is False
         assert snap.state_mtime is False
         assert snap.log_mtime is False
         assert snap.cpu_delta is False
@@ -207,9 +207,9 @@ class TestCollectSignals:
         snap = self._call(tmp_path, log_file_recent=True)
         assert snap.log_mtime is True
 
-    def test_pr_commit_signal(self, tmp_path):
-        snap = self._call(tmp_path, pr_commit=True)
-        assert snap.pr_commit is True
+    def test_pr_activity_signal(self, tmp_path):
+        snap = self._call(tmp_path, pr_activity=True)
+        assert snap.pr_activity is True
 
     def test_cpu_delta_first_sample(self, tmp_path):
         """First CPU sample (no prev) should be treated as active (benefit of doubt)."""
@@ -245,16 +245,16 @@ class TestCollectSignals:
                 tmp_path,
                 pid=99999,
                 prev_cpu=None,
-                pr_commit=True,
+                pr_activity=True,
                 log_file_recent=True,
             )
-        # pr_commit=True, log=True, cpu=True (first sample), state=False
+        # pr_activity=True, log=True, cpu=True (first sample), state=False
         assert snap.absent_count == 1
         assert not snap.is_stalled()
 
     def test_two_absent_stalled(self, tmp_path):
         """With 2 signals absent, is_stalled() returns True."""
-        snap = self._call(tmp_path, pr_commit=True, log_file_recent=True)
+        snap = self._call(tmp_path, pr_activity=True, log_file_recent=True)
         # pr=True, log=True, state=False, cpu=False -> 2 absent
         assert snap.absent_count == 2
         assert snap.is_stalled()
@@ -270,7 +270,7 @@ class TestCheckStall:
         _, attempt_id = running_attempt
         with patch("orchctl.heartbeat.collect_signals") as mock_collect:
             mock_collect.return_value = SignalSnapshot(
-                pr_commit=False, state_mtime=False, log_mtime=False, cpu_delta=False
+                pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False
             )
             stalled, _ = check_stall(
                 conn,
@@ -291,7 +291,7 @@ class TestCheckStall:
         _, attempt_id = running_attempt
         with patch("orchctl.heartbeat.collect_signals") as mock_collect:
             mock_collect.return_value = SignalSnapshot(
-                pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=False
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=False
             )
             stalled, snap = check_stall(
                 conn,
@@ -312,7 +312,7 @@ class TestCheckStall:
         record_heartbeat(
             conn, attempt_id,
             SignalSnapshot(
-                pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
                 cpu_jiffies=500,
             ),
         )
@@ -322,7 +322,7 @@ class TestCheckStall:
         def fake_collect(**kwargs):
             captured["prev_cpu_jiffies"] = kwargs.get("prev_cpu_jiffies")
             return SignalSnapshot(
-                pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=True,
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=True,
                 cpu_jiffies=600,
             )
 
@@ -391,7 +391,7 @@ class TestHeartbeatPassInReconcile:
 
         with patch("orchctl.heartbeat.collect_signals") as mock_collect:
             mock_collect.return_value = SignalSnapshot(
-                pr_commit=False, state_mtime=False, log_mtime=False, cpu_delta=False
+                pr_activity=False, state_mtime=False, log_mtime=False, cpu_delta=False
             )
             with patch.dict(os.environ, {"MONOREPO_ROOT": str(tmp_path)}):
                 result = _heartbeat_pass(
@@ -426,7 +426,7 @@ class TestHeartbeatPassInReconcile:
 
         with patch("orchctl.heartbeat.collect_signals") as mock_collect:
             mock_collect.return_value = SignalSnapshot(
-                pr_commit=True, state_mtime=True, log_mtime=True, cpu_delta=False
+                pr_activity=True, state_mtime=True, log_mtime=True, cpu_delta=False
             )
             with patch.dict(os.environ, {"MONOREPO_ROOT": str(tmp_path)}):
                 result = _heartbeat_pass(

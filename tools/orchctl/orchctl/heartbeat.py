@@ -1,10 +1,10 @@
 """Multi-signal heartbeat collection and stall detection for orchctl.
 
 Signals collected per running attempt:
-  1. pr_commit   - PR had a commit pushed recently (GitHub API)
-  2. state_mtime - pipeline state file was recently modified
-  3. log_mtime   - worker log file was recently modified
-  4. cpu_delta   - /proc/{pid}/stat CPU jiffies changed since last sample
+  1. pr_activity  - PR had any activity recently (GitHub API, updatedAt)
+  2. state_mtime  - pipeline state file was recently modified
+  3. log_mtime    - worker log file was recently modified
+  4. cpu_delta    - /proc/{pid}/stat CPU jiffies changed since last sample
 
 Stall rule: absent_count >= STALL_MIN_ABSENT (default 2).
 A single absent signal is ignored; two or more absent signals indicate a stall.
@@ -29,7 +29,7 @@ STALL_MIN_ABSENT: int = 2
 
 @dataclass
 class SignalSnapshot:
-    pr_commit: bool    # True = PR had recent commit activity
+    pr_activity: bool  # True = PR had recent activity (updatedAt within threshold)
     state_mtime: bool  # True = pipeline state file recently modified
     log_mtime: bool    # True = worker log recently modified
     cpu_delta: bool    # True = CPU jiffies changed since last sample
@@ -39,7 +39,7 @@ class SignalSnapshot:
     def absent_count(self) -> int:
         """Number of absent (False) signals."""
         return sum(
-            1 for v in (self.pr_commit, self.state_mtime, self.log_mtime, self.cpu_delta)
+            1 for v in (self.pr_activity, self.state_mtime, self.log_mtime, self.cpu_delta)
             if not v
         )
 
@@ -49,7 +49,7 @@ class SignalSnapshot:
 
     def to_json(self) -> str:
         return json.dumps({
-            "pr_commit": self.pr_commit,
+            "pr_activity": self.pr_activity,
             "state_mtime": self.state_mtime,
             "log_mtime": self.log_mtime,
             "cpu_delta": self.cpu_delta,
@@ -62,12 +62,23 @@ class SignalSnapshot:
 # ---------------------------------------------------------------------------
 
 def _read_cpu_jiffies(pid: int) -> Optional[int]:
-    """Read utime + stime from /proc/{pid}/stat. Returns None on any error."""
+    """Read utime + stime from /proc/{pid}/stat. Returns None on any error.
+
+    Parses after the closing ')' of the comm field to handle process names
+    that contain spaces (e.g. kernel threads like "(kworker/0:1)").
+    After the last ')': state ppid pgrp ... utime(at+11) stime(at+12).
+    """
     try:
         with open(f"/proc/{pid}/stat") as f:
-            fields = f.read().split()
-        # Fields are 0-indexed; utime=13, stime=14 in /proc/[pid]/stat.
-        return int(fields[13]) + int(fields[14])
+            raw = f.read()
+        # The comm field is enclosed in parentheses and may contain spaces.
+        # Split on the last ')' to skip it entirely.
+        comm_end = raw.rfind(")")
+        if comm_end == -1:
+            return None
+        fields = raw[comm_end + 1:].split()
+        # After the closing ')': state(0) ppid(1) pgrp(2) ... utime(11) stime(12)
+        return int(fields[11]) + int(fields[12])
     except (OSError, IndexError, ValueError):
         return None
 
@@ -81,13 +92,17 @@ def _recent_mtime(path: str, now: float, threshold_s: int) -> bool:
         return False
 
 
-def _check_pr_commit(
+def _check_pr_activity(
     area: str,
     issue_number: int,
     state_file: str,
     threshold_s: int,
 ) -> bool:
-    """Return True if the issue's PR has had activity within *threshold_s* seconds.
+    """Return True if the issue's PR has had any activity within *threshold_s* seconds.
+
+    Activity is defined as `updatedAt` being within the threshold: this includes
+    new commits, comments, label changes, and status updates.  The field name
+    `pr_activity` reflects this broader semantics (not just commits).
 
     Reads the PR number from the pipeline state file to avoid an extra gh API
     call.  Returns False if the state file is missing, the PR is not yet
@@ -175,8 +190,8 @@ def collect_signals(
     )
     state_mtime = _recent_mtime(state_file, now, threshold_s)
 
-    # Signal 1: PR commit activity (reads pr number from state file)
-    pr_commit = _check_pr_commit(area, issue_number, state_file, threshold_s)
+    # Signal 1: PR activity (reads pr number from state file)
+    pr_activity = _check_pr_activity(area, issue_number, state_file, threshold_s)
 
     # Signal 3: log file mtime
     log_file = os.path.join(attempt_dir, "worker.log")
@@ -200,7 +215,7 @@ def collect_signals(
         cpu_delta = False
 
     return SignalSnapshot(
-        pr_commit=pr_commit,
+        pr_activity=pr_activity,
         state_mtime=state_mtime,
         log_mtime=log_mtime,
         cpu_delta=cpu_delta,

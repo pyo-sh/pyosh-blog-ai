@@ -30,6 +30,7 @@ from ..policy import apply_policy, find_policy_file, load_policy
 from ..heartbeat import check_stall
 from ..state_machine import (
     apply_attempt_transition,
+    apply_attempt_transition_tx,
     apply_issue_transition,
     apply_issue_transition_tx,
 )
@@ -446,18 +447,25 @@ def _heartbeat_pass(
             )
             continue
 
-        stalled, snapshot = check_stall(
-            conn,
-            area=area,
-            issue_number=number,
-            attempt_id=attempt_id,
-            pid=worker_pid,
-            monorepo_root=monorepo_root,
-        )
+        try:
+            stalled, snapshot = check_stall(
+                conn,
+                area=area,
+                issue_number=number,
+                attempt_id=attempt_id,
+                pid=worker_pid,
+                monorepo_root=monorepo_root,
+            )
+        except Exception as exc:  # noqa: BLE001
+            click.echo(
+                f"reconcile [{area}]: issue #{number} heartbeat collection failed: {exc}",
+                err=True,
+            )
+            continue
 
         click.echo(
             f"reconcile [{area}]: issue #{number} heartbeat:"
-            f" pr_commit={snapshot.pr_commit},"
+            f" pr_activity={snapshot.pr_activity},"
             f" state_mtime={snapshot.state_mtime},"
             f" log_mtime={snapshot.log_mtime},"
             f" cpu_delta={snapshot.cpu_delta}"
@@ -471,8 +479,9 @@ def _heartbeat_pass(
                 " → marking timed-out."
             )
             try:
-                apply_attempt_transition(conn, attempt_id, "timed-out")
-                apply_issue_transition(conn, issue_id, "failed-terminal")
+                with conn:
+                    apply_attempt_transition_tx(conn, attempt_id, "timed-out")
+                    apply_issue_transition_tx(conn, issue_id, "failed-terminal")
             except Exception as exc:  # noqa: BLE001
                 click.echo(
                     f"reconcile [{area}]: issue #{number} stall transition failed: {exc}",
