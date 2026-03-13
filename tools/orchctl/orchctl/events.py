@@ -79,7 +79,7 @@ def emit_event(
     if event_id is None:
         raise RuntimeError("INSERT INTO events did not return a lastrowid")
 
-    _maybe_dispatch_webhook(conn, event_type, area, payload or {})
+    _maybe_dispatch_webhook(conn, event_type, area, issue_id, payload or {})
     return event_id
 
 
@@ -122,7 +122,12 @@ def _start_webhook_thread(url: str, body: str) -> None:
     Non-daemon so the process stays alive (up to the 5-second HTTP timeout)
     until delivery completes. Daemon threads are killed on process exit and
     would silently drop notifications in short-lived CLI invocations.
+
+    Side effect: if the endpoint is unresponsive, the CLI process will hang
+    silently for up to 5 seconds after the command completes. The stderr
+    notice printed here makes this visible to operators.
     """
+    print("[orchctl] dispatching webhook notification...", file=sys.stderr)
     threading.Thread(target=_fire, args=(url, body), daemon=False).start()
 
 
@@ -130,6 +135,7 @@ def _maybe_dispatch_webhook(
     conn: sqlite3.Connection,
     event_type: str,
     area: str | None,
+    issue_id: int | None,
     payload: dict[str, Any],
 ) -> None:
     """Fire the webhook in a background thread if enabled and event passes the filter."""
@@ -146,7 +152,7 @@ def _maybe_dispatch_webhook(
         return
 
     body = json.dumps(
-        {"event_type": event_type, "area": area, "data": payload},
+        {"event_type": event_type, "area": area, "issue_id": issue_id, "data": payload},
         ensure_ascii=False,
     )
     _start_webhook_thread(url, body)

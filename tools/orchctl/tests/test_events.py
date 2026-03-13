@@ -103,6 +103,10 @@ class TestEmitEvent:
         with patch.object(events_mod, "_start_webhook_thread") as mock_wh:
             emit_event(conn, EVENT_ISSUE_STATE_CHANGED, area="workspace")
             mock_wh.assert_called_once()
+            _, body = mock_wh.call_args[0]
+            body_data = json.loads(body)
+            assert "issue_id" in body_data
+            assert body_data["issue_id"] is None
         conn.close()
 
     def test_webhook_event_filter_allows_matching(self, runner, db_path):
