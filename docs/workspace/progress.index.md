@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | agent-tracker regression / fixture / portability suite (#113, PR #188) - bash 6개 신규(list-panes failure/partial-write/dead-orch/stale-token/control-char/path-traversal), Python pytest 105개(file_adapter/process_adapter/collector/models/display_adapter), display_adapter.py(wc -L→unicodedata), list-panes race condition fix, UnicodeDecodeError fix | done |
 | 2026-03-13 | agent-tracker orchctl normalized export contract + adapter (#112, PR #186) - orchctl export command(SQLite→JSON), contract/validate_export(), orchctl_adapter(fixture fallback), collector.py legacy batch.state.json 교체, 35 tests, pipeline runner max-turns 15→30 fix | done |
 | 2026-03-13 | orchctl issue discovery + auto-enqueue + configurable scope (#89, PR #185) - reconcile cycle discovery phase, github.py(OR label filter, 30s timeout, limit warning), _REOPEN_STATES auto-derived, re-open transitions(completed/failed-terminal/cancelled→pending), schema v5(5 scope keys), 174 tests, 3라운드 리뷰 | done |
 | 2026-03-13 | agent-tracker Python backend + normalized domain model (#111, PR #183) - contract/models/adapters(process+tmux+file)/collector/exporter/__main__, sidecar v2 읽기, atomic export, 8라운드 리뷰 | done |

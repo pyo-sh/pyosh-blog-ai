@@ -1,5 +1,29 @@
 # Progress 2026-03-13
 
+## agent-tracker regression / fixture / portability suite (#113, PR #188)
+
+- **목적**: regression test 체계화, Python fixture suite 구축, GNU 전용 도구를 Python stdlib adapter로 교체
+- **Bash regression tests 6개 신규** (`tools/agent-tracker/tests/`):
+  - `test-list-panes-failure.sh` - list-panes 빈 결과 시 v2 sidecar cleanup 스킵 (race condition 방어)
+  - `test-sidecar-partial-write.sh` - 잘린 JSON/빈 파일/바이너리 가비지 → `status=fault`, no crash
+  - `test-dead-orchestrator.sh` - 존재하지 않는 PID → `batch_status=dead` (숨김 방지)
+  - `test-stale-token.sh` - `tokens_updated_at` 30s 임계값 경계 조건 (fallback, 29s/30s/31s)
+  - `test-control-char-sanitize.sh` - ANSI/OSC/제어문자가 `@base64` 프로토콜 파손 없이 통과
+  - `test-path-traversal.sh` - `%../../../etc` 형식 pane_id 차단, 숫자 외 문자 모두 거부
+- **Python pytest fixture suite 105개** (`tools/agent-tracker/backend/tests/`):
+  - `test_file_adapter.py` - read_json(partial write/zero-byte/binary garbage), atomic_write, list helpers
+  - `test_process_adapter.py` - is_running, get_create_time (psutil + /proc fallback 경로 분리)
+  - `test_collector.py` - `_collect_claude_pane`(path traversal/fault/stale token), `_parse_batch`(dead orch/done/counts)
+  - `test_models.py` - AgentState/BatchState/Snapshot schema contract (EXPORT_FIELDS/AGENT_FIELDS/TOKEN_FIELDS)
+  - `test_display_adapter.py` - east_asian_display_width (CJK 2-wide, ASCII 1-wide, fullwidth)
+- **Platform adapter 신규** (`display_adapter.py`, `lib/display_width.py`):
+  - GNU 전용 `wc -L` 대체 - `unicodedata.east_asian_width()` 기반 CJK width 계산
+  - `lib/util.sh::display_width()` - Python 우선, fallback `wc -L` 유지 (macOS/WSL 호환)
+- **버그 수정 2건**:
+  - `agent-tracker.sh` - list-panes 빈 결과 시 `_active_panes` 비어 전체 sidecar 삭제되는 race condition 방어
+  - `file_adapter.read_json` - `UnicodeDecodeError` 추가 catch (바이너리 가비지 입력)
+- **리뷰 2라운드** - 1라운드: pytest를 runtime requirements.txt에 추가한 문제 수정(dev-only로 이동), 2라운드: suggestion-only(중복 로직 low-priority, PR description 불일치 cosmetic) → skip
+
 ## agent-tracker orchctl normalized export contract + adapter (#112, PR #186)
 
 - **목적**: agent-tracker가 orchctl SQLite를 직접 읽지 않고 orchctl이 생성한 normalized export JSON만 소비하도록 contract와 adapter 구현
