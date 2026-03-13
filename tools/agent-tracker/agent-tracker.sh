@@ -31,7 +31,10 @@ source "$SCRIPT_DIR/lib/render.sh"
 _BACKEND_PID=""
 cleanup() {
   local ec=$?
-  [[ -n "$_BACKEND_PID" ]] && kill "$_BACKEND_PID" 2>/dev/null
+  if [[ -n "$_BACKEND_PID" ]]; then
+    kill "$_BACKEND_PID" 2>/dev/null
+    wait "$_BACKEND_PID" 2>/dev/null
+  fi
   tput cnorm 2>/dev/null
   tput rmcup 2>/dev/null
   exit "$ec"
@@ -64,7 +67,7 @@ fi
 # Sidecar state dir must exist before backend starts.
 mkdir -p "$(dirname "$EXPORT_FILE")"
 
-PYTHONPATH="$SCRIPT_DIR" python3 -m backend \
+PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m backend \
   --root "$REPO_ROOT" \
   --session "$SESSION" \
   --interval "$INTERVAL" \
@@ -74,11 +77,18 @@ _BACKEND_PID=$!
 
 # Brief liveness check — catch immediate startup failures (missing module, bad flag, etc.)
 # before entering the main loop where a dead backend silently yields empty snapshots.
-sleep 0.5
-if ! kill -0 "$_BACKEND_PID" 2>/dev/null; then
+# Poll 5×100 ms instead of a fixed sleep to avoid unnecessary latency on fast hosts.
+_alive=false
+for _i in 1 2 3 4 5; do
+  sleep 0.1
+  kill -0 "$_BACKEND_PID" 2>/dev/null && { _alive=true; break; }
+done
+unset _i
+if ! $_alive; then
   printf '[agent-tracker] WARNING: backend exited early — check %s\n' \
     "$REPO_ROOT/.workspace/agent-tracker/backend.log" >&2
 fi
+unset _alive
 
 # ── Sidecar cleanup (safe) ──
 # Runs once at startup. Scoped to the current tmux server + target session only.
