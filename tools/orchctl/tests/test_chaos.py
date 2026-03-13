@@ -349,8 +349,12 @@ class TestPrOpenWorkerDead:
         attempt_id = "att-dead-1"
         _insert_running_attempt(conn, issue_id, attempt_id, pid=None)
 
-        # Write a stale log file
-        attempt_dir = tmp_path / "attempt"
+        # Write a stale log to the path check_stall derives internally:
+        # {monorepo_root}/.workspace/orchestrate/{area}/issues/{N}/attempts/{id}/worker.log
+        attempt_dir = (
+            tmp_path / ".workspace" / "orchestrate" / "workspace"
+            / "issues" / "1" / "attempts" / attempt_id
+        )
         attempt_dir.mkdir(parents=True)
         log_file = attempt_dir / "worker.log"
         log_file.write_text("some output", encoding="utf-8")
@@ -467,7 +471,11 @@ class TestWorkerAliveLogFrozen:
         attempt_id = "att-alive-1"
         _insert_running_attempt(conn, issue_id, attempt_id, pid=os.getpid())
 
-        attempt_dir = tmp_path / "attempt"
+        # Write a stale log to the path check_stall derives internally
+        attempt_dir = (
+            tmp_path / ".workspace" / "orchestrate" / "workspace"
+            / "issues" / "1" / "attempts" / attempt_id
+        )
         attempt_dir.mkdir(parents=True)
         log_file = attempt_dir / "worker.log"
         log_file.write_text("output", encoding="utf-8")
@@ -732,9 +740,10 @@ class TestSchedulerOverlap:
         db.execute(
             "UPDATE config SET value = 'false' WHERE key = 'scheduler_overlap'"
         )
-        # Pre-acquire the lease as PID 1 (init/systemd — always alive on Linux) so our
-        # reconcile cannot acquire it and cleanup_stale does not evict the lease.
-        foreign_pid = 1
+        # Pre-acquire the lease as a foreign PID.  Mock _pid_alive so cleanup_stale
+        # treats it as alive (same pattern as TestPidReuse), making the test portable
+        # across Linux, macOS, and container environments.
+        foreign_pid = 99999
         future_exp = "2099-01-01 00:00:00"
         db.execute(
             "INSERT INTO leases (area, holder_pid, acquired_at, heartbeat_at, expires_at)"
@@ -744,7 +753,8 @@ class TestSchedulerOverlap:
         db.commit()
         db.close()
 
-        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "workspace"])
+        with patch("orchctl.db.lease._pid_alive", return_value=True):
+            result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "workspace"])
 
         assert result.exit_code == 0
         assert "lease held by another process" in result.output
@@ -806,15 +816,18 @@ class TestSchedulerOverlap:
             dispatch_fn=lambda *a: dispatched_first.append(a[2]),
         )
 
-        # Second reconciler sees the updated state (first already dispatched one)
+        # Same reconciler re-runs dispatch pass with a fresh state snapshot.
+        # The atomic _record_dispatch guard prevents issue #21 from being dispatched
+        # because maxOpenPR=1 is already reached by the first pass.
         issues_by_state_2 = _observe_issues(conn, "workspace")
         _dispatch_pass(
-            conn, "workspace", pid + 1, False, issues_by_state_2, config,
+            conn, "workspace", pid, False, issues_by_state_2, config,
             dispatch_fn=lambda *a: dispatched_second.append(a[2]),
         )
 
         total_dispatched = conn.execute(
             "SELECT COUNT(*) FROM issues WHERE state = 'dispatched'"
         ).fetchone()[0]
-        # Total dispatched must not exceed maxOpenPR
-        assert total_dispatched <= 1
+        # Exactly 1 dispatched — second pass stopped by the maxOpenPR atomic guard
+        assert total_dispatched == 1
+        assert dispatched_second == []
