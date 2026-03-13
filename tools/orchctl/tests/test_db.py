@@ -42,14 +42,19 @@ def test_config_defaults_inserted(tmp_db):
     assert rows["retry_budget"] == "3"
     assert rows["heartbeat_ttl"] == "120"
     assert rows["lease_ttl"] == "60"
+    # v4 additions
+    assert rows["max_open_pr"] == "2"
+    assert rows["drain_mode"] == "false"
 
 
 def test_idempotent_migration(tmp_db):
+    from orchctl.db.schema import LATEST_VERSION
+
     conn1, v1 = init_db(tmp_db)
     conn1.close()
     conn2, v2 = init_db(tmp_db)
     conn2.close()
-    assert v1 == v2 == 3
+    assert v1 == v2 == LATEST_VERSION
 
 
 def test_leases_has_heartbeat_at_column(tmp_db):
