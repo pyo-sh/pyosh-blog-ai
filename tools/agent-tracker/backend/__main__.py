@@ -81,13 +81,15 @@ def main() -> None:
     from .exporter import run_once
 
     if args.interval > 0:
-        try:
-            while True:
+        while True:
+            try:
                 _run(args.session, sidecar_dir, orch_dir, pipeline_dir, output_path,
                      args.print_output, run_once)
-                time.sleep(args.interval)
-        except KeyboardInterrupt:
-            pass
+            except KeyboardInterrupt:
+                break
+            except Exception as exc:
+                print(f"[agent-tracker] error: {exc}", file=sys.stderr)
+            time.sleep(args.interval)
     else:
         _run(args.session, sidecar_dir, orch_dir, pipeline_dir, output_path,
              args.print_output, run_once)

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .contract import (
     AgentStatus,
+    BatchStatus,
     Engine,
     ProvenanceSource,
     STALE_THRESHOLD_SECS,
@@ -122,7 +123,9 @@ def _collect_claude_pane(
     )
 
     if not sidecar_path.exists():
-        state.provenance = Provenance(source=ProvenanceSource.SCRAPING, collected_at=now)
+        # No sidecar yet (hooks not installed, pane just started, or sidecar cleaned up).
+        # No pane scraping is performed here, so provenance is UNKNOWN.
+        state.provenance = Provenance(source=ProvenanceSource.UNKNOWN, collected_at=now)
         return state
 
     data = file_adapter.read_json(sidecar_path)
@@ -249,21 +252,26 @@ def _parse_batch(
     orch_started_at = data.get("orchestratorStartedAt")
     created_at = data.get("createdAt") or ""
 
-    # Liveness check via process adapter
-    create_time = None
-    if orch_pid and orch_started_at:
-        create_time = process_adapter.get_create_time(orch_pid)
-    batch_alive = process_adapter.is_running(orch_pid, create_time) if orch_pid else False
+    # Liveness check: compare against the stored start time from batch.state.json
+    # (not a live OS read) so PID reuse is detected correctly.
+    stored_create_time = None
+    if orch_started_at:
+        try:
+            dt = datetime.fromisoformat(orch_started_at.replace("Z", "+00:00"))
+            stored_create_time = dt.timestamp()
+        except (ValueError, TypeError):
+            pass
+    batch_alive = process_adapter.is_running(orch_pid, stored_create_time) if orch_pid else False
 
-    liveness = Liveness(is_alive=batch_alive, pid=orch_pid or None, create_time=create_time)
+    liveness = Liveness(is_alive=batch_alive, pid=orch_pid or None, create_time=stored_create_time)
 
     n_terminal = n_done + n_failed
     if not batch_alive:
-        batch_status = "dead"
+        batch_status = BatchStatus.DEAD
     elif n_total > 0 and n_terminal >= n_total:
-        batch_status = "done"
+        batch_status = BatchStatus.DONE
     else:
-        batch_status = "active"
+        batch_status = BatchStatus.ACTIVE
 
     elapsed = _elapsed_from_iso(created_at, now)
 
@@ -272,6 +280,8 @@ def _parse_batch(
     dispatched: list[DispatchedIssue] = []
 
     for issue_key, dispatch_info in dispatched_raw.items():
+        # Only include issues currently in the "dispatched" state (actively running pipelines).
+        # Issues in other states (completed, failed, pending, blocked) are excluded here.
         if status_map.get(issue_key) != "dispatched":
             continue
 

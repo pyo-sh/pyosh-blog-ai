@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from .contract import (
     AgentStatus,
-    BatchStatus,
+    BatchStatus,  # noqa: F401 - exported for type annotations
     Engine,
     EXPORT_SCHEMA_VERSION,
     ProvenanceSource,
@@ -135,7 +135,7 @@ class DispatchedIssue:
 class BatchState:
     area: str
     batch_id: str
-    batch_status: str
+    batch_status: BatchStatus
     n_done: int = 0
     n_failed: int = 0
     n_total: int = 0
