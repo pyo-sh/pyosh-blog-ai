@@ -28,6 +28,25 @@ ORCH_BASE="$MONOREPO_ROOT/.workspace/orchestrate"
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 
 # ──────────────────────────────────────────────
+# Single-writer guarantee: cutover check
+# ──────────────────────────────────────────────
+
+orch_assert_legacy_active() {
+  # Usage: orch_assert_legacy_active <area>
+  # Exits 1 if orchctl has taken over for this area (sentinel file present).
+  # Call this at the start of any shell orchestrator run that may dispatch issues.
+  local area=$1
+  local sentinel="$ORCH_BASE/${area}/.orchctl-active"
+  if [ -f "$sentinel" ]; then
+    >&2 echo "[orchestrator] ERROR: orchctl has taken over for area '${area}'."
+    >&2 echo "[orchestrator] Sentinel: ${sentinel}"
+    >&2 echo "[orchestrator] The legacy shell orchestrator is disabled for this area."
+    >&2 echo "[orchestrator] To re-enable: orchctl control rollback ${area} --confirm"
+    exit 1
+  fi
+}
+
+# ──────────────────────────────────────────────
 # State management
 # ──────────────────────────────────────────────
 
