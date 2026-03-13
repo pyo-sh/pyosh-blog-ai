@@ -25,7 +25,7 @@ from ..db import (
 )
 from ..db.schema import LATEST_VERSION
 from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues
-from ..failure_classifier import classify_and_record
+from ..failure_classifier import classify, classify_and_record, next_action_for_class
 from ..models import (
     ISSUE_TRANSITIONS,
     FailureClass,
@@ -384,14 +384,14 @@ def _mark_complete_pass(
             attempt_id = latest["attempt_id"]
             terminal_json = latest["terminal_json"]
 
-            failure_class, next_action = (
-                (FailureClass.UNKNOWN, NextAction.ESCALATE)
-                if dry_run
-                else classify_and_record(conn, issue_id, attempt_id, status, terminal_json)
-            )
+            # classify() is pure — always call it so dry-run output reflects reality.
+            failure_class = classify(status, terminal_json)
+            next_action = next_action_for_class(failure_class)
+            if not dry_run:
+                classify_and_record(conn, issue_id, attempt_id, status, terminal_json)
 
             new_state = _next_action_to_state(
-                conn, area, issue_id, number, retry_count, failure_class, next_action
+                conn, area, issue_id, number, retry_count, failure_class, next_action, dry_run
             )
             click.echo(
                 f"reconcile [{area}]: issue #{number} attempt {status}"
@@ -412,19 +412,21 @@ def _next_action_to_state(
     retry_count: int,
     failure_class: FailureClass,
     next_action: NextAction,
+    dry_run: bool = False,
 ) -> str:
     """Map next_action to an IssueState string, enforcing per-class retry budgets."""
     if next_action in (NextAction.RETRY, NextAction.REPAIR):
         budget_by_class = get_config_json(conn, "retry_budget_by_class", default={})
         budget = int(budget_by_class.get(failure_class.value, budget_by_class.get("default", 1)))
         if retry_count < budget:
-            conn.execute(
-                "UPDATE issues SET retry_count = retry_count + 1 WHERE id = ?",
-                (issue_id,),
-            )
+            if not dry_run:
+                conn.execute(
+                    "UPDATE issues SET retry_count = retry_count + 1 WHERE id = ?",
+                    (issue_id,),
+                )
             click.echo(
                 f"reconcile [{area}]: issue #{number}"
-                f" retry {retry_count + 1}/{budget} scheduled."
+                f" retry {retry_count + 1}/{budget} scheduled{' (dry-run)' if dry_run else ''}."
             )
             return IssueState.PENDING.value
         click.echo(

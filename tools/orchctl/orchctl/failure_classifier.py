@@ -142,6 +142,10 @@ def classify_and_record(
     """Classify the attempt, write results to DB, and return (class, next_action).
 
     Does NOT commit — caller owns the transaction.
+
+    Note: log_text is not forwarded here because worker log files are not stored
+    in the DB.  If richer log-based classification is needed in the future,
+    callers can pass the log content to classify() directly.
     """
     fc = classify(attempt_status, terminal_json_text)
     na = next_action_for_class(fc)
