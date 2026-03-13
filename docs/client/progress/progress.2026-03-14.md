@@ -9,6 +9,15 @@
   - verification: `pnpm lint && pnpm compile:types`
   - merge: squash merge, merge commit `4e00e3ea036d115b83a6c6e8398c4988aa70c897`
   - branch: `feat/issue-39-post-detail-ssr` (remote branch deleted, local issue worktree cleaned up)
+- [x] #33 PostCard PR #138 머지
+  - PR: `feat: add post card (#33)`
+  - merge target: `main`
+  - 구현: `src/features/post-list/ui/post-card.tsx`, `src/features/post-list/index.ts`
+  - review fix 1: `thumbnailUrl`가 `next.config.js`에 없는 원격 호스트를 가리켜도 렌더가 깨지지 않도록, 허용된 경로만 `next/image`를 사용하고 나머지는 일반 `<img>` fallback으로 처리
+  - review fix 2: 게시일 포맷터에 `timeZone: "UTC"`를 고정해 SSR/브라우저 환경별 날짜 흔들림과 hydration mismatch 가능성을 제거
+  - verification: `pnpm lint && pnpm compile:types`
+  - merge: squash merge, merge commit `6740670622e7066967957af24e16980ac18fcc97`
+  - branch: `feat/issue-33-post-card` (remote branch deleted, local issue worktree cleaned up)
 - [x] #43 Admin 대시보드 페이지 PR #136 머지
   - PR: `feat: implement dashboard page (#43)`
   - merge target: `main`
@@ -68,6 +77,8 @@
 
 ## Discoveries
 - The post detail page could render safely without a tag route only if tags stayed non-interactive; linking them before `src/app/tags/[slug]/page.tsx` exists creates a guaranteed 404 path from the new SSR page.
+- Next.js `next/image`는 `next.config.js`의 `images.remotePatterns`에 없는 원격 호스트를 즉시 거부하므로, API가 임의 CDN URL을 줄 수 있는 카드 UI에서는 사전 allowlist 검사나 `<img>` fallback이 필요하다.
+- `Intl.DateTimeFormat`를 timezone 없이 서버/클라이언트 양쪽에서 쓰면 자정 근처 timestamp가 다른 날짜로 렌더될 수 있어, list card 같은 SSR 텍스트에는 timezone pinning이 필요하다.
 - Admin landing pages should not advertise unavailable routes as primary CTAs or shortcut cards; if the backing route is missing, the dashboard needs explicit status/coming-soon presentation instead of broken or dead navigation.
 - In this repo, `text-heading-md` is referenced in app code but is not defined in `src/app-layer/style/typography.css`; dashboard headings need to use the existing `text-h*` or `text-body-*` utility set.
 - Admin list UI could not call the existing admin read helpers from a client component until `fetchAdminPost` and `fetchAdminPosts` supported a browser `clientFetch` path when no server cookie header is provided.
@@ -93,6 +104,10 @@
 ## Issues & Resolutions
 - **Issue**: The first `#39` review found that the new post detail page linked tags to `/tags/[slug]`, but this app tree does not implement that route yet, so every tag click would land on a 404.
 - **Resolution**: removed the tag links in `src/app/posts/[slug]/page.tsx` and kept tags as static pills until a real tag page is implemented.
+- **Issue**: 첫 PR #138 리뷰에서 `PostCard`가 모든 원격 `thumbnailUrl`을 `next/image`로 렌더해, `github.com` 외 호스트에서는 런타임 에러가 발생할 수 있었다.
+- **Resolution**: 허용된 로컬/`github.com` 이미지만 `next/image`를 사용하고, 그 외 URL은 plain `<img>`로 fallback 하도록 `src/features/post-list/ui/post-card.tsx`를 보완했다.
+- **Issue**: `PostCard` 날짜 포맷터가 런타임 기본 timezone을 사용해 SSR과 브라우저 사이에서 날짜 문자열이 달라질 수 있었다.
+- **Resolution**: `Intl.DateTimeFormat("ko-KR", { ..., timeZone: "UTC" })`로 고정해 hydration mismatch와 off-by-one 날짜 노출 위험을 제거했다.
 - **Issue**: The first `#43` dashboard implementation exposed `/dashboard/stats` and several admin shortcuts before those app routes existed, which made the new landing page send users directly into 404 states.
 - **Resolution**: replaced the broken CTA/shortcut links with explicit ready-state messaging and reframed the lower section as `관리 메뉴 준비 현황` until real admin routes are implemented.
 - **Issue**: The original `최신 댓글` panel in `#43` rendered hard-coded sample entries as if they were real moderation data.
@@ -126,6 +141,8 @@
 ## Notes
 - Related PR: #139
 - Related Issue: #39
+- Related PR: #138
+- Related Issue: #33
 - Related PR: #137
 - Related Issue: #45
 - Related PR: #135
