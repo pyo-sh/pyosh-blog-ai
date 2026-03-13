@@ -19,14 +19,17 @@ Parse the user's request into one of the commands below and call `orchctl` accor
 
 Initialize and start the reconciliation loop for an area.
 
+> **Before starting:** ensure issues will enter the queue. With the default `discovery_enabled: false`, reconcile processes no issues and the loop exits immediately.
+> Set `discovery_enabled: true` in `policy.yaml` to auto-discover open GitHub issues, or manually enqueue known issues first with `orchctl control requeue --area <area> --issue <N>`.
+
 ```bash
 # 1. Initialize DB (idempotent)
 orchctl init
 
-# 2. Apply policy if file is available (auto-discovers path)
+# 2. Apply policy (sets discovery_enabled, scopes, concurrency limits)
 orchctl apply-policy
 
-# 3. Run first reconcile pass (discovery enqueues open issues when enabled)
+# 3. Run first reconcile pass (discovery enqueues open issues when discovery_enabled=true)
 orchctl reconcile --area <area>
 
 # 4. Show current state
@@ -155,9 +158,9 @@ orchctl merge-gate --area <area> --issue <N>
 
 ## Agent selection
 
-The pipeline runner is always `claude -p` (Claude Code is required for pipeline skills). The review subprocess tool and model are configured per issue dispatch.
+The pipeline runner is always `claude -p` (Claude Code is required for pipeline skills). Currently, all issues dispatched via `orchctl reconcile` use the default Claude model for both pipeline and review subprocesses.
 
-Native agent/model selection in `orchctl` is planned for a future stage. Until then, the values are passed to `/dev-pipeline` outside of orchctl (for example, via the `/dev-pipeline` skill directly or via pipeline state). Supported tool values: `claude`, `claude:<model>`, `codex`, `codex:<model>`.
+Native agent/model selection in `orchctl` is planned for a future stage. Users who need non-default model or tool routing (e.g., `codex:o3` for review) should invoke `/dev-pipeline` directly for those issues instead of using the orchestrator.
 
 ## Policy
 
