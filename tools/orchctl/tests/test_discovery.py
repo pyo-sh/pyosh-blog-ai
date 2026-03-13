@@ -419,6 +419,36 @@ class TestDiscoveryPass:
         conn.close()
         assert row is None
 
+    def test_discovery_skips_unmapped_area(self, tmp_db):
+        """When an area has no AREA_REPOS entry, discovery logs a warning and continues."""
+        runner = CliRunner()
+        runner.invoke(cli, ["--db", str(tmp_db), "init"])
+
+        conn_setup = get_db(str(tmp_db))
+        conn_setup.execute("UPDATE config SET value='true' WHERE key='discovery_enabled'")
+        conn_setup.commit()
+        conn_setup.close()
+
+        gh_fn = MagicMock(return_value=[])
+        from orchctl.commands.reconcile import _discovery_pass
+        from orchctl.db.connection import get_db as _gdb
+
+        conn = _gdb(str(tmp_db))
+        config = {
+            "discovery_enabled": True,
+            "scope_include_labels": [],
+            "scope_exclude_labels": [],
+            "scope_milestone": "",
+            "scope_allow_unassigned": True,
+        }
+        # "unknown-area" is not in AREA_REPOS — should return True (non-fatal) without
+        # calling gh_fn.
+        result = _discovery_pass(conn, "unknown-area", 9999, dry_run=False, config=config, gh_list_fn=gh_fn)
+        conn.close()
+
+        assert result is True
+        gh_fn.assert_not_called()
+
     def test_discovery_passes_scope_config_to_gh_fn(self, tmp_db):
         """scope config values are forwarded as kwargs to the gh list function."""
         runner = CliRunner()
