@@ -21,14 +21,14 @@ _aggregate_statuses() {
 
   while IFS= read -r status; do
     [[ -z "$status" ]] && continue
-    (( n_total++ ))
+    (( ++n_total ))
     case "$status" in
-      working|needs-input) (( n_working++ )) ;;
-      plan)                (( n_plan++ ))    ;;
-      stale)               (( n_stale++ ))   ;;
-      fault)               (( n_fault++ ))   ;;
-      unknown)             (( n_unknown++ )) ;;
-      *)                   (( n_idle++ ))    ;;
+      working|needs-input) (( ++n_working )) ;;
+      plan)                (( ++n_plan ))    ;;
+      stale)               (( ++n_stale ))   ;;
+      fault)               (( ++n_fault ))   ;;
+      unknown)             (( ++n_unknown )) ;;
+      *)                   (( ++n_idle ))    ;;
     esac
   done <<< "$agents_tsv"
 
@@ -158,5 +158,23 @@ dead_tsv7=$(printf '%s' "$snapshot7" | jq -r '
 n_dead_ok=0
 [[ -n "$dead_tsv7" ]] && n_dead_ok=$(printf '%s\n' "$dead_tsv7" | grep -c .)
 assert_eq "no dead orch: count is 0" "0" "$n_dead_ok"
+
+# ── Test 8: null-area dead orchestrator is not counted (#114) ──
+snapshot8=$(jq -nc '{
+  "agents": [],
+  "orchestrators": [
+    {"area":null,"batch_id":"20260314-null","batch_status":"dead","n_done":0,"n_failed":0,"n_total":1,"elapsed":"1m","dispatched":[]},
+    {"area":"workspace","batch_id":"20260314-real","batch_status":"dead","n_done":0,"n_failed":0,"n_total":1,"elapsed":"2m","dispatched":[]}
+  ]
+}')
+
+dead_tsv8=$(printf '%s' "$snapshot8" | jq -r '
+  (.orchestrators // .orchestrator // [])[] |
+  select(.batch_status == "dead" and (.area | type == "string") and .area != "") | .area
+' 2>/dev/null)
+
+n_dead8=0
+[[ -n "$dead_tsv8" ]] && n_dead8=$(printf '%s\n' "$dead_tsv8" | grep -c .)
+assert_eq "null-area dead orch: not counted" "1" "$n_dead8"
 
 test_summary

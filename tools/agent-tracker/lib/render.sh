@@ -191,7 +191,7 @@ render_dashboard() {
   local dead_tsv
   dead_tsv=$(printf '%s' "$snapshot" | jq -r '
     (.orchestrators // .orchestrator // [])[] |
-    select(.batch_status == "dead") | .area
+    select(.batch_status == "dead" and (.area | type == "string") and .area != "") | .area
   ' 2>/dev/null)
   [[ -n "$dead_tsv" ]] && n_dead_orch=$(printf '%s\n' "$dead_tsv" | grep -c .)
 
