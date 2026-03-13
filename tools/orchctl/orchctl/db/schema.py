@@ -254,6 +254,20 @@ MIGRATIONS: list[tuple[int, str]] = [
         ON CONFLICT(key) DO NOTHING;
         """,
     ),
+    (
+        7,
+        """
+        -- v7: legacy cutover support
+        -- {area}.legacy_mode = 'true' means the legacy shell orchestrator is still active
+        -- for that area.  orchctl control cutover <area> sets this to 'false'.
+        -- The sentinel path is stored so rollback can locate and remove it.
+        INSERT INTO config (key, value) VALUES
+            ('client.legacy_mode',   'true'),
+            ('server.legacy_mode',   'true'),
+            ('workspace.legacy_mode', 'true')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)

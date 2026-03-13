@@ -28,6 +28,25 @@ ORCH_BASE="$MONOREPO_ROOT/.workspace/orchestrate"
 PIPELINE_DIR="$MONOREPO_ROOT/.workspace/pipeline"
 
 # ──────────────────────────────────────────────
+# Single-writer guarantee: cutover check
+# ──────────────────────────────────────────────
+
+orch_assert_legacy_active() {
+  # Usage: orch_assert_legacy_active <area>
+  # Exits 1 if orchctl has taken over for this area (sentinel file present).
+  # Call this at the start of any shell orchestrator run that may dispatch issues.
+  local area=$1
+  local sentinel="$ORCH_BASE/${area}/.orchctl-active"
+  if [ -f "$sentinel" ]; then
+    >&2 echo "[orchestrator] ERROR: orchctl has taken over for area '${area}'."
+    >&2 echo "[orchestrator] Sentinel: ${sentinel}"
+    >&2 echo "[orchestrator] The legacy shell orchestrator is disabled for this area."
+    >&2 echo "[orchestrator] To re-enable: orchctl control rollback ${area} --confirm"
+    exit 1
+  fi
+}
+
+# ──────────────────────────────────────────────
 # State management
 # ──────────────────────────────────────────────
 
@@ -75,6 +94,8 @@ orch_init() {
   # Usage: orch_init <area> <agent> <issues_json> <dag_json> [max_concurrent] [dep_types_json] [cross_area_deps_json]
   # Creates initial batch state file.
   #
+  # Exits 1 if orchctl has taken over for this area (sentinel present).
+  #
   # dep_types_json (optional): {"issue_n": {"dep_m": "hard"|"soft"}}
   #   Dep type per issue->dep pair. Defaults to "hard" when absent.
   #
@@ -85,6 +106,8 @@ orch_init() {
   #
   # Cycle detection: SCCs are isolated (cycle-isolated status) instead of aborting.
   local area=$1
+  # Guard: refuse to start if orchctl has taken over for this area.
+  orch_assert_legacy_active "$area"
   local agent=$2
   local issues_json=$3  # JSON array e.g. '[1,2,3]'
   local dag_json=$4     # JSON object e.g. '{"3":[1,2]}'
