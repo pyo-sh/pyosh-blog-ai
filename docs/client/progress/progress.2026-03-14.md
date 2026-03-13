@@ -1,6 +1,14 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #27 글로벌 loading/error/not-found 페이지 PR #133 머지
+  - PR: `feat: add global app states (#27)`
+  - merge target: `main`
+  - 구현: `src/app/loading.tsx`, `src/app/error.tsx`, `src/app/not-found.tsx`
+  - review fix 1: `src/app/dashboard/loading.tsx` 추가로 대시보드가 public feed skeleton을 상속하지 않도록 분리
+  - review fix 2: `src/app/global-error.tsx` 추가로 root layout / provider 초기화 실패에도 커스텀 전역 에러 UI 제공
+  - merge: squash merge, merge commit `7a7e21c58f0a4ba4a4407de78a58749fb837919f`
+  - branch: `feat/issue-27-app-states` (PR merge 후 remote branch deleted, local issue worktree cleanup pending at log time)
 - [x] #26 Public Post API functions PR #131 머지
   - PR: `feat: add post API functions (#26)`
   - merge: squash merge, merge commit `b56d8d2d9e25e095c8bfe1f81876ce5f779e3e05`
@@ -17,6 +25,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- Next.js App Router에서 `app/error.tsx`는 root layout 위에서 발생한 실패를 잡지 않으므로, 진짜 전역 런타임 에러 화면이 필요하면 `app/global-error.tsx`를 별도로 둬야 한다.
+- root `app/loading.tsx`는 하위 모든 세그먼트에 전파되므로, public 영역 전용 스켈레톤을 둘 때는 dashboard 같은 별도 섹션에 route-local loading boundary를 추가해야 fallback mismatch를 막을 수 있다.
 - Public post reads fit cleanly into the existing `src/entities/post/api.ts` module; a separate public/admin split was unnecessary for this scope.
 - A fresh issue worktree did not have dependencies installed, so `pnpm install --frozen-lockfile` was required before `pnpm compile:types && pnpm lint && pnpm build` could run.
 - The Codex review on PR #131 reported `[CRITICAL]=0`, `[WARNING]=0`, `[SUGGESTION]=0`, so the pipeline advanced directly to merge without a resolve round.
@@ -29,6 +39,10 @@
 - GitHub marked PR #132 as merged at `2026-03-13T20:48:25Z`, which is `2026-03-14 05:48:25` in KST.
 
 ## Issues & Resolutions
+- **Issue**: Root `src/app/loading.tsx` 때문에 `/dashboard` 로딩 시 public post-list skeleton이 잠시 표시되었다.
+- **Resolution**: `src/app/dashboard/loading.tsx`를 추가해 admin 라우트 트리에 전용 loading fallback을 분리했다.
+- **Issue**: `src/app/error.tsx`만으로는 `src/app/layout.tsx` 또는 전역 provider 초기화 단계에서 발생한 런타임 에러를 처리할 수 없었다.
+- **Resolution**: `src/app/global-error.tsx`를 추가해 앱 전체에 적용되는 runtime error boundary를 제공했다.
 - **Issue**: `gh pr merge --delete-branch` could not remove the local branch because `feat/pagination-component` is checked out in an existing client worktree.
 - **Resolution**: kept the active worktree branch intact and verified that the PR itself was merged successfully on GitHub.
 - **Issue**: The original `#30` branch was stacked on top of `#24`, so the already-merged feature work was not represented by a clean PR to `main`.
@@ -38,6 +52,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #133
+- Related Issue: #27
 - Related PR: #131
 - Related Issue: #26
 - Related PR: #128
