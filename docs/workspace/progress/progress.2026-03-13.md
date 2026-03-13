@@ -1,5 +1,40 @@
 # Progress 2026-03-13
 
+## orchctl policy config + operational commands + merge gate (#92, PR #187)
+
+- **목적**: orchctl Stage 2 - YAML policy 로더, operational control 커맨드, 5-check merge gate, 안전장치
+- **Policy YAML 로더** (`orchctl/policy.py`):
+  - `find_policy_file()` - `.workspace/orchestrate/policy.yaml` 자동 탐지 또는 `$ORCHCTL_POLICY` env
+  - `load_policy(path)` - YAML 파싱
+  - `apply_policy(conn, policy)` - DB config 동기화, 변경된 키 반환
+  - reconcile pass 시작마다 자동 로드
+- **Operational control 커맨드** (`orchctl/commands/control.py`):
+  - `control pause <area>` / `control resume <area>` - 영역별 dispatch 일시정지
+  - `control drain` / `control undrain` - 전역 drain mode (신규 dispatch 차단/해제 대칭 쌍)
+  - `control stop <area> --confirm` - 영역 내 dispatched 이슈 전체 cancelled (단일 트랜잭션)
+  - `control cancel-attempt --area --issue` - 활성 attempt 취소 (attempt UPDATE + issue 상태변경 원자적 처리)
+  - `control requeue --area --issue` - failed-terminal/cancelled/needs-human/blocked-failed-dependency → pending
+- **Merge gate** (`orchctl/commands/merge_gate.py`):
+  - 5개 체크: `checks_pass`, `sha_match`, `no_conflict`, `no_blocking_labels`, `branch_protection`
+  - `merge_enabled=false` 시 `reason="merge_disabled"` 조기 반환 (명확한 진단)
+  - 평가 결과를 `issues.merge_state` 컬럼에 자동 기록 (eligible/rejected)
+  - Exit 0=pass, 1=fail, 2=error
+- **Guardrails** (`orchctl/commands/reconcile.py`):
+  - `repo_allowlist` - 허용 레포 목록, 미설정 시 제한 없음, `{area}.repo` 미설정 시 fail-closed
+  - `scheduler_overlap=true` - 두 번째 reconciler가 lease를 취득하지 않아도 dispatch 진행 (`owns_lease` 플래그)
+  - `max_concurrent_repair` - 동시 retry 제한
+  - `area_paused` - 영역별 일시정지 체크
+- **Schema v6** (`orchctl/db/schema.py`):
+  - `issues.retry_count INTEGER NOT NULL DEFAULT 0` - 재시도 횟수
+  - `issues.merge_state TEXT NOT NULL DEFAULT 'none'` - merge gate 결과 (CHECK 5가지 값)
+  - policy config 기본값 12개 추가 (merge_enabled, protected_branches, repo_allowlist 등)
+  - main의 schema v5 (discovery/scope)와 clean merge
+- **State machine 확장** (`orchctl/models.py`):
+  - needs-human → pending, blocked-failed-dependency → pending (requeue 지원)
+  - completed → pending (main PR #185의 re-open 이벤트 지원)
+- **테스트**: 201개 신규(control 22 + merge_gate 24 + policy 18 + state_machine 갱신), 262개 전체 통과
+- **리뷰 4라운드**: cancel-attempt 원자성, owns_lease, merge_disabled reason, undrain, merge_state 와이어업
+
 ## agent-tracker regression / fixture / portability suite (#113, PR #188)
 
 - **목적**: regression test 체계화, Python fixture suite 구축, GNU 전용 도구를 Python stdlib adapter로 교체
