@@ -156,6 +156,10 @@ def parse_priority_from_body(body: str) -> int:
 
     Looks for a ``priority: <int>`` line inside a fenced ``orchestrator`` block.
     Returns 0 if the block or line is absent, or if the value cannot be parsed.
+
+    Only non-negative integers are supported via the fenced block (the regex
+    matches ``\\d+``).  To assign a priority below 0, set the ``priority``
+    column directly in the database.
     """
     block_match = _ORCH_BLOCK_RE.search(body)
     if not block_match:

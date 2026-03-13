@@ -109,7 +109,7 @@ def apply_policy(conn: sqlite3.Connection, policy: dict) -> list[str]:
         _maybe_set(
             conn,
             "max_awaiting_merge",
-            str(int(guardrails["max_awaiting_merge"])),
+            str(max(0, int(guardrails["max_awaiting_merge"]))),
             changed,
         )
 

@@ -17,6 +17,7 @@ from ..db import (
     current_version,
     get_config,
     get_config_bool,
+    get_config_float,
     get_config_int,
     get_config_json,
     get_db,
@@ -231,22 +232,11 @@ def _observe_config(conn: sqlite3.Connection, area: str) -> dict:
         "scope_exclude_labels": get_config_json(conn, "scope_exclude_labels", default=[]),
         "scope_milestone": get_config(conn, "scope_milestone", default=""),
         "scope_allow_unassigned": get_config_bool(conn, "scope_allow_unassigned", default=True),
-        "scheduling_priority_weight": _get_config_float(conn, "scheduling_priority_weight", default=1.0),
-        "scheduling_age_weight": _get_config_float(conn, "scheduling_age_weight", default=0.1),
-        "scheduling_retry_weight": _get_config_float(conn, "scheduling_retry_weight", default=1.0),
+        "scheduling_priority_weight": get_config_float(conn, "scheduling_priority_weight", default=1.0),
+        "scheduling_age_weight": get_config_float(conn, "scheduling_age_weight", default=0.1),
+        "scheduling_retry_weight": get_config_float(conn, "scheduling_retry_weight", default=1.0),
         "max_awaiting_merge": get_config_int(conn, "max_awaiting_merge", default=0),
     }
-
-
-def _get_config_float(conn: sqlite3.Connection, key: str, *, default: float) -> float:
-    """Read a config key and parse it as a float, returning default on error."""
-    raw = get_config(conn, key, default=None)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except (ValueError, TypeError):
-        return default
 
 
 # ---------------------------------------------------------------------------
