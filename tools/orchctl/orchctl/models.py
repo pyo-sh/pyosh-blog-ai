@@ -56,7 +56,7 @@ FAILURE_CLASS_NEXT_ACTION: dict[FailureClass, NextAction] = {
     FailureClass.TIMEOUT: NextAction.RETRY,
     FailureClass.GIT_CONFLICT: NextAction.REPAIR,
     FailureClass.FLAKY_TEST: NextAction.RETRY,
-    FailureClass.DETERMINISTIC_TEST_FAILURE: NextAction.ESCALATE,
+    FailureClass.DETERMINISTIC_TEST_FAILURE: NextAction.REPAIR,
     FailureClass.PERMISSION_AUTH: NextAction.ESCALATE,
     FailureClass.DEPENDENCY_UNRESOLVED: NextAction.REPAIR,
     FailureClass.ISSUE_SPEC_AMBIGUOUS: NextAction.ESCALATE,

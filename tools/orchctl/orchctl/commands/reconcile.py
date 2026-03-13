@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import uuid
@@ -26,7 +27,16 @@ from ..db import (
     renew,
 )
 from ..db.schema import LATEST_VERSION
-from ..github import AREA_REPOS, GitHubError, GitHubIssue, list_open_issues, post_issue_comment
+from ..github import (
+    AREA_REPOS,
+    GitHubError,
+    GitHubIssue,
+    create_issue,
+    fetch_ci_logs,
+    get_pr_branch,
+    list_open_issues,
+    post_issue_comment,
+)
 from ..failure_classifier import classify, next_action_for_class, record_failure_class
 from ..models import (
     ISSUE_TRANSITIONS,
@@ -419,7 +429,9 @@ def _mark_complete_pass(
                 record_failure_class(conn, issue_id, attempt_id, failure_class)
 
             new_state = _next_action_to_state(
-                conn, area, issue_id, number, retry_count, failure_class, next_action, dry_run
+                conn, area, issue_id, number, retry_count, failure_class, next_action,
+                dry_run, terminal_json=terminal_json,
+                pid=pid, owns_lease=owns_lease,
             )
             click.echo(
                 f"reconcile [{area}]: issue #{number} attempt {status}"
@@ -441,6 +453,10 @@ def _next_action_to_state(
     failure_class: FailureClass,
     next_action: NextAction,
     dry_run: bool = False,
+    *,
+    terminal_json: str | None = None,
+    pid: int = 0,
+    owns_lease: bool = False,
 ) -> str:
     """Map next_action to an IssueState string, enforcing per-class retry budgets."""
     if next_action in (NextAction.RETRY, NextAction.REPAIR):
@@ -457,6 +473,15 @@ def _next_action_to_state(
                     (issue_id,),
                 )
                 _post_retry_comment(area, number, retry_count + 1, budget, failure_class)
+                # CI repair playbook: collect logs and post repair context.
+                # Called here (within-budget branch) so the comment is only sent
+                # when a repair attempt will actually be re-queued, not on the
+                # final exhausted failure.
+                if failure_class == FailureClass.DETERMINISTIC_TEST_FAILURE:
+                    _run_ci_repair_playbook(
+                        conn, area, number, terminal_json,
+                        pid=pid, owns_lease=owns_lease,
+                    )
             click.echo(
                 f"reconcile [{area}]: issue #{number}"
                 f" retry {retry_count + 1}/{budget} scheduled{' (dry-run)' if dry_run else ''}."
@@ -469,6 +494,9 @@ def _next_action_to_state(
         )
         if not dry_run:
             _post_budget_exhausted_comment(area, number, retry_count, budget, failure_class)
+            # CI repair playbook: create blocker issue on repeated test failure.
+            if failure_class == FailureClass.DETERMINISTIC_TEST_FAILURE:
+                _create_ci_blocker_issue(conn, area, issue_id, number, retry_count, terminal_json)
         return IssueState.NEEDS_HUMAN.value
 
     if next_action == NextAction.PAUSE:
@@ -515,6 +543,170 @@ def _post_budget_exhausted_comment(
         "Human review required."
     )
     post_issue_comment(repo, number, body)
+
+
+# ---------------------------------------------------------------------------
+# CI repair playbook helpers
+# ---------------------------------------------------------------------------
+
+
+def _run_ci_repair_playbook(
+    conn: sqlite3.Connection,
+    area: str,
+    number: int,
+    terminal_json: str | None,
+    *,
+    pid: int = 0,
+    owns_lease: bool = False,
+) -> None:
+    """Collect CI logs and post a repair context comment on the issue.
+
+    Called when a ``deterministic_test_failure`` attempt is about to be
+    re-queued as a repair attempt.  Errors are non-fatal.
+
+    Steps:
+    1. Parse PR number from terminal_json.
+    2. Resolve the PR's head branch via gh CLI.
+    3. Renew the area lease before the log-fetch gh call (prevents expiry
+       from the cumulative timeout of sequential gh subprocesses).
+    4. Fetch the latest failed workflow run logs for that branch.
+    5. Post a repair context comment with the log tail.
+    """
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+
+    pr_number: int | None = None
+    if terminal_json:
+        try:
+            tj = json.loads(terminal_json)
+            raw_pr = tj.get("prNumber")
+            if raw_pr and raw_pr != "null":
+                pr_number = int(raw_pr)
+        except (ValueError, TypeError, AttributeError):
+            pass
+
+    ci_logs: str | None = None
+    if pr_number:
+        branch = get_pr_branch(repo, pr_number)
+        # Renew lease before the second blocking gh call (log fetch) so that
+        # the cumulative timeout of get_pr_branch + fetch_ci_logs does not
+        # push the total elapsed time past the lease TTL.
+        if owns_lease and pid:
+            renew(conn, area, pid)
+        if branch:
+            ci_logs = fetch_ci_logs(repo, branch)
+
+    log_section = (
+        f"\n\n**CI log tail:**\n```\n{ci_logs}\n```"
+        if ci_logs
+        else "\n\n*(CI logs unavailable — check the workflow run directly)*"
+    )
+    pr_ref = f" (PR #{pr_number})" if pr_number else ""
+    body = (
+        f"**CI repair attempt scheduled**{pr_ref}\n\n"
+        f"- Failure class: `deterministic_test_failure`\n"
+        f"- This repair worker will receive the CI failure context below."
+        f"{log_section}"
+    )
+    try:
+        post_issue_comment(repo, number, body)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"reconcile [{area}]: repair comment failed (#{number}): {exc}", err=True)
+
+
+def _create_ci_blocker_issue(
+    conn: sqlite3.Connection,
+    area: str,
+    issue_id: int,
+    number: int,
+    retry_count: int,
+    terminal_json: str | None,
+) -> None:
+    """Create a blocker GitHub issue after repeated deterministic test failures.
+
+    The blocker issue includes the failure history, CI log links from all
+    attempts, and a reference to the original issue.  Non-fatal on error.
+    """
+    repo = AREA_REPOS.get(area)
+    if not repo:
+        return
+
+    # Collect failure history from the DB (terminal attempts only).
+    attempt_rows = conn.execute(
+        """
+        SELECT attempt_id, status, terminal_json, created_at
+        FROM attempts
+        WHERE issue_id = ?
+          AND status IN ('failed', 'timed-out')
+        ORDER BY created_at ASC
+        """,
+        (issue_id,),
+    ).fetchall()
+
+    history_lines: list[str] = []
+    for i, row in enumerate(attempt_rows, 1):
+        try:
+            tj = json.loads(row["terminal_json"] or "{}")
+        except (ValueError, TypeError):
+            tj = {}
+        pr = tj.get("prNumber")
+        reason = tj.get("reason", row["status"])
+        pr_ref = f" · PR #{pr}" if pr and pr != "null" else ""
+        history_lines.append(
+            f"{i}. `{row['status']}`{pr_ref} — {reason} _(at {row['created_at']})_"
+        )
+
+    history_md = "\n".join(history_lines) if history_lines else "_No attempt records found._"
+
+    body = (
+        f"## CI repair blocker: #{number}\n\n"
+        f"Automated repair attempts for #{number} failed {retry_count + 1} time(s).\n"
+        f"Human review required.\n\n"
+        f"### Failure history\n\n"
+        f"{history_md}\n\n"
+        f"### Context\n\n"
+        f"- Original issue: #{number}\n"
+        f"- Area: `{area}`\n"
+        f"- Failure class: `deterministic_test_failure`\n"
+        f"- Total repair attempts: {retry_count + 1}\n\n"
+        f"### Next steps\n\n"
+        f"1. Review the CI logs linked above.\n"
+        f"2. Fix the root cause in #{number} and reopen it, or close this blocker if resolved.\n"
+        f"3. Requeue the original issue: `orchctl control requeue --area {area} --issue {number}`\n"
+    )
+
+    # NOTE: the 'blocker' label must exist in the target GitHub repo.
+    # If it is absent, gh issue create exits non-zero, create_issue returns
+    # None, and the failure is logged to stderr.  Create the label once via:
+    #   gh label create blocker -R <owner/repo> --color e11d48
+    blocker_number = create_issue(
+        repo,
+        title=f"[blocker] CI repair failed for #{number}",
+        body=body,
+        labels=["blocker"],
+    )
+    if blocker_number:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} blocker issue created: #{blocker_number}."
+        )
+        try:
+            post_issue_comment(
+                repo,
+                number,
+                f"**Blocker issue created:** #{blocker_number}\n\n"
+                f"Repair attempts exhausted after {retry_count + 1} tries. "
+                f"See #{blocker_number} for failure history and next steps.",
+            )
+        except Exception as exc:  # noqa: BLE001
+            click.echo(
+                f"reconcile [{area}]: blocker comment failed (#{number}): {exc}", err=True
+            )
+    else:
+        click.echo(
+            f"reconcile [{area}]: issue #{number} blocker issue creation failed.",
+            err=True,
+        )
 
 
 # ---------------------------------------------------------------------------

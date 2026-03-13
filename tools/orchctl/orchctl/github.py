@@ -151,6 +151,174 @@ def post_issue_comment(repo: str, issue_number: int, body: str) -> None:
         )
 
 
+def fetch_ci_logs(repo: str, branch: str, max_lines: int = 100) -> str | None:
+    """Fetch the tail of the most recent failed CI workflow run logs for *branch*.
+
+    Uses ``gh run list`` to find the latest failed run on the branch, then
+    ``gh run view --log-failed`` to retrieve the failed step output.
+
+    Returns a trimmed log string (at most *max_lines* lines), or None if no
+    failed run is found or the gh CLI call fails.  Errors are logged but do
+    not raise — a log fetch failure must never abort a reconcile pass.
+
+    Args:
+        repo: GitHub repo in ``owner/name`` form.
+        branch: Branch name to filter runs.
+        max_lines: Maximum number of log lines to return (tail).
+    """
+    list_cmd = [
+        "gh", "run", "list",
+        "-R", repo,
+        "--branch", branch,
+        "--status", "failure",
+        "--limit", "1",
+        "--json", "databaseId",
+    ]
+    try:
+        list_result = subprocess.run(
+            list_cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT
+        )
+    except subprocess.TimeoutExpired:
+        click.echo(
+            f"github: gh run list timed out for branch '{branch}'",
+            err=True,
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"github: gh run list error for branch '{branch}': {exc}", err=True)
+        return None
+
+    if list_result.returncode != 0:
+        click.echo(
+            f"github: gh run list failed for branch '{branch}': {list_result.stderr.strip()}",
+            err=True,
+        )
+        return None
+
+    runs: list[dict] = json.loads(list_result.stdout or "[]")
+    if not runs:
+        return None
+
+    run_id = runs[0].get("databaseId")
+    if not run_id:
+        return None
+
+    log_cmd = [
+        "gh", "run", "view", str(run_id),
+        "-R", repo,
+        "--log-failed",
+    ]
+    try:
+        log_result = subprocess.run(
+            log_cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT
+        )
+    except subprocess.TimeoutExpired:
+        click.echo(
+            f"github: gh run view --log-failed timed out for run {run_id}",
+            err=True,
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"github: gh run view error for run {run_id}: {exc}", err=True)
+        return None
+
+    if log_result.returncode != 0:
+        click.echo(
+            f"github: gh run view failed for run {run_id}: {log_result.stderr.strip()}",
+            err=True,
+        )
+        return None
+
+    raw_log = log_result.stdout or ""
+    lines = raw_log.splitlines()
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+    return "\n".join(lines)
+
+
+def create_issue(
+    repo: str,
+    title: str,
+    body: str,
+    labels: list[str] | None = None,
+) -> int | None:
+    """Create a GitHub issue and return its number.
+
+    Returns None on failure.  Errors are logged but do not raise — a creation
+    failure must never abort a reconcile pass.
+
+    Args:
+        repo: GitHub repo in ``owner/name`` form.
+        title: Issue title.
+        body: Issue body (Markdown).
+        labels: Optional list of label names to apply.
+    """
+    cmd = [
+        "gh", "issue", "create",
+        "-R", repo,
+        "--title", title,
+        "--body", body,
+    ]
+    for label in (labels or []):
+        cmd += ["--label", label]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        click.echo(f"github: gh issue create timed out for '{title}'", err=True)
+        return None
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"github: gh issue create error for '{title}': {exc}", err=True)
+        return None
+
+    if result.returncode != 0:
+        click.echo(
+            f"github: gh issue create failed for '{title}': {result.stderr.strip()}",
+            err=True,
+        )
+        return None
+
+    # gh issue create prints the URL; extract the issue number from the tail.
+    url = result.stdout.strip()
+    try:
+        return int(url.rstrip("/").rsplit("/", 1)[-1])
+    except (ValueError, IndexError):
+        click.echo(f"github: could not parse issue number from URL: {url}", err=True)
+        return None
+
+
+def get_pr_branch(repo: str, pr_number: int) -> str | None:
+    """Return the head branch name for a PR.  Returns None on any error."""
+    cmd = [
+        "gh", "pr", "view", str(pr_number),
+        "-R", repo,
+        "--json", "headRefName",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        click.echo(
+            f"github: gh pr view timed out for PR #{pr_number}",
+            err=True,
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"github: gh pr view error for PR #{pr_number}: {exc}", err=True)
+        return None
+
+    if result.returncode != 0:
+        click.echo(
+            f"github: gh pr view failed for PR #{pr_number}: {result.stderr.strip()}",
+            err=True,
+        )
+        return None
+
+    try:
+        return json.loads(result.stdout).get("headRefName")
+    except (json.JSONDecodeError, AttributeError):
+        return None
+
+
 def parse_priority_from_body(body: str) -> int:
     """Extract the priority value from a fenced orchestrator block in an issue body.
 
