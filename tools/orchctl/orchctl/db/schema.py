@@ -278,6 +278,18 @@ MIGRATIONS: list[tuple[int, str]] = [
         ALTER TABLE attempts ADD COLUMN failure_class TEXT;
         """,
     ),
+    (
+        9,
+        """
+        -- v9: stall detection threshold
+        -- stall_threshold_s: activity window in seconds for multi-signal stall detection.
+        -- Independent of heartbeat_ttl (which governs lease renewal).
+        -- Default matches the SIGNAL_THRESHOLD_S constant in orchctl.heartbeat.
+        INSERT INTO config (key, value) VALUES
+            ('stall_threshold_s', '600')
+        ON CONFLICT(key) DO NOTHING;
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)
