@@ -273,7 +273,8 @@ def test_reconcile_max_open_pr_blocks_dispatch(runner, db_path):
 
     result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
     assert result.exit_code == 0, result.output
-    assert "maxOpenPR=1 reached" in result.output
+    assert "globalQuota=1 reached" in result.output
+    assert "max_open_pr" in result.output
 
 
 def test_reconcile_drain_mode_blocks_dispatch(runner, db_path):
@@ -639,8 +640,8 @@ def test_reconcile_unblock_no_deps(runner, db_path):
     assert state == "pending"
 
 
-def test_reconcile_unblock_deferred_for_soft_deps(runner, db_path):
-    """Blocked issue with soft dependency logs 'deferred' rather than unblocking."""
+def test_reconcile_unblock_no_dep_rows_for_soft_deps(runner, db_path):
+    """Blocked issue with soft dep_type but no dependency rows is unblocked optimistically."""
     from orchctl.db.connection import get_db
 
     result = runner.invoke(cli, ["--db", db_path, "init"])
@@ -654,14 +655,14 @@ def test_reconcile_unblock_deferred_for_soft_deps(runner, db_path):
 
     result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
     assert result.exit_code == 0, result.output
-    assert "deferred" in result.output
+    assert "no dependency rows" in result.output
 
     conn = get_db(db_path)
     state = conn.execute(
         "SELECT state FROM issues WHERE area='client' AND number=15"
     ).fetchone()["state"]
     conn.close()
-    assert state == "blocked"  # unchanged
+    assert state == "pending"  # unblocked optimistically
 
 
 def test_reconcile_dry_run_no_state_change(runner, db_path):
