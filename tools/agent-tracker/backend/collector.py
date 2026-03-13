@@ -201,6 +201,9 @@ def _collect_codex_pane(pane: tmux_adapter.PaneInfo) -> AgentState:
         pane_addr=f"{pane.addr} {pane.pane_id}",
         engine=Engine.CODEX,
         model="Codex",
+        # No sidecar for Codex; status cannot be determined without session JSONL parsing.
+        status=AgentStatus.UNKNOWN,
+        liveness=Liveness(is_alive=True),
     )
     state.provenance = Provenance(source=ProvenanceSource.UNKNOWN, collected_at=now)
     return state
@@ -246,9 +249,12 @@ def _parse_batch(
         return None
 
     status_map: dict[str, str] = data.get("status") or {}
-    n_done = sum(1 for v in status_map.values() if v == "completed")
-    n_failed = sum(1 for v in status_map.values() if v == "failed")
-    n_total = len(data.get("issues") or [])
+    # Count only issues present in the issues list to avoid stale status_map keys
+    # from a previous batch inflating n_terminal beyond n_total.
+    issue_keys: set[str] = {str(i) for i in (data.get("issues") or [])}
+    n_total = len(issue_keys)
+    n_done = sum(1 for k in issue_keys if status_map.get(k) == "completed")
+    n_failed = sum(1 for k in issue_keys if status_map.get(k) == "failed")
 
     orch_pid = int(data.get("orchestratorPid") or 0)
     orch_started_at = data.get("orchestratorStartedAt")
@@ -320,9 +326,14 @@ def _parse_batch(
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _safe_int(v: object, default: int = 0) -> int:
-    """Cast v to int, returning default on any error."""
+    """Cast v to int, returning default on None or conversion error.
+
+    Uses explicit None check so that a valid stored value of 0 is preserved.
+    """
+    if v is None:
+        return default
     try:
-        return int(v or default)
+        return int(v)
     except (ValueError, TypeError):
         return default
 
