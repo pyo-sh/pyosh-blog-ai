@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-14 | orchctl cycle quarantine + rate limit (#100, PR #202) - Tarjan SCC cycle-isolated quarantine (non-cycle blocked issues unaffected), exponential backoff + infra-degraded state, cmd_resume clears all backoff keys, _check_and_release_backoff auto-resume, v14 migration, 33 new tests, 507 tests total | done |
 | 2026-03-14 | orchctl git conflict rebase playbook (#99, PR #201) - GIT_CONFLICT→REPAIR, rebase context comment (PR/branch/conflict reason), lease renewal, blocker issue on budget exhaustion, 14 tests, 488 tests total | done |
 | 2026-03-14 | orchctl CI failure repair + blocker issue playbook (#98, PR #199) - DETERMINISTIC_TEST_FAILURE→REPAIR, CI log collection (gh run view --log-failed), lease renewal between gh calls, blocker issue on budget exhaustion, v13 migration (INSERT OR IGNORE), 5라운드 리뷰, 474 tests | done |
 | 2026-03-14 | Agent tracker: read-only UI + footer semantics (#114, PR #198) - Python backend daemon replaces direct collect.sh call; fault/unknown/stale separate from idle in footer; .orchestrators/.orchestrator dual-key support; 23 new tests, 4 review rounds | done |

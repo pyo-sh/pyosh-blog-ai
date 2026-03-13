@@ -137,3 +137,26 @@ Implemented Stage 4 of the orchestrator redesign: global quota enforcement, cros
 - Round 2 (WARNING): `dependencies.dep_type` fetched but unused - resolution used uniform issue-level `dependency_type`; fixed with `_resolve_per_edge` reading per-edge `dep_type`; `_resolve_deps` wrapper removed
 - Round 3 (SUGGESTION only): policy load before lease acquisition in `reconcile_all._reconcile_area` - moved inside try block after `acquire`
 - Rebase conflict: another PR added v11 (priority scheduling); our migration renumbered to v12; `test_chaos.py::TestDependencyCycle` updated to insert explicit dep rows instead of relying on old deferred behavior
+
+## orchctl cycle quarantine + rate limit (#100, PR #202)
+
+Two self-healing playbooks added to the orchctl reconcile loop.
+
+### Changes merged
+
+- **`db/schema.py`** - migration v14: recreates issues table with `cycle-isolated` in the state CHECK constraint; adds `rate_limit_backoff_base_s=60` and `infra_degraded_threshold=5` config defaults
+- **`models.py`** - `IssueState.CYCLE_ISOLATED = "cycle-isolated"` added; `BLOCKED → CYCLE_ISOLATED` and `CYCLE_ISOLATED → PENDING` transitions; `cycle-isolated` added to `TERMINAL_ISSUE_STATES`
+- **`commands/reconcile.py`** - `_cycle_quarantine_pass`: Tarjan SCC-based cycle detection, quarantines only cycle members (not downstream dependents), posts GitHub comment (non-fatal); `_is_rate_limit_error` / `_handle_rate_limit_error`: exponential backoff (base_s * 2^(n-1), capped at 3600s), infra-degraded threshold, area pause; `_check_and_release_backoff`: auto-resume when window elapsed, full backoff-state clear on corrupt timestamp; `_tarjan_cycle_members`: recursive Tarjan SCC, forward adjacency, self-loop detection; pass order: check_backoff → observe → discovery → mark_complete → heartbeat → **cycle_quarantine** → unblock → dispatch
+- **`commands/control.py`** - `cmd_resume` clears `infra_degraded`, `backoff_count`, `backoff_until` in addition to `paused`; `cycle-isolated` added to `_REQUEUEABLE` set in `cmd_requeue`
+- **`tests/test_cycle_ratelimit.py`** (new) - 33 tests: IssueState model, schema v14, `_is_rate_limit_error`, `_handle_rate_limit_error`, `_check_and_release_backoff`, `_cycle_quarantine_pass` (correct member isolation, non-members unaffected, post-quarantine unblock, non-fatal comment failure), control requeue of cycle-isolated
+- **`tests/test_multi_area.py`** - `test_latest_version_is_14` (was 13); 507 tests total
+
+### Key decisions
+
+- Tarjan SCC over Kahn's algorithm - Kahn incorrectly quarantines downstream dependents of cycle members; Tarjan identifies only actual cycle participants (SCC size > 1 or self-loop)
+- Rate-limit detection scoped to `_discovery_pass` only - dispatch/heartbeat use shell invocations that surface 429s as generic non-zero exit codes; scope decision documented in `_is_rate_limit_error` docstring
+- Per-issue DB state check in `_unblock_pass` (not snapshot re-read) - avoids single-pass dispatch contract violation
+
+### Finding
+
+- findings.019: Tarjan SCC vs Kahn for dependency cycle quarantine

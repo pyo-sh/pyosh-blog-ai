@@ -24,6 +24,7 @@
 | 017 | pipeline_run_headless_core CLAUDECODE 환경변수 전파 버그 | 2026-03-09 | #pipeline #headless #claude-p #claudecode #env-var #nested-session |
 | 016 | Pipeline cwd 혼용 진단 및 3-way 분리 | 2026-03-09 | #pipeline #cwd #worktree #monorepo #skill-discovery #merge-lock |
 | 018 | agent-tracker sidecar v2 namespace design | 2026-03-13 | #agent-tracker #sidecar #namespace #tmux #multi-session |
+| 019 | Tarjan SCC vs Kahn for dependency cycle quarantine | 2026-03-14 | #orchctl #cycle-detection #tarjan #scc #scheduling |
 
 ## 상세 문서
 
@@ -45,6 +46,7 @@
 - [findings.017-pipeline-headless-claudecode-env.md](./findings/findings.017-pipeline-headless-claudecode-env.md) - pipeline_run_headless_core CLAUDECODE 미해제: Claude Code 세션 안에서 claude -p 호출 시 중첩 세션 오류, unset CLAUDECODE 해결
 - [findings.016-pipeline-cwd-separation.md](./findings/findings.016-pipeline-cwd-separation.md) - Pipeline cwd 혼용 진단: skill cwd / repo dir / worktree dir 3-way 분리, TTL merge lock, area-scoped 경로
 - [findings.018-sidecar-v2-namespace.md](./findings/findings.018-sidecar-v2-namespace.md) - agent-tracker sidecar v2: socket-hash/session/pane 3레벨 경로, immediate cutover, source precedence, md5sum Linux-only 주의
+- [findings.019-tarjan-scc-cycle-quarantine.md](./findings/findings.019-tarjan-scc-cycle-quarantine.md) - Tarjan SCC correctly isolates cycle members only; Kahn's algorithm incorrectly quarantines downstream dependents; rate-limit detection scoped to discovery pass
 
 ## 주요 원칙
 
