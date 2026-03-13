@@ -109,6 +109,15 @@ def test_pnpm_test_log_prefix_does_not_match() -> None:
     assert result == FailureClass.UNKNOWN
 
 
+def test_infra_crash_not_shadowed_by_test_failure() -> None:
+    """OOM/signal in a test log should be INFRA_CRASH, not DETERMINISTIC_TEST_FAILURE."""
+    result = classify("failed", '{"reason": "pytest failed: process killed by signal 9"}')
+    assert result == FailureClass.INFRA_CRASH
+
+    result = classify("failed", '{"reason": "jest failed with rc=137"}')
+    assert result == FailureClass.INFRA_CRASH
+
+
 # ---------------------------------------------------------------------------
 # next_action_for_class()
 # ---------------------------------------------------------------------------

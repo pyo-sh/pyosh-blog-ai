@@ -56,17 +56,19 @@ _PATTERNS: list[tuple[re.Pattern[str], FailureClass]] = [
         r"|randomly.*fail",
         re.IGNORECASE,
     ), FailureClass.FLAKY_TEST),
+    # INFRA_CRASH before DETERMINISTIC_TEST_FAILURE: crash signals like rc=137
+    # or "killed by signal 9" in a test log should be retried, not escalated.
+    (re.compile(
+        r"segfault|segmentation fault|killed.*signal|signal \d+|out of memory"
+        r"|oom|process crash|core dump|rc=139|rc=137",
+        re.IGNORECASE,
+    ), FailureClass.INFRA_CRASH),
     (re.compile(
         r"test.*fail|assert.*error|assertion.*fail|spec.*fail"
         r"|jest.*fail|pytest.*fail"
         r"|pnpm test.*(?:fail|error)|(?:fail|error).*pnpm test",
         re.IGNORECASE,
     ), FailureClass.DETERMINISTIC_TEST_FAILURE),
-    (re.compile(
-        r"segfault|segmentation fault|killed.*signal|signal \d+|out of memory"
-        r"|oom|process crash|core dump|rc=139|rc=137",
-        re.IGNORECASE,
-    ), FailureClass.INFRA_CRASH),
 ]
 
 
