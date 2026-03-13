@@ -164,7 +164,7 @@ class SourceInfo:
     details: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        return {"type": self.type, **self.details}
+        return {"type": self.type, "details": self.details}
 
 
 @dataclass

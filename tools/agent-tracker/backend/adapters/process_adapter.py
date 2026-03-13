@@ -72,6 +72,8 @@ def _get_create_time_psutil(pid: int) -> float | None:
 def _is_running_proc(pid: int, create_time: float | None) -> bool:
     try:
         os.kill(pid, 0)
+    except PermissionError:
+        pass  # EPERM: process exists but is owned by another user
     except OSError:
         return False
 
