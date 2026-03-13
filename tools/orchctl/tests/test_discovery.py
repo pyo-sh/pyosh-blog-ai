@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -523,3 +524,68 @@ def test_reconcile_discovery_dry_run_reports_new_issue(tmp_path):
     assert result.exit_code == 0, result.output
     assert "101" in result.output
     assert "dry-run" in result.output
+
+
+# ---------------------------------------------------------------------------
+# list_open_issues: timeout and limit-warning behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestListOpenIssues:
+    def test_timeout_expired_raises_github_error(self):
+        """TimeoutExpired from subprocess is converted to GitHubError."""
+        from orchctl.github import list_open_issues
+
+        with patch(
+            "orchctl.github.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="gh", timeout=30),
+        ):
+            with pytest.raises(GitHubError, match="timed out"):
+                list_open_issues("owner/repo")
+
+    def test_nonzero_exit_raises_github_error(self):
+        """Non-zero returncode raises GitHubError."""
+        from orchctl.github import list_open_issues
+        from unittest.mock import MagicMock
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "authentication failed"
+
+        with patch("orchctl.github.subprocess.run", return_value=mock_result):
+            with pytest.raises(GitHubError, match="authentication failed"):
+                list_open_issues("owner/repo")
+
+    def test_limit_hit_emits_warning(self, capsys):
+        """When gh returns exactly limit items, a warning is printed to stderr."""
+        import subprocess as _sp
+        from orchctl.github import list_open_issues, _GH_TIMEOUT
+        from unittest.mock import MagicMock
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        # Return exactly 2 items when limit=2 to trigger the warning
+        mock_result.stdout = '[{"number":1,"title":"a","labels":[],"milestone":null,"assignees":[]},{"number":2,"title":"b","labels":[],"milestone":null,"assignees":[]}]'
+
+        with patch("orchctl.github.subprocess.run", return_value=mock_result):
+            issues = list_open_issues("owner/repo", limit=2)
+
+        assert len(issues) == 2
+        captured = capsys.readouterr()
+        assert "hit issue limit" in captured.err
+
+    def test_below_limit_no_warning(self, capsys):
+        """When gh returns fewer items than limit, no warning is emitted."""
+        from orchctl.github import list_open_issues
+        from unittest.mock import MagicMock
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = '[{"number":1,"title":"a","labels":[],"milestone":null,"assignees":[]}]'
+
+        with patch("orchctl.github.subprocess.run", return_value=mock_result):
+            issues = list_open_issues("owner/repo", limit=500)
+
+        assert len(issues) == 1
+        captured = capsys.readouterr()
+        assert "hit issue limit" not in captured.err

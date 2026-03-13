@@ -6,12 +6,19 @@ import json
 import subprocess
 from dataclasses import dataclass, field
 
-# Area → GitHub repo mapping (mirrors monorepo-layout.md)
+import click
+
+# Mirrors .agents/references/monorepo-layout.md — update both when adding areas.
 AREA_REPOS: dict[str, str] = {
     "client": "pyo-sh/pyosh-blog-fe",
     "server": "pyo-sh/pyosh-blog-be",
     "workspace": "pyo-sh/pyosh-blog-ai",
 }
+
+# Default timeout for gh CLI calls (seconds).  Chosen to be well within a
+# typical lease TTL (60 s) so a stalled gh process does not hold the lease
+# until it expires.
+_GH_TIMEOUT = 30
 
 
 @dataclass
@@ -52,7 +59,7 @@ def list_open_issues(
         limit: Maximum number of issues to fetch from GitHub (default 500).
 
     Raises:
-        GitHubError: When the ``gh`` subprocess exits non-zero.
+        GitHubError: When the ``gh`` subprocess exits non-zero or times out.
     """
     cmd = [
         "gh", "issue", "list",
@@ -64,11 +71,22 @@ def list_open_issues(
     if milestone:
         cmd += ["--milestone", milestone]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT)
+    except subprocess.TimeoutExpired as exc:
+        raise GitHubError(f"gh issue list timed out after {exc.timeout}s") from exc
+
     if result.returncode != 0:
         raise GitHubError(f"gh issue list failed: {result.stderr.strip()}")
 
     raw: list[dict] = json.loads(result.stdout or "[]")
+
+    if len(raw) >= limit:
+        click.echo(
+            f"github: hit issue limit ({limit}) for {repo} — some issues may be missed.",
+            err=True,
+        )
+
     issues = [_parse_issue(item) for item in raw]
 
     return _apply_scope_filters(
