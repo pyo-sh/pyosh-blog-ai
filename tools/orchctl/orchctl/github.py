@@ -101,6 +101,36 @@ def list_open_issues(
     )
 
 
+def post_issue_comment(repo: str, issue_number: int, body: str) -> None:
+    """Post a comment to a GitHub issue via the gh CLI.
+
+    Errors are logged but do not raise — a comment failure must never abort
+    a reconcile pass.
+
+    Args:
+        repo: GitHub repo in ``owner/name`` form.
+        issue_number: The GitHub issue number.
+        body: Markdown comment body.
+    """
+    cmd = [
+        "gh", "issue", "comment", str(issue_number),
+        "-R", repo,
+        "--body", body,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT)
+        if result.returncode != 0:
+            click.echo(
+                f"github: issue comment failed (#{issue_number}): {result.stderr.strip()}",
+                err=True,
+            )
+    except subprocess.TimeoutExpired:
+        click.echo(
+            f"github: issue comment timed out (#{issue_number}) after {_GH_TIMEOUT}s",
+            err=True,
+        )
+
+
 def _parse_issue(item: dict) -> GitHubIssue:
     ms = item.get("milestone") or {}
     return GitHubIssue(

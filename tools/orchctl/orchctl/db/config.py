@@ -29,8 +29,8 @@ def get_config_bool(conn: sqlite3.Connection, key: str, default: bool = False) -
     return val in ("1", "true", "yes")
 
 
-def get_config_json(conn: sqlite3.Connection, key: str, default: list | None = None) -> list:
-    """Return a config value parsed as a JSON array.
+def get_config_json(conn: sqlite3.Connection, key: str, default: list | dict | None = None) -> list | dict:
+    """Return a config value parsed as JSON (array or object).
 
     Falls back to *default* (or []) when the key is missing or the stored
     value is not valid JSON.
@@ -41,8 +41,7 @@ def get_config_json(conn: sqlite3.Connection, key: str, default: list | None = N
     if not raw:
         return default
     try:
-        parsed = json.loads(raw)
-        return parsed if isinstance(parsed, list) else default
+        return json.loads(raw)
     except (ValueError, TypeError):
         return default
 

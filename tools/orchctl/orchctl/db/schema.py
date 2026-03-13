@@ -278,6 +278,19 @@ MIGRATIONS: list[tuple[int, str]] = [
         ALTER TABLE attempts ADD COLUMN failure_class TEXT;
         """,
     ),
+    (
+        9,
+        """
+        -- v9: per-class retry budgets for crash/timeout/flaky auto-retry playbook.
+        -- Sets default budgets only when the operator has not yet customised the
+        -- value (i.e. it is still the empty-dict default from v6).
+        INSERT INTO config (key, value) VALUES
+            ('retry_budget_by_class',
+             '{"infra_crash": 3, "timeout": 3, "flaky_test": 2, "default": 1}')
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            WHERE value = '{}';
+        """,
+    ),
 ]
 
 LATEST_VERSION: int = max(v for v, _ in MIGRATIONS)

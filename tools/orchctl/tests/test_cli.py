@@ -405,9 +405,9 @@ def test_reconcile_mark_complete_dispatched_to_completed(runner, db_path):
     assert state == "completed"
 
 
-@pytest.mark.parametrize("attempt_status", ["failed", "timed-out"])
-def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path, attempt_status):
-    """Dispatched issue with failed or timed-out attempt transitions to failed-terminal."""
+def test_reconcile_mark_complete_unknown_failure_escalates_to_needs_human(runner, db_path):
+    """Dispatched issue with unclassifiable failure routes to needs-human via ESCALATE."""
+    attempt_status = "failed"  # timed-out → TIMEOUT → RETRY (not escalate)
     from orchctl.db.connection import get_db
 
     result = runner.invoke(cli, ["--db", db_path, "init"])
@@ -417,6 +417,7 @@ def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path, 
     issue_id = conn.execute(
         "SELECT id FROM issues WHERE area='client' AND number=13"
     ).fetchone()["id"]
+    # No terminal_json → classify → UNKNOWN → ESCALATE → needs-human
     conn.execute(
         "INSERT INTO attempts (attempt_id, issue_id, status) VALUES ('a-fail', ?, ?)",
         (issue_id, attempt_status),
@@ -426,14 +427,197 @@ def test_reconcile_mark_complete_dispatched_to_failed_terminal(runner, db_path, 
 
     result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
     assert result.exit_code == 0, result.output
-    assert "marking failed-terminal" in result.output
+    assert "needs-human" in result.output
 
     conn = get_db(db_path)
     state = conn.execute(
         "SELECT state FROM issues WHERE area='client' AND number=13"
     ).fetchone()["state"]
     conn.close()
-    assert state == "failed-terminal"
+    assert state == "needs-human"
+
+
+# ---------------------------------------------------------------------------
+# Auto-retry playbook (#97): crash/timeout/flaky with per-class budgets
+# ---------------------------------------------------------------------------
+
+
+def _setup_dispatched_issue(conn, area: str, number: int, attempt_status: str, terminal_json: str | None = None):
+    """Helper: insert a dispatched issue + one terminal attempt."""
+    conn.execute(
+        "INSERT INTO issues (area, number, state) VALUES (?, ?, 'dispatched')",
+        (area, number),
+    )
+    issue_id = conn.execute(
+        "SELECT id FROM issues WHERE area = ? AND number = ?", (area, number)
+    ).fetchone()["id"]
+    conn.execute(
+        "INSERT INTO attempts (attempt_id, issue_id, status, terminal_json) VALUES (?, ?, ?, ?)",
+        (f"a-{number}", issue_id, attempt_status, terminal_json),
+    )
+    conn.commit()
+    return issue_id
+
+
+@pytest.mark.parametrize(
+    "failure_reason, expected_class, budget",
+    [
+        ('{"reason": "segmentation fault"}', "infra_crash", 3),
+        ('{"reason": "pipeline exited with rc=1"}', "unknown", 1),
+    ],
+)
+def test_retry_playbook_first_attempt_re_enqueues(
+    runner, db_path, failure_reason, expected_class, budget
+):
+    """First failure within budget re-enqueues issue as pending with retry_count=1."""
+    import unittest.mock as mock
+    from orchctl.db.connection import get_db
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    _setup_dispatched_issue(conn, "client", 20, "failed", failure_reason)
+    conn.close()
+
+    with mock.patch("orchctl.commands.reconcile.post_issue_comment"):
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    row = conn.execute(
+        "SELECT state, retry_count FROM issues WHERE area='client' AND number=20"
+    ).fetchone()
+    conn.close()
+
+    if expected_class in ("infra_crash", "timeout", "flaky_test"):
+        # retry budget > 0 → re-enqueue
+        assert row["state"] == "pending"
+        assert row["retry_count"] == 1
+    else:
+        # unknown → escalate → needs-human (default budget=1, retry_count starts at 0, 0<1 so retry once)
+        # Actually for unknown: next_action=ESCALATE → needs-human directly (no budget check)
+        assert row["state"] == "needs-human"
+
+
+def test_retry_playbook_timeout_re_enqueues(runner, db_path):
+    """timed-out attempt (timeout class) re-enqueues as pending on first failure."""
+    import unittest.mock as mock
+    from orchctl.db.connection import get_db
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    _setup_dispatched_issue(conn, "client", 21, "timed-out", None)
+    conn.close()
+
+    with mock.patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment:
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    row = conn.execute(
+        "SELECT state, retry_count, failure_class FROM issues WHERE area='client' AND number=21"
+    ).fetchone()
+    conn.close()
+
+    assert row["state"] == "pending", f"Expected pending, got {row['state']}"
+    assert row["retry_count"] == 1
+    assert row["failure_class"] == "timeout"
+    mock_comment.assert_called_once()
+    body = mock_comment.call_args[0][2]
+    assert "Auto-retry scheduled" in body
+    assert "1/3" in body
+
+
+def test_retry_playbook_budget_exhausted_escalates_to_needs_human(runner, db_path):
+    """When retry budget is exhausted, issue transitions to needs-human."""
+    import unittest.mock as mock
+    from orchctl.db.connection import get_db
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    # Set retry_count at budget limit (3 for timeout)
+    conn.execute(
+        "INSERT INTO issues (area, number, state, retry_count) VALUES ('client', 22, 'dispatched', 3)"
+    )
+    issue_id = conn.execute(
+        "SELECT id FROM issues WHERE area='client' AND number=22"
+    ).fetchone()["id"]
+    conn.execute(
+        "INSERT INTO attempts (attempt_id, issue_id, status, terminal_json) VALUES "
+        "('a-22', ?, 'timed-out', NULL)",
+        (issue_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    with mock.patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment:
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    state = conn.execute(
+        "SELECT state FROM issues WHERE area='client' AND number=22"
+    ).fetchone()["state"]
+    conn.close()
+
+    assert state == "needs-human"
+    assert "exhausted" in result.output
+    mock_comment.assert_called_once()
+    body = mock_comment.call_args[0][2]
+    assert "Retry budget exhausted" in body
+
+
+def test_retry_playbook_schema_v9_default_budgets(runner, db_path):
+    """After init (schema v9), retry_budget_by_class has per-class defaults."""
+    import json
+    from orchctl.db.connection import get_db
+    from orchctl.db.config import get_config_json
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    budgets = get_config_json(conn, "retry_budget_by_class", default={})
+    conn.close()
+
+    assert budgets.get("infra_crash") == 3
+    assert budgets.get("timeout") == 3
+    assert budgets.get("flaky_test") == 2
+    assert budgets.get("default") == 1
+
+
+def test_retry_playbook_dry_run_does_not_mutate(runner, db_path):
+    """--dry-run reconcile does not increment retry_count or post GitHub comments."""
+    import unittest.mock as mock
+    from orchctl.db.connection import get_db
+
+    result = runner.invoke(cli, ["--db", db_path, "init"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    _setup_dispatched_issue(conn, "client", 23, "timed-out", None)
+    conn.close()
+
+    with mock.patch("orchctl.commands.reconcile.post_issue_comment") as mock_comment:
+        result = runner.invoke(cli, ["--db", db_path, "reconcile", "--area", "client", "--dry-run"])
+    assert result.exit_code == 0, result.output
+
+    conn = get_db(db_path)
+    row = conn.execute(
+        "SELECT state, retry_count FROM issues WHERE area='client' AND number=23"
+    ).fetchone()
+    conn.close()
+
+    # dry-run must not change state or retry_count
+    assert row["state"] == "dispatched"
+    assert row["retry_count"] == 0
+    # dry-run must not post comments
+    mock_comment.assert_not_called()
 
 
 def test_reconcile_unblock_no_deps(runner, db_path):
