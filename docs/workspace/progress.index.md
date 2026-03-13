@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-13 | agent-tracker Python backend + normalized domain model (#111, PR #183) - contract/models/adapters(process+tmux+file)/collector/exporter/__main__, sidecar v2 읽기, atomic export, 8라운드 리뷰 | done |
 | 2026-03-13 | orchctl reconcile loop + admission control (#88, PR #184) - observe/diff/act 패턴, mark-complete/unblock/dispatch pass, atomic maxOpenPR TOCTOU 방지, schema v4, 13 new tests, 3라운드 리뷰 | done |
 | 2026-03-13 | Skill Python 호출 경로 + 부수 버그 5건 수정 (#181, PR #182) - PYTHONPATH 방식 통일, `--model` 플래그, `gh issue view --json` 제약, cleanup_wt 단계 분리, codex review_runner 디버깅 개선, SKILL 압축 최적화 | done |
 | 2026-03-13 | 확장 terminal states + claim/hold 라벨 (#91, PR #179) - `failed-terminal`/`needs-human`/`needs-spec`/`cancelled` 신규 terminal state, `orch_set_terminal` 래퍼, `claimed-by-orch`/`needs-human`/`needs-spec`/`manual-hold` issue 라벨 자동 관리, dispatch 전 `manual-hold` skip | done |

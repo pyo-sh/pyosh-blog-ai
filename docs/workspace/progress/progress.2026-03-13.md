@@ -1,5 +1,20 @@
 # Progress 2026-03-13
 
+## agent-tracker Python backend + normalized domain model (#111, PR #183)
+
+- **목적**: Python 기반 tracker backend 구축, normalized domain model 정의. 장기적으로 이 backend가 tracker의 truth source
+- **`tools/agent-tracker/backend/`** 신규 패키지 - 8라운드 리뷰 통과 후 머지
+- **contract.py** - 공유 계약 모듈: AgentStatus/TokenSource/BatchStatus/Engine/ProvenanceSource enum, field name set, STALE_THRESHOLD_SECS. 비즈니스 로직 없음
+- **models.py** - 정규화 도메인 모델: AgentState, TokenState, BatchState, Freshness, Liveness, Provenance, Snapshot, SourceInfo
+- **adapters/process_adapter.py** - psutil 기반 (is_running + PID 재사용 방지 create_time 비교, get_create_time); /proc fallback (spaces-in-comm 처리를 위한 rfind ')' 파서, PermissionError EPERM 분리)
+- **adapters/tmux_adapter.py** - tmux CLI 래핑: list_panes, capture_pane, pane_tty, socket_hash; returncode!=0 시 stderr 로깅
+- **adapters/file_adapter.py** - pathlib/json: read_json(utf-8), list_sidecar_files, list_batch_files, read_pipeline_state, atomic_write(tmp+rename, utf-8)
+- **collector.py** - sidecar v2 수집 (상태 enum 검증, staleness 감지, done prefix), orchestrator batch state (issue_keys 범위 제한, PID 재사용 방지, dispatchedAt 기반 dispatched 프로세스 liveness), Codex pane status=UNKNOWN
+- **exporter.py** - Snapshot → current.json atomic write
+- **__main__.py** - CLI 진입점: `python3 -m backend [--session] [--root] [--interval] [--print]`; 폴링 루프 예외 처리
+- **requirements.txt** - `psutil>=6.0`
+- **export 경로**: `.workspace/agent-tracker/state/current.json`
+
 ## orchctl reconcile loop + admission control (#88, PR #184)
 
 - **목적**: observe → diff → act 패턴의 idempotent reconcile 명령 구현 + 기본 admission control
