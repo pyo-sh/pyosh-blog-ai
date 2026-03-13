@@ -297,8 +297,8 @@ def _dispatch_claude(
         "-p",
         "--dangerously-skip-permissions",
         "--no-session-persistence",
-        "--allowedTools", "Bash,Read,Skill",
-        "--max-turns", "15",
+        "--allowedTools", "Bash,Read,Write,Skill",
+        "--max-turns", "30",
     ]
     if model:
         cmd += ["--model", model]

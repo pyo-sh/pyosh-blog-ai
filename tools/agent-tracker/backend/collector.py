@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from .contract import (
     AgentStatus,
-    BatchStatus,
     Engine,
+    ORCHCTL_EXPORT_DIR,
     ProvenanceSource,
     STALE_THRESHOLD_SECS,
     TokenSource,
@@ -21,7 +21,6 @@ from .contract import (
 from .models import (
     AgentState,
     BatchState,
-    DispatchedIssue,
     Freshness,
     Liveness,
     Provenance,
@@ -29,7 +28,8 @@ from .models import (
     SourceInfo,
     TokenState,
 )
-from .adapters import file_adapter, process_adapter, tmux_adapter
+from .adapters import file_adapter, tmux_adapter
+from .adapters.orchctl_adapter import load_exports
 
 
 def collect(
@@ -37,8 +37,16 @@ def collect(
     sidecar_dir: str | Path,
     orch_dir: str | Path,
     pipeline_dir: str | Path,
+    export_dir: str | Path | None = None,
 ) -> Snapshot:
-    """Collect a full snapshot from sidecar files and orchestrator state."""
+    """Collect a full snapshot from sidecar files and orchestrator state.
+
+    *export_dir* is the directory containing per-area orchctl export files
+    (``<export_dir>/<area>/current.json``).  Defaults to
+    ``ORCHCTL_EXPORT_DIR`` relative to the monorepo root (auto-detected via
+    ``.agents/``).  The adapter falls back to the built-in fixture when no
+    export files are found.
+    """
     snap = Snapshot()
     sock_hash = tmux_adapter.socket_hash()
 
@@ -46,11 +54,34 @@ def collect(
     snap.agents = agents
     snap.sources.append(agent_source)
 
-    orchestrators, orch_source = _collect_orchestrators(orch_dir, pipeline_dir)
+    resolved_export_dir = _resolve_export_dir(export_dir, orch_dir)
+    orchestrators, orch_source = _collect_orchestrators(resolved_export_dir, pipeline_dir)
     snap.orchestrators = orchestrators
     snap.sources.append(orch_source)
 
     return snap
+
+
+def _resolve_export_dir(
+    export_dir: str | Path | None,
+    orch_dir: str | Path,
+) -> Path:
+    """Return the export directory to use.
+
+    Priority:
+    1. Explicit *export_dir* argument.
+    2. ``ORCHCTL_EXPORT_DIR`` relative to the monorepo root (found by walking
+       up from *orch_dir* looking for a ``.agents/`` directory).
+    3. ``export/`` sibling of *orch_dir* as a last-resort fallback.
+    """
+    if export_dir is not None:
+        return Path(export_dir)
+    # Walk up to find monorepo root
+    for parent in Path(orch_dir).resolve().parents:
+        if (parent / ".agents").is_dir():
+            return parent / ORCHCTL_EXPORT_DIR
+    # Fallback: export/ next to orch_dir
+    return Path(orch_dir).parent / "export"
 
 
 # ── Agent collection ──────────────────────────────────────────────────────────
@@ -214,128 +245,29 @@ def _collect_codex_pane(pane: tmux_adapter.PaneInfo) -> AgentState:
 # ── Orchestrator collection ───────────────────────────────────────────────────
 
 def _collect_orchestrators(
-    orch_dir: str | Path,
+    export_dir: str | Path,
     pipeline_dir: str | Path,
 ) -> tuple[list[BatchState], SourceInfo]:
-    batch_files = file_adapter.list_batch_files(orch_dir)
-    batches: list[BatchState] = []
-    now = time.time()
+    """Collect orchestrator state from the orchctl normalized export.
 
-    for batch_file in batch_files:
-        data = file_adapter.read_json(batch_file)
-        if not data:
-            continue
-        batch = _parse_batch(data, pipeline_dir, now)
-        if batch is not None:
-            batches.append(batch)
+    Reads per-area `current.json` files under *export_dir*.  Falls back to
+    the built-in fixture when no export files are found, so the tracker
+    always has data to display during development.
+
+    Legacy batch.state.json files are not read here; the orchctl export is
+    the sole orchestrator data source in production.
+    """
+    export_dir = Path(export_dir)
+    batches = load_exports(export_dir, pipeline_dir)
 
     source = SourceInfo(
-        type="orchestrator",
+        type="orchctl_export",
         details={
-            "orch_dir": str(orch_dir),
-            "batch_files_found": len(batch_files),
-            "batches_parsed": len(batches),
+            "export_dir": str(export_dir),
+            "batches_loaded": len(batches),
         },
     )
     return batches, source
-
-
-def _parse_batch(
-    data: dict,
-    pipeline_dir: str | Path,
-    now: float,
-) -> BatchState | None:
-    area = data.get("area") or ""
-    batch_id = data.get("batchId") or ""
-    if not area or not batch_id:
-        return None
-
-    status_map: dict[str, str] = data.get("status") or {}
-    # Count only issues present in the issues list to avoid stale status_map keys
-    # from a previous batch inflating n_terminal beyond n_total.
-    issue_keys: set[str] = {str(i) for i in (data.get("issues") or [])}
-    n_total = len(issue_keys)
-    n_done = sum(1 for k in issue_keys if status_map.get(k) == "completed")
-    n_failed = sum(1 for k in issue_keys if status_map.get(k) == "failed")
-
-    orch_pid = int(data.get("orchestratorPid") or 0)
-    orch_started_at = data.get("orchestratorStartedAt")
-    created_at = data.get("createdAt") or ""
-
-    # Liveness check: compare against the stored start time from batch.state.json
-    # (not a live OS read) so PID reuse is detected correctly.
-    stored_create_time = None
-    if orch_started_at:
-        try:
-            dt = datetime.fromisoformat(orch_started_at.replace("Z", "+00:00"))
-            stored_create_time = dt.timestamp()
-        except (ValueError, TypeError):
-            pass
-    batch_alive = process_adapter.is_running(orch_pid, stored_create_time) if orch_pid else False
-
-    liveness = Liveness(is_alive=batch_alive, pid=orch_pid or None, create_time=stored_create_time)
-
-    n_terminal = n_done + n_failed
-    if not batch_alive:
-        batch_status = BatchStatus.DEAD
-    elif n_total > 0 and n_terminal >= n_total:
-        batch_status = BatchStatus.DONE
-    else:
-        batch_status = BatchStatus.ACTIVE
-
-    elapsed = _elapsed_from_iso(created_at, now)
-
-    # Dispatched issues
-    dispatched_raw: dict = data.get("dispatched") or {}
-    dispatched: list[DispatchedIssue] = []
-
-    for issue_key, dispatch_info in dispatched_raw.items():
-        # Scope to issue_keys (consistent with n_done/n_failed/n_total counting)
-        # so orphaned dispatch entries from a previous batch are excluded.
-        if issue_key not in issue_keys:
-            continue
-        # Only include issues currently in the "dispatched" state (actively running pipelines).
-        if status_map.get(issue_key) != "dispatched":
-            continue
-
-        pid = _safe_int(dispatch_info.get("pid"))
-        # Use dispatchedAt as reference create_time for PID-reuse protection,
-        # consistent with how orchestratorStartedAt is used for the batch process.
-        dispatched_at_str = dispatch_info.get("dispatchedAt") or ""
-        stored_pid_create_time = None
-        if dispatched_at_str:
-            try:
-                dt = datetime.fromisoformat(dispatched_at_str.replace("Z", "+00:00"))
-                stored_pid_create_time = dt.timestamp()
-            except (ValueError, TypeError):
-                pass
-        alive = process_adapter.is_running(pid, stored_pid_create_time) if pid else False
-
-        ps = file_adapter.read_pipeline_state(pipeline_dir, area, issue_key)
-        step = (ps.get("step") or "-") if ps else "-"
-        pr_num = _safe_int(ps.get("pr")) if ps else 0
-
-        issue_elapsed = _elapsed_from_iso(dispatch_info.get("dispatchedAt") or "", now)
-
-        dispatched.append(DispatchedIssue(
-            issue=issue_key,
-            alive=alive,
-            step=step,
-            pr_num=pr_num,
-            elapsed=issue_elapsed,
-        ))
-
-    return BatchState(
-        area=area,
-        batch_id=batch_id,
-        batch_status=batch_status,
-        n_done=n_done,
-        n_failed=n_failed,
-        n_total=n_total,
-        created_at=created_at,
-        elapsed=elapsed,
-        dispatched=dispatched,
-    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
