@@ -1,6 +1,17 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #41 Admin 로그인 페이지 PR #141 머지
+  - PR: `feat: add admin login page (#41)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/login/layout.tsx`, `src/app/dashboard/login/page.tsx`, `src/app/dashboard/layout.tsx`, `src/app/dashboard/layout-shell.tsx`, `src/features/admin-login/index.ts`, `src/features/admin-login/ui/login-form.tsx`
+  - initial change: `/dashboard/login` 전용 레이아웃과 로그인 페이지 추가, `LoginForm`에서 `login()` 호출 후 성공 시 `/dashboard`로 이동
+  - review fix 1: `await login()` 구간도 커버하도록 `isLoading`과 `busy` 상태를 추가해 중복 로그인 요청을 방지
+  - review fix 2: `useSelectedLayoutSegment` 로직을 `src/app/dashboard/layout-shell.tsx`로 분리해 `dashboard/layout.tsx`를 server component로 유지
+  - suggestion fix: 로그인 실패 메시지에 `role="alert"`를 추가해 screen reader가 동적으로 오류를 읽도록 보완
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - merge: squash merge, merge commit `3a7d7ea543efc81ff475ee372747a6209fc0c846`
+  - branch: `feat/issue-41-admin-login` (remote branch deleted, local issue worktree cleaned up)
 - [x] #49 Tag entity types + API PR #143 머지
   - PR: `feat: add tag entity api (#49)`
   - merge target: `main`
@@ -94,6 +105,9 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- React 18의 `useTransition`에서 `isPending`은 `startTransition()` 내부의 라우터 전환 구간만 추적하므로, 로그인 같은 선행 async API 호출을 막으려면 별도의 `isLoading` 상태를 합쳐서 submit 중복을 차단해야 한다.
+- `src/app/dashboard/layout.tsx`에서 login segment만 예외 처리하려고 전체 레이아웃을 client component로 바꾸는 대신, `useSelectedLayoutSegment()`를 thin client shell로 분리하면 서버 레이아웃을 유지하면서도 sidebar-free login route를 만들 수 있다.
+- 동적으로 나타나는 로그인 오류 메시지는 시각적으로만 렌더하면 screen reader에 바로 전달되지 않으므로 `role="alert"` 같은 live region 속성이 필요하다.
 - The `GET /api/tags` backend contract already exposes camelCase `postCount`, so the client `Tag` entity can safely model that field without a mapping layer.
 - Tailwind Typography를 이 repo에 도입할 때 `prose-neutral` 같은 palette modifier를 그대로 쓰면, `.markdown-content`가 아직 다루지 않는 `strong`, `table`, `figcaption`, `kbd` 등의 요소가 Tailwind 고정 회색값을 사용해 dark mode token 시스템과 어긋난다.
 - 이 client 테마 구조에서는 `prose`를 유지하더라도 `.markdown-content`에 `--tw-prose-*` CSS 변수를 project design token으로 연결하면 typography plugin의 기본 요소들까지 light/dark 테마를 일관되게 맞출 수 있다.
@@ -123,6 +137,12 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: 첫 `#41` 리뷰에서 로그인 폼이 `await login()` 네트워크 요청 동안 비활성화되지 않아 사용자가 submit을 연속으로 눌러 중복 로그인 요청을 보낼 수 있었다.
+- **Resolution**: `src/features/admin-login/ui/login-form.tsx`에 `isLoading` 상태를 추가하고 `isPending`과 합친 `busy` 플래그로 입력과 submit 버튼을 모두 잠그도록 수정했다.
+- **Issue**: `/dashboard/login`만 sidebar를 숨기기 위해 `src/app/dashboard/layout.tsx` 전체를 client component로 바꾸면 admin 레이아웃이 불필요하게 클라이언트 번들로 승격된다.
+- **Resolution**: `src/app/dashboard/layout-shell.tsx`를 새로 만들어 segment 판별 로직만 client로 분리하고, `dashboard/layout.tsx`는 server component로 되돌렸다.
+- **Issue**: 로그인 실패 오류 박스가 동적으로 나타나도 보조기기에는 자동으로 공지되지 않았다.
+- **Resolution**: 오류 컨테이너에 `role="alert"`를 추가해 screen reader가 즉시 오류 메시지를 읽도록 보완했다.
 - **Issue**: 첫 구현에서 `PostContent`에 `prose prose-neutral max-w-none`와 기존 `.markdown-content`를 같이 적용해, `.markdown-content`가 직접 스타일링하지 않는 markdown 요소들이 Tailwind 고정 neutral palette를 사용하면서 dark mode에서 색상 불일치가 생길 수 있었다.
 - **Resolution**: `prose-neutral`를 제거하고 `src/app-layer/style/typography.css`의 `.markdown-content`에 `--tw-prose-*` 변수를 design token 기반으로 선언해 typography plugin과 기존 theme system을 정렬했다.
 - **Issue**: The first `#39` review found that the new post detail page linked tags to `/tags/[slug]`, but this app tree does not implement that route yet, so every tag click would land on a 404.
@@ -158,10 +178,13 @@
 
 ## Next Steps
 - [ ] Add `src/app/tags/[slug]/page.tsx` so post tags can become real navigation targets again.
+- [ ] Add route-level auth guarding so already authenticated admins are redirected away from `/dashboard/login` and unauthenticated users are blocked from protected dashboard screens.
 - [ ] Add actual `/dashboard/posts/new` and `/dashboard/posts/[id]` admin routes, then reconnect the create/edit navigation removed during PR #137 review.
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #141
+- Related Issue: #41
 - Related PR: #143
 - Related Issue: #49
 - Related PR: #140
