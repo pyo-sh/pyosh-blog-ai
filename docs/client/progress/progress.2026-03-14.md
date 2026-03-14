@@ -1,6 +1,15 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #49 Tag entity types + API PR #143 머지
+  - PR: `feat: add tag entity api (#49)`
+  - merge target: `main`
+  - 구현: `src/entities/tag/model.ts`, `src/entities/tag/api.ts`, `src/entities/tag/index.ts`
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 1
+  - review note: 서버 `GET /api/tags` 계약은 이미 camelCase `postCount`를 사용함 (`server/src/routes/tags/tag.schema.ts`, `server/src/routes/tags/tag.service.ts`)
+  - merge: squash merge, merge commit `0614d26ca584d55ff4294cb1a52d76390761c4dc`
+  - branch: `feat/issue-49-tags-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #35 마크다운 타이포그래피 스타일링 PR #140 머지
   - PR: `feat: add markdown typography (#35)`
   - merge target: `main`
@@ -85,6 +94,7 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- The `GET /api/tags` backend contract already exposes camelCase `postCount`, so the client `Tag` entity can safely model that field without a mapping layer.
 - Tailwind Typography를 이 repo에 도입할 때 `prose-neutral` 같은 palette modifier를 그대로 쓰면, `.markdown-content`가 아직 다루지 않는 `strong`, `table`, `figcaption`, `kbd` 등의 요소가 Tailwind 고정 회색값을 사용해 dark mode token 시스템과 어긋난다.
 - 이 client 테마 구조에서는 `prose`를 유지하더라도 `.markdown-content`에 `--tw-prose-*` CSS 변수를 project design token으로 연결하면 typography plugin의 기본 요소들까지 light/dark 테마를 일관되게 맞출 수 있다.
 - The post detail page could render safely without a tag route only if tags stayed non-interactive; linking them before `src/app/tags/[slug]/page.tsx` exists creates a guaranteed 404 path from the new SSR page.
@@ -152,6 +162,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #143
+- Related Issue: #49
 - Related PR: #140
 - Related Issue: #35
 - Related PR: #139
