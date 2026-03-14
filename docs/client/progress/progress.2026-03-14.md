@@ -1,6 +1,15 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #56 PopularPost API PR #146 머지
+  - PR: `feat: add popular post api (#56)`
+  - merge target: `main`
+  - 구현: `src/entities/stat/model.ts`, `src/entities/stat/api.ts`, `src/entities/stat/index.ts`
+  - initial change: `PopularPost` 타입 추가, public stats endpoint `/api/stats/popular`를 위한 `fetchPopularPosts(days, cookieHeader?)` helper 추가, backend `data` wrapper unwrap
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `f4cd3ca5f56b0a5e9a21477ae42c2feb6f0234ce`
+  - branch: `feat/issue-56-popular-post-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #52 Comment entity types + API PR #145 머지
   - PR: `feat: add comment entity api (#52)`
   - merge target: `main`
@@ -137,6 +146,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- The public stats backend contract at `GET /api/stats/popular` returns `{ data: PopularPost[] }`, so the client entity helper should unwrap `response.data` rather than expose the transport wrapper upstream.
+- In a fresh client issue worktree, `pnpm install --frozen-lockfile` was still required before `pnpm compile:types && pnpm lint && pnpm build` because the worktree did not start with its own `node_modules`.
 - Comment create/delete client payloads need the same `authorType`-discriminated union pattern as guestbook; without a discriminator, the OAuth subset weakens the union enough that guest-only required fields like `guestPassword` stop being enforced by TypeScript.
 - In this client repo, public comment endpoints still use the server's original body contract, so the entity API should strip client-only discriminators before sending to `/api/posts/:postId/comments` and `/api/comments/:id`.
 - In this repo, dashboard route protection can live entirely in `src/middleware.ts`; forwarding the incoming `Cookie` header to the existing backend `/api/auth/me` endpoint was enough to reuse the auth contract from issue #38 without adding a new client entity layer.
