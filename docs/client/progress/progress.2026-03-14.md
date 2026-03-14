@@ -1,6 +1,17 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #66 검색 결과 페이지 SSR PR #151 머지
+  - PR: `feat: add search results page (#66)`
+  - merge target: `main`
+  - 구현: `src/app/search/page.tsx`
+  - initial change: `/search` SSR 페이지 추가, `q`/`page` query parsing, `fetchPosts({ q, page })` 연동, `PostCard`/`Pagination` 재사용, 결과 수/빈 상태 UI 구현
+  - policy: 빈 검색어는 안내 화면을 보여주고, 검색어가 있을 때만 `page`를 검증하며 양의 정수가 아닌 `page`는 `notFound()`로 404 처리
+  - review fix: 빈 검색 상태에서 `page`가 의미 없는데도 먼저 검증해 404가 나던 흐름을 수정해, `q`가 없을 때는 `page`를 무시하고 정상 empty state를 렌더하도록 순서 조정
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 clean
+  - merge: squash merge, merge commit `3789b4cc2598cad8975c3ccb172ef39a36ff078b`
+  - branch: `feat/issue-66-search-page` (remote branch deleted, local issue worktree cleaned up)
 - [x] #65 Admin 댓글/방명록 API functions PR #150 머지
   - PR: `feat: add admin comment and guestbook api functions (#65)`
   - merge target: `main`
