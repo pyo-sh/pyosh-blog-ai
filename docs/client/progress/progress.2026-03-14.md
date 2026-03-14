@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #68 Admin 방명록 관리 페이지 PR #158 머지
+  - PR: `feat: add admin guestbook page (#68)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/guestbook/page.tsx`, `src/features/guestbook-manager/index.ts`, `src/features/guestbook-manager/ui/guestbook-manager.tsx`
+  - initial change: `/dashboard/guestbook` 라우트와 guestbook-manager feature를 추가하고, 작성자/내용/비밀 여부/작성일/삭제 액션이 포함된 관리자 방명록 테이블과 클라이언트 페이지네이션을 연결
+  - review fix: 이미 `deleted` 상태인 방명록 row에는 삭제 버튼 대신 `삭제됨` 상태 표시를 렌더해 중복 삭제 요청과 혼란을 방지
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 clean
+  - merge: squash merge, PR #158
+  - branch: `feat/issue-68-admin-guestbook` (remote branch deleted, local issue worktree cleaned up)
 - [x] #55 댓글 섹션 feature PR #155 머지
   - PR: `feat: add comment section feature (#55)`
   - merge target: `main`
