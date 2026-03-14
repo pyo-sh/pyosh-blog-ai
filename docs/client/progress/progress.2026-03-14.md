@@ -1,6 +1,15 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #35 마크다운 타이포그래피 스타일링 PR #140 머지
+  - PR: `feat: add markdown typography (#35)`
+  - merge target: `main`
+  - 구현: `package.json`, `src/app-layer/style/index.css`, `src/app-layer/style/typography.css`, `src/features/post-detail/ui/post-content.tsx`
+  - initial change: `@tailwindcss/typography` 플러그인 추가, global CSS에 `@plugin` 등록, `PostContent`에 `prose max-w-none` 적용
+  - review fix: `prose-neutral`를 제거하고 `.markdown-content`에서 Tailwind Typography `--tw-prose-*` 변수를 기존 design token(`--text*`, `--border*`, `--primary1`, `--background2`)에 매핑해 다크 모드 색상 불일치 제거
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - merge: squash merge, merge commit `edb0fe0e7587ebf2f26957bb09631f4589aa730b`
+  - branch: `feat/issue-35-markdown-style` (remote branch deleted, local issue worktree cleaned up)
 - [x] #39 글 상세 페이지 SSR PR #139 머지
   - PR: `feat: add post detail page (#39)`
   - merge target: `main`
@@ -76,6 +85,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- Tailwind Typography를 이 repo에 도입할 때 `prose-neutral` 같은 palette modifier를 그대로 쓰면, `.markdown-content`가 아직 다루지 않는 `strong`, `table`, `figcaption`, `kbd` 등의 요소가 Tailwind 고정 회색값을 사용해 dark mode token 시스템과 어긋난다.
+- 이 client 테마 구조에서는 `prose`를 유지하더라도 `.markdown-content`에 `--tw-prose-*` CSS 변수를 project design token으로 연결하면 typography plugin의 기본 요소들까지 light/dark 테마를 일관되게 맞출 수 있다.
 - The post detail page could render safely without a tag route only if tags stayed non-interactive; linking them before `src/app/tags/[slug]/page.tsx` exists creates a guaranteed 404 path from the new SSR page.
 - Next.js `next/image`는 `next.config.js`의 `images.remotePatterns`에 없는 원격 호스트를 즉시 거부하므로, API가 임의 CDN URL을 줄 수 있는 카드 UI에서는 사전 allowlist 검사나 `<img>` fallback이 필요하다.
 - `Intl.DateTimeFormat`를 timezone 없이 서버/클라이언트 양쪽에서 쓰면 자정 근처 timestamp가 다른 날짜로 렌더될 수 있어, list card 같은 SSR 텍스트에는 timezone pinning이 필요하다.
@@ -102,6 +113,8 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: 첫 구현에서 `PostContent`에 `prose prose-neutral max-w-none`와 기존 `.markdown-content`를 같이 적용해, `.markdown-content`가 직접 스타일링하지 않는 markdown 요소들이 Tailwind 고정 neutral palette를 사용하면서 dark mode에서 색상 불일치가 생길 수 있었다.
+- **Resolution**: `prose-neutral`를 제거하고 `src/app-layer/style/typography.css`의 `.markdown-content`에 `--tw-prose-*` 변수를 design token 기반으로 선언해 typography plugin과 기존 theme system을 정렬했다.
 - **Issue**: The first `#39` review found that the new post detail page linked tags to `/tags/[slug]`, but this app tree does not implement that route yet, so every tag click would land on a 404.
 - **Resolution**: removed the tag links in `src/app/posts/[slug]/page.tsx` and kept tags as static pills until a real tag page is implemented.
 - **Issue**: 첫 PR #138 리뷰에서 `PostCard`가 모든 원격 `thumbnailUrl`을 `next/image`로 렌더해, `github.com` 외 호스트에서는 런타임 에러가 발생할 수 있었다.
@@ -139,6 +152,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #140
+- Related Issue: #35
 - Related PR: #139
 - Related Issue: #39
 - Related PR: #138
