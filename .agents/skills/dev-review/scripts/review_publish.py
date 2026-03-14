@@ -67,7 +67,7 @@ def validate_payload(payload: dict) -> list[str]:
             errors.append(f"issues[{i}].suggested_fix exceeds 2000 chars")
         if isinstance(item.get("path"), str) and len(item["path"]) > 500:
             errors.append(f"issues[{i}].path exceeds 500 chars")
-        if "line" in item:
+        if "line" in item and item["line"] is not None:
             if not isinstance(item["line"], int):
                 errors.append(f"issues[{i}].line is not an integer")
             elif item["line"] < 1:
@@ -188,7 +188,7 @@ def render_markdown(payload: dict) -> str:
             continue
         lines.append(f"### {section_name}")
         for n, item in enumerate(section_items, 1):
-            path = item.get("path", "")
+            path = item.get("path") or ""
             line_no = item.get("line")
             loc = ""
             if path:

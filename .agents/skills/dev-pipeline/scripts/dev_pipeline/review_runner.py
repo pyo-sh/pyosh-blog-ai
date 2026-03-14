@@ -143,8 +143,8 @@ Field rules:
 - summary: Short prose summary of findings (max 2000 chars).
 - issues: Array of findings. Empty array for clean reviews.
   - severity: "P1" (must fix), "P2" (should fix), "P3" (suggestion).
-  - path: Relative file path. Omit if not file-specific.
-  - line: Line number. Omit if not applicable.
+  - path: Relative file path. null if not file-specific.
+  - line: Line number. null if not applicable.
   - title: One-line issue title (max 200 chars).
   - body: Explanation and suggested fix (max 2000 chars).
 

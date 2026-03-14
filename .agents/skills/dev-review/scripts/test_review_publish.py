@@ -157,6 +157,22 @@ class TestValidatePayload:
         errors = validate_payload([])
         assert errors == ["payload is not a JSON object"]
 
+    def test_null_path_is_valid(self):
+        payload = {
+            "verdict": "comment",
+            "summary": "ok",
+            "issues": [{"severity": "P1", "path": None, "title": "t", "body": "b"}],
+        }
+        assert validate_payload(payload) == []
+
+    def test_null_line_is_valid(self):
+        payload = {
+            "verdict": "comment",
+            "summary": "ok",
+            "issues": [{"severity": "P1", "line": None, "title": "t", "body": "b"}],
+        }
+        assert validate_payload(payload) == []
+
 
 # ---------------------------------------------------------------------------
 # Contamination check
@@ -296,6 +312,26 @@ class TestRenderMarkdown:
     def test_ends_with_newline(self):
         md = render_markdown(VALID_PAYLOAD)
         assert md.endswith("\n")
+
+    def test_null_path_renders_without_location(self):
+        payload = {
+            "verdict": "comment",
+            "summary": "ok",
+            "issues": [{"severity": "P1", "path": None, "title": "General issue", "body": "Details."}],
+        }
+        md = render_markdown(payload)
+        assert "General issue" in md
+        assert "`" not in md.split("General issue")[0].split("\n")[-1]
+
+    def test_null_line_renders_path_without_line(self):
+        payload = {
+            "verdict": "comment",
+            "summary": "ok",
+            "issues": [{"severity": "P1", "path": "src/foo.ts", "line": None, "title": "Issue", "body": "Details."}],
+        }
+        md = render_markdown(payload)
+        assert "`src/foo.ts`" in md
+        assert "`src/foo.ts:" not in md
 
 
 # ---------------------------------------------------------------------------
