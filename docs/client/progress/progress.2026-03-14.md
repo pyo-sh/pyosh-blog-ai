@@ -1,6 +1,17 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #62 Category Admin API functions PR #148 머지
+  - PR: `feat: add category admin api (#62)`
+  - merge target: `main`
+  - 구현: `src/entities/category/model.ts`, `src/entities/category/api.ts`, `src/entities/category/index.ts`
+  - initial change: admin 카테고리 조회/생성/수정/순서 변경/삭제 helper와 request body 타입 추가
+  - contract alignment: 카테고리 목록 응답을 `{ categories: [...] }` shape로 unwrap하고 reorder body는 서버 계약 기준 `items`로 구현
+  - review fix: `UpdateCategoryBody`에 `parentId`를 추가하고 `fetchCategoriesAdmin(cookieHeader?)`로 server/client 양쪽 호출 지원
+  - verification: `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 / suggestion 1 -> resolve, round 2 clean
+  - merge: squash merge, PR #148
+  - branch: `feat/issue-62-category-admin-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #58 Asset entity types + API PR #149 머지
   - PR: `feat: add asset entity api (#58)`
   - merge target: `main`
@@ -210,6 +221,8 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: 이슈 설명의 reorder payload 키는 `orders`로 적혀 있었지만 서버 카테고리 스키마는 `items`를 사용했다.
+- **Resolution**: `src/entities/category/model.ts`와 `src/entities/category/api.ts`를 서버 route/schema 기준 `items` payload로 맞췄다.
 - **Issue**: The first `#52` implementation modeled comment mutations as guest-only bodies, so authenticated OAuth comment create/delete flows could not be represented through the client entity API.
 - **Resolution**: expanded `CreateCommentBody` and `DeleteCommentBody` to cover guest and OAuth callers, while keeping the outgoing HTTP payload aligned with the existing backend schema.
 - **Issue**: The second `#52` review found that a plain guest|oauth union still allowed invalid guest requests to compile because the OAuth shape was a subset of the guest shape.
