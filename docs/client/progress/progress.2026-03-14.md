@@ -1,6 +1,18 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #48 공개 방명록 페이지 PR #165 머지
+  - PR: `feat: add guestbook page (#48)`
+  - merge target: `main`
+  - 구현: `src/app/guestbook/page.tsx`, `src/features/guestbook-form/index.ts`, `src/features/guestbook-form/ui/guestbook-page-content.tsx`, `src/features/comment-section/ui/comment-form.tsx`
+  - initial change: `/guestbook`를 SSR 데이터 로더 + client page content 구조로 재구성하고, 기존 guestbook entity API 위에 방명록 작성 폼, 삭제 모달, 페이지네이션, local optimistic state를 연결
+  - reuse: `CommentForm`을 guestbook variant까지 확장해 게스트/OAuth 공용 입력 UX와 validation 흐름을 그대로 재사용
+  - review fix 1: viewer lookup이 non-401 auth 실패를 무조건 guest로 숨기거나 반대로 페이지 전체를 죽이지 않도록, 게스트 fallback과 non-blocking warning 배너를 함께 제공
+  - review fix 2: SSR 단계에서 cookie header를 한 번만 계산하고 `fetchGuestbook` + viewer lookup을 `Promise.all`로 병렬화해 추가 latency를 줄였으며, `admin` 세션의 public guestbook 처리도 명시적으로 guest mode로 정리
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 warning 1 -> resolve, round 3 suggestion 2 -> resolve, round 4 clean
+  - merge: squash merge, PR #165
+  - branch: `feat/issue-48-guestbook-page` (remote branch deleted, local issue worktree cleaned up)
 - [x] #37 카테고리별 글 목록 페이지 PR #163 머지
   - PR: `feat: add category archive page (#37)`
   - merge target: `main`
@@ -438,6 +450,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #165
+- Related Issue: #48
 - Related PR: #149
 - Related Issue: #58
 - Related PR: #145
