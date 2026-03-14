@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #53 Admin 글 작성/수정 페이지 PR #161 머지
+  - PR: `feat: add post create and edit pages (#53)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/posts/new/page.tsx`, `src/app/dashboard/posts/[id]/edit/page.tsx`, `src/app/dashboard/posts/page.tsx`
+  - initial change: `/dashboard/posts/new`에 빈 `PostForm` 기반 작성 페이지를 추가하고, `/dashboard/posts/[id]/edit`에서 `useParams` + `fetchAdminPost`로 기존 글을 로드해 수정 페이지를 구성
+  - UX: 수정 페이지에 로딩 skeleton, fetch 실패 재시도, 잘못된 `id` 가드 추가; 글 목록 페이지에는 새 글 작성 CTA와 행별 수정 링크를 연결
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm compile:types`, `pnpm lint`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `c4aa63fdbc902e8693ce1c93c467a9658e873555`, merged at `2026-03-14T12:52:58Z`
+  - branch: `feat/issue-53-post-editor-pages` (remote branch deleted, local issue worktree cleaned up)
 - [x] #61 인기 글 페이지 기간 필터 PR #160 머지
   - PR: `feat: add popular page filter (#61)`
   - merge target: `main`
