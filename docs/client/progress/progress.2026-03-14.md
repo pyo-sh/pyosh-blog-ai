@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #61 인기 글 페이지 기간 필터 PR #160 머지
+  - PR: `feat: add popular page filter (#61)`
+  - merge target: `main`
+  - 구현: `src/app/popular/page.tsx`, `src/app/popular/popular-page-content.tsx`
+  - initial change: `/popular` 페이지를 SSR 유지 상태로 `days` 쿼리 파라미터 기반 기간 필터로 전환하고, `7일 / 30일` pill 탭과 랭킹 리스트를 페이지 로컬 프레젠테이션 컴포넌트로 분리
+  - policy: `days`가 없거나 `7`, `30` 이외 값이면 `redirect('/popular?days=7')`로 canonical URL 정정
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `641741f6f58a072542a54cddac404e769cba4175`, merged at `2026-03-14T12:49:48Z`
+  - branch: `feat/issue-61-popular-page` (remote branch deleted, local issue worktree cleaned up)
 - [x] #64 헤더 검색바 PR #157 머지
   - PR: `feat: add header search bar (#64)`
   - merge target: `main`
