@@ -1,6 +1,18 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #64 헤더 검색바 PR #157 머지
+  - PR: `feat: add header search bar (#64)`
+  - merge target: `main`
+  - 구현: `src/widgets/header/search-bar.tsx`, `src/widgets/header/index.tsx`
+  - initial change: 헤더 액션 영역에 토글형 검색 UI를 추가하고, 입력 후 Enter 또는 검색 아이콘으로 `/search?q=...`로 이동하는 흐름을 연결
+  - review fix 1: 전역 헤더에서 `useSearchParams()`를 제거해 App Router static shell이 client-render bailout 되지 않도록 조정
+  - review fix 2: `/search`에서는 현재 `q` 값을 다시 열 때 반영하고, 열려 있는 상태의 검색 아이콘은 submit으로 동작하도록 상호작용을 보완
+  - review fix 3: 비검색 route에서 stale query가 남지 않도록 open 시 입력값을 초기화하고, collapsed input은 `disabled`/`tabIndex={-1}`로 숨김 상태에서 tab order에 남지 않게 처리
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 warning 1 -> resolve, round 4 warning 1 -> resolve, round 5 clean
+  - merge: squash merge, merge commit `f8634c6ddad067e87abf1827b44d9175785fe6be`, merged at `2026-03-14T12:38:33Z`
+  - branch: `feat/issue-64-header-search` (remote branch deleted, local issue worktree cleaned up)
 - [x] #60 에셋 라이브러리 feature + 페이지 PR #159 머지
   - PR: `feat: add asset library page (#60)`
   - merge target: `main`
