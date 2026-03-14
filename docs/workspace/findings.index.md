@@ -25,6 +25,7 @@
 | 016 | Pipeline cwd 혼용 진단 및 3-way 분리 | 2026-03-09 | #pipeline #cwd #worktree #monorepo #skill-discovery #merge-lock |
 | 018 | agent-tracker sidecar v2 namespace design | 2026-03-13 | #agent-tracker #sidecar #namespace #tmux #multi-session |
 | 019 | Tarjan SCC vs Kahn for dependency cycle quarantine | 2026-03-14 | #orchctl #cycle-detection #tarjan #scc #scheduling |
+| 020 | OpenAI --output-schema requires all properties in required array | 2026-03-14 | #codex #openai #structured-output #schema #json-schema |
 
 ## 상세 문서
 
@@ -47,6 +48,7 @@
 - [findings.016-pipeline-cwd-separation.md](./findings/findings.016-pipeline-cwd-separation.md) - Pipeline cwd 혼용 진단: skill cwd / repo dir / worktree dir 3-way 분리, TTL merge lock, area-scoped 경로
 - [findings.018-sidecar-v2-namespace.md](./findings/findings.018-sidecar-v2-namespace.md) - agent-tracker sidecar v2: socket-hash/session/pane 3레벨 경로, immediate cutover, source precedence, md5sum Linux-only 주의
 - [findings.019-tarjan-scc-cycle-quarantine.md](./findings/findings.019-tarjan-scc-cycle-quarantine.md) - Tarjan SCC correctly isolates cycle members only; Kahn's algorithm incorrectly quarantines downstream dependents; rate-limit detection scoped to discovery pass
+- [findings.020-openai-output-schema-required-contract.md](./findings/findings.020-openai-output-schema-required-contract.md) - OpenAI --output-schema rejects schemas where any property is absent from required; nullable fields must use type union ["T", "null"]
 
 ## 주요 원칙
 
@@ -77,3 +79,4 @@
 - **gh 명령은 explicit repo 사용** → cwd 의존 제거. `-R owner/repo` 또는 `repos/owner/repo/...` 명시
 - **merge lock은 한 프로세스에서 acquire/release 완결** → 별도 Bash tool 호출 분리 금지. TTL 기반 stale 판단
 - **모든 transient 파일 경로에 area 포함** → client/server 번호 충돌 방지. worktree, log, message, state 전부 area-scoped
+- **OpenAI --output-schema는 draft-07 superset** → 모든 properties 키가 required에 포함되어야 함. optional 필드는 `["T", "null"]` 타입 유니온으로 표현. nullable 필드의 maxLength/minimum 제약은 제거할 것

@@ -1,5 +1,27 @@
 # Progress 2026-03-14
 
+## Codex schema contract fix + dev-codex-pipeline --tool override (PR #203)
+
+Fixed two bugs that caused codex review dispatch to fail silently.
+
+### Changes merged
+
+- **`review_schema.json`** - add `path` and `line` to `required` array; change types to nullable unions (`["string", "null"]`, `["integer", "null"]`); remove `maxLength`/`minimum` constraints on nullable fields. Root cause: OpenAI `--output-schema` requires every key in `properties` to appear in `required`, otherwise the request is rejected with `400 invalid_json_schema` before codex executes at all.
+- **`review_publish.py`** - validator: `if "line" in item` changed to `if "line" in item and item["line"] is not None` to prevent spurious error on `{"line": null}`; renderer: `item.get("path", "")` changed to `item.get("path") or ""` to handle null path correctly.
+- **`review_runner.py`** - prompt wording `Omit if not...` changed to `null if not...` to match schema.
+- **`test_review_publish.py`** - 4 new tests: null path/line in validator, null path/null line rendering.
+- **`dev-codex-pipeline/SKILL.md`** - reordered `TOOL` initialization to parse-first pattern; added "Never override a user-supplied `--tool` value with the default" to prevent AI from ignoring `--tool claude` when explicitly specified.
+- **54 tests** passing (40 review_publish + 14 pipeline regression).
+
+### Key decisions
+
+- Nullable union types instead of removing fields: OpenAI structured output requires all properties in `required`; making them nullable preserves the contract while allowing the model to express "not applicable".
+- Downstream `review_publish.py` validator enforces `line >= 1` only when the value is a non-null integer, matching prior behavior for real line numbers.
+
+### Finding
+
+- findings.020: OpenAI --output-schema requires all properties in required array
+
 ## orchctl dashboard / webhook / notification (#105, PR #200)
 
 Stage 4 observability feature: event log, webhook dispatch, and CLI commands so operators can query orchestrator lifecycle events in real time and receive HTTP notifications on key state changes.
