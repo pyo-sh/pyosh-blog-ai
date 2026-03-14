@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #65 Admin 댓글/방명록 API functions PR #150 머지
+  - PR: `feat: add admin comment and guestbook api functions (#65)`
+  - merge target: `main`
+  - 구현: `src/entities/comment/api.ts`, `src/entities/comment/index.ts`, `src/entities/guestbook/api.ts`, `src/entities/guestbook/index.ts`
+  - initial change: 관리자 댓글/방명록 목록 조회와 강제 삭제 helper, 관리자 전용 item/query 타입 추가
+  - contract alignment: 서버 admin route 스키마 기준으로 댓글은 `postId` 필터와 `hidden` 상태를 포함하고, 댓글/방명록 목록 함수 모두 server/client 호출 경로를 지원하도록 `cookieHeader?` 분기 추가
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, PR #150
+  - branch: `feat/issue-65-admin-comment-guestbook` (remote branch deleted, local issue worktree cleaned up)
 - [x] #62 Category Admin API functions PR #148 머지
   - PR: `feat: add category admin api (#62)`
   - merge target: `main`
@@ -182,6 +192,8 @@
 - The backend asset upload endpoint `POST /api/assets/upload` returns `{ assets: UploadedAsset[] }` without `createdAt`, while `GET /api/assets` returns paginated list items with `createdAt`, so the client entity layer should model those as separate types.
 - The public stats backend contract at `GET /api/stats/popular` returns `{ data: PopularPost[] }`, so the client entity helper should unwrap `response.data` rather than expose the transport wrapper upstream.
 - In a fresh client issue worktree, `pnpm install --frozen-lockfile` was still required before `pnpm compile:types && pnpm lint && pnpm build` because the worktree did not start with its own `node_modules`.
+- The admin comment backend contract at `GET /api/admin/comments` returns flat paginated items with `status: "active" | "deleted" | "hidden"` plus optional filters like `postId`, `authorType`, `startDate`, and `endDate`, so the client admin helper should model that full query surface instead of just page/postId.
+- The admin guestbook backend contract at `GET /api/admin/guestbook` follows the same paginated pattern as admin comments but without `postId` or `replyToName`, so the client guestbook entity can reuse the same server/client dual-fetch pattern already used by admin post reads.
 - Comment create/delete client payloads need the same `authorType`-discriminated union pattern as guestbook; without a discriminator, the OAuth subset weakens the union enough that guest-only required fields like `guestPassword` stop being enforced by TypeScript.
 - In this client repo, public comment endpoints still use the server's original body contract, so the entity API should strip client-only discriminators before sending to `/api/posts/:postId/comments` and `/api/comments/:id`.
 - In this repo, dashboard route protection can live entirely in `src/middleware.ts`; forwarding the incoming `Cookie` header to the existing backend `/api/auth/me` endpoint was enough to reuse the auth contract from issue #38 without adding a new client entity layer.
@@ -225,6 +237,8 @@
 - **Resolution**: `src/entities/category/model.ts`와 `src/entities/category/api.ts`를 서버 route/schema 기준 `items` payload로 맞췄다.
 - **Issue**: The first `#52` implementation modeled comment mutations as guest-only bodies, so authenticated OAuth comment create/delete flows could not be represented through the client entity API.
 - **Resolution**: expanded `CreateCommentBody` and `DeleteCommentBody` to cover guest and OAuth callers, while keeping the outgoing HTTP payload aligned with the existing backend schema.
+- **Issue**: Fresh client issue worktrees still did not have local dependencies installed, so the initial verification attempt for `#65` failed immediately with `tsc: not found`.
+- **Resolution**: ran `pnpm install --frozen-lockfile` inside the issue worktree before the standard `pnpm compile:types && pnpm lint && pnpm build` verification sequence.
 - **Issue**: The second `#52` review found that a plain guest|oauth union still allowed invalid guest requests to compile because the OAuth shape was a subset of the guest shape.
 - **Resolution**: changed comment mutation bodies to `authorType`-discriminated unions and stripped the discriminator in `src/entities/comment/api.ts` before sending the request.
 - **Issue**: The first middleware pass redirected unauthenticated users to `/dashboard/login` but dropped the original destination, had no explicit timeout on `/api/auth/me`, and hard-threw on missing `API_URL` during module initialization.
