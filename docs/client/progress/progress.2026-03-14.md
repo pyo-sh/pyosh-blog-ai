@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #57 카테고리 관리 feature + 페이지 PR #156 머지
+  - PR: `feat: add category admin page (#57)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/categories/page.tsx`, `src/features/category-manager/index.ts`, `src/features/category-manager/ui/category-tree.tsx`, `src/features/category-manager/ui/category-form-modal.tsx`, `src/features/category-manager/ui/category-manager.tsx`
+  - initial change: `/dashboard/categories` 관리 페이지와 category-manager feature를 추가하고, 재귀 트리 렌더링, 추가/수정 공용 모달, 삭제 확인 모달, TanStack Query 기반 CRUD 흐름을 연결
+  - policy: 자식 카테고리가 있는 항목은 삭제 요청 전에 차단하고 안내만 표시하며, 수정 모드에서는 현재 노드와 descendant를 부모 후보에서 제외해 순환 구조를 방지
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm lint`, `pnpm build`, `pnpm compile:types`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, PR #156
+  - branch: `feat/issue-57-category-admin` (remote branch deleted, local issue worktree cleaned up)
 - [x] #59 태그 목록/태그별 글 목록 페이지 PR #154 머지
   - PR: `feat: implement tag pages (#59)`
   - merge target: `main`
