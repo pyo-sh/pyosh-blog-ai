@@ -1,6 +1,18 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #36 홈 페이지 SSR PR #153 머지
+  - PR: `feat: implement SSR home page (#36)`
+  - merge target: `main`
+  - 구현: `src/app/page.tsx`, `src/widgets/home-page/index.ts`, `src/widgets/home-page/ui/home-page.tsx`
+  - initial change: 홈 페이지를 서버 렌더링 목록 화면으로 구현하고 `page` query parsing, `fetchPosts({ page })`, `PostCard` 목록, 빈 상태 문구, `Pagination` 연동 추가
+  - policy: `page` 미지정은 1로 처리하고, 음수/0/비정수/범위 초과 페이지는 `notFound()`로 404 처리, 총 페이지 수가 1 이하일 때는 페이지네이션 숨김
+  - review fix 1: 게시글이 없는 경우에도 `/?page=2` 이상은 invalid page로 간주하도록 `totalPages === 0` 경로를 별도로 검증
+  - review fix 2: `src/app/page.tsx`는 routing entry만 남기고, 데이터 로드/검증/렌더링 로직은 `src/widgets/home-page/ui/home-page.tsx`로 이동해 app 레이어 규칙 준수
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm lint`, `pnpm build`, `pnpm compile:types`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 clean
+  - merge: squash merge, PR #153
+  - branch: `feat/issue-36-home-ssr` (remote branch deleted, local issue worktree cleaned up)
 - [x] #66 검색 결과 페이지 SSR PR #151 머지
   - PR: `feat: add search results page (#66)`
   - merge target: `main`
