@@ -1,6 +1,17 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #52 Comment entity types + API PR #145 머지
+  - PR: `feat: add comment entity api (#52)`
+  - merge target: `main`
+  - 구현: `src/entities/comment/model.ts`, `src/entities/comment/api.ts`, `src/entities/comment/index.ts`
+  - initial change: public comment entity 타입과 `fetchComments`/`createComment`/`deleteComment` helper 추가
+  - review fix 1: create/delete mutation contract를 guest/oauth 양쪽을 표현하는 union으로 확장해 authenticated comment flow를 지원
+  - review fix 2: guest payload가 compile time에 강제되도록 `authorType` discriminated union으로 재구성하고, API helper에서 discriminator를 제거한 뒤 서버 계약에 맞는 body만 전송
+  - verification: `pnpm build && pnpm compile:types && pnpm lint`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 clean
+  - merge: squash merge, PR #145
+  - branch: `feat/issue-52-comment-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #40 Dashboard 인증 미들웨어 PR #144 머지
   - PR: `feat: add dashboard auth middleware (#40)`
   - merge target: `main`
@@ -126,6 +137,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- Comment create/delete client payloads need the same `authorType`-discriminated union pattern as guestbook; without a discriminator, the OAuth subset weakens the union enough that guest-only required fields like `guestPassword` stop being enforced by TypeScript.
+- In this client repo, public comment endpoints still use the server's original body contract, so the entity API should strip client-only discriminators before sending to `/api/posts/:postId/comments` and `/api/comments/:id`.
 - In this repo, dashboard route protection can live entirely in `src/middleware.ts`; forwarding the incoming `Cookie` header to the existing backend `/api/auth/me` endpoint was enough to reuse the auth contract from issue #38 without adding a new client entity layer.
 - `pnpm compile:types && pnpm lint && pnpm build` should be run sequentially in a fresh Next.js worktree here; running `compile:types` in parallel with `build` can race on `.next/types/**` generation because `tsconfig.json` includes those generated route type files.
 - The initial `CreateGuestbookBody` shape from the issue description was too guest-specific for the actual `optionalAuth` backend contract; the client entity layer needed to model guest and OAuth creation separately even though both hit the same `/api/guestbook` endpoint.
@@ -163,6 +176,10 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: The first `#52` implementation modeled comment mutations as guest-only bodies, so authenticated OAuth comment create/delete flows could not be represented through the client entity API.
+- **Resolution**: expanded `CreateCommentBody` and `DeleteCommentBody` to cover guest and OAuth callers, while keeping the outgoing HTTP payload aligned with the existing backend schema.
+- **Issue**: The second `#52` review found that a plain guest|oauth union still allowed invalid guest requests to compile because the OAuth shape was a subset of the guest shape.
+- **Resolution**: changed comment mutation bodies to `authorType`-discriminated unions and stripped the discriminator in `src/entities/comment/api.ts` before sending the request.
 - **Issue**: The first middleware pass redirected unauthenticated users to `/dashboard/login` but dropped the original destination, had no explicit timeout on `/api/auth/me`, and hard-threw on missing `API_URL` during module initialization.
 - **Resolution**: added a `returnTo` query param, bounded the auth fetch with `AbortSignal.timeout(3000)`, changed production misconfiguration handling to log and deny access, and redirected already authenticated admins away from `/dashboard/login`.
 - **Issue**: The first guestbook entity pass made `CreateGuestbookBody` and `DeleteGuestbookBody` guest-only, which forced impossible password/name/email fields into OAuth call sites even though the server route supports authenticated OAuth requests without them.
@@ -213,6 +230,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #145
+- Related Issue: #52
 - Related PR: #144
 - Related Issue: #40
 - Related PR: #142
