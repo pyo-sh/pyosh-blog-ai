@@ -1,6 +1,19 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #67 헤더 네비게이션 업데이트 PR #152 머지
+  - PR: `feat: update header navigation (#67)`
+  - merge target: `main`
+  - 구현: `src/widgets/header/index.tsx`, `src/widgets/header/navigation.tsx`, `src/app/popular/page.tsx`, `src/app/tags/page.tsx`, `src/app/guestbook/page.tsx`
+  - initial change: 헤더 공개 네비게이션을 `홈/인기/태그/방명록` 4개 링크로 확장하고, 누락돼 있던 public route 3개를 App Router 페이지로 추가
+  - review fix 1: `/popular`, `/tags`, `/guestbook`가 실제 route로 존재하도록 각 페이지를 server-rendered public page로 구현
+  - review fix 2: 태그 요약 copy를 unique post count처럼 보이지 않도록 `태그 연결` 기준으로 수정하고, 모바일 헤더는 2-row layout + wrapped nav로 전환
+  - review fix 3: guestbook page는 서버가 반환한 secret body를 그대로 신뢰하고, `sessionId` cookie만 선택적으로 전달해 권한 기반 응답과 cookie scope를 모두 보존
+  - review fix 4: fixed header spacer를 `ResizeObserver` 기반 실측 높이와 동기화해 mobile wrapping 시에도 본문이 헤더 뒤로 가려지지 않게 보완
+  - verification: fresh issue worktree에서 base `client/node_modules`를 symlink한 뒤 `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 warning 2 -> resolve, round 4 warning 1 -> resolve, round 5 warning 1 -> resolve, round 6 clean
+  - merge: squash merge, merge commit `33e06861dc31a73e7b7c60b70bcdcbb645528061`, merged at `2026-03-14T11:24:55Z`
+  - branch: `feat/issue-67-header-nav` (remote branch deleted, local issue worktree cleaned up)
 - [x] #36 홈 페이지 SSR PR #153 머지
   - PR: `feat: implement SSR home page (#36)`
   - merge target: `main`
@@ -254,6 +267,8 @@
 - The verification flow in both the fresh issue worktree and the resolve worktree required `pnpm install` before `pnpm compile:types && pnpm lint && pnpm build`.
 - GitHub marked PR #132 as merged at `2026-03-13T20:48:25Z`, which is `2026-03-14 05:48:25` in KST.
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
+- Issue #67 showed that header-only navigation changes can still require companion route work when `main` is missing pages assumed by the issue text; in this case `/popular`, `/tags`, and `/guestbook` had to be added before the nav was safe to expose.
+- For this repo, forwarding the entire `cookies()` jar from a Next.js server component to `NEXT_PUBLIC_API_URL` is too broad; permission-aware server fetches should pass only the specific auth cookie (`sessionId`) that the Fastify session plugin actually consumes.
 
 ## Issues & Resolutions
 - **Issue**: 이슈 설명의 reorder payload 키는 `orders`로 적혀 있었지만 서버 카테고리 스키마는 `items`를 사용했다.
