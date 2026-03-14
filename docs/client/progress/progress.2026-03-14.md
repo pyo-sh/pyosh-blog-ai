@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #51 Guestbook entity types + API PR #142 머지
+  - PR: `feat: add guestbook entity api (#51)`
+  - merge target: `main`
+  - 구현: `src/entities/guestbook/model.ts`, `src/entities/guestbook/api.ts`, `src/entities/guestbook/index.ts`
+  - review fix 1: `CreateGuestbookBody`를 guest/oauth discriminated union으로 재구성하고, `api.ts`에서 `authorType`은 전송 전에 제거해 서버 계약을 유지
+  - review fix 2: `DeleteGuestbookBody`를 guest 비밀번호/ oauth 빈 body union으로 보완하고, `CommentAuthor`도 `oauth`/`guest` discriminated union으로 정제
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 suggestion-only -> resolve, round 2 warning 1 / suggestion 2 -> resolve, round 3 clean
+  - merge: squash merge, merge commit `c10551960f7d4c44faeef10cfbd4d672c012f73a`
+  - branch: `feat/issue-51-guestbook-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #41 Admin 로그인 페이지 PR #141 머지
   - PR: `feat: add admin login page (#41)`
   - merge target: `main`
@@ -105,6 +115,9 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- The initial `CreateGuestbookBody` shape from the issue description was too guest-specific for the actual `optionalAuth` backend contract; the client entity layer needed to model guest and OAuth creation separately even though both hit the same `/api/guestbook` endpoint.
+- Adding a discriminant like `authorType` is still compatible with the existing backend contract as long as the client API helper strips that field before serializing the request payload.
+- `DeleteGuestbookBody` also needs dual-mode typing because OAuth-authenticated deletes rely on session cookies and do not send `guestPassword`.
 - React 18의 `useTransition`에서 `isPending`은 `startTransition()` 내부의 라우터 전환 구간만 추적하므로, 로그인 같은 선행 async API 호출을 막으려면 별도의 `isLoading` 상태를 합쳐서 submit 중복을 차단해야 한다.
 - `src/app/dashboard/layout.tsx`에서 login segment만 예외 처리하려고 전체 레이아웃을 client component로 바꾸는 대신, `useSelectedLayoutSegment()`를 thin client shell로 분리하면 서버 레이아웃을 유지하면서도 sidebar-free login route를 만들 수 있다.
 - 동적으로 나타나는 로그인 오류 메시지는 시각적으로만 렌더하면 screen reader에 바로 전달되지 않으므로 `role="alert"` 같은 live region 속성이 필요하다.
@@ -137,6 +150,8 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: The first guestbook entity pass made `CreateGuestbookBody` and `DeleteGuestbookBody` guest-only, which forced impossible password/name/email fields into OAuth call sites even though the server route supports authenticated OAuth requests without them.
+- **Resolution**: changed the entity contracts to discriminated unions for guest vs. OAuth authors, stripped `authorType` before `POST /api/guestbook`, and allowed empty delete bodies for OAuth callers while keeping guest password support.
 - **Issue**: 첫 `#41` 리뷰에서 로그인 폼이 `await login()` 네트워크 요청 동안 비활성화되지 않아 사용자가 submit을 연속으로 눌러 중복 로그인 요청을 보낼 수 있었다.
 - **Resolution**: `src/features/admin-login/ui/login-form.tsx`에 `isLoading` 상태를 추가하고 `isPending`과 합친 `busy` 플래그로 입력과 submit 버튼을 모두 잠그도록 수정했다.
 - **Issue**: `/dashboard/login`만 sidebar를 숨기기 위해 `src/app/dashboard/layout.tsx` 전체를 client component로 바꾸면 admin 레이아웃이 불필요하게 클라이언트 번들로 승격된다.
@@ -183,6 +198,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #142
+- Related Issue: #51
 - Related PR: #141
 - Related Issue: #41
 - Related PR: #143
