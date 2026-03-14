@@ -12,7 +12,7 @@ Synchronous wrapper around `$dev-pipeline`. Runs the same state machine with no 
 All `$dev-pipeline` invariants apply. Additionally:
 
 1. **No turn breaks.** Run build through log in a single turn. Stop only on terminal states.
-2. **Default tool is `codex`. Always pass `--tool` to the run command.** Use `codex` unless the user explicitly provided a different value via `--tool`.
+2. **Always pass `--tool $TOOL` to the run command.** `TOOL` comes from user input (`--tool <value>`) or defaults to `codex`. User-supplied value takes priority - never override it.
 3. **Do not modify dev-pipeline skills or scripts.** This skill is a caller, not an owner.
 4. **Edits only in resolve step**, only in the issue worktree.
 
@@ -20,11 +20,11 @@ All `$dev-pipeline` invariants apply. Additionally:
 
 - `AREA`: `client` | `server` | `workspace`
 - `ISSUE`: GitHub issue number
-- `TOOL` (optional): default `codex`. **Initialize `TOOL=codex` at skill start unless the user explicitly provided a different value.**
+- `TOOL`: Parse from user input first. If the user wrote `--tool <value>` (e.g. `--tool claude`), set `TOOL=<value>`. If absent, set `TOOL=codex`. **Never override a user-supplied `--tool` value with the default.**
 
 ## Workflow
 
-Before running any step, set `TOOL=codex` unless the user explicitly specified `--tool`. Never omit `--tool` from the run command.
+Parse user input before setting any variable. After parsing: if user specified `--tool`, use that value; otherwise use `codex`. Always pass `--tool $TOOL` explicitly - never omit it.
 
 Follow `$dev-pipeline` workflow for all steps except `review_dispatch`. Steps that are identical to base: init, build, review_process, suggestion_decide, resolve, merge, cleanup_wt, log.
 
@@ -35,7 +35,8 @@ Base dev-pipeline ends the turn at dispatch and resumes on task notification. Th
 On `dispatch` action:
 
 1. Run synchronously (do NOT use `run_in_background`):
-   `python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool ${TOOL:-codex}`
+   `python3 -m dev_pipeline run --issue $ISSUE --area $AREA --pr $PR --tool $TOOL`
+   (`$TOOL` is always set from the parse step above - either user-specified or `codex`.)
 2. Enter poll loop:
    `python3 -m dev_pipeline step review-wait --issue $ISSUE --area $AREA`
 
