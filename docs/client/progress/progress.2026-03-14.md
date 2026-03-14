@@ -1,6 +1,18 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #60 에셋 라이브러리 feature + 페이지 PR #159 머지
+  - PR: `feat: add asset library page (#60)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/assets/page.tsx`, `src/features/asset-uploader/index.ts`, `src/features/asset-uploader/ui/asset-uploader.tsx`, `src/features/asset-uploader/ui/asset-grid.tsx`, `src/features/asset-uploader/ui/upload-zone.tsx`, `src/entities/asset/api.ts`
+  - initial change: `/dashboard/assets` 관리 페이지와 asset-uploader feature를 추가하고, 업로드 대기열, drag-and-drop/파일 선택, 수동 업로드 버튼, paginated gallery, URL/마크다운 복사, 단건/다중 삭제 확인 모달을 연결
+  - review fix 1: 배치 삭제를 `Promise.allSettled`로 바꿔 부분 성공 시에도 목록 invalidate와 선택 상태 정리를 수행하고, 실패 개수는 별도 에러 메시지로 안내
+  - review fix 2: 모바일/터치 환경에서도 per-item 액션이 보이도록 overlay를 small screen 기본 노출 + hover/focus 확장으로 조정하고, malformed asset URL에도 render가 깨지지 않게 filename decode fallback 추가
+  - review fix 3: settled mutation의 stale variables가 `삭제 중...` 상태를 남기지 않도록 deleting ids를 `deleteMutation.isPending`으로 게이트
+  - verification: issue worktree에서 base `client/node_modules` symlink 후 `pnpm build && pnpm compile:types && pnpm lint`
+  - review: round 1 warning 2 / suggestion 1 -> resolve, round 2 warning 1 -> resolve, round 3 clean
+  - merge: squash merge, merge commit `4c63858c44d4e1c9b7fbd1944b9c164f0adf43f8`, merged at `2026-03-14T12:35:57Z`
+  - branch: `feat/issue-60-assets-library` (remote branch deleted, local issue worktree cleaned up)
 - [x] #68 Admin 방명록 관리 페이지 PR #158 머지
   - PR: `feat: add admin guestbook page (#68)`
   - merge target: `main`
