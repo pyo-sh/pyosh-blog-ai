@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #58 Asset entity types + API PR #149 머지
+  - PR: `feat: add asset entity api (#58)`
+  - merge target: `main`
+  - 구현: `src/entities/asset/model.ts`, `src/entities/asset/api.ts`, `src/entities/asset/index.ts`
+  - initial change: asset list item 타입, paginated `fetchAssets(page)`, CSRF 토큰 기반 multipart `uploadAssets(files)`, `deleteAsset(id)` helper 추가
+  - contract alignment: 업로드 응답은 서버 계약상 `createdAt` 없이 `{ assets: UploadedAsset[] }`를 반환하므로 list item `Asset`과 upload result `UploadedAsset`을 분리
+  - verification: `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `6a1f6bd8f9f02217a96367e5a2d1ab172c1da18a`
+  - branch: `feat/issue-58-asset-api` (remote branch deleted, local issue worktree cleaned up)
 - [x] #54 마크다운 에디터 + 프리뷰 feature PR #147 머지
   - PR: `feat: add markdown editor feature (#54)`
   - merge target: `main`
@@ -158,6 +168,7 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- The backend asset upload endpoint `POST /api/assets/upload` returns `{ assets: UploadedAsset[] }` without `createdAt`, while `GET /api/assets` returns paginated list items with `createdAt`, so the client entity layer should model those as separate types.
 - The public stats backend contract at `GET /api/stats/popular` returns `{ data: PopularPost[] }`, so the client entity helper should unwrap `response.data` rather than expose the transport wrapper upstream.
 - In a fresh client issue worktree, `pnpm install --frozen-lockfile` was still required before `pnpm compile:types && pnpm lint && pnpm build` because the worktree did not start with its own `node_modules`.
 - Comment create/delete client payloads need the same `authorType`-discriminated union pattern as guestbook; without a discriminator, the OAuth subset weakens the union enough that guest-only required fields like `guestPassword` stop being enforced by TypeScript.
@@ -253,6 +264,8 @@
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #149
+- Related Issue: #58
 - Related PR: #145
 - Related Issue: #52
 - Related PR: #144
