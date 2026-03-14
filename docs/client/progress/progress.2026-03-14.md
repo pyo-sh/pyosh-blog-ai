@@ -1,6 +1,17 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #40 Dashboard 인증 미들웨어 PR #144 머지
+  - PR: `feat: add dashboard auth middleware (#40)`
+  - merge target: `main`
+  - 구현: `src/middleware.ts`, `.env.local.example`
+  - initial change: `/dashboard/:path*` matcher 추가, `/dashboard/login` allowlist, 백엔드 `API_URL` + `/api/auth/me`로 쿠키 전달 인증 확인, 실패 시 로그인 리다이렉트
+  - review fix 1: 로그인 리다이렉트에 `returnTo`를 포함하고, `/api/auth/me` 인증 fetch에 `AbortSignal.timeout(3000)`을 추가
+  - review fix 2: 운영 환경에서 `API_URL` 미설정 시 접근을 거부하도록 fail-closed 처리하고, 인증된 사용자가 `/dashboard/login`으로 직접 들어오면 `/dashboard`로 되돌리도록 보완
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 3 / suggestion 1 -> resolve, round 2 warning 1 / suggestion 1 -> resolve, round 3 suggestion-only -> merge
+  - merge: squash merge, merge commit `7ba93bdf0a53e221251f06fbddb5032d1d0fba24`
+  - branch: `feat/issue-40-dashboard-auth` (remote branch deleted, local issue worktree cleaned up)
 - [x] #51 Guestbook entity types + API PR #142 머지
   - PR: `feat: add guestbook entity api (#51)`
   - merge target: `main`
@@ -115,6 +126,8 @@
   - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
 
 ## Discoveries
+- In this repo, dashboard route protection can live entirely in `src/middleware.ts`; forwarding the incoming `Cookie` header to the existing backend `/api/auth/me` endpoint was enough to reuse the auth contract from issue #38 without adding a new client entity layer.
+- `pnpm compile:types && pnpm lint && pnpm build` should be run sequentially in a fresh Next.js worktree here; running `compile:types` in parallel with `build` can race on `.next/types/**` generation because `tsconfig.json` includes those generated route type files.
 - The initial `CreateGuestbookBody` shape from the issue description was too guest-specific for the actual `optionalAuth` backend contract; the client entity layer needed to model guest and OAuth creation separately even though both hit the same `/api/guestbook` endpoint.
 - Adding a discriminant like `authorType` is still compatible with the existing backend contract as long as the client API helper strips that field before serializing the request payload.
 - `DeleteGuestbookBody` also needs dual-mode typing because OAuth-authenticated deletes rely on session cookies and do not send `guestPassword`.
@@ -150,6 +163,8 @@
 - GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
 
 ## Issues & Resolutions
+- **Issue**: The first middleware pass redirected unauthenticated users to `/dashboard/login` but dropped the original destination, had no explicit timeout on `/api/auth/me`, and hard-threw on missing `API_URL` during module initialization.
+- **Resolution**: added a `returnTo` query param, bounded the auth fetch with `AbortSignal.timeout(3000)`, changed production misconfiguration handling to log and deny access, and redirected already authenticated admins away from `/dashboard/login`.
 - **Issue**: The first guestbook entity pass made `CreateGuestbookBody` and `DeleteGuestbookBody` guest-only, which forced impossible password/name/email fields into OAuth call sites even though the server route supports authenticated OAuth requests without them.
 - **Resolution**: changed the entity contracts to discriminated unions for guest vs. OAuth authors, stripped `authorType` before `POST /api/guestbook`, and allowed empty delete bodies for OAuth callers while keeping guest password support.
 - **Issue**: 첫 `#41` 리뷰에서 로그인 폼이 `await login()` 네트워크 요청 동안 비활성화되지 않아 사용자가 submit을 연속으로 눌러 중복 로그인 요청을 보낼 수 있었다.
@@ -193,11 +208,13 @@
 
 ## Next Steps
 - [ ] Add `src/app/tags/[slug]/page.tsx` so post tags can become real navigation targets again.
-- [ ] Add route-level auth guarding so already authenticated admins are redirected away from `/dashboard/login` and unauthenticated users are blocked from protected dashboard screens.
+- [ ] Update the admin login success flow to consume the new `returnTo` query param and send authenticated users back to their originally requested dashboard route.
 - [ ] Add actual `/dashboard/posts/new` and `/dashboard/posts/[id]` admin routes, then reconnect the create/edit navigation removed during PR #137 review.
 - [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
 
 ## Notes
+- Related PR: #144
+- Related Issue: #40
 - Related PR: #142
 - Related Issue: #51
 - Related PR: #141
