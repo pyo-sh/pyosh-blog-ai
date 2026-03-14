@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #59 태그 목록/태그별 글 목록 페이지 PR #154 머지
+  - PR: `feat: implement tag pages (#59)`
+  - merge target: `main`
+  - 구현: `src/app/tags/page.tsx`, `src/app/tags/[slug]/page.tsx`
+  - initial change: `/tags`의 태그 pill을 각 태그 archive 링크로 연결하고, `/tags/[slug]`에서 `fetchPosts({ tagSlug, page })` 기반의 SSR 목록/빈 상태/페이지네이션을 추가
+  - review fix: 범위를 벗어난 `page` query가 misleading empty state를 렌더하지 않도록 홈 목록과 동일한 out-of-range `notFound()` 검증 추가
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 clean
+  - merge: squash merge, PR #154
+  - branch: `feat/issue-59-tag-pages` (remote branch deleted, local issue worktree cleaned up)
 - [x] #67 헤더 네비게이션 업데이트 PR #152 머지
   - PR: `feat: update header navigation (#67)`
   - merge target: `main`
