@@ -1,6 +1,16 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #37 카테고리별 글 목록 페이지 PR #163 머지
+  - PR: `feat: add category archive page (#37)`
+  - merge target: `main`
+  - 구현: `src/app/categories/[slug]/page.tsx`
+  - initial change: `/categories/[slug]` placeholder를 SSR 카테고리 archive로 교체하고, slug 기반 카테고리 조회, `categoryId` 필터 게시글 목록, `CategoryNav`/`PostCard`/`Pagination` 렌더링을 연결
+  - policy: 카테고리 트리를 재귀 탐색해 nested category slug도 찾고, 숨김 카테고리/없는 slug/음수·0·비정수·범위 초과 `page`는 모두 `notFound()`로 404 처리
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, PR #163
+  - branch: `feat/issue-37-category-page` (remote branch deleted, local issue worktree cleaned up)
 - [x] #70 Admin 댓글 관리 페이지 PR #162 머지
   - PR: `feat: add admin comments page (#70)`
   - merge target: `main`
