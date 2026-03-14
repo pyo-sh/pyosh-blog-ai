@@ -1,6 +1,19 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #55 댓글 섹션 feature PR #155 머지
+  - PR: `feat: add comment section feature (#55)`
+  - merge target: `main`
+  - 구현: `src/app/posts/[slug]/page.tsx`, `src/features/comment-section/index.ts`, `src/features/comment-section/ui/comment-form.tsx`, `src/features/comment-section/ui/comment-item.tsx`, `src/features/comment-section/ui/comment-list.tsx`
+  - initial change: 글 상세 페이지에 댓글 목록/작성 폼/대댓글/삭제 확인 모달을 연결하고, 게스트와 OAuth viewer 모두를 지원하는 local comment interaction 흐름을 추가
+  - review fix 1: 부모 댓글 삭제 시 subtree를 제거하지 않고 `status: "deleted"` placeholder를 유지하도록 local tree update를 보정하고, root/nested list markup ownership을 정리
+  - review fix 2: comment create/delete payload를 viewer/comment author type에 따라 guest/OAuth로 분기하고, deleted placeholder 댓글에는 reply/delete action을 숨김
+  - review fix 3: post page viewer detection을 shared auth contract 기반으로 맞추고, delete modal backdrop를 `bg-grey-2/50`로 바꿔 dialog opacity regression을 제거
+  - review fix 4: comments fetch 실패가 post SSR 전체를 깨뜨리지 않도록 graceful fallback과 non-blocking error state를 추가하고, whitespace-only comment submit을 client-side에서 차단
+  - verification: issue worktree에서 `pnpm lint && pnpm compile:types && pnpm build`
+  - review: round 1 warning 1 / suggestion 1 -> resolve, round 2 warning 2 -> resolve, round 3 warning 1 / suggestion 1 -> resolve, round 4 warning 1 / suggestion 1 -> resolve
+  - merge: squash merge, merge commit `049e1fa57507d3d879aebd4cbe3bcead92751426`, merged at `2026-03-14T12:09:39Z`
+  - branch: `feat/issue-55-comment-section` (remote branch deleted, local issue worktree cleaned up)
 - [x] #57 카테고리 관리 feature + 페이지 PR #156 머지
   - PR: `feat: add category admin page (#57)`
   - merge target: `main`
