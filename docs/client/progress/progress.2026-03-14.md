@@ -1,6 +1,18 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #70 Admin 댓글 관리 페이지 PR #162 머지
+  - PR: `feat: add admin comments page (#70)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/comments/page.tsx`, `src/widgets/admin-comments/index.ts`, `src/widgets/admin-comments/ui/admin-comments-page.tsx`
+  - initial change: `/dashboard/comments` 관리자 댓글 관리 페이지를 추가하고, 댓글 목록 테이블에 작성자/본문 요약/비밀 여부/상태/작성일/강제 삭제 액션을 연결
+  - review fix 1: 숨김 댓글도 관리자 화면에서는 원문을 검토할 수 있도록 표시하고, 긴 댓글은 `전체 보기` 토글로 확장 가능하게 보완
+  - review fix 2: `src/app/dashboard/comments/page.tsx`는 라우팅 래퍼만 남기고 실제 구현을 `src/widgets/admin-comments`로 이동해 FSD app 레이어 규칙 준수
+  - review fix 3: 마지막 페이지에서 마지막 댓글 삭제 시 이전 페이지로 선이동해 out-of-range 에러 상태에 갇히지 않도록 페이지 보정 로직 추가
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm compile:types && pnpm lint`
+  - review: round 1 warning 2 -> resolve, round 2 warning 1 -> resolve, round 3 warning 1 -> resolve, round 4 clean
+  - merge: squash merge, PR #162
+  - branch: `feat/issue-70-admin-comments` (remote branch deleted, local issue worktree cleaned up)
 - [x] #53 Admin 글 작성/수정 페이지 PR #161 머지
   - PR: `feat: add post create and edit pages (#53)`
   - merge target: `main`
