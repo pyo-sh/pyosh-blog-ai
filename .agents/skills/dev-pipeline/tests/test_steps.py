@@ -211,8 +211,8 @@ class TestReviewWait:
         assert result.action == "review"
         assert result.data["reviewId"] == 777
 
-    def test_codex_failed_fallback(self, monorepo_root, monkeypatch):
-        """Bug fix #2: codex FAILED triggers codex->claude fallback."""
+    def test_codex_failed_retries_codex_first(self, monorepo_root, monkeypatch):
+        """First codex FAILED retries with codex (not immediate claude fallback)."""
         _write_state(
             monorepo_root, 42, "workspace",
             step=PipelineStep.REVIEW_WAIT,
@@ -222,10 +222,11 @@ class TestReviewWait:
 
         result = step_review_wait(42, "workspace", monorepo_root)
         assert result.action == "retry"
-        assert result.data["tool"] == "claude"
+        assert result.data["tool"] == "codex"
+        assert "retry 1/2" in result.data["reason"]
 
-    def test_codex_failed_parse_fallback(self, monorepo_root, monkeypatch):
-        """Existing behavior preserved: codex FAILED_PARSE also triggers fallback."""
+    def test_codex_failed_parse_retries_codex_first(self, monorepo_root, monkeypatch):
+        """First codex FAILED_PARSE retries with codex."""
         _write_state(
             monorepo_root, 42, "workspace",
             step=PipelineStep.REVIEW_WAIT,
@@ -235,10 +236,13 @@ class TestReviewWait:
 
         result = step_review_wait(42, "workspace", monorepo_root)
         assert result.action == "retry"
-        assert result.data["tool"] == "claude"
+        assert result.data["tool"] == "codex"
 
-    def test_codex_failed_auth_fallback(self, monorepo_root, monkeypatch):
-        """Bug fix #2: codex FAILED_AUTH triggers fallback."""
+    def test_codex_failed_auth_skips_codex_retry_falls_back_to_claude(self, monorepo_root, monkeypatch):
+        """FAILED_AUTH skips codex retries entirely and falls back to claude immediately.
+
+        Auth failures are not transient - retrying the same tool is pointless.
+        """
         _write_state(
             monorepo_root, 42, "workspace",
             step=PipelineStep.REVIEW_WAIT,
@@ -248,10 +252,12 @@ class TestReviewWait:
 
         result = step_review_wait(42, "workspace", monorepo_root)
         assert result.action == "retry"
-        assert result.data["tool"] == "claude"
+        assert result.data["tool"] == "claude", (
+            "FAILED_AUTH must immediately fall back to claude, not retry codex"
+        )
 
-    def test_codex_failed_publish_fallback(self, monorepo_root, monkeypatch):
-        """Bug fix #2: codex FAILED_PUBLISH triggers fallback."""
+    def test_codex_failed_publish_retries_codex_first(self, monorepo_root, monkeypatch):
+        """First codex FAILED_PUBLISH retries with codex."""
         _write_state(
             monorepo_root, 42, "workspace",
             step=PipelineStep.REVIEW_WAIT,
@@ -261,14 +267,88 @@ class TestReviewWait:
 
         result = step_review_wait(42, "workspace", monorepo_root)
         assert result.action == "retry"
-        assert result.data["tool"] == "claude"
+        assert result.data["tool"] == "codex"
 
-    def test_claude_failed_escalates(self, monorepo_root, monkeypatch):
-        """claude failure -> escalate (no double fallback)."""
+    def test_codex_retries_exhausted_falls_back_to_claude(self, monorepo_root, monkeypatch):
+        """After CODEX_REVIEW_MAX_RETRIES (2), codex falls back to claude."""
+        from dev_pipeline.steps import CODEX_REVIEW_MAX_RETRIES
+
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_WAIT,
+            review_job=ReviewJob(status=ReviewJobStatus.FAILED, tool="codex"),
+            stage_retries={
+                **{s.value: 0 for s in PipelineStep},
+                "codex_review_dispatch": CODEX_REVIEW_MAX_RETRIES,
+            },
+        )
+        monkeypatch.setattr(f"{S}.check_review_exists", lambda *a, **kw: None)
+
+        result = step_review_wait(42, "workspace", monorepo_root)
+        assert result.action == "retry"
+        assert result.data["tool"] == "claude"
+        assert "falling back to claude" in result.data["reason"]
+
+    def test_codex_second_retry_still_codex(self, monorepo_root, monkeypatch):
+        """Codex retry counter=1 (second failure) still retries with codex."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_WAIT,
+            review_job=ReviewJob(status=ReviewJobStatus.FAILED_PARSE, tool="codex"),
+            stage_retries={
+                **{s.value: 0 for s in PipelineStep},
+                "codex_review_dispatch": 1,
+            },
+        )
+        monkeypatch.setattr(f"{S}.check_review_exists", lambda *a, **kw: None)
+
+        result = step_review_wait(42, "workspace", monorepo_root)
+        assert result.action == "retry"
+        assert result.data["tool"] == "codex"
+        assert "retry 2/2" in result.data["reason"]
+
+    def test_claude_failed_retries_claude(self, monorepo_root, monkeypatch):
+        """First claude failure retries with claude (not immediate escalate)."""
         _write_state(
             monorepo_root, 42, "workspace",
             step=PipelineStep.REVIEW_WAIT,
             review_job=ReviewJob(status=ReviewJobStatus.FAILED, tool="claude"),
+        )
+        monkeypatch.setattr(f"{S}.check_review_exists", lambda *a, **kw: None)
+
+        result = step_review_wait(42, "workspace", monorepo_root)
+        assert result.action == "retry"
+        assert result.data["tool"] == "claude"
+
+    def test_claude_failed_escalates_when_retries_exhausted(self, monorepo_root, monkeypatch):
+        """Claude failure with exhausted retries -> escalate."""
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_WAIT,
+            review_job=ReviewJob(status=ReviewJobStatus.FAILED, tool="claude"),
+            stage_retries={
+                **{s.value: 0 for s in PipelineStep},
+                "review_dispatch": 3,  # maxStageRetries=3, so 3 >= 3 → exhausted
+            },
+        )
+        monkeypatch.setattr(f"{S}.check_review_exists", lambda *a, **kw: None)
+
+        result = step_review_wait(42, "workspace", monorepo_root)
+        assert result.action == "escalate"
+
+    def test_all_retries_exhausted_escalates(self, monorepo_root, monkeypatch):
+        """Both codex and claude retries exhausted -> escalate."""
+        from dev_pipeline.steps import CODEX_REVIEW_MAX_RETRIES
+
+        _write_state(
+            monorepo_root, 42, "workspace",
+            step=PipelineStep.REVIEW_WAIT,
+            review_job=ReviewJob(status=ReviewJobStatus.FAILED, tool="codex"),
+            stage_retries={
+                **{s.value: 0 for s in PipelineStep},
+                "codex_review_dispatch": CODEX_REVIEW_MAX_RETRIES,
+                "review_dispatch": 3,
+            },
         )
         monkeypatch.setattr(f"{S}.check_review_exists", lambda *a, **kw: None)
 

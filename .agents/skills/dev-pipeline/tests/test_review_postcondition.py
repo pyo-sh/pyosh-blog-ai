@@ -146,6 +146,147 @@ class TestClaudePostCondition:
         assert not check_called, "check_review_exists must not be called when subprocess fails"
 
 
+class TestCodexCommandShape:
+    """Verify codex dispatch uses generic `codex exec` with --output-schema."""
+
+    def test_command_uses_output_schema_not_exec_review(self, tmp_path):
+        """REGRESSION: must use `codex exec --output-schema`, not `codex exec review --base`."""
+        issue, area, pr = _init_state(tmp_path)
+        captured_cmds = []
+
+        def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
+            captured_cmds.append(cmd)
+            review_json = '{"verdict":"comment","summary":"ok","issues":[]}'
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
+                Path(out_path).write_text(review_json)
+            return _make_run_result(rc=0, stderr="codex ok")
+
+        def fake_subprocess_run(cmd, **kwargs):
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("subprocess.run", side_effect=fake_subprocess_run),
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.get_pr_base_ref", return_value="main"),
+            patch("dev_pipeline.github_client.check_review_exists", return_value=88001),
+        ):
+            from dev_pipeline import review_runner
+            review_runner._dispatch_codex(issue=issue, area=area, pr=pr, monorepo_root=tmp_path)
+
+        assert len(captured_cmds) == 1
+        cmd = captured_cmds[0]
+
+        # Must use generic `codex exec`, NOT `codex exec review`
+        assert cmd[0] == "codex"
+        assert cmd[1] == "exec"
+        assert "review" not in cmd[2:3], (
+            "REGRESSION: must use generic `codex exec`, not `codex exec review`. "
+            "`codex exec review` does not support --output-schema."
+        )
+
+        # Must include --output-schema pointing to review_schema.json
+        assert "--output-schema" in cmd, "command must include --output-schema"
+        schema_idx = cmd.index("--output-schema")
+        schema_path = cmd[schema_idx + 1]
+        assert schema_path.endswith("review_schema.json")
+
+        # Must include --output-last-message for JSON file output
+        assert "--output-last-message" in cmd
+
+        # Must NOT include --base (that's a `codex exec review` flag)
+        assert "--base" not in cmd, (
+            "--base is a `codex exec review` flag, not available in generic `codex exec`"
+        )
+
+    def test_command_includes_explicit_prompt(self, tmp_path):
+        """The last argument must be the review prompt (not stdin)."""
+        issue, area, pr = _init_state(tmp_path)
+        captured_cmds = []
+
+        def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
+            captured_cmds.append(cmd)
+            review_json = '{"verdict":"approve","summary":"clean","issues":[]}'
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
+                Path(out_path).write_text(review_json)
+            return _make_run_result(rc=0, stderr="")
+
+        def fake_subprocess_run(cmd, **kwargs):
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("subprocess.run", side_effect=fake_subprocess_run),
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.get_pr_base_ref", return_value="main"),
+            patch("dev_pipeline.github_client.check_review_exists", return_value=88001),
+        ):
+            from dev_pipeline import review_runner
+            review_runner._dispatch_codex(issue=issue, area=area, pr=pr, monorepo_root=tmp_path)
+
+        cmd = captured_cmds[0]
+        prompt = cmd[-1]
+        assert "git diff" in prompt, "prompt must instruct codex to read the diff"
+        assert "origin/main" in prompt, "prompt must reference the base ref"
+        assert "JSON" in prompt, "prompt must instruct codex to produce JSON"
+
+        # Read-only safety constraints must be in the prompt
+        assert "Do NOT modify" in prompt, "prompt must forbid file modification"
+        assert "git commit" in prompt, "prompt must forbid git commit"
+        assert "git checkout" in prompt, "prompt must forbid git checkout"
+        assert "git reset" in prompt, "prompt must forbid git reset"
+
+    def test_empty_output_file_sets_failed_parse(self, tmp_path):
+        """When --output-last-message writes empty file, status must be failed_parse."""
+        issue, area, pr = _init_state(tmp_path)
+
+        def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
+                Path(out_path).write_text("")  # empty file
+            return _make_run_result(rc=0, stderr="codex ok")
+
+        def fake_subprocess_run(cmd, **kwargs):
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("subprocess.run", side_effect=fake_subprocess_run),
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.get_pr_base_ref", return_value="main"),
+        ):
+            from dev_pipeline import review_runner
+            rc = review_runner._dispatch_codex(issue=issue, area=area, pr=pr, monorepo_root=tmp_path)
+
+        assert rc == 1
+        state = state_read(issue, area, tmp_path)
+        assert state.review_job.status == ReviewJobStatus.FAILED_PARSE
+
+    def test_non_json_output_sets_failed_parse(self, tmp_path):
+        """When --output-last-message writes non-JSON, status must be failed_parse."""
+        issue, area, pr = _init_state(tmp_path)
+
+        def fake_run(cmd, *, cwd=None, env=None, timeout=None, capture_output=False, replace_env=False):
+            if "--output-last-message" in cmd:
+                out_path = cmd[cmd.index("--output-last-message") + 1]
+                Path(out_path).write_text("This is not JSON, just a transcript")
+            return _make_run_result(rc=0, stderr="codex ok")
+
+        def fake_subprocess_run(cmd, **kwargs):
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("subprocess.run", side_effect=fake_subprocess_run),
+            patch("dev_pipeline.review_runner.run", side_effect=fake_run),
+            patch("dev_pipeline.github_client.get_pr_base_ref", return_value="main"),
+        ):
+            from dev_pipeline import review_runner
+            rc = review_runner._dispatch_codex(issue=issue, area=area, pr=pr, monorepo_root=tmp_path)
+
+        assert rc == 1
+        state = state_read(issue, area, tmp_path)
+        assert state.review_job.status == ReviewJobStatus.FAILED_PARSE
+
+
 class TestCodexPostCondition:
     def test_publisher_failure_sets_failed_publish_not_success(self, tmp_path):
         """When review_publish.py fails, status must be failed_publish, not success."""

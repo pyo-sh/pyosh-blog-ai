@@ -109,6 +109,49 @@ Rules:
 """
 
 
+def _codex_review_prompt(
+    issue: int,
+    area: str,
+    pr: int,
+    repo: str,
+    base_ref: str,
+) -> str:
+    """Build an explicit review prompt for generic `codex exec` with --output-schema.
+
+    Unlike `codex exec review --base`, generic `codex exec` does not automatically
+    load the diff. The prompt must instruct codex to read the diff and produce
+    schema-conforming JSON as its final response.
+    """
+    return f"""You are a code reviewer. Review PR #{pr} for issue #{issue} in {repo} ({area}).
+
+STRICT CONSTRAINTS - READ-ONLY REVIEW:
+- Do NOT modify, create, or delete any files.
+- Do NOT run git commit, git checkout, git reset, git stash, or any git write command.
+- Do NOT run any command that changes repository state.
+- ONLY use git diff, git log, git show, cat, and file-reading commands.
+
+Steps:
+1. Run: git diff origin/{base_ref}...HEAD --stat
+2. Run: git diff origin/{base_ref}...HEAD
+3. For files that need more context, read the full file.
+4. Evaluate the changes for correctness, security, performance, and style.
+
+Your final response MUST be a single JSON object conforming to the provided --output-schema.
+
+Field rules:
+- verdict: "approve" if no issues, "request_changes" if any P1 or P2 found, "comment" otherwise.
+- summary: Short prose summary of findings (max 2000 chars).
+- issues: Array of findings. Empty array for clean reviews.
+  - severity: "P1" (must fix), "P2" (should fix), "P3" (suggestion).
+  - path: Relative file path. Omit if not file-specific.
+  - line: Line number. Omit if not applicable.
+  - title: One-line issue title (max 200 chars).
+  - body: Explanation and suggested fix (max 2000 chars).
+
+Do NOT output anything other than the JSON object. No markdown, no explanation, just JSON.
+"""
+
+
 def _write_job_meta(
     meta_path: Path,
     *,
@@ -569,14 +612,24 @@ def _dispatch_codex(
         )
         Path(tmp_codex_home, "config.toml").write_text(config_toml)
 
+        # Use generic `codex exec` with --output-schema for structured JSON output.
+        # `codex exec review` does NOT support --output-schema, so its
+        # --output-last-message writes unstructured text that fails JSON parsing.
+        schema_path = str(
+            monorepo_root / ".agents" / "skills" / "dev-pipeline"
+            / "scripts" / "dev_pipeline" / "review_schema.json"
+        )
+        prompt = _codex_review_prompt(issue, area, pr, repo, base_ref)
+
         cmd = [
-            "codex", "exec", "review",
-            "--base", f"origin/{base_ref}",
+            "codex", "exec",
+            "--output-schema", schema_path,
             "--output-last-message", str(review_json_path),
             "--dangerously-bypass-approvals-and-sandbox",
         ]
         if model:
             cmd += ["--model", model]
+        cmd.append(prompt)
 
         print(
             f"[review_runner:subprocess] start tool=codex stage=review "

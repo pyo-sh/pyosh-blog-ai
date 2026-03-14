@@ -61,7 +61,7 @@ class StepResult:
 
 
 # ---------------------------------------------------------------------------
-# All failed_* statuses that warrant codex -> claude fallback
+# All failed_* statuses that warrant retry or tool fallback
 # ---------------------------------------------------------------------------
 _FAILED_STATUSES = frozenset({
     ReviewJobStatus.FAILED,
@@ -71,6 +71,9 @@ _FAILED_STATUSES = frozenset({
     ReviewJobStatus.FAILED_POSTCONDITION,
     ReviewJobStatus.FAILED_DISPATCH,
 })
+
+# Codex gets up to this many retries (same tool) before falling back to claude.
+CODEX_REVIEW_MAX_RETRIES = 2
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +252,29 @@ def step_review_wait(issue: int, area: str, monorepo_root: Path) -> StepResult:
 
     if job.status in _FAILED_STATUSES:
         if job.tool == "codex":
+            # Auth failures cannot be resolved by retrying the same tool.
+            # Skip codex retries entirely and fall back to claude immediately.
+            if job.status != ReviewJobStatus.FAILED_AUTH:
+                # Retry with codex up to CODEX_REVIEW_MAX_RETRIES times before
+                # falling back to claude. Uses a dedicated counter key so it does
+                # not consume the general review_dispatch budget.
+                codex_retries = state.stage_retries.get("codex_review_dispatch", 0)
+                if codex_retries < CODEX_REVIEW_MAX_RETRIES:
+                    state_update(issue, area, monorepo_root, {
+                        "step": "review_dispatch",
+                        "stageRetries": {"codex_review_dispatch": codex_retries + 1},
+                    })
+                    return StepResult(
+                        action="retry",
+                        data={
+                            "tool": "codex",
+                            "reason": (
+                                f"codex {job.status.value}, "
+                                f"retry {codex_retries + 1}/{CODEX_REVIEW_MAX_RETRIES}"
+                            ),
+                        },
+                    )
+            # Codex retries exhausted (or auth failure) - fall back to claude
             can_retry = stage_retry(issue, area, monorepo_root, "review_dispatch")
             if can_retry:
                 state_update(issue, area, monorepo_root, {"step": "review_dispatch"})
@@ -256,10 +282,24 @@ def step_review_wait(issue: int, area: str, monorepo_root: Path) -> StepResult:
                     action="retry",
                     data={
                         "tool": "claude",
-                        "reason": f"codex {job.status.value}, falling back to claude",
+                        "reason": (
+                            f"codex {job.status.value}, "
+                            "falling back to claude"
+                        ),
                     },
                 )
-        # claude failed or retries exhausted -> escalate
+        elif job.tool == "claude":
+            can_retry = stage_retry(issue, area, monorepo_root, "review_dispatch")
+            if can_retry:
+                state_update(issue, area, monorepo_root, {"step": "review_dispatch"})
+                return StepResult(
+                    action="retry",
+                    data={
+                        "tool": "claude",
+                        "reason": f"claude {job.status.value}, retrying",
+                    },
+                )
+        # All retries exhausted -> escalate
         return StepResult(
             action="escalate",
             data={
@@ -322,6 +362,7 @@ def step_review_process(
             "review_dispatch": 0,
             "review_wait": 0,
             "review_process": 0,
+            "codex_review_dispatch": 0,
         },
     })
 

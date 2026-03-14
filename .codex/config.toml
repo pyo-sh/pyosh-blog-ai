@@ -1,0 +1,20 @@
+# Codex configuration for pyosh-blog monorepo
+
+# Fall back to CLAUDE.md when AGENTS.md is not present in a directory
+project_doc_fallback_filenames = ["CLAUDE.md"]
+
+# Default sandbox: allow writing within the workspace, block network by default
+sandbox_mode = "workspace-write"
+
+# Pause before running commands that modify git state or run external processes
+approval_policy = "on-request"
+
+[profiles.review]
+# Use for code review tasks that need deep reasoning
+model_reasoning_effort = "high"
+approval_policy = "never"
+
+[profiles.fast]
+# Use for lightweight read-only tasks
+model_reasoning_effort = "low"
+approval_policy = "untrusted"
