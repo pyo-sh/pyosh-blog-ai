@@ -1,6 +1,18 @@
 # Progress: 2026-03-14
 
 ## Completed
+- [x] #54 마크다운 에디터 + 프리뷰 feature PR #147 머지
+  - PR: `feat: add markdown editor feature (#54)`
+  - merge target: `main`
+  - 구현: `src/entities/category/api.ts`, `src/entities/category/index.ts`, `src/features/post-editor/index.ts`, `src/features/post-editor/ui/markdown-editor.tsx`, `src/features/post-editor/ui/markdown-preview.tsx`, `src/features/post-editor/ui/markdown-preview.worker.ts`, `src/features/post-editor/ui/post-form.tsx`
+  - initial change: admin 글 작성용 `MarkdownEditor`/`MarkdownPreview`/`PostForm` feature 추가, 카테고리 목록 query, create/update mutation, 60vh editor-preview layout 구현
+  - review fix 1: category SSR 호출이 stale cache 경로로 바뀌지 않도록 `fetchCategoriesClient()`를 분리하고, preview는 shared renderer 기반 worker로 옮겨 main thread blocking을 제거
+  - review fix 2: `PostForm` hydration을 post identity와 prop refresh 기준으로만 동기화하도록 조정해 편집 중 refetch나 저장 직후 stale props가 로컬 입력값을 덮어쓰지 않게 보완
+  - review fix 3: initial snapshot/signature 계산을 memoize하고 `onCancel`이 없을 때 cancel button을 렌더링하지 않도록 정리
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 2 -> resolve, round 2 warning 2 -> resolve, round 3 warning 1 -> resolve, round 4 warning 1 -> resolve, round 5 warning 1 / suggestion 1 -> resolve, round 6 clean
+  - merge: squash merge, merge commit `842a51b2dcaf1a68734ba5d1244fe16bfe98eb75`
+  - branch: `feat/issue-54-markdown-editor` (remote branch deleted, local issue worktree cleaned up)
 - [x] #56 PopularPost API PR #146 머지
   - PR: `feat: add popular post api (#56)`
   - merge target: `main`
