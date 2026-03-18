@@ -44,6 +44,7 @@
 | F-16 | 목차 (TOC) | `client/specs/toc.md` | `SPEC` | F-02 |
 | F-17 | 다크 모드 | `client/specs/dark-mode.md` | `SPEC` | - |
 | F-18 | 반응형 레이아웃 | `client/specs/responsive.md` | `SPEC` | - |
+| F-39 | Public 사이드바 레이아웃 | `client/specs/public-sidebar.md` | `SPEC` | F-01, F-04, F-06, F-10, F-17, F-18 |
 
 ## Admin 기능
 
@@ -127,7 +128,8 @@ F-01 홈 기반
 ├── F-03  카테고리별 목록
 ├── F-05  태그별 목록 (+ F-04)
 ├── F-06  인기 글
-└── F-11  검색
+├── F-11  검색
+└── F-39  Public 사이드바 (+ F-04, F-06, F-10, F-17, F-18)
 
 F-19 관리자 로그인 기반
 ├── F-20  대시보드
