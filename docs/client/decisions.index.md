@@ -4,9 +4,20 @@
 
 <!-- 새 항목은 아래에 추가 -->
 
-## 서버 API 추가 필요 사항
+## 001 - Docs branch git strategy
 
-> 아래 항목은 클라이언트 구현 과정에서 서버에 추가 API가 필요한 부분입니다.
+- **File**: `decisions/decision-001-docs-branch-strategy.md`
+- **Date**: 2026-03-13
+- **Status**: accepted
+- **Summary**: All dev-log commits target long-lived `docs` branch; squash-merge to `main` via `/dev-archive`
+- **Keywords**: dev-log, docs, git strategy, branching
 
-- **태그 목록 API** (`GET /api/tags`) — Issue #15에서 필요
-- **에셋 목록 API** (`GET /api/assets`) — Issue #18에서 필요
+<!-- 새 항목은 아래에 추가 -->
+
+## 002 - Category admin feature structure
+
+- **File**: `decisions/2026-03-14-category-admin-design.md`
+- **Date**: 2026-03-14
+- **Status**: accepted
+- **Summary**: Keep `/dashboard/categories` as a thin app entry and place query/mutation/modal orchestration in `features/category-manager`
+- **Keywords**: client, admin, categories, FSD, TanStack Query
