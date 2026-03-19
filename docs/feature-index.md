@@ -26,7 +26,7 @@
 
 | # | 기능 | 스펙 파일 | 상태 | 의존성 |
 |---|---|---|---|---|
-| F-01 | 홈 - 글 목록 (페이지네이션) | `client/specs/home-post-list.md` | `SPEC` | - |
+| F-01 | 홈 - 글 목록 (페이지네이션) | `client/specs/home-post-list.md` | `DRAFT` | - |
 | F-02 | 글 상세 (마크다운 렌더링, 코드 하이라이팅) | `client/specs/post-detail.md` | `SPEC` | F-01 |
 | F-03 | 카테고리별 글 목록 | `client/specs/category-post-list.md` | `SPEC` | F-01 |
 | F-04 | 태그 목록 | `client/specs/tag-list.md` | `SPEC` | - |
@@ -37,20 +37,20 @@
 | F-09 | 방명록 | `client/specs/guestbook.md` | `SPEC` | - |
 | F-10 | 조회수 기록 | `client/specs/view-counter.md` | `SPEC` | F-02 |
 | F-11 | 검색 | `client/specs/search.md` | `SPEC` | F-01 |
-| F-12 | 에러 페이지 (404, 글로벌 에러) | `client/specs/error-pages.md` | `SPEC` | - |
+| F-12 | 에러 페이지 (404, 글로벌 에러) | `client/specs/error-pages.md` | `DRAFT` | - |
 | F-13 | 로딩/빈 상태 | `client/specs/loading-empty-states.md` | `SPEC` | - |
 | F-14 | Toast 알림 | `client/specs/toast.md` | `SPEC` | - |
 | F-15 | 맨 위로 버튼 | `client/specs/scroll-to-top.md` | `SPEC` | - |
 | F-16 | 목차 (TOC) | `client/specs/toc.md` | `SPEC` | F-02 |
-| F-17 | 다크 모드 | `client/specs/dark-mode.md` | `SPEC` | - |
-| F-18 | 반응형 레이아웃 | `client/specs/responsive.md` | `SPEC` | - |
-| F-39 | Public 사이드바 레이아웃 | `client/specs/public-sidebar.md` | `SPEC` | F-01, F-04, F-06, F-10, F-17, F-18 |
+| F-17 | 다크 모드 | `client/specs/dark-mode.md` | `DRAFT` | - |
+| F-18 | 반응형 레이아웃 | `client/specs/responsive.md` | `DRAFT` | - |
+| F-39 | Public 사이드바 레이아웃 | `client/specs/public-sidebar.md` | `DRAFT` | F-01, F-04, F-06, F-10, F-17, F-18 |
 
 ## Admin 기능
 
 | # | 기능 | 스펙 파일 | 상태 | 의존성 |
 |---|---|---|---|---|
-| F-19 | 관리자 로그인 | `client/specs/admin-login.md` | `SPEC` | - |
+| F-19 | 관리자 로그인 | `client/specs/admin-login.md` | `DRAFT` | - |
 | F-20 | 대시보드 (통계 요약) | `client/specs/admin-dashboard.md` | `SPEC` | F-19 |
 | F-21 | 글 관리 (목록, 필터, 삭제/복원) | `client/specs/admin-post-list.md` | `SPEC` | F-19 |
 | F-22 | 마크다운 에디터 (편집 + 실시간 프리뷰) | `client/specs/admin-markdown-editor.md` | `SPEC` | F-19 |
