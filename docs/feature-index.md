@@ -29,7 +29,7 @@
 | F-01 | 홈 - 글 목록 (페이지네이션) | `client/specs/home-post-list.md` | `DRAFT` | - |
 | F-02 | 글 상세 (마크다운 렌더링, 코드 하이라이팅) | `client/specs/post-detail.md` | `SPEC` | F-01 |
 | F-03 | 카테고리별 글 목록 | `client/specs/category-post-list.md` | `SPEC` | F-01 |
-| F-04 | 태그 목록 | `client/specs/tag-list.md` | `SPEC` | - |
+| F-04 | 태그 목록 | `client/specs/tag-list.md` | `DRAFT` | - |
 | F-05 | 태그별 글 목록 | `client/specs/tag-post-list.md` | `SPEC` | F-01, F-04 |
 | F-06 | 인기 글 (7일/30일) | `client/specs/popular-posts.md` | `SPEC` | F-01 |
 | F-07 | 댓글 표시 (계층형 목록, 비밀글 마스킹) | `client/specs/comment-display.md` | `SPEC` | F-02 |
