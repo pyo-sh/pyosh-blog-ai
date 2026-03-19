@@ -38,8 +38,8 @@
 | F-10 | 조회수 기록 | `client/specs/view-counter.md` | `SPEC` | F-02 |
 | F-11 | 검색 | `client/specs/search.md` | `SPEC` | F-01 |
 | F-12 | 에러 페이지 (404, 글로벌 에러) | `client/specs/error-pages.md` | `DRAFT` | - |
-| F-13 | 로딩/빈 상태 | `client/specs/loading-empty-states.md` | `SPEC` | - |
-| F-14 | Toast 알림 | `client/specs/toast.md` | `SPEC` | - |
+| F-13 | 로딩/빈 상태 | `client/specs/loading-empty-states.md` | `DRAFT` | - |
+| F-14 | Toast 알림 | `client/specs/toast.md` | `DRAFT` | - |
 | F-15 | 맨 위로 버튼 | `client/specs/scroll-to-top.md` | `SPEC` | - |
 | F-16 | 목차 (TOC) | `client/specs/toc.md` | `SPEC` | F-02 |
 | F-17 | 다크 모드 | `client/specs/dark-mode.md` | `DRAFT` | - |
