@@ -15,6 +15,8 @@ services:
       # 단일 파일 bind mount는 에디터가 inode를 교체하면 깨지므로 사용하지 않음
     environment:
       - TZ=${TZ:-Asia/Seoul}
+      # Playwright MCP가 빌드 시 설치된 Chromium을 찾도록 경로 고정
+      - PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
     env_file:
       - ../../.env
     working_dir: /workspace
