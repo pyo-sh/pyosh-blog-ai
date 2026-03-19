@@ -16,6 +16,9 @@ CLAUDE.local.md
 .workspace/
 .pnpm-store
 
+## Playwright MCP artifacts (session logs, screenshots)
+.playwright-mcp/
+
 ## Python
 __pycache__/
 *.pyc
