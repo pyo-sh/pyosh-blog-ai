@@ -91,7 +91,7 @@
 
 | # | 기능 | 스펙 파일 | 상태 | 의존성 |
 |---|---|---|---|---|
-| F-37 | Swagger 세부화 (예시 데이터, 상세 설명) | `server/specs/swagger-docs.md` | `SPEC` | - |
+| F-37 | Swagger 세부화 (예시 데이터, 상세 설명) | `server/specs/swagger-docs.md` | `DRAFT` | - |
 | F-38 | Storybook 환경 구성 | `client/specs/storybook-setup.md` | `SPEC` | - |
 
 ---
