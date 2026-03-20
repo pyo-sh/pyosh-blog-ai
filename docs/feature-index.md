@@ -33,7 +33,7 @@
 | F-05 | 태그별 글 목록 | `client/specs/tag-post-list.md` | `DRAFT` | F-01, F-04 |
 | F-06 | 인기 글 (7일/30일) | `client/specs/popular-posts.md` | `DRAFT` | F-01, F-39 |
 | F-07 | 댓글 표시 (계층형 목록, 비밀글 마스킹) | `client/specs/comment-display.md` | `DRAFT` | F-02 |
-| F-08 | 댓글 작성/삭제 (게스트 폼, 대댓글, 비밀번호 삭제) | `client/specs/comment-interaction.md` | `SPEC` | F-07 |
+| F-08 | 댓글 작성/삭제 (게스트 폼, 대댓글, 비밀번호 삭제) | `client/specs/comment-interaction.md` | `DRAFT` | F-07 |
 | F-09 | 방명록 | `client/specs/guestbook.md` | `DRAFT` | - |
 | F-10 | 조회수 기록 | `client/specs/view-counter.md` | `SPEC` | F-02 |
 | F-11 | 검색 | `client/specs/search.md` | `SPEC` | F-01 |
