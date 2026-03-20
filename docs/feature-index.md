@@ -40,7 +40,7 @@
 | F-12 | 에러 페이지 (404, 글로벌 에러) | `client/specs/error-pages.md` | `DRAFT` | - |
 | F-13 | 로딩/빈 상태 | `client/specs/loading-empty-states.md` | `DRAFT` | - |
 | F-14 | Toast 알림 | `client/specs/toast.md` | `DRAFT` | - |
-| F-15 | 맨 위로 버튼 | `client/specs/scroll-to-top.md` | `SPEC` | - |
+| F-15 | 맨 위로 버튼 | `client/specs/scroll-to-top.md` | `DRAFT` | - |
 | F-16 | 목차 (TOC) | `client/specs/toc.md` | `SPEC` | F-02 |
 | F-17 | 다크 모드 | `client/specs/dark-mode.md` | `DRAFT` | - |
 | F-18 | 반응형 레이아웃 | `client/specs/responsive.md` | `DRAFT` | - |
