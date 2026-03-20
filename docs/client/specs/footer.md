@@ -1,0 +1,161 @@
+# F-36: Footer 콘텐츠
+
+**상태:** DRAFT
+**최종 수정:** 2026-03-20
+
+---
+
+## 1. 개요
+
+모든 Public 페이지 하단에 표시되는 Footer. 로고 텍스트, GitHub 프로필 링크, 이메일 링크, 저작권 문구를 포함한다. Admin 페이지에서는 숨긴다.
+
+## 2. 배경 및 동기
+
+현재 Footer가 구현되어 있으나 다음 개선이 필요하다:
+
+- 저작권 문구 없음
+- GitHub URL이 이전 repo(`pyosh_blog`)를 가리키고 있어 프로필 URL로 변경 필요
+- GitHub 링크에 전체 URL이 텍스트로 노출되어 있어 핸들명으로 변경
+- Admin 페이지에서도 Footer가 표시됨
+
+## 3. 목표
+
+- 저작권 문구를 추가한다
+- GitHub 링크를 프로필로 변경하고 표시 텍스트를 핸들명으로 한다
+- Admin 페이지에서 Footer를 숨긴다
+- 모바일/데스크톱 모두 적절한 높이와 간격으로 중앙 정렬한다
+
+## 4. 비목표
+
+- Footer 내 네비게이션 링크 (카테고리, 태그 등)
+- 뉴스레터 구독 폼
+- 블로그 소개 문구
+
+---
+
+## 5. 상세 설계
+
+### 5.1 콘텐츠 구성
+
+위에서 아래 순서:
+
+1. **로고 텍스트** - 아이콘 없이 텍스트만 (`showIcon={false}`), 홈 링크
+2. **소셜 링크**
+   - GitHub: 아이콘 + "pyo-sh" 텍스트, `https://github.com/pyo-sh` 링크
+   - 이메일: 아이콘 + 이메일 주소 텍스트, `mailto:` 링크
+3. **저작권 문구** - `© {연도} pyo-sh`
+
+### 5.2 UI 구성
+
+#### 레이아웃
+
+```
+┌──────────────────────────────────┐
+│                                  │
+│          [로고 텍스트]             │
+│                                  │
+│       🐙 pyo-sh                  │
+│       ✉️  pygosky@gmail.com      │
+│                                  │
+│        © 2026 pyo-sh             │
+│                                  │
+└──────────────────────────────────┘
+```
+
+- 전체: 수직 중앙 정렬, 수평 중앙 정렬
+- 상단 border: `border-t border-border-3`
+- 배경: `bg-background-1`
+
+#### 간격
+
+| 요소 간 | 간격 |
+|---|---|
+| 로고 ~ 소셜 링크 | `12px` (0.75rem) |
+| 소셜 링크 항목 간 | `8px` (0.5rem) |
+| 소셜 링크 ~ 저작권 | `16px` (1rem) |
+| Footer 상하 패딩 | `32px` (2rem) |
+
+#### 저작권 문구 스타일
+
+- 폰트: `body-xs`
+- 색상: `text-text-4` (보조 텍스트)
+- 연도: JavaScript `new Date().getFullYear()`로 동적 생성
+
+#### 소셜 링크 스타일
+
+- 아이콘: `1.5rem × 1.5rem`
+- 텍스트: `body-xs`
+- 기본 색상: `text-text-4`
+- 호버: `text-text-1` + `transition-colors`
+- 아이콘-텍스트 간격: `10px` (0.625rem)
+
+### 5.3 표시 범위
+
+| 페이지 | Footer |
+|---|---|
+| Public 전체 (홈, 글 상세, 태그 등) | 표시 |
+| Admin 대시보드 (`/dashboard/*`) | 숨김 |
+| Admin 로그인 (`/dashboard/login`) | 숨김 |
+
+Admin에서 숨기는 방법: Admin 레이아웃(`app/dashboard/layout.tsx`)은 별도의 Provider를 사용하거나, Providers 컴포넌트에 Footer 표시 여부를 제어하는 prop을 전달한다.
+
+### 5.4 URL 변경
+
+| 항목 | 변경 전 | 변경 후 |
+|---|---|---|
+| `URLS.github` | `https://github.com/pyo-sh/pyosh_blog` | `https://github.com/pyo-sh` |
+| GitHub 표시 텍스트 | `https://github.com/pyo-sh/pyosh_blog` (전체 URL) | `pyo-sh` |
+
+`URLS.githubProfile`은 이미 `https://github.com/pyo-sh`로 정의되어 있으므로, `URLS.github`를 프로필 URL로 통일하거나 Footer에서 `URLS.githubProfile`을 사용한다.
+
+### 5.5 반응형
+
+모바일과 데스크톱 모두 동일한 세로 중앙 정렬 레이아웃을 사용한다. 브레이크포인트별 차이 없음.
+
+### 5.6 컴포넌트 구조 (FSD)
+
+| 계층 | 파일 | 역할 |
+|---|---|---|
+| `widgets` | `footer/index.tsx` | Footer 컴포넌트 (기존 파일 수정) |
+| `shared` | `constant/url.ts` | GitHub URL 값 변경 |
+| `shared` | `ui/icons/github-icon.tsx` | 기존 아이콘 재사용 |
+| `shared` | `ui/icons/mail-icon.tsx` | 기존 아이콘 재사용 |
+
+### 5.7 다크모드
+
+시맨틱 토큰 기반으로 자동 대응. 추가 작업 없음.
+
+- `bg-background-1`: 라이트 `#f9f9fa` / 다크 `#131415`
+- `border-border-3`: 라이트 `#dbdde0` / 다크 `#54595d`
+- `text-text-4`: 라이트 `#babfc4` / 다크 `#656b70`
+
+## 6. API 연동
+
+없음. 순수 정적 UI.
+
+## 7. 수용 기준
+
+- [ ] Footer에 로고 텍스트, GitHub 링크, 이메일 링크, 저작권 문구가 표시된다
+- [ ] 저작권 문구가 `© {현재연도} pyo-sh` 형식으로 표시된다
+- [ ] GitHub 링크가 `https://github.com/pyo-sh`로 이동하며 "pyo-sh"로 표시된다
+- [ ] Public 페이지에서 Footer가 표시된다
+- [ ] Admin 페이지(`/dashboard/*`)에서 Footer가 숨겨진다
+- [ ] 모바일/데스크톱 모두 중앙 정렬이 유지된다
+- [ ] 다크모드 자동 적용
+- [ ] 접근성: 링크에 적절한 텍스트, nav 랜드마크 (A-01 참조)
+
+## 8. 에지 케이스
+
+| 케이스 | 처리 |
+|---|---|
+| 연도가 바뀌는 시점 | `new Date().getFullYear()` 실시간 반영 |
+| 이메일 링크 클릭 시 메일 앱 없음 | 브라우저 기본 동작 (OS 메일 앱 선택 또는 무반응) |
+| 매우 좁은 뷰포트 | 텍스트 줄바꿈 허용, 최소 너비 제한 없음 |
+
+## 9. 의존성
+
+- 없음 (기반 기능)
+
+## 10. 미해결 사항
+
+없음. 모든 사항 확정됨.
