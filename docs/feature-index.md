@@ -27,7 +27,7 @@
 | # | 기능 | 스펙 파일 | 상태 | 의존성 |
 |---|---|---|---|---|
 | F-01 | 홈 - 글 목록 (페이지네이션) | `client/specs/home-post-list.md` | `DRAFT` | - |
-| F-02 | 글 상세 (마크다운 렌더링, 코드 하이라이팅) | `client/specs/post-detail.md` | `SPEC` | F-01 |
+| F-02 | 글 상세 (마크다운 렌더링, 코드 하이라이팅) | `client/specs/post-detail.md` | `DRAFT` | F-01 |
 | F-03 | 카테고리별 글 목록 | `client/specs/category-post-list.md` | `SPEC` | F-01 |
 | F-04 | 태그 목록 | `client/specs/tag-list.md` | `DRAFT` | - |
 | F-05 | 태그별 글 목록 | `client/specs/tag-post-list.md` | `SPEC` | F-01, F-04 |
