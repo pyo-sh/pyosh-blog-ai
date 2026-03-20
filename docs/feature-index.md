@@ -68,7 +68,7 @@
 |---|---|---|---|---|
 | F-30 | SEO 메타 (메타태그, OG, sitemap, RSS, robots.txt, Canonical URL) | `client/specs/seo-meta.md` | `SPEC` | F-01, F-02 |
 | F-31 | 구조화 데이터 (JSON-LD) | `client/specs/seo-jsonld.md` | `SPEC` | F-02 |
-| F-32 | Favicon / Web Manifest | `client/specs/favicon-manifest.md` | `SPEC` | - |
+| F-32 | Favicon / Web Manifest | `client/specs/favicon-manifest.md` | `DRAFT` | F-17 |
 
 ## 접근성
 
