@@ -48,7 +48,7 @@
 ┌─────────────────────────────────────┐
 │ [썸네일 이미지 (16:9)]               │
 ├─────────────────────────────────────┤
-│ 카테고리 · 날짜                      │
+│ 카테고리 · 날짜 · 조회수              │
 │ 제목 (h1)                           │
 │ #태그1 #태그2 #태그3                 │
 ├─────────────────────────────────────┤
@@ -61,11 +61,14 @@
 │  - 외부 링크 (새 탭)                 │
 │                                     │
 ├─────────────────────────────────────┤
-│ [← 이전 글]          [다음 글 →]     │
+│ 관련 글 (가로 스크롤 카드 리스트)      │
+│ [📷제목] [📷제목] [📷제목] [📷제목]  │
 ├─────────────────────────────────────┤
 │ 댓글 섹션 (F-07, F-08)              │
 └─────────────────────────────────────┘
 ```
+
+- 썸네일 없는 글: 썸네일 영역 미표시, 바로 메타데이터 표시
 
 - SSR (Server Component)
 - 최대 너비: `max-w-5xl` (960px)
@@ -263,30 +266,25 @@ export function CodeBlockEnhancer({ children }: PropsWithChildren) {
 - `loading="lazy"`: 뷰포트 근처까지 스크롤해야 로드
 - `decoding="async"`: 이미지 디코딩이 메인 스레드를 블로킹하지 않음
 
-### 5.8 이전/다음 글 네비게이션
+### 5.8 관련 글
 
-현재 구현에 모바일 반응형을 추가한다.
+본문 하단에 가로 스크롤 카드 리스트로 관련 글을 표시한다.
 
 ```
-데스크톱 (1080px+):
-┌──────────────────┐  ┌──────────────────┐
-│ ← 이전 글         │  │         다음 글 → │
-│ 이전 글 제목       │  │      다음 글 제목  │
-└──────────────────┘  └──────────────────┘
-
-모바일 (< 1080px):
-┌──────────────────────────────────────┐
-│ ← 이전 글                            │
-│ 이전 글 제목                          │
-├──────────────────────────────────────┤
-│                          다음 글 →    │
-│                       다음 글 제목     │
-└──────────────────────────────────────┘
+관련 글
+┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+│ 썸네일 │ │ 썸네일 │ │ 썸네일 │ │ 썸네일 │ │ 썸네일 │  → 가로 스크롤
+│ 제목   │ │ 제목   │ │ 제목   │ │ 제목   │ │ 제목   │
+└──────┘ └──────┘ └──────┘ └──────┘ └──────┘
 ```
 
-```tsx
-<nav className="flex flex-col md:flex-row justify-between gap-4">
-```
+- 카드 너비: `180px`, 고정
+- 썸네일: `aspect-ratio: 16/10`, `overflow-hidden`, `rounded-lg`
+- 제목: `line-clamp-2`, `text-xs font-semibold`
+- 카드 호버: `translateY(-3px)` + `box-shadow` + 썸네일 `scale(1.05)`
+- 가로 스크롤: `overflow-x: auto`, `scroll-snap-type: x mandatory`, 스크롤바 숨김
+- 관련 글 선정: 같은 카테고리의 최신 글 최대 5개 (서버에서 조회)
+- 관련 글이 없으면 섹션 미표시
 
 ### 5.9 코드블록 가로 스크롤 (모바일)
 
@@ -309,14 +307,14 @@ export function CodeBlockEnhancer({ children }: PropsWithChildren) {
 ```
 PostDetailPage (Server Component)
   ├─ fetchPostBySlug(slug) → GET /api/posts/:slug
-  │   └─ 응답: { post, prevPost, nextPost }
+  │   └─ 응답: { post, relatedPosts }
   ├─ fetchComments(postId) → GET /api/posts/:postId/comments
   ├─ getCurrentViewer() → GET /api/auth/me (쿠키 기반)
   │
   ├─ PostContent → renderMarkdown(contentMd) → HTML
   │   └─ CodeBlockEnhancer (Client) → 복사 버튼/언어 라벨 삽입
   ├─ ViewCounter (Client) → POST /api/stats/view (세션 중복 방지)
-  ├─ PostNavigation → 이전/다음 글 링크
+  ├─ RelatedPosts → 관련 글 가로 카드 리스트
   └─ CommentList (Client) → 댓글 목록 + 작성 폼
 ```
 
@@ -327,7 +325,7 @@ PostDetailPage (Server Component)
 | `app` | `posts/[slug]/page.tsx` | 페이지 컴포넌트 (SSR) |
 | `features` | `post-detail/ui/post-content.tsx` | 마크다운 렌더링 서버 컴포넌트 |
 | `features` | `post-detail/ui/code-block-enhancer.tsx` | 코드블록 복사/라벨 클라이언트 컴포넌트 |
-| `features` | `post-detail/ui/post-navigation.tsx` | 이전/다음 글 네비게이션 |
+| `features` | `post-detail/ui/related-posts.tsx` | 관련 글 가로 카드 리스트 |
 | `features` | `post-detail/ui/view-counter.tsx` | 조회수 기록 클라이언트 컴포넌트 |
 | `features` | `comment-section/` | 댓글 목록/작성/삭제 (F-07, F-08) |
 | `shared` | `lib/markdown.ts` | unified 마크다운 프로세서 |
@@ -337,7 +335,7 @@ PostDetailPage (Server Component)
 
 | 메서드 | 경로 | 용도 |
 |---|---|---|
-| GET | `/api/posts/:slug` | 글 상세 + 이전/다음 글 |
+| GET | `/api/posts/:slug` | 글 상세 + 관련 글 |
 | GET | `/api/posts/:postId/comments` | 댓글 목록 |
 | GET | `/api/auth/me` | 현재 사용자 (댓글 작성자 식별) |
 | POST | `/api/stats/view` | 조회수 기록 |
@@ -353,7 +351,7 @@ PostDetailPage (Server Component)
 - [ ] 코드블록 복사 버튼 클릭 시 코드가 클립보드에 복사되고 "복사됨" 피드백이 표시된다
 - [ ] 외부 링크가 새 탭에서 열리며 `rel="noopener noreferrer"`가 적용된다
 - [ ] 마크다운 내 이미지에 `loading="lazy"` `decoding="async"`가 적용된다
-- [ ] 이전/다음 글 네비게이션이 모바일에서 세로 스택으로 전환된다
+- [ ] 관련 글이 가로 스크롤 카드 리스트로 표시된다 (최대 5개)
 - [ ] 모바일에서 코드블록이 페이지 레이아웃을 깨지 않고 가로 스크롤된다
 - [ ] rehypeSanitize로 XSS 공격이 차단된다
 - [ ] 다크모드 자동 적용 (typography.css 시맨틱 토큰)
@@ -371,7 +369,7 @@ PostDetailPage (Server Component)
 | 마크다운 내 `<script>` 태그 | rehypeSanitize가 제거 |
 | 외부 이미지 URL 깨짐 | 브라우저 기본 깨진 이미지 아이콘 |
 | 썸네일 없는 글 | 썸네일 영역 미표시, 바로 메타데이터 표시 |
-| 이전 글만 있고 다음 글 없음 | 이전 글만 좌측에 표시, 우측 빈 공간 |
+| 관련 글 없음 (같은 카테고리 글이 없음) | 관련 글 섹션 미표시 |
 | 댓글 로드 실패 | 에러 메시지 표시, 글 본문은 정상 표시 |
 | 클립보드 API 미지원 브라우저 | 복사 버튼 숨김 또는 폴백 처리 |
 

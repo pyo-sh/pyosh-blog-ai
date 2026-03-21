@@ -90,15 +90,18 @@
 
 #### 스타일
 
+사이드바의 다른 섹션과 동일한 톤으로 배경/테두리 박스 없이 미니멀하게 표시한다.
+
 | 요소 | 스타일 |
 |---|---|
-| 섹션 타이틀 | `text-body-sm`, `font-semibold`, `text-text-1` |
-| 접기/펼치기 아이콘 | Lucide `ChevronUp` / `ChevronDown`, `text-text-3` |
-| h1 항목 | `text-body-sm`, `text-text-2`, `pl-0` |
-| h2 항목 | `text-body-sm`, `text-text-3`, `pl-4` |
-| h3 항목 | `text-body-xs`, `text-text-4`, `pl-8` |
+| 섹션 타이틀 | 사이드바 공통 헤더 (`.sidebar-section-title`): `text-xs`, `font-bold`, `uppercase`, `letter-spacing`, `text-text-4`, 아이콘 포함 |
+| 접기/펼치기 아이콘 | Solar `alt-arrow-up-linear`, `text-text-4` |
+| 항목 리스트 | `border-left: 2px solid border-4`, `pl-3` |
+| h1 항목 | `text-xs`, `font-medium`, `text-text-3`, `pl-0` |
+| h2 항목 | `text-xs`, `font-medium`, `text-text-3`, `pl-2.5` |
+| h3 항목 | `text-[11px]`, `text-text-4`, `pl-5` |
 | hover | `text-primary-1`, `transition-colors` |
-| 컨테이너 | `rounded-[1.5rem]`, `border border-border-3`, `bg-background-2`, `p-4` |
+| 컨테이너 | 배경/테두리 없음, 사이드바 섹션 구분선만 사용 |
 
 ### 5.4 heading anchor ID 부여
 
