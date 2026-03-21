@@ -1,781 +1,1466 @@
-# Server API 명세서
+# Server API Spec
 
-> Fastify 5 + Drizzle ORM | Base URL: `http://localhost:5500`
+> 기준: `server/src` 라우트/스키마/테스트 구현
+>
+> 서버: Fastify 5 + Zod + Drizzle ORM
+>
+> Base URL: `http://localhost:5500`
 
-## 인증 방식
+## 문서 기준
+
+- 이 문서는 `docs/server/api-spec.md` 기존 내용이 아니라 현재 구현을 다시 읽고 정리한 버전이다.
+- 입력/출력은 우선 `route` + `schema` 구현을 기준으로 작성했다.
+- 동작 설명은 필요한 경우 테스트(`server/test/routes/*.test.ts`)로 교차 확인했다.
+
+## 공통 규칙
+
+### Swagger / OpenAPI
+
+- 개발 환경에서는 Swagger UI가 `/docs`에 노출된다.
+- OpenAPI 스펙은 서버가 등록한 Zod route schema에서 자동 생성된다.
+- 루트 컬렉션 경로는 OpenAPI 상 `/api/posts/`, `/api/categories/`, `/api/assets/`처럼 trailing slash로 보일 수 있다. 이 문서에서는 읽기 편하게 slash 없는 형태로 표기했다.
+- 카테고리 트리, 댓글 replies, 방명록 replies 같은 재귀 응답은 현재 OpenAPI 변환기 한계로 nested `items`가 느슨하게 표현될 수 있다. 그 구조 설명은 이 문서가 더 정확하다.
+
+### 인증
 
 | 방식 | 설명 |
 |---|---|
-| **Admin Session** | `POST /api/auth/admin/login` 후 세션 쿠키 발급. `requireAdmin` 훅으로 보호 |
-| **OAuth (Google/GitHub)** | Passport 기반. `request.user`로 접근. `requireAuth` 훅으로 보호 |
-| **optionalAuth** | 인증 선택적. 비로그인 시에도 접근 가능 (게스트 댓글 등) |
+| Admin session | `POST /api/auth/admin/login` 성공 시 세션 쿠키 발급. 관리자 전용 라우트는 `requireAdmin`으로 보호되며, 미인증 시 `403` |
+| OAuth session | Google/GitHub Passport 로그인 후 `request.user` 사용. `/api/user/*`는 `requireAuth`로 보호되며, 미인증 시 `401` |
+| Optional auth | 댓글/방명록 조회·작성·삭제 일부는 로그인 없이도 호출 가능 |
 
-## CSRF 보호
+### CSRF
 
-상태 변경 요청에 CSRF 토큰 필요. `GET /api/auth/csrf-token`으로 토큰 발급 후 요청 헤더에 포함.
+- `GET`, `HEAD`, `OPTIONS`, `TRACE` 외 메서드에 대해 `/api/admin/*` 전체에 CSRF 보호가 적용된다.
+- Public 라우트 중 일부도 개별적으로 CSRF 보호를 적용한다.
+- 토큰 발급: `GET /api/auth/csrf-token`
+- 전송 헤더: `x-csrf-token`
 
-적용 대상:
-- `POST /api/auth/admin/logout`
-- `POST /api/posts/:postId/comments`
-- `DELETE /api/comments/:id`
-- `POST /api/guestbook`
-- `DELETE /api/guestbook/:id`
-- `POST /api/stats/view`
+### Rate limit
 
-## Rate limiting
-
-| 엔드포인트 | 제한 |
+| Endpoint | Limit |
 |---|---|
 | `POST /api/auth/admin/login` | 5 req/min |
 | `POST /api/posts/:postId/comments` | 10 req/min |
 | `POST /api/guestbook` | 10 req/min |
 | `POST /api/stats/view` | 30 req/min |
 
-## 에러 응답 형식
+### 에러 응답
+
+기본 형식:
 
 ```json
-{ "statusCode": 400, "error": "Bad Request", "message": "..." }
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "..."
+}
 ```
 
----
+검증 실패는 `details`가 추가될 수 있다.
 
-## Health check
+```json
+{
+  "statusCode": 400,
+  "error": "Validation Error",
+  "message": "...",
+  "details": []
+}
+```
+
+## Health
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/health` | `{ "status": "ok", "timestamp": "ISO" }` |
-| GET | `/api/health` | 전체 헬스체크 (DB 포함) |
-| GET | `/api/health/live` | Liveness probe (DB 미확인) |
-| GET | `/api/health/ready` | Readiness probe (DB 확인, 실패 시 non-200) |
+| GET | `/health` | 단순 헬스 체크 |
+| GET | `/api/health/live` | liveness |
+| GET | `/api/health/ready` | readiness + DB 상태 |
+| GET | `/api/health` | 종합 상태 + DB 상태 |
+
+### GET `/health`
+
+```json
+{ "status": "ok", "timestamp": "ISO-8601" }
+```
 
 ### GET `/api/health/live`
 
-**Response 200:**
 ```json
-{ "status": "ok", "timestamp": "ISO", "uptime": 12345, "version": "string" }
+{
+  "status": "ok",
+  "timestamp": "ISO-8601",
+  "uptime": 12345.67,
+  "version": "string"
+}
 ```
 
 ### GET `/api/health/ready`
 
-**Response 200:**
+### GET `/api/health`
+
 ```json
 {
-  "status": "ok", "timestamp": "ISO", "uptime": 12345, "version": "string",
-  "memory": { "rss": 0, "heapUsed": 0, "heapTotal": 0 },
-  "database": { "status": "ok", "latencyMs": 5 }
+  "status": "ok | degraded | error",
+  "timestamp": "ISO-8601",
+  "uptime": 12345.67,
+  "version": "string",
+  "memory": {
+    "rss": 0,
+    "heapUsed": 0,
+    "heapTotal": 0
+  },
+  "database": {
+    "status": "ok | error",
+    "latencyMs": 5
+  }
 }
 ```
 
----
+## Auth
 
-## Auth (`/api/auth`)
+Prefix: `/api/auth`
 
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/auth/google` | - | Google OAuth 리다이렉트 |
-| GET | `/api/auth/google/callback` | - | Google OAuth 콜백 |
-| GET | `/api/auth/github` | - | GitHub OAuth 리다이렉트 |
-| GET | `/api/auth/github/callback` | - | GitHub OAuth 콜백 |
-| GET | `/api/auth/csrf-token` | - | CSRF 토큰 발급 |
-| POST | `/api/auth/admin/login` | - | 관리자 로그인 (5 req/min) |
-| POST | `/api/auth/admin/logout` | CSRF | 관리자 로그아웃 (세션 파기) |
-| GET | `/api/auth/me` | - | 현재 로그인 사용자 정보 |
-| GET | `/api/auth/csrf-token` | - | CSRF 토큰 발급 |
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| GET | `/google` | - | - | Google OAuth 시작. 환경변수 설정 시에만 등록 |
+| GET | `/google/callback` | - | - | Google OAuth 콜백 |
+| GET | `/github` | - | - | GitHub OAuth 시작. 환경변수 설정 시에만 등록 |
+| GET | `/github/callback` | - | - | GitHub OAuth 콜백 |
+| GET | `/csrf-token` | - | - | CSRF 토큰 발급 |
+| POST | `/admin/login` | - | - | 관리자 로그인 |
+| POST | `/admin/logout` | Admin session | Required | 관리자 로그아웃 |
+| GET | `/me` | Optional | - | 현재 로그인 주체 조회 |
 
 ### GET `/api/auth/csrf-token`
 
-**Response 200:**
 ```json
 { "token": "string" }
 ```
 
 ### POST `/api/auth/admin/login`
 
-**Request Body:**
+Request:
+
 ```json
-{ "username": "string", "password": "string" }
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
 ```
 
-**Response 200:**
+제약:
+
+- `email`: 유효한 이메일 형식
+- `password`: 최소 8자
+
+Response `200`:
+
 ```json
-{ "admin": { "id": 1, "username": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" } }
+{
+  "admin": {
+    "id": 1,
+    "email": "admin@example.com",
+    "createdAt": "ISO-8601",
+    "updatedAt": "ISO-8601",
+    "lastLoginAt": "ISO-8601 | null"
+  }
+}
 ```
+
+오류:
+
+- `401`: 자격 증명 오류
+- `429`: rate limit
 
 ### POST `/api/auth/admin/logout`
 
-**Response:** 204 No Content
+Response: `204 No Content`
 
 ### GET `/api/auth/me`
 
-**Response 200 (Admin):**
-```json
-{ "type": "admin", "id": 1, "username": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" }
-```
-
-**Response 200 (OAuth):**
-```json
-{ "type": "oauth", "id": 1, "name": "...", "email": "...", "githubId": "...", "googleEmail": "..." }
-```
-
-**Response 401:** 미인증
-
----
-
-## Posts
-
-### Public (`/api/posts`)
-
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/posts` | - | 게시글 목록 (공개+발행 글만) |
-| GET | `/api/posts/slugs` | - | 발행된 글 slug 목록 (sitemap용) |
-| GET | `/api/posts/:slug` | - | 게시글 상세 (slug 기반) |
-
-#### GET `/api/posts`
-
-**Query parameters:**
-| Param | Type | Default | 설명 |
-|---|---|---|---|
-| page | number | 1 | 페이지 번호 |
-| limit | number (1-100) | 10 | 페이지당 개수 |
-| categoryId | number | - | 카테고리 필터 |
-| tagSlug | string | - | 태그 슬러그 필터 |
-| q | string | - | 제목/내용 검색 |
-| filter | string | title_content | 검색 범위 (`title_content` \| `title` \| `content` \| `tag` \| `category` \| `comment`) |
-| sort | string | published_at | 정렬 기준 (`published_at` \| `created_at`) |
-| order | string | desc | 정렬 방향 (`asc` \| `desc`) |
-
-> Public API에서는 `status=published`, `visibility=public`, `deletedAt IS NULL`이 강제 적용됩니다.
-
-**Response 200:**
-```json
-{
-  "data": [PostListItem],
-  "meta": { "page": 1, "limit": 20, "totalCount": 100, "totalPages": 5 }
-}
-```
-
-#### GET `/api/posts/slugs`
-
-발행된 글의 slug + updatedAt만 반환하는 경량 엔드포인트 (sitemap용).
-
-**Response 200:**
-```json
-{ "slugs": [{ "slug": "...", "updatedAt": "ISO" }] }
-```
-
-#### GET `/api/posts/:slug`
-
-**Response 200:**
-```json
-{
-  "post": PostDetail,
-  "prevPost": { "slug": "...", "title": "..." } | null,
-  "nextPost": { "slug": "...", "title": "..." } | null
-}
-```
-
-### Admin (`/api/admin/posts`) - `requireAdmin`
-
-| Method | Path | 설명 |
-|---|---|---|
-| GET | `/api/admin/posts` | 게시글 목록 (모든 상태/가시성, 삭제 포함 가능) |
-| GET | `/api/admin/posts/:id` | 게시글 상세 (ID 기반) |
-| POST | `/api/admin/posts` | 게시글 생성 |
-| PATCH | `/api/admin/posts/:id` | 게시글 수정 |
-| PATCH | `/api/admin/posts/bulk` | 게시글 벌크 작업 (카테고리/commentStatus 변경, 삭제, 복원, 영구 삭제) |
-| DELETE | `/api/admin/posts/:id` | 게시글 소프트 삭제 |
-| PUT | `/api/admin/posts/:id/restore` | 삭제된 게시글 복원 |
-| DELETE | `/api/admin/posts/:id/hard` | 게시글 하드 삭제 (댓글, 조회수, 고아 태그 연쇄 삭제) |
-
-#### GET `/api/admin/posts`
-
-**Query Parameters:**
-| Param | Type | Default | 설명 |
-|---|---|---|---|
-| page | number | 1 | 페이지 번호 |
-| limit | number (max 100) | 20 | 페이지당 개수 |
-| status | string | - | 상태 필터 (`draft` \| `published` \| `archived`) |
-| visibility | string | - | 공개여부 필터 (`public` \| `private`) |
-| q | string | - | 제목/내용 검색 |
-| sort | string | created_at | 정렬 기준 (`created_at` \| `published_at` \| `totalPageviews` \| `commentCount`) |
-| order | string | desc | 정렬 방향 (`asc` \| `desc`) |
-| includeDeleted | boolean | false | 삭제된 글 포함 |
-
-#### PATCH `/api/admin/posts/bulk`
-
-**Request Body:**
-```json
-{
-  "ids": [1, 2, 3],
-  "action": "update | soft_delete | restore | hard_delete",
-  "categoryId": 1,
-  "commentStatus": "open | locked | disabled"
-}
-```
-
-- `update`: `categoryId`, `commentStatus` 중 하나 이상 필수
-- 단일 트랜잭션: 전체 성공 or 전체 실패
-
-#### GET `/api/admin/posts`
-
-Public과 동일한 쿼리 파라미터. 기본 정렬: `created_at`, 기본 limit: 20. 모든 상태/가시성 조회 가능, `includeDeleted` 지원.
-
-#### POST `/api/admin/posts`
-
-**Request Body:**
-```json
-{
-  "title": "string (1-200)",
-  "contentMd": "string (min 1)",
-  "categoryId": 1,
-  "thumbnailUrl": "/uploads/example.jpg",
-  "visibility": "public | private",
-  "status": "draft | published | archived",
-  "tags": ["tag1", "tag2"],
-  "publishedAt": "ISO datetime",
-  "summary": "string (max 200)",
-  "description": "string (max 300)",
-  "commentStatus": "open | locked | disabled"
-}
-```
-
-**Response 201:** `{ "post": PostDetail }`
-
-### PostDetail 스키마
+Admin 로그인 상태:
 
 ```json
 {
+  "type": "admin",
   "id": 1,
-  "categoryId": 1,
-  "title": "...",
-  "slug": "...",
-  "contentMd": "...",
-  "summary": "...",
-  "description": "...",
-  "thumbnailUrl": "/uploads/example.jpg",
-  "visibility": "public",
-  "status": "published",
-  "commentStatus": "open",
-  "isPinned": false,
-  "publishedAt": "ISO",
-  "contentModifiedAt": "ISO",
-  "createdAt": "ISO",
-  "updatedAt": "ISO",
-  "deletedAt": null,
-  "category": {
-    "id": 1, "name": "...", "slug": "...",
-    "ancestors": [{ "name": "...", "slug": "..." }]
-  },
-  "tags": [{ "id": 1, "name": "...", "slug": "..." }],
-  "totalPageviews": 245,
-  "commentCount": 12
+  "email": "admin@example.com",
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601",
+  "lastLoginAt": "ISO-8601 | null"
 }
 ```
 
-- `category.ancestors`: 루트부터 부모까지 순서. 직속 카테고리 자체는 포함하지 않음 (이미 `category.name`/`slug`로 제공).
-
-### PostListItem 스키마
-
-글 목록 API 응답 항목. `contentMd` 제외, 집계 필드 포함.
+OAuth 로그인 상태:
 
 ```json
 {
+  "type": "oauth",
   "id": 1,
-  "categoryId": 1,
-  "title": "...",
-  "slug": "...",
-  "summary": "...",
-  "description": "...",
-  "thumbnailUrl": "/uploads/example.jpg",
-  "visibility": "public",
-  "status": "published",
-  "commentStatus": "open",
-  "isPinned": false,
-  "publishedAt": "ISO",
-  "contentModifiedAt": "ISO",
-  "createdAt": "ISO",
-  "updatedAt": "ISO",
-  "deletedAt": null,
-  "category": { "id": 1, "name": "...", "slug": "..." },
-  "tags": [{ "id": 1, "name": "...", "slug": "..." }],
-  "totalPageviews": 245,
-  "commentCount": 12
+  "name": "User Name",
+  "email": "user@example.com",
+  "githubId": "12345",
+  "googleEmail": "user@gmail.com"
 }
 ```
 
----
+오류:
 
-## Tags (`/api/tags`)
+- `401`: 로그인 필요
 
-| Method | Path | Auth | 설명 |
+## Categories
+
+Prefix: `/api/categories`
+
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| GET | `/` | Public | - | 카테고리 트리 조회 |
+| POST | `/` | Admin | Required | 카테고리 생성 |
+| PATCH | `/tree` | Admin | Required | 카테고리 트리 일괄 변경 |
+| PATCH | `/:id` | Admin | Required | 카테고리 수정 |
+| DELETE | `/:id` | Admin | Required | 카테고리 삭제 |
+
+### GET `/api/categories`
+
+Query:
+
+| Name | Type | Default | 설명 |
 |---|---|---|---|
-| GET | `/api/tags` | - | 태그 목록 (공개+발행 글 기준 postCount 포함) |
+| `include_hidden` | `"true" \| "false"` | - | Admin session이 있을 때만 유효 |
 
-#### GET `/api/tags`
+응답:
 
-**Response 200:**
 ```json
 {
-  "tags": [{ "id": 1, "name": "...", "slug": "...", "postCount": 5 }]
+  "categories": [
+    {
+      "id": 1,
+      "parentId": null,
+      "name": "Backend",
+      "slug": "backend",
+      "sortOrder": 0,
+      "isVisible": true,
+      "publishedPostCount": 3,
+      "totalPostCount": 5,
+      "createdAt": "ISO-8601",
+      "updatedAt": "ISO-8601",
+      "children": []
+    }
+  ]
 }
 ```
 
-> 공개 발행 게시글에 사용된 태그만 포함됩니다.
+### POST `/api/categories`
 
----
+Request:
 
-## Categories (`/api/categories`)
-
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/categories` | - | 카테고리 트리 (Cache: 300s) |
-| POST | `/api/categories` | Admin | 카테고리 생성 |
-| PATCH | `/api/categories/:id` | Admin | 카테고리 수정 |
-| PATCH | `/api/categories/tree` | Admin | 카테고리 트리 배치 변경 (parentId, sortOrder) |
-| DELETE | `/api/categories/:id` | Admin | 카테고리 삭제 |
-
-#### GET `/api/categories`
-
-**Query:** `?include_hidden=true` (관리자 세션일 때만 적용)
-
-> 카테고리 조회는 트리 엔드포인트(`GET /api/categories`) 하나로 통합합니다.
-
-**Response 200:**
 ```json
 {
-  "categories": [{
-    "id": 1, "parentId": null, "name": "...", "slug": "...",
-    "sortOrder": 0, "isVisible": true,
-    "publishedPostCount": 3, "totalPostCount": 5,
-    "createdAt": "ISO", "updatedAt": "ISO",
-    "children": [CategoryTree]
-  }]
+  "name": "Backend",
+  "parentId": null,
+  "isVisible": true
 }
 ```
 
-#### POST `/api/categories`
+### PATCH `/api/categories/tree`
 
-**Request Body:**
-```json
-{ "name": "string (1-50)", "parentId": 1, "isVisible": true }
-```
+Request:
 
-**Response 201:** `{ "category": Category }`
-
-#### PATCH `/api/categories/:id`
-
-**Request Body:**
-```json
-{ "name": "string (1-50)", "parentId": 1, "sortOrder": 0, "isVisible": true }
-```
-
-모든 필드 optional.
-
-#### PATCH `/api/categories/tree`
-
-**Request Body:**
-```json
-{ "changes": [{ "id": 1, "parentId": null, "sortOrder": 0 }, { "id": 2, "parentId": 1, "sortOrder": 1 }] }
-```
-
-- 단일 트랜잭션: 전체 성공 or 전체 실패
-
-**Response 200:** `{ "success": true }`
-
-#### DELETE `/api/categories/:id`
-
-**Query:** `?action=move&moveTo=3` 또는 `?action=trash`
-
-- `move`: 해당 카테고리의 글을 `moveTo` 카테고리로 이동 후 삭제
-- `trash`: 해당 카테고리의 글을 휴지통으로 이동 후 삭제
-
----
-
-## Assets (`/api/assets`)
-
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/assets` | Admin | 에셋 목록 조회 (페이지네이션) |
-| POST | `/api/assets/upload` | Admin | 이미지 업로드 (multipart) |
-| GET | `/api/assets/:id` | - | 에셋 정보 조회 |
-| DELETE | `/api/assets/:id` | Admin | 에셋 삭제 (DB + 파일) |
-| DELETE | `/api/assets/bulk` | Admin | 에셋 벌크 삭제 |
-
-#### GET `/api/assets`
-
-**Query:** `page` (default: 1), `limit` (default: 20, max: 100)
-
-**Response 200:**
 ```json
 {
-  "data": [{ "id": 1, "url": "/uploads/2026/02/uuid.png", "mimeType": "image/png", "sizeBytes": 12345, "width": 800, "height": 600, "createdAt": "ISO" }],
-  "meta": { "page": 1, "limit": 20, "totalCount": 50, "totalPages": 3 }
+  "changes": [
+    { "id": 1, "parentId": null, "sortOrder": 0 },
+    { "id": 2, "parentId": 1, "sortOrder": 1 }
+  ]
 }
 ```
 
-#### POST `/api/assets/upload`
+Response:
 
-**Request:** `multipart/form-data` (허용 MIME: jpeg, png, gif, webp, svg)
-
-**Response 201:**
-```json
-{ "assets": [{ "id": 1, "url": "/uploads/2026/02/uuid.png", "mimeType": "image/png", "sizeBytes": 12345, "width": 800, "height": 600 }] }
-```
-
-#### DELETE `/api/assets/bulk`
-
-**Request Body:**
-```json
-{ "ids": [1, 2, 3] }
-```
-
-- 단일 트랜잭션 (DB), 물리 파일 삭제는 best-effort
-
----
-
-## Comments
-
-### Public (`/api`)
-
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/posts/:postId/comments` | optionalAuth | 댓글 목록 (계층형, 비밀글 마스킹) |
-| POST | `/api/posts/:postId/comments` | optionalAuth, CSRF | 댓글 작성 (10 req/min) |
-| DELETE | `/api/comments/:id` | optionalAuth, CSRF | 댓글 소프트 삭제 (게스트: 비밀번호 필요) |
-
-### Admin (`/api/admin`)
-
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/admin/comments` | Admin | 댓글 목록 (필터 + 페이지네이션, post.title 포함) |
-| GET | `/api/admin/comments/:id/thread` | Admin | 스레드 조회 (부모 + 모든 답글) |
-| PUT | `/api/admin/comments/:id/restore` | Admin | 댓글 복원 (deleted → active) |
-| DELETE | `/api/admin/comments/:id` | Admin | 댓글 삭제 (`?action=soft_delete` \| `?action=hard_delete`) |
-| DELETE | `/api/admin/comments/bulk` | Admin | 댓글 벌크 삭제/복원 |
-
-#### GET `/api/posts/:postId/comments`
-
-**Query Parameters:**
-| Param | Type | Default | 설명 |
-|---|---|---|---|
-| page | number | 1 | 페이지 번호 (루트 댓글 기준) |
-| limit | number (max 50) | 10 | 페이지당 루트 댓글 수 |
-
-**Response 200:**
-```json
-{
-  "data": [CommentDetail],
-  "meta": { "page": 1, "limit": 10, "totalCount": 50, "totalRootComments": 30, "totalPages": 3 }
-}
-```
-
-#### GET `/api/admin/comments`
-
-**Query Parameters:**
-| Param | Type | Default | 설명 |
-|---|---|---|---|
-| page | number | 1 | 페이지 번호 |
-| limit | number (max 100) | 20 | 페이지당 개수 |
-| status | string | - | 상태 필터 (`active` \| `deleted` \| `hidden`) |
-| authorType | string | - | 작성자 유형 (`oauth` \| `guest`) |
-| postId | number | - | 특정 글의 댓글만 |
-| startDate | string | - | 시작일 (YYYY-MM-DD) |
-| endDate | string | - | 종료일 (YYYY-MM-DD) |
-| sort | string | created_at | 정렬 기준 (`created_at`) |
-| order | string | desc | 정렬 방향 (`asc` \| `desc`) |
-
-**Response 200:**
-```json
-{
-  "data": [{ ...CommentDetail, "post": { "id": 1, "title": "..." } }],
-  "meta": { "page": 1, "limit": 20, "totalCount": 100, "totalPages": 5 }
-}
-```
-
-#### GET `/api/admin/comments/:id/thread`
-
-**Response 200:**
-```json
-{
-  "parent": CommentDetail,
-  "replies": [CommentDetail]
-}
-```
-
-#### POST `/api/posts/:postId/comments`
-
-**OAuth 사용자:**
-```json
-{ "body": "string (1-2000)", "parentId": 1, "replyToCommentId": 1, "isSecret": false }
-```
-
-**게스트:**
-```json
-{ "body": "...", "parentId": 1, "replyToCommentId": 1, "isSecret": false,
-  "guestName": "string (1-50)", "guestEmail": "string (email)", "guestPassword": "string (4-100)" }
-```
-
-#### DELETE `/api/comments/:id`
-
-**Body (게스트만):**
-```json
-{ "guestPassword": "string (min 4)" }
-```
-
-#### PUT `/api/admin/comments/:id/restore`
-
-**Response 200:**
 ```json
 { "success": true }
 ```
 
-- `status: "deleted"` → `status: "active"`, `deletedAt: null`
+### PATCH `/api/categories/:id`
 
-#### DELETE `/api/admin/comments/bulk`
-
-**Request Body:**
-```json
-{ "ids": [1, 2, 3], "action": "restore | soft_delete | hard_delete" }
-```
-
-- `restore`: deleted → active 복원
-- `soft_delete`: body 보존, status/deletedAt만 변경
-- `hard_delete`: 대댓글 cascade 삭제
-
-#### CommentDetail 스키마
+Request:
 
 ```json
 {
-  "id": 1, "postId": 1, "parentId": null, "depth": 0,
-  "body": "...", "isSecret": false, "status": "active",
-  "author": { "type": "oauth | guest", "id": 1, "name": "...", "email": "...", "avatarUrl": "..." },
-  "replyToName": null,
-  "replies": [CommentDetail],
-  "createdAt": "ISO", "updatedAt": "ISO"
+  "name": "Renamed",
+  "parentId": null,
+  "sortOrder": 0,
+  "isVisible": true
 }
 ```
 
-> 대댓글은 최대 depth 1. `parentId`는 depth=0 댓글을 가리키고, `replyToCommentId`는 같은 parent 내 대상 댓글을 추적합니다.
+Response `200`:
 
----
+```json
+{
+  "category": {
+    "id": 1,
+    "parentId": null,
+    "name": "Renamed",
+    "slug": "renamed",
+    "sortOrder": 0,
+    "isVisible": true,
+    "publishedPostCount": 3,
+    "totalPostCount": 5,
+    "createdAt": "ISO-8601",
+    "updatedAt": "ISO-8601"
+  }
+}
+```
+
+### DELETE `/api/categories/:id`
+
+Query:
+
+| Name | Type | 설명 |
+|---|---|---|
+| `action` | `move \| trash` | 삭제 방식 |
+| `moveTo` | `number` | `action=move`일 때 필수 |
+
+Response: `204 No Content`
+
+## Assets
+
+Prefix: `/api/assets`
+
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| POST | `/upload` | Admin | Required | 이미지 업로드 |
+| GET | `/` | Admin | - | 업로드된 에셋 목록 |
+| GET | `/:id` | Public | - | 에셋 메타데이터 조회 |
+| DELETE | `/bulk` | Admin | Required | 에셋 일괄 삭제 |
+| DELETE | `/:id` | Admin | Required | 에셋 단건 삭제 |
+
+### POST `/api/assets/upload`
+
+Content-Type: `multipart/form-data`
+
+폼 필드:
+
+- `files`: 단일 또는 다중 파일
+
+제약:
+
+- 허용 MIME: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/svg+xml`
+- 최대 파일 크기: 10MB
+- 최대 파일 수: 5
+
+Response `201`:
+
+```json
+{
+  "assets": [
+    {
+      "id": 1,
+      "url": "/uploads/example.webp",
+      "mimeType": "image/webp",
+      "sizeBytes": 12345,
+      "width": 800,
+      "height": 600
+    }
+  ]
+}
+```
+
+### GET `/api/assets`
+
+Query:
+
+| Name | Type | Default |
+|---|---|---|
+| `page` | `number` | `1` |
+| `limit` | `number` | `20` |
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "url": "/uploads/example.webp",
+      "mimeType": "image/webp",
+      "sizeBytes": 12345,
+      "width": 800,
+      "height": 600,
+      "createdAt": "ISO-8601"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+### GET `/api/assets/:id`
+
+```json
+{
+  "id": 1,
+  "url": "/uploads/example.webp",
+  "mimeType": "image/webp",
+  "sizeBytes": 12345,
+  "width": 800,
+  "height": 600
+}
+```
+
+### DELETE `/api/assets/bulk`
+
+Request:
+
+```json
+{ "ids": [1, 2, 3] }
+```
+
+Response: `204 No Content`
+
+## Posts
+
+Public prefix: `/api/posts`
+
+Admin prefix: `/api/admin/posts`
+
+### Public endpoints
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/posts` | 공개 발행 게시글 목록 |
+| GET | `/api/posts/slugs` | sitemap용 slug 목록 |
+| GET | `/api/posts/:slug` | slug 기반 게시글 상세 |
+
+### GET `/api/posts`
+
+Query:
+
+| Name | Type | Default | 설명 |
+|---|---|---|---|
+| `page` | `number` | `1` | 페이지 |
+| `limit` | `number` | `10` | 최대 100 |
+| `categoryId` | `number` | - | 카테고리 필터 |
+| `tagSlug` | `string` | - | 태그 슬러그 |
+| `q` | `string` | - | 검색어 |
+| `filter` | `title_content \| title \| content \| tag \| category \| comment` | `title_content` | 검색 대상 |
+| `sort` | `published_at \| created_at` | `published_at` | 정렬 기준 |
+| `order` | `asc \| desc` | `desc` | 정렬 방향 |
+
+강제 조건:
+
+- `status=published`
+- `visibility=public`
+- `includeDeleted=false`
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "categoryId": 1,
+      "title": "Post title",
+      "slug": "post-title",
+      "summary": "summary",
+      "description": "description",
+      "thumbnailUrl": "/uploads/thumb.webp",
+      "visibility": "public",
+      "status": "published",
+      "commentStatus": "open",
+      "isPinned": false,
+      "publishedAt": "ISO-8601 | null",
+      "contentModifiedAt": "ISO-8601 | null",
+      "createdAt": "ISO-8601",
+      "updatedAt": "ISO-8601",
+      "deletedAt": null,
+      "tags": [
+        { "id": 1, "name": "fastify", "slug": "fastify" }
+      ],
+      "totalPageviews": 10,
+      "commentCount": 2,
+      "category": {
+        "id": 1,
+        "name": "Backend",
+        "slug": "backend"
+      }
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+### GET `/api/posts/slugs`
+
+```json
+{
+  "slugs": [
+    {
+      "slug": "post-title",
+      "updatedAt": "ISO-8601"
+    }
+  ]
+}
+```
+
+### GET `/api/posts/:slug`
+
+```json
+{
+  "post": {
+    "id": 1,
+    "categoryId": 1,
+    "title": "Post title",
+    "slug": "post-title",
+    "contentMd": "# Markdown",
+    "summary": "summary",
+    "description": "description",
+    "thumbnailUrl": "/uploads/thumb.webp",
+    "visibility": "public",
+    "status": "published",
+    "commentStatus": "open",
+    "isPinned": false,
+    "publishedAt": "ISO-8601 | null",
+    "contentModifiedAt": "ISO-8601 | null",
+    "createdAt": "ISO-8601",
+    "updatedAt": "ISO-8601",
+    "deletedAt": null,
+    "tags": [],
+    "totalPageviews": 10,
+    "commentCount": 2,
+    "category": {
+      "id": 1,
+      "name": "Backend",
+      "slug": "backend",
+      "ancestors": [
+        { "name": "Root", "slug": "root" }
+      ]
+    }
+  },
+  "prevPost": { "slug": "prev-post", "title": "Prev" },
+  "nextPost": { "slug": "next-post", "title": "Next" }
+}
+```
+
+### Admin endpoints
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/admin/posts` | 전체 게시글 목록 |
+| GET | `/api/admin/posts/pinned-count` | pinned 게시글 수 |
+| GET | `/api/admin/posts/:id` | ID 기반 상세 |
+| POST | `/api/admin/posts` | 게시글 생성 |
+| PATCH | `/api/admin/posts/bulk` | 벌크 작업 |
+| PATCH | `/api/admin/posts/:id` | 게시글 수정 |
+| DELETE | `/api/admin/posts/:id` | soft delete |
+| PUT | `/api/admin/posts/:id/restore` | 복원 |
+| DELETE | `/api/admin/posts/:id/hard` | hard delete |
+
+### GET `/api/admin/posts`
+
+Query:
+
+| Name | Type | Default | 설명 |
+|---|---|---|---|
+| `page` | `number` | `1` | 페이지 |
+| `limit` | `number` | `20` | 최대 100 |
+| `categoryId` | `number` | - | 카테고리 필터 |
+| `tagSlug` | `string` | - | 태그 슬러그 |
+| `q` | `string` | - | 검색어 |
+| `status` | `draft \| published \| archived` | - | 상태 필터 |
+| `visibility` | `public \| private` | - | 공개 범위 |
+| `sort` | `published_at \| created_at \| totalPageviews \| commentCount` | `created_at` | 정렬 기준 |
+| `order` | `asc \| desc` | `desc` | 정렬 방향 |
+| `includeDeleted` | `boolean` | `false` | soft delete 포함 여부 |
+
+응답 구조는 public 목록과 동일하다.
+
+### GET `/api/admin/posts/pinned-count`
+
+```json
+{ "pinnedCount": 3 }
+```
+
+### POST `/api/admin/posts`
+
+Request:
+
+```json
+{
+  "title": "My First Post",
+  "contentMd": "# Hello",
+  "categoryId": 1,
+  "summary": "summary",
+  "description": "description",
+  "thumbnailUrl": "/uploads/example.webp",
+  "visibility": "public",
+  "status": "draft",
+  "commentStatus": "open",
+  "isPinned": false,
+  "tags": ["fastify", "zod"],
+  "publishedAt": "2026-04-04T12:00:00.000Z"
+}
+```
+
+주요 제약:
+
+- `title`: 1..200
+- `contentMd`: 1자 이상
+- `summary`: 1..200, optional
+- `description`: 1..300, optional
+- `thumbnailUrl`: `null`, 빈 문자열, `/uploads/...`, `http://`, `https://` 허용
+- `status`: `draft | published | archived`
+- `visibility`: `public | private`
+- `commentStatus`: `open | locked | disabled`
+- `isPinned`: optional, default `false`
+- `tags[]`: 각 1..30
+- `publishedAt`: ISO datetime
+
+구현 메모:
+
+- 제목에서 slug를 자동 생성한다.
+- 중복 slug는 suffix를 붙여 고유화한다.
+- `status=published`이고 `publishedAt`이 없으면 자동 설정된다.
+- pinned 게시글은 최대 5개까지 허용되며 초과 시 `409`.
+
+Response `201`:
+
+```json
+{ "post": { "...PostDetail" : "GET /api/posts/:slug 의 post와 동일 구조" } }
+```
+
+### PATCH `/api/admin/posts/bulk`
+
+Request:
+
+```json
+{
+  "ids": [1, 2, 3],
+  "action": "update",
+  "categoryId": 2,
+  "commentStatus": "locked"
+}
+```
+
+`action`:
+
+- `update`
+- `soft_delete`
+- `restore`
+- `hard_delete`
+
+규칙:
+
+- `action=update`일 때 `categoryId` 또는 `commentStatus` 중 하나 이상 필요
+- 그 외 action에서는 `categoryId`, `commentStatus`를 보내면 검증 실패
+
+Response: `204 No Content`
+
+### PATCH `/api/admin/posts/:id`
+
+수정 가능한 필드:
+
+- `title`
+- `contentMd`
+- `categoryId`
+- `summary`
+- `description`
+- `thumbnailUrl`
+- `visibility`
+- `status`
+- `commentStatus`
+- `isPinned`
+- `tags`
+- `publishedAt`
+
+응답은 `PostDetail` 래핑 형식:
+
+```json
+{ "post": { "...PostDetail": "..." } }
+```
+
+### DELETE `/api/admin/posts/:id`
+
+Response: `204 No Content`
+
+### PUT `/api/admin/posts/:id/restore`
+
+Response:
+
+```json
+{ "post": { "...PostDetail": "..." } }
+```
+
+### DELETE `/api/admin/posts/:id/hard`
+
+Response: `204 No Content`
+
+## Tags
+
+Prefix: `/api/tags`
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/` | 공개 발행 게시글 기준 태그 목록 |
+
+### GET `/api/tags`
+
+```json
+{
+  "tags": [
+    {
+      "id": 1,
+      "name": "fastify",
+      "slug": "fastify",
+      "postCount": 3
+    }
+  ]
+}
+```
+
+## Comments
+
+Public prefix: `/api`
+
+Admin prefix: `/api/admin`
+
+### Public endpoints
+
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| GET | `/posts/:postId/comments` | Optional | - | 게시글 댓글 조회 |
+| POST | `/posts/:postId/comments` | Optional | Required | 댓글 작성 |
+| POST | `/comments/:id/reveal` | - | - | 비밀 댓글 복원 토큰 조회 |
+| DELETE | `/comments/:id` | Optional | Required | 댓글 삭제 |
+
+### GET `/api/posts/:postId/comments`
+
+Query:
+
+| Name | Type | Default | 설명 |
+|---|---|---|---|
+| `page` | `number` | `1` | 루트 댓글 페이지 |
+| `limit` | `number` | `10` | 최대 50 |
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "postId": 10,
+      "parentId": null,
+      "depth": 0,
+      "body": "댓글 본문",
+      "isSecret": false,
+      "status": "active",
+      "author": {
+        "type": "guest",
+        "name": "홍길동",
+        "email": "guest@example.com"
+      },
+      "replyToName": null,
+      "replies": [],
+      "createdAt": "ISO-8601",
+      "updatedAt": "ISO-8601"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "totalCount": 1,
+    "totalRootComments": 1,
+    "totalPages": 1
+  }
+}
+```
+
+메모:
+
+- 응답은 계층 구조다.
+- 페이지네이션은 루트 댓글 기준이다.
+- 공개 응답의 `status`는 `active | deleted`.
+- 비밀 댓글은 작성자와 관리자만 원문을 볼 수 있다.
+
+### POST `/api/posts/:postId/comments`
+
+OAuth 작성:
+
+```json
+{
+  "body": "댓글",
+  "parentId": 1,
+  "replyToCommentId": 2,
+  "isSecret": false
+}
+```
+
+Guest 작성:
+
+```json
+{
+  "body": "댓글",
+  "parentId": 1,
+  "replyToCommentId": 2,
+  "isSecret": true,
+  "guestName": "홍길동",
+  "guestEmail": "guest@example.com",
+  "guestPassword": "pass1234"
+}
+```
+
+제약:
+
+- `body`: 1..2000
+- `guestName`: 1..50
+- `guestEmail`: optional
+- `guestPassword`: 4..100
+
+구현 메모:
+
+- depth 2 이상 대댓글은 허용되지 않는다.
+- 게스트 비밀 댓글 작성 시 `revealToken`이 발급된다.
+
+Response `201`:
+
+```json
+{
+  "data": {
+    "id": 1,
+    "postId": 10,
+    "parentId": null,
+    "depth": 0,
+    "body": "댓글",
+    "isSecret": true,
+    "status": "active",
+    "author": {
+      "type": "guest",
+      "name": "홍길동",
+      "email": "guest@example.com"
+    },
+    "replyToName": null,
+    "replies": [],
+    "createdAt": "ISO-8601",
+    "updatedAt": "ISO-8601"
+  },
+  "revealToken": "string | null"
+}
+```
+
+### POST `/api/comments/:id/reveal`
+
+Request:
+
+```json
+{ "revealToken": "token-string" }
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "id": 1,
+    "postId": 10,
+    "parentId": null,
+    "depth": 0,
+    "body": "원문",
+    "isSecret": true,
+    "status": "active",
+    "author": {
+      "type": "guest",
+      "name": "홍길동"
+    },
+    "replyToName": null,
+    "replies": [],
+    "createdAt": "ISO-8601",
+    "updatedAt": "ISO-8601"
+  }
+}
+```
+
+### DELETE `/api/comments/:id`
+
+OAuth 사용자는 세션으로 삭제 가능.
+
+게스트는 body에 비밀번호 전달:
+
+```json
+{ "guestPassword": "pass1234" }
+```
+
+Response: `204 No Content`
+
+### Admin endpoints
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/admin/comments` | 전체 댓글 목록 |
+| GET | `/api/admin/comments/:id/thread` | 부모 + 답글 전체 |
+| PUT | `/api/admin/comments/:id/restore` | `deleted` 또는 `hidden` 복원 |
+| DELETE | `/api/admin/comments/bulk` | 벌크 복원/삭제 |
+| DELETE | `/api/admin/comments/:id` | 단건 soft/hard delete |
+
+### GET `/api/admin/comments`
+
+Query:
+
+| Name | Type | Default |
+|---|---|---|
+| `page` | `number` | `1` |
+| `limit` | `number` | `20` |
+| `postId` | `number` | - |
+| `status` | `active \| deleted \| hidden` | - |
+| `authorType` | `oauth \| guest` | - |
+| `startDate` | `string` | - |
+| `endDate` | `string` | - |
+| `sort` | `created_at` | `created_at` |
+| `order` | `asc \| desc` | `desc` |
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "postId": 10,
+      "parentId": null,
+      "depth": 0,
+      "body": "관리자용 원문",
+      "isSecret": true,
+      "status": "hidden",
+      "author": {
+        "type": "oauth",
+        "id": 3,
+        "name": "OAuth User",
+        "avatarUrl": "https://..."
+      },
+      "replyToName": null,
+      "post": {
+        "id": 10,
+        "title": "Post title"
+      },
+      "createdAt": "ISO-8601",
+      "updatedAt": "ISO-8601"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+### GET `/api/admin/comments/:id/thread`
+
+```json
+{
+  "parent": { "...AdminCommentItem": "..." },
+  "replies": [{ "...AdminCommentItem": "..." }]
+}
+```
+
+### PUT `/api/admin/comments/:id/restore`
+
+```json
+{ "success": true }
+```
+
+### DELETE `/api/admin/comments/bulk`
+
+Request:
+
+```json
+{
+  "ids": [1, 2, 3],
+  "action": "restore"
+}
+```
+
+`action`:
+
+- `restore`
+- `soft_delete`
+- `hard_delete`
+
+Response: `204 No Content`
+
+### DELETE `/api/admin/comments/:id`
+
+Query:
+
+| Name | Type | Default |
+|---|---|---|
+| `action` | `soft_delete \| hard_delete` | `soft_delete` |
+
+Response: `204 No Content`
 
 ## Guestbook
 
-### Public (`/api`)
+Public prefix: `/api`
 
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/guestbook` | optionalAuth | 방명록 목록 (페이지네이션) |
-| POST | `/api/guestbook` | optionalAuth, CSRF | 방명록 작성 (guestbook_enabled 확인, 10 req/min) |
-| DELETE | `/api/guestbook/:id` | optionalAuth, CSRF | 방명록 소프트 삭제 (게스트: 비밀번호 필요, body 보존) |
+Admin prefix: `/api/admin`
 
-### Admin (`/api/admin`)
+### Public endpoints
 
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/admin/guestbook` | Admin | 방명록 목록 (필터 + 검색 + 페이지네이션) |
-| DELETE | `/api/admin/guestbook/:id` | Admin | 방명록 삭제 (`?action=hide` \| `?action=soft_delete` \| `?action=hard_delete`) |
-| DELETE | `/api/admin/guestbook/bulk` | Admin | 방명록 벌크 삭제 |
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| GET | `/guestbook` | Optional | - | 방명록 목록 |
+| POST | `/guestbook` | Optional | Required | 방명록 작성 |
+| DELETE | `/guestbook/:id` | Optional | Required | 방명록 삭제 |
 
-#### GET `/api/guestbook`
+### GET `/api/guestbook`
 
-**Query:** `?page=1&limit=20` (max 100)
+Query:
 
-**Response 200:**
+| Name | Type | Default |
+|---|---|---|
+| `page` | `number` | `1` |
+| `limit` | `number` | `20` |
+
+Response:
+
 ```json
 {
-  "data": [GuestbookEntryDetail],
-  "meta": { "page": 1, "limit": 20, "totalCount": 50, "totalPages": 3 }
+  "data": [
+    {
+      "id": 1,
+      "parentId": null,
+      "body": "방명록 본문",
+      "isSecret": false,
+      "status": "active",
+      "author": {
+        "type": "guest",
+        "name": "방문자",
+        "email": "visitor@example.com"
+      },
+      "replies": [],
+      "createdAt": "ISO-8601",
+      "updatedAt": "ISO-8601"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
 }
 ```
 
-#### POST `/api/guestbook`
+메모:
 
-**OAuth 사용자:**
-```json
-{ "body": "string (1-2000)", "parentId": 1, "isSecret": false }
-```
+- 응답은 계층 구조다.
+- 공개 응답의 `status`는 `active | deleted`.
+- 비밀글은 작성자와 관리자만 원문을 볼 수 있다.
 
-**게스트:**
-```json
-{ "body": "...", "parentId": 1, "isSecret": false,
-  "guestName": "string (1-50)", "guestEmail": "string (email)", "guestPassword": "string (4-100)" }
-```
+### POST `/api/guestbook`
 
-#### DELETE `/api/guestbook/:id`
+OAuth 작성:
 
-**Body (게스트만):**
-```json
-{ "guestPassword": "string (min 4)" }
-```
-
-#### GET `/api/admin/guestbook`
-
-**Query Parameters:**
-| Param | Type | Default | 설명 |
-|---|---|---|---|
-| page | number | 1 | 페이지 번호 |
-| limit | number (max 100) | 20 | 페이지당 개수 |
-| status | string | - | 상태 필터 (`active` \| `deleted` \| `hidden`) |
-| authorType | string | - | 작성자 유형 (`oauth` \| `guest`) |
-| q | string | - | 작성자 이름 + 본문 검색 |
-| startDate | string | - | 시작일 (YYYY-MM-DD) |
-| endDate | string | - | 종료일 (YYYY-MM-DD) |
-
-**Response 200:**
 ```json
 {
-  "data": [GuestbookEntryDetail],
-  "meta": { "page": 1, "limit": 20, "totalCount": 50, "totalPages": 3 }
+  "body": "OAuth 방명록",
+  "parentId": 1,
+  "isSecret": false
 }
 ```
 
-#### DELETE `/api/admin/guestbook/bulk`
+Guest 작성:
 
-**Request Body:**
 ```json
-{ "ids": [1, 2, 3], "action": "hide | restore | soft_delete | hard_delete" }
+{
+  "body": "게스트 방명록",
+  "parentId": 1,
+  "isSecret": false,
+  "guestName": "방문자",
+  "guestEmail": "visitor@example.com",
+  "guestPassword": "pass1234"
+}
 ```
 
----
+제약:
 
-## Settings (`/api/settings`)
+- `body`: 1..2000
+- `guestName`: 1..50
+- `guestEmail`: 필수
+- `guestPassword`: 4..100
 
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/settings/guestbook` | - | 방명록 활성 상태 조회 |
-| PATCH | `/api/admin/settings/guestbook` | Admin | 방명록 활성 상태 변경 |
+구현 메모:
 
-#### GET `/api/settings/guestbook`
+- 방명록 기능이 비활성화되어 있으면 `403`
 
-**Response 200:**
+Response `201`:
+
+```json
+{
+  "data": {
+    "id": 1,
+    "parentId": null,
+    "body": "방명록 본문",
+    "isSecret": false,
+    "status": "active",
+    "author": {
+      "type": "guest",
+      "name": "방문자",
+      "email": "visitor@example.com"
+    },
+    "replies": [],
+    "createdAt": "ISO-8601",
+    "updatedAt": "ISO-8601"
+  }
+}
+```
+
+### DELETE `/api/guestbook/:id`
+
+게스트 삭제 요청:
+
+```json
+{ "guestPassword": "pass1234" }
+```
+
+Response: `204 No Content`
+
+### Admin endpoints
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/admin/guestbook` | 전체 방명록 목록 |
+| DELETE | `/api/admin/guestbook/bulk` | 벌크 비가역 삭제 |
+| PATCH | `/api/admin/guestbook/bulk` | 벌크 hide/restore |
+| PATCH | `/api/admin/guestbook/:id` | 단건 hide/restore |
+| DELETE | `/api/admin/guestbook/:id` | 단건 soft/hard delete |
+
+### GET `/api/admin/guestbook`
+
+Query:
+
+| Name | Type | Default |
+|---|---|---|
+| `page` | `number` | `1` |
+| `limit` | `number` | `20` |
+| `status` | `active \| deleted \| hidden` | - |
+| `authorType` | `oauth \| guest` | - |
+| `q` | `string` | - |
+| `startDate` | `string` | - |
+| `endDate` | `string` | - |
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "parentId": null,
+      "body": "관리자용 원문",
+      "isSecret": true,
+      "status": "hidden",
+      "author": {
+        "type": "guest",
+        "name": "방문자",
+        "email": "visitor@example.com"
+      },
+      "createdAt": "ISO-8601",
+      "updatedAt": "ISO-8601"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+### DELETE `/api/admin/guestbook/bulk`
+
+Request:
+
+```json
+{
+  "ids": [1, 2, 3],
+  "action": "soft_delete"
+}
+```
+
+`action`:
+
+- `soft_delete`
+- `hard_delete`
+
+Response: `204 No Content`
+
+### PATCH `/api/admin/guestbook/bulk`
+
+Request:
+
+```json
+{
+  "ids": [1, 2, 3],
+  "action": "hide"
+}
+```
+
+`action`:
+
+- `hide`
+- `restore`
+
+Response: `204 No Content`
+
+### PATCH `/api/admin/guestbook/:id`
+
+Query:
+
+| Name | Type |
+|---|---|
+| `action` | `hide \| restore` |
+
+Response: `204 No Content`
+
+### DELETE `/api/admin/guestbook/:id`
+
+Query:
+
+| Name | Type |
+|---|---|
+| `action` | `soft_delete \| hard_delete` |
+
+Response: `204 No Content`
+
+## Settings
+
+Public prefix: `/api/settings`
+
+Admin prefix: `/api/admin`
+
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| GET | `/api/settings/guestbook` | Public | - | 방명록 활성 상태 조회 |
+| PATCH | `/api/admin/settings/guestbook` | Admin | Required | 방명록 활성 상태 변경 |
+
+### GET `/api/settings/guestbook`
+
 ```json
 { "enabled": true }
 ```
 
-#### PATCH `/api/admin/settings/guestbook`
+### PATCH `/api/admin/settings/guestbook`
 
-**Request Body:**
+Request:
+
 ```json
-{ "enabled": true }
+{ "enabled": false }
 ```
 
----
+Response:
+
+```json
+{ "enabled": false }
+```
 
 ## Stats
 
-### Public (`/api/stats`)
+Public prefix: `/api/stats`
 
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| POST | `/api/stats/view` | CSRF | 조회수 기록 (postId 선택적, 같은 IP 5분 내 중복 제거, KST 기준 unique, 30 req/min) |
-| GET | `/api/stats/popular` | - | 인기 게시글 |
-| GET | `/api/stats/total-views` | - | 사이트 전체 누적 조회수 |
+Admin prefix: `/api/admin/stats`
 
-#### POST `/api/stats/view`
+| Method | Path | Auth | CSRF | 설명 |
+|---|---|---|---|---|
+| POST | `/api/stats/view` | Public | Required | 조회수 기록 |
+| GET | `/api/stats/popular` | Public | - | 인기 게시글 |
+| GET | `/api/stats/total-views` | Public | - | 사이트 전체 조회수 |
+| GET | `/api/admin/stats/dashboard` | Admin | - | 대시보드 통계 |
 
-**Request Body:**
+### POST `/api/stats/view`
+
+Request:
+
 ```json
 { "postId": 1 }
 ```
 
-- `postId` 선택적: 있으면 글별 조회수, 없으면 사이트 전체 조회수 (`postId: NULL`)
-- unique 기준: KST(UTC+9) 자정 초기화
+또는 사이트 전체 조회수:
 
-**Response 200:** `{ "success": true, "deduplicated": false }`
-
-#### GET `/api/stats/popular`
-
-**Query:** `?limit=10&days=7` (max limit=100, max days=365)
-
-**Response 200:**
 ```json
-{ "data": [{ "postId": 1, "slug": "...", "title": "...", "pageviews": 100, "uniques": 80 }] }
+{}
 ```
 
-#### GET `/api/stats/total-views`
+Response:
 
-**Response 200:**
-```json
-{ "totalPageviews": 12345 }
-```
-
-- `stats_daily_tb`에서 `postId IS NULL`인 행의 `SUM(pageviews)` 반환
-
-### Admin (`/api/admin/stats`)
-
-| Method | Path | Auth | 설명 |
-|---|---|---|---|
-| GET | `/api/admin/stats/dashboard` | Admin | 대시보드 통계 |
-
-**Response 200:**
 ```json
 {
-  "todayPageviews": 50,
-  "weekPageviews": 300,
-  "monthPageviews": 1200,
-  "totalPosts": 25,
-  "totalComments": 150,
-  "postsByStatus": { "draft": 5, "published": 18, "archived": 2 }
+  "success": true,
+  "deduplicated": false
 }
 ```
 
----
+메모:
 
-## User (`/api/user`)
+- 동일 IP가 같은 대상에 5분 내 재요청하면 `deduplicated: true`
+- `postId`가 존재하면 공개 발행 게시글에 대해서만 집계되며, 그 외는 `404`
 
-| Method | Path | Auth | 설명 |
+### GET `/api/stats/popular`
+
+Query:
+
+| Name | Type | Default | 설명 |
 |---|---|---|---|
-| GET | `/api/user/me` | requireAuth | 현재 OAuth 사용자 프로필 |
-| PUT | `/api/user/me` | requireAuth | 사용자 프로필 수정 |
-| DELETE | `/api/user/me` | requireAuth | 사용자 소프트 삭제 (세션 파기) |
+| `limit` | `number` | `10` | 최대 100 |
+| `days` | `number` | `7` | 최대 365 |
 
-### GET `/api/user/me`
+Response:
 
-**Response 200:**
 ```json
 {
-  "id": 1, "provider": "github", "email": "...",
-  "displayName": "...", "avatarUrl": "...",
-  "createdAt": "ISO", "updatedAt": "ISO"
+  "data": [
+    {
+      "postId": 1,
+      "slug": "post-title",
+      "title": "Post title",
+      "pageviews": 10,
+      "uniques": 8
+    }
+  ]
 }
 ```
 
-### PUT `/api/user/me`
+### GET `/api/stats/total-views`
 
-**Request Body:**
 ```json
-{ "displayName": "string (1-100)", "avatarUrl": "string (URL, max 500) | null" }
+{ "totalPageviews": 1234 }
 ```
 
-모든 필드 optional. **Response 200:** 위와 동일.
+### GET `/api/admin/stats/dashboard`
 
----
+```json
+{
+  "todayPageviews": 10,
+  "weekPageviews": 70,
+  "monthPageviews": 300,
+  "totalPosts": 12,
+  "totalComments": 40,
+  "postsByStatus": {
+    "draft": 2,
+    "published": 8,
+    "archived": 2
+  }
+}
+```
 
-## SEO (root)
+## User
+
+Prefix: `/api/user`
+
+모든 엔드포인트는 OAuth 로그인 필요.
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/sitemap.xml` | XML 사이트맵 (Cache: 3600s) |
-| GET | `/rss.xml` | RSS 2.0 피드 - 최신 20개 공개 글 (Cache: 3600s) |
+| GET | `/me` | 내 프로필 조회 |
+| PUT | `/me` | 내 프로필 수정 |
+| DELETE | `/me` | 회원 탈퇴 |
 
----
+### GET `/api/user/me`
 
-## DB 스키마 요약 (13개 테이블)
+```json
+{
+  "id": 1,
+  "provider": "github",
+  "email": "user@example.com",
+  "displayName": "User Name",
+  "avatarUrl": "https://example.com/avatar.png",
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601"
+}
+```
 
-| 테이블 | 용도 |
-|---|---|
-| `admin_tb` | 관리자 계정 (username + argon2) |
-| `user_tb` | OAuth 사용자 (레거시) |
-| `oauth_account_tb` | OAuth 계정 (provider별 관리) |
-| `session_tb` | 세션 저장소 |
-| `image_tb` | 이미지 (레거시) |
-| `asset_tb` | 에셋 (현재 이미지 업로드 시스템) |
-| `category_tb` | 카테고리 (트리 구조, self-FK) |
-| `tag_tb` | 태그 |
-| `post_tb` | 게시글 (소프트 삭제 지원) |
-| `post_tag_tb` | 게시글-태그 M:N |
-| `comment_tb` | 댓글 (계층형, 비밀글) |
-| `guestbook_entry_tb` | 방명록 (계층형, 비밀글) |
-| `stats_daily_tb` | 일별 조회 통계 (postId NULL = 사이트 전체) |
+메모:
+
+- `providerUserId`, `deletedAt` 등 민감 필드는 노출하지 않는다.
+
+### PUT `/api/user/me`
+
+Request:
+
+```json
+{
+  "displayName": "New Name",
+  "avatarUrl": null
+}
+```
+
+제약:
+
+- `displayName`: 1..100
+- `avatarUrl`: 유효한 URL 또는 `null`
+- 빈 body도 허용되며 no-op으로 처리된다
+
+Response는 `GET /api/user/me`와 동일 구조다.
+
+### DELETE `/api/user/me`
+
+Response: `204 No Content`
+
+구현 메모:
+
+- 계정은 soft delete 처리된다.
+- 세션도 함께 파기된다.
+- 탈퇴한 사용자의 댓글/방명록 작성자명은 별도 마스킹 규칙을 따른다.
+
+## SEO
+
+루트 경로에 등록된다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/sitemap.xml` | sitemap XML |
+| GET | `/rss.xml` | RSS 2.0 XML |
+
+### GET `/sitemap.xml`
+
+- 공개 정적 페이지(` /`, `/portfolio`, `/guestbook`)
+- 공개 카테고리
+- 공개 발행 게시글
+
+응답 헤더:
+
+- `Content-Type: application/xml; charset=utf-8`
+- `Cache-Control: public, max-age=3600`
+
+### GET `/rss.xml`
+
+- 최신 공개 발행 게시글 최대 20개
+- 본문 Markdown을 평문화 후 220자 기준으로 description 생성
+
+응답 헤더:
+
+- `Content-Type: application/rss+xml; charset=utf-8`
+- `Cache-Control: public, max-age=3600`
+
+## 현재 문서에서 바로잡은 점
+
+- 관리자 로그인 필드는 `username`이 아니라 `email`
+- Admin 보호 라우트의 실패 코드는 구현상 대부분 `401`이 아니라 `403`
+- `/api/admin/posts/pinned-count`가 실제로 존재
+- 댓글/방명록의 관리자 상태값에는 `hidden`이 포함
+- User API는 OAuth 전용이며 `/api/user/me` 입출력을 별도로 정리
+- SEO 엔드포인트는 `/api/*`가 아니라 루트 `/sitemap.xml`, `/rss.xml`
+- Swagger/OpenAPI 생성 시 깨지던 `204` 응답 스키마를 코드에서 정정해 현재 스펙 추출이 가능하다
