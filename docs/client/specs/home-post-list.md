@@ -58,7 +58,7 @@
 |---|---|
 | 썸네일 | md breakpoint 이상에서 표시. 미등록 시 미표시 |
 | 카테고리명 | 배지 형태 |
-| 발행일 | `publishedAt` 기준, ko-KR 포맷 |
+| 날짜 | `publishedAt` 표시. `contentModifiedAt`이 있으면 "수정: {날짜}"도 함께 표시 |
 | 제목 | 최대 2줄, 초과 시 ellipsis |
 | 요약 | 서버 저장 `summary` 필드, CSS `line-clamp`으로 ellipsis 처리 |
 | 조회수 | 아이콘 + 숫자 |
@@ -123,6 +123,7 @@ Server Component (SSR)
 | 응답 필드 | 없음 | `viewCount` 추가 |
 | 응답 필드 | 없음 | `commentCount` 추가 |
 | 응답 필드 | 없음 | `isPinned` 추가 |
+| 응답 필드 | 없음 | `contentModifiedAt` 추가 |
 
 ### 서버 변경 필요사항
 
@@ -130,6 +131,7 @@ Server Component (SSR)
 |---|---|
 | DB 스키마 | `posts` 테이블에 `summary` 컬럼 추가 (VARCHAR 200, nullable) |
 | DB 스키마 | `posts` 테이블에 `is_pinned` 컬럼 추가 (BOOLEAN, default false) |
+| DB 스키마 | `posts` 테이블에 `content_modified_at` 컬럼 추가 (TIMESTAMP, nullable) |
 | 글 발행 로직 | `summary`가 비어있으면 `contentMd`에서 plain text 200자 자동 추출 |
 | 글 목록 응답 | `viewCount`, `commentCount` 집계하여 응답에 포함 |
 | 글 목록 정렬 | 고정 글이 최상단, 이후 `published_at` 내림차순 |
@@ -139,7 +141,8 @@ Server Component (SSR)
 ## 7. 수용 기준
 
 - [ ] `/` 접속 시 최신순 글 목록이 리스트형으로 표시된다
-- [ ] 리스트 아이템에 카테고리, 발행일, 제목, 요약, 조회수, 댓글 수가 표시된다
+- [ ] 리스트 아이템에 카테고리, 날짜(발행일 + 수정일), 제목, 요약, 조회수, 댓글 수가 표시된다
+- [ ] `contentModifiedAt`이 있는 글은 "수정: {날짜}"가 추가로 표시된다
 - [ ] 요약은 서버 `summary` 필드를 사용하며, CSS `line-clamp`으로 ellipsis 처리된다
 - [ ] 썸네일은 md breakpoint 이상에서만 표시된다
 - [ ] 고정 글이 목록 최상단에 핀 아이콘과 함께 표시된다

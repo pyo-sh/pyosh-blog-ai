@@ -42,7 +42,7 @@
   "headline": "글 제목",
   "description": "글 description 또는 본문 160자 요약",
   "datePublished": "2026-03-15T09:00:00+09:00",
-  "dateModified": "2026-03-20T14:00:00+09:00",
+  "dateModified": "2026-03-20T14:00:00+09:00",  // contentModifiedAt ?? publishedAt
   "author": {
     "@type": "Person",
     "name": "Pyosh",
@@ -58,7 +58,7 @@
 - `headline`: `post.title`
 - `description`: F-30의 `getPostDescription()` 공유
 - `datePublished`: `post.publishedAt`
-- `dateModified`: `post.updatedAt`
+- `dateModified`: `post.contentModifiedAt ?? post.publishedAt` (수정일이 없으면 발행일 사용)
 - `author`: 이름 "Pyosh", URL은 GitHub 프로필. `Person` 스키마를 독립 엔티티로 분리하지 않고 인라인으로 최소한만 포함
 - `image`: `post.thumbnailUrl` (없으면 필드 생략)
 - `keywords`: `post.tags.map(t => t.name)`

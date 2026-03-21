@@ -64,13 +64,14 @@
 |---|---|---|---|
 | ☐ (체크박스) | 벌크 선택 | - | 헤더에 전체 선택 |
 | 📌 | `isPinned` | - | 토글 버튼 |
-| 제목 | `title` + `category.name` | - | 카테고리 배지 포함 |
+| 썸네일 | `thumbnailUrl` | - | 소형 썸네일 (40x40), 없으면 플레이스홀더 |
+| 제목 + 요약 | `title` + `summary` + `category.name` | - | 카테고리 배지, 요약 1줄 truncate |
 | 상태 | `status` | - | 배지 (초안/발행/보관) |
 | 공개 | `visibility` | - | 토글 스위치 (공개/비공개) |
 | 조회수 | `viewCount` | O | 숫자 |
 | 댓글 | `commentCount` | O | 숫자 |
-| 작성일 | `createdAt` | O | ko-KR 포맷 |
 | 발행일 | `publishedAt` | O | ko-KR 포맷, null이면 `-` |
+| 수정일 | `contentModifiedAt` | O | ko-KR 포맷, null이면 `-` |
 | 작업 | - | - | 미리보기, 수정, 삭제 |
 
 #### 휴지통 탭 (삭제된 글)
@@ -234,6 +235,7 @@
 | 공개 토글 | 인라인 토글 스위치 |
 | 고정 토글 | 핀 토글 버튼 |
 | 상태 변경 | 드롭다운 (초안/발행/보관) |
+| 수정일 관리 | "수정일 제거" 또는 커스텀 날짜 설정 |
 
 #### 미리보기 본문 렌더링
 
@@ -366,7 +368,8 @@ PostListPage
 | `AdminPostListQuerySchema` | `sort` 옵션에 `viewCount`, `commentCount` 추가 |
 | 글 목록 정렬 | `viewCount`, `commentCount` 정렬 시 집계 서브쿼리 또는 JOIN |
 | `hardDeletePost()` | 댓글, 조회수, 고아 태그 연쇄 삭제 추가 |
-| `PostDetailSchema` | `isPinned` 필드 포함 (F-01에서 추가) |
+| `PostDetailSchema` | `isPinned`, `contentModifiedAt` 필드 포함 (F-01에서 추가) |
+| `contentModifiedAt` 자동 설정 | 글 수정 API 호출 시 명시적 값 없으면 현재 시각 자동 설정, null 명시 시 제거, 메타데이터만 변경(공개 토글, 핀 토글) 시 변경하지 않음 |
 
 ### 응답 데이터
 
@@ -382,7 +385,7 @@ interface AdminPostListItem extends Post {
 ## 7. 수용 기준
 
 - [ ] 글 관리 경로가 `/manage/posts`이다
-- [ ] 테이블에 조회수, 댓글 수, 고정 여부, 발행일 컬럼이 있다
+- [ ] 테이블에 썸네일, 요약, 조회수, 댓글 수, 고정 여부, 발행일, 수정일 컬럼이 있다
 - [ ] 상태 필터 드롭다운이 동작한다 (전체/초안/발행/보관)
 - [ ] 공개여부 필터 드롭다운이 동작한다 (전체/공개/비공개)
 - [ ] 검색 입력으로 제목/내용 검색이 동작한다

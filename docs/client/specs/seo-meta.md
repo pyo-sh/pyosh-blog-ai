@@ -147,7 +147,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: post.title,
       description,
       publishedTime: post.publishedAt ?? undefined,
-      modifiedTime: post.updatedAt,
+      modifiedTime: post.contentModifiedAt ?? post.publishedAt ?? undefined,
       tags: post.tags.map(t => t.name),
       ...(post.thumbnailUrl && { images: [post.thumbnailUrl] }),
     },
