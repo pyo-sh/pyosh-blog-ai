@@ -51,7 +51,7 @@
 | # | 기능 | 스펙 파일 | 상태 | 의존성 |
 |---|---|---|---|---|
 | F-19 | 관리자 로그인 | `client/specs/admin-login.md` | `DRAFT` | - |
-| F-20 | 대시보드 (통계 요약) | `client/specs/admin-dashboard.md` | `SPEC` | F-19 |
+| F-20 | 대시보드 (통계 요약) | `client/specs/admin-dashboard.md` | `DRAFT` | F-19 |
 | F-21 | 글 관리 (목록, 필터, 삭제/복원) | `client/specs/admin-post-list.md` | `SPEC` | F-19 |
 | F-22 | 마크다운 에디터 (편집 + 실시간 프리뷰) | `client/specs/admin-markdown-editor.md` | `SPEC` | F-19 |
 | F-23 | 글 메타데이터 폼 (제목, 카테고리, 태그, 상태, 썸네일) | `client/specs/admin-post-meta-form.md` | `SPEC` | F-19, F-22 |
