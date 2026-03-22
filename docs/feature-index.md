@@ -56,7 +56,7 @@
 | F-22 | 마크다운 에디터 (편집 + 실시간 프리뷰) | `client/specs/admin-markdown-editor.md` | `DRAFT` | F-19 |
 | F-23 | 글 메타데이터 폼 (제목, 카테고리, 태그, 상태, 썸네일) | `client/specs/admin-post-meta-form.md` | `DRAFT` | F-19, F-22 |
 | F-24 | 카테고리 트리 표시 | `client/specs/admin-category-tree.md` | `DRAFT` | F-19 |
-| F-25 | 카테고리 CRUD (생성/수정/삭제 모달) | `client/specs/admin-category-crud.md` | `SPEC` | F-24 |
+| F-25 | 카테고리 CRUD (생성/수정/삭제 모달) | `client/specs/admin-category-crud.md` | `DRAFT` | F-24 |
 | F-26 | 에셋 업로드 (드래그&드롭, 파일 검증, 업로드 큐) | `client/specs/admin-asset-upload.md` | `SPEC` | F-19 |
 | F-27 | 에셋 갤러리/관리 (그리드, 선택, 삭제, URL 복사) | `client/specs/admin-asset-gallery.md` | `SPEC` | F-26 |
 | F-28 | 댓글 관리 (목록, 비밀글 확인, 강제 삭제) | `client/specs/admin-comment-manager.md` | `SPEC` | F-19 |
