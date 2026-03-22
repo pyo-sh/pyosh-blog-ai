@@ -2,7 +2,7 @@
 
 > pyosh-blog v1 기능 마스터 목록
 
-**최종 수정:** 2026-03-18
+**최종 수정:** 2026-03-23
 
 각 기능의 상세 스펙은 `docs/client/specs/`, `docs/server/specs/`, `docs/specs/`에 개별 파일로 관리한다.
 접근성 요구사항은 별도 스펙이 아닌 공통 체크리스트(`docs/a11y-checklist.md`)로 관리하며, 각 기능 스펙의 수용 기준에 포함한다.
@@ -54,7 +54,7 @@
 | F-20 | 대시보드 (통계 요약) | `client/specs/admin-dashboard.md` | `DRAFT` | F-19 |
 | F-21 | 글 관리 (목록, 필터, 삭제/복원) | `client/specs/admin-post-list.md` | `DRAFT` | F-19 |
 | F-22 | 마크다운 에디터 (편집 + 실시간 프리뷰) | `client/specs/admin-markdown-editor.md` | `DRAFT` | F-19 |
-| F-23 | 글 메타데이터 폼 (제목, 카테고리, 태그, 상태, 썸네일) | `client/specs/admin-post-meta-form.md` | `SPEC` | F-19, F-22 |
+| F-23 | 글 메타데이터 폼 (제목, 카테고리, 태그, 상태, 썸네일) | `client/specs/admin-post-meta-form.md` | `DRAFT` | F-19, F-22 |
 | F-24 | 카테고리 트리 표시 | `client/specs/admin-category-tree.md` | `SPEC` | F-19 |
 | F-25 | 카테고리 CRUD (생성/수정/삭제 모달) | `client/specs/admin-category-crud.md` | `SPEC` | F-24 |
 | F-26 | 에셋 업로드 (드래그&드롭, 파일 검증, 업로드 큐) | `client/specs/admin-asset-upload.md` | `SPEC` | F-19 |
