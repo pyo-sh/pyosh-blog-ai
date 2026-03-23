@@ -28,6 +28,7 @@
 | 020 | OpenAI --output-schema requires all properties in required array | 2026-03-14 | #codex #openai #structured-output #schema #json-schema |
 | 021 | Docker 환경에서 HTML → Figma 캡처 방법                         | 2026-03-20 | #figma #playwright #docker #html-to-design #capture #mcp |
 | 022 | Figma captureForDesign hang 원인과 Section 배치 패턴           | 2026-03-23 | #figma #playwright #captureForDesign #section #layout #dialog #mcp |
+| 023 | captureForDesign color-mix() 미해석 및 inline 요소 높이 불일치 패턴 | 2026-03-23 | #figma #captureForDesign #color-mix #rgba #inline-block #html-to-design |
 
 ## 상세 문서
 
@@ -53,6 +54,7 @@
 - [findings.020-openai-output-schema-required-contract.md](./findings/findings.020-openai-output-schema-required-contract.md) - OpenAI --output-schema rejects schemas where any property is absent from required; nullable fields must use type union ["T", "null"]
 - [findings.021-docker-figma-html-capture.md](./findings/findings.021-docker-figma-html-capture.md) - Docker headless 환경에서 HTML을 Figma로 캡처: browser_run_code + waitForTimeout(8000) 패턴, Chromium 권한 수정, 네트워크 오진단 방지
 - [findings.022-figma-capture-section-layout.md](./findings/findings.022-figma-capture-section-layout.md) - captureForDesign hang 원인(POST성공 후 status 404 폴링), 409 재발급 정책, Section API, appendChild 후 좌표 설정, Dialog 판별 패턴, figma-remote rate limit
+- [findings.023-figma-capture-color-mix-inline.md](./findings/findings.023-figma-capture-color-mix-inline.md) - color-mix() 미캡처 원인/rgba 교체 매핑표, inline 높이 불일치(inline-block 해결), exportAsync rate-limit 없음
 
 ## 주요 원칙
 
@@ -92,3 +94,6 @@
 - **section.appendChild 후 x/y 설정** → reparent 전 좌표는 무의미. appendChild 이후에만 상대 좌표 설정 유효
 - **Dialog 판별: x >= parentFrame.width** → navigation drawer는 frame 오른쪽 밖에 위치. 단, 사이드바 전용 프레임 내부 노드는 삭제 금지
 - **배치 Figma 조작은 figma-console figma_execute** → figma-remote MCP는 rate limit 빠름. 노드 생성/이동/삭제는 figma_execute로 Plugin API 직접 실행
+- **captureForDesign은 color-mix() 미해석** → `color-mix(in srgb, var(--X) N%, transparent)` → `rgba(R,G,B, N/100)` pre-computed 값으로 교체. RGB는 figma_tokens.json light 테마 값과 동일해야 Figma 변수 자동 연결
+- **captureForDesign inline 요소는 display:inline-block 필수** → `display:inline`이면 frame.height = em-box. `inline-block`으로 변경해야 frame.height = line-height와 일치
+- **Figma 변경 직후 검증은 figma_capture_screenshot** → Plugin exportAsync API 사용으로 REST API rate limit 없이 즉시 캡처 가능

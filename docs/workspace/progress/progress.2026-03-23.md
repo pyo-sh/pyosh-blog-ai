@@ -89,3 +89,44 @@ Playwright headless Chromium으로 19개 와이어프레임을 Figma 디자인 �
 **Section 크기 재산정 후 resizeWithoutConstraints 적용**
 
 기술적 발견사항: findings.022 참조
+
+### 5. HTML color-mix() → rgba() 전면 교체
+
+`captureForDesign`이 `color-mix()` CSS 함수를 투명으로 캡처하는 문제 발견 및 수정.
+
+**수정 범위**: `/workspace/.workspace/design/` 전체 10개 HTML 파일, 99곳 교체
+
+**교체 원칙**: light theme `figma_tokens.json` RGB 값과 1:1 대응 - Figma 변수 자동 연결 가능
+
+```
+color-mix(in srgb, var(--primary1) 12%, transparent)  →  rgba(138,111,224,.12)
+color-mix(in srgb, var(--background1) 80%, transparent) →  rgba(249,249,250,.80)
+color-mix(in srgb, var(--border3) 50%, transparent)    →  rgba(219,221,224,.50)
+... (총 13가지 패턴)
+```
+
+**파생색 2종 토큰 대체** (직접 토큰으로 표현 불가):
+- `primary1 85% + black` (hover) → `var(--secondary1)` (#6b49b5)
+- `yellow1 28% + border3` (border) → `rgba(255,190,61,.28)` (yellow/1 토큰 연결 가능)
+
+### 6. inline 요소 높이 불일치 수정
+
+`display:inline` 요소가 captureForDesign에서 frame height < text height 문제 수정.
+
+**HTML 수정**:
+- `post-detail.html`: `.markdown-content code:not(.code-block code)` → `display:inline-block; vertical-align:baseline` 추가
+- `search.html`: `.search-highlight` → `display:inline-block; vertical-align:baseline` 추가
+
+### 7. Figma 기존 프레임 직접 수정
+
+이전 캡처(color-mix 미해석)로 인해 잘못 저장된 fill들을 Figma Plugin API로 직접 수정.
+
+| 수정 대상 | 노드 수 | 수정 내용 |
+|---|---|---|
+| Navigation glass (`white@0%`) | 19개 | `background1(249,249,250)@80%` 적용 |
+| `Highlighted Text` (search-highlight) | 11개 | `primary1@20%` fill 추가 + 높이 교정 |
+| `Code` (inline code) | 26개 | 높이 교정 (h:19 → h:24) |
+
+**검증**: `figma_capture_screenshot` (Plugin exportAsync API) - REST API rate limit 없이 즉시 검증 가능
+
+기술적 발견사항: findings.023 참조

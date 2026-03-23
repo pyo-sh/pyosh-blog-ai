@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-23 | 와이어프레임 color-mix()→rgba() 전면교체(99곳), inline-block 수정, Figma 직접 패치(Navigation×19, Highlighted Text×11, Code×26) | done |
 | 2026-03-23 | 와이어프레임 HTML 컬러 토큰/타이포그래피 컴플라이언스 수정 + Figma 캡처 (19개 프레임, node-id 70:2-88:2) | done |
 | 2026-03-14 | Codex schema contract fix + dev-codex-pipeline --tool override (PR #203) - review_schema.json required array, nullable path/line, review_publish.py null guard, SKILL.md parse-first TOOL pattern, 54 tests passing | done |
 | 2026-03-14 | orchctl dashboard / webhook / notification (#105, PR #200) - event log (events table v15 migration), emit_event with in_transaction guard + non-daemon webhook thread, orchctl events list + notify status/set/test CLI, 33 new tests (554 total), rebase conflict resolved with v14 cycle-quarantine | done |
