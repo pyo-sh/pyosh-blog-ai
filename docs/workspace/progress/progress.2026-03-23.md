@@ -71,3 +71,21 @@ Playwright headless Chromium으로 19개 와이어프레임을 Figma 디자인 �
 | 빈 상태 Empty Mobile (375px) | 88:2 |
 
 **기술적 발견사항**: `captureForDesign`은 POST 전송 후 서버 측 상태 폴링에서 hang 발생 (status endpoint 404 반환). 실제 데이터 전송은 15초 이내 완료되며, 짧은 timeout 후 MCP polling으로 완료 확인하는 방식이 효과적.
+
+### 4. Figma Section 배치 및 정리
+
+19개 프레임을 8개 Section(Layer)으로 배치했다.
+
+**배치 규칙**
+- Desktop 프레임: Section 내 x:0, y:0
+- Mobile 프레임: Desktop 오른쪽 x:1540 (Desktop width 1440 + 100 간격)
+- 홈 사이드바: Mobile 오른쪽 x:2015 (Mobile width 375 + 100 간격)
+
+**Dialog/메뉴 노드 삭제**
+- 기준: 노드 이름이 "Dialog" 또는 "Container" AND x >= 부모 프레임 width
+- 총 18개 navigation drawer 노드 삭제
+- 예외: 72:367 (홈 Mobile 사이드바 프레임 내부 Dialog, x:56 - 사이드바 콘텐츠이므로 유지)
+
+**Section 크기 재산정 후 resizeWithoutConstraints 적용**
+
+기술적 발견사항: findings.022 참조

@@ -27,6 +27,7 @@
 | 019 | Tarjan SCC vs Kahn for dependency cycle quarantine | 2026-03-14 | #orchctl #cycle-detection #tarjan #scc #scheduling |
 | 020 | OpenAI --output-schema requires all properties in required array | 2026-03-14 | #codex #openai #structured-output #schema #json-schema |
 | 021 | Docker 환경에서 HTML → Figma 캡처 방법                         | 2026-03-20 | #figma #playwright #docker #html-to-design #capture #mcp |
+| 022 | Figma captureForDesign hang 원인과 Section 배치 패턴           | 2026-03-23 | #figma #playwright #captureForDesign #section #layout #dialog #mcp |
 
 ## 상세 문서
 
@@ -51,6 +52,7 @@
 - [findings.019-tarjan-scc-cycle-quarantine.md](./findings/findings.019-tarjan-scc-cycle-quarantine.md) - Tarjan SCC correctly isolates cycle members only; Kahn's algorithm incorrectly quarantines downstream dependents; rate-limit detection scoped to discovery pass
 - [findings.020-openai-output-schema-required-contract.md](./findings/findings.020-openai-output-schema-required-contract.md) - OpenAI --output-schema rejects schemas where any property is absent from required; nullable fields must use type union ["T", "null"]
 - [findings.021-docker-figma-html-capture.md](./findings/findings.021-docker-figma-html-capture.md) - Docker headless 환경에서 HTML을 Figma로 캡처: browser_run_code + waitForTimeout(8000) 패턴, Chromium 권한 수정, 네트워크 오진단 방지
+- [findings.022-figma-capture-section-layout.md](./findings/findings.022-figma-capture-section-layout.md) - captureForDesign hang 원인(POST성공 후 status 404 폴링), 409 재발급 정책, Section API, appendChild 후 좌표 설정, Dialog 판별 패턴, figma-remote rate limit
 
 ## 주요 원칙
 
@@ -84,3 +86,9 @@
 - **OpenAI --output-schema는 draft-07 superset** → 모든 properties 키가 required에 포함되어야 함. optional 필드는 `["T", "null"]` 타입 유니온으로 표현. nullable 필드의 maxLength/minimum 제약은 제거할 것
 - **Docker Figma 캡처 = browser_run_code + waitForTimeout(8000)** → `browser_navigate` 후 별도 도구 호출은 타이밍 방해로 실패. 단일 `browser_run_code` 안에서 goto + 8초 대기가 필수. `/opt/ms-playwright` 쓰기 권한 선행 확보
 - **Chromium fetch HEAD to root → ERR_FAILED는 네트워크 이상 아님** → mcp.figma.com GET/POST는 정상 작동. HEAD 요청 실패를 네트워크 차단으로 오진단하지 말 것
+- **captureForDesign은 항상 timeout됨 - POST 관찰로 성공 판단** → 함수는 status endpoint 404 폴링으로 반환 불가. 15s 타임아웃 + `page.on('response')` POST 관찰로 성공 여부 판단
+- **captureId는 세션마다 새로 발급** → 재사용 시 409 CAPTURE_ID_ALREADY_SUBMITTED. 세션 시작 시 전량 재발급 필수
+- **SECTION 리사이즈는 resizeWithoutConstraints** → SECTION 타입에는 `resize()` 없음. `resizeWithoutConstraints(w, h)` 사용
+- **section.appendChild 후 x/y 설정** → reparent 전 좌표는 무의미. appendChild 이후에만 상대 좌표 설정 유효
+- **Dialog 판별: x >= parentFrame.width** → navigation drawer는 frame 오른쪽 밖에 위치. 단, 사이드바 전용 프레임 내부 노드는 삭제 금지
+- **배치 Figma 조작은 figma-console figma_execute** → figma-remote MCP는 rate limit 빠름. 노드 생성/이동/삭제는 figma_execute로 Plugin API 직접 실행
