@@ -28,19 +28,19 @@
 
 **Request Body:**
 ```json
-{ "email": "string", "password": "string (min 8)" }
+{ "username": "string", "password": "string" }
 ```
 
 **Response 200:**
 ```json
-{ "admin": { "id": 1, "email": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" } }
+{ "admin": { "id": 1, "username": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" } }
 ```
 
 ### GET `/api/auth/me`
 
 **Response 200 (Admin):**
 ```json
-{ "type": "admin", "id": 1, "email": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" }
+{ "type": "admin", "id": 1, "username": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" }
 ```
 
 **Response 200 (OAuth):**
