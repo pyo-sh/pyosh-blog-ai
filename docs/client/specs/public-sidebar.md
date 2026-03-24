@@ -97,8 +97,8 @@ Public 페이지에 2컬럼 레이아웃을 적용한다. 왼쪽 사이드바에
 
 ```
 사이드바 데이터:
-  최근글: GET /api/posts?sort=recent&limit=5
-  인기글: GET /api/posts?sort=popular&limit=5&period=7d
+  최근글: GET /api/posts?limit=5 (기본 정렬 published_at desc)
+  인기글: GET /api/stats/popular?period=7d&limit=5 (F-06 엔드포인트 재사용)
   카테고리: GET /api/categories (트리 구조 + 글 수)
   태그: GET /api/tags
   조회수: GET /api/stats/total-views
@@ -126,17 +126,18 @@ Public 페이지에 2컬럼 레이아웃을 적용한다. 왼쪽 사이드바에
 
 ## 6. API 연동
 
-### GET /api/posts (사이드바용)
+### GET /api/posts (최근글)
 
-기존 엔드포인트에 파라미터 추가:
+기존 엔드포인트 활용. `limit=5`로 소량 조회.
 
-| 파라미터 | 설명 |
-|---|---|
-| `sort=recent` | 최신순 정렬 |
-| `sort=popular&period=7d` | 7일 인기순 |
-| `limit=5` | 사이드바용 소량 조회 |
+- 기본 정렬(`published_at desc`)이 최신순이므로 추가 파라미터 불필요
+- 응답 필드: `id`, `title`, `slug`, `publishedAt` (사이드바 리스트에 필요한 최소 필드)
 
-응답 필드: `id`, `title`, `slug`, `publishedAt` (사이드바 리스트에 필요한 최소 필드)
+### GET /api/stats/popular (인기글)
+
+F-06에서 사용하는 기존 엔드포인트 재사용. `period=7d&limit=5`로 조회.
+
+- 7일/30일 기간 전환은 F-06 사이드바 탭에서 처리
 
 ### GET /api/categories
 
