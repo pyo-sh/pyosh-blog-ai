@@ -97,9 +97,9 @@ interface PostListItem {
 
 서버에서 글 목록 조회 시 `stats_daily_tb`를 LEFT JOIN하여 각 글의 pageviews 합산을 포함한다.
 
-### 5.4 조회수 기록 - 클라이언트 (기존 유지)
+### 5.4 조회수 기록 - 클라이언트
 
-현재 구현을 그대로 유지한다.
+#### 글별 조회수 (기존 유지)
 
 ```
 ViewCounter (Client Component, 렌더링 null)
@@ -110,6 +110,22 @@ ViewCounter (Client Component, 렌더링 null)
      └─ POST /api/stats/view { postId } (keepalive: true)
 ```
 
+#### 사이트 전체 조회수 (신규)
+
+루트 레이아웃(`app/layout.tsx`)에 `SiteViewCounter`를 배치하여 모든 페이지 방문을 기록한다.
+
+```
+SiteViewCounter (Client Component, 렌더링 null)
+  └─ useSiteViewCount()
+     ├─ sessionStorage 중복 체크 (site_viewed)
+     ├─ pending 체크 (pending_site_view, 5분 TTL)
+     └─ POST /api/stats/view {} (postId 없음, keepalive: true)
+```
+
+- `postId`를 보내지 않으면 서버에서 사이트 전체 조회수(`postId: NULL`)로 기록
+- 글 상세 방문 시: 글별 + 사이트 전체 **둘 다** 기록됨 (별도 요청)
+- sessionStorage 키를 분리하여 글별/사이트 전체 중복 체크가 독립적으로 동작
+
 ### 5.5 서버 uniques 카운팅 개선
 
 #### 캐시 분리
@@ -117,19 +133,41 @@ ViewCounter (Client Component, 렌더링 null)
 ```
 변경 전: 단일 캐시 {postId}:{ip} → TTL 5분
 변경 후: 두 개의 캐시
-  - pageview 캐시: {postId}:{ip} → TTL 5분 (연타 방지)
-  - unique 캐시: {postId}:{ip}:{date} → TTL 24시간 (일별 고유 방문자)
+  - pageview 캐시: {key}:{ip} → TTL 5분 (연타 방지)
+  - unique 캐시: {key}:{ip}:{kstDate} → KST 자정까지 (일별 고유 방문자)
 ```
 
-#### incrementPageView 로직 변경
+- `key`: 글별은 `postId`, 사이트 전체는 `"site"`
+- `kstDate`: KST(UTC+9) 기준 날짜 문자열 (`"2026-03-25"`)
+
+#### KST 기준 날짜 산출
+
+unique 초기화는 **한국 시간 자정(00:00 KST)**을 기준으로 한다.
+
+```typescript
+function getKSTDate(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10); // "2026-03-25"
+}
+```
+
+- DB의 `date` 컬럼도 `CURDATE()` 대신 `getKSTDate()` 값을 사용
+- unique 캐시 TTL: KST 자정까지 남은 시간으로 동적 설정, 또는 최대 24시간 고정 (KST date가 키에 포함되므로 날짜 변경 시 자동 분리)
+
+#### incrementView 로직 (글별 + 사이트 전체 공통)
 
 ```
-1. pageview 캐시 확인 ({postId}:{ip})
+입력: postId (nullable), ip
+key = postId ?? "site"
+
+1. pageview 캐시 확인 ({key}:{ip})
    └─ 히트 → 전체 스킵 (deduplicated=true)
 
 2. pageview 캐시 미스 → pageview 캐시 등록 (TTL 5분)
 
-3. unique 캐시 확인 ({postId}:{ip}:{date})
+3. kstDate = getKSTDate()
+   unique 캐시 확인 ({key}:{ip}:{kstDate})
    ├─ 히트 → pageviews만 +1
    └─ 미스 → pageviews +1, uniques +1, unique 캐시 등록 (TTL 24시간)
 ```
@@ -139,31 +177,39 @@ ViewCounter (Client Component, 렌더링 null)
 ```sql
 -- unique 캐시 미스 (새 고유 방문자)
 INSERT INTO stats_daily_tb (post_id, date, pageviews, uniques)
-VALUES (:postId, CURDATE(), 1, 1)
+VALUES (:postIdOrNull, :kstDate, 1, 1)
 ON DUPLICATE KEY UPDATE
   pageviews = pageviews + 1,
   uniques = uniques + 1;
 
 -- unique 캐시 히트 (재방문)
 INSERT INTO stats_daily_tb (post_id, date, pageviews, uniques)
-VALUES (:postId, CURDATE(), 1, 0)
+VALUES (:postIdOrNull, :kstDate, 1, 0)
 ON DUPLICATE KEY UPDATE
   pageviews = pageviews + 1;
 ```
 
+- `postIdOrNull`: 글별이면 postId, 사이트 전체면 NULL
+- `kstDate`: KST 기준 날짜 (`getKSTDate()`)
+
 #### 결과 예시
 
 ```
-같은 IP, 같은 글, 같은 날:
-  10:00 → pageviews +1, uniques +1  (첫 방문)
-  10:02 → 스킵 (5분 캐시)
-  10:07 → pageviews +1만 (unique 캐시 유지)
-  15:00 → pageviews +1만 (unique 캐시 유지)
+같은 IP, 같은 글, KST 기준 같은 날:
+  10:00 KST → pageviews +1, uniques +1  (첫 방문)
+  10:02 KST → 스킵 (5분 캐시)
+  10:07 KST → pageviews +1만 (unique 캐시 유지)
+  15:00 KST → pageviews +1만 (unique 캐시 유지)
 
-다음 날:
-  10:00 → pageviews +1, uniques +1  (새 날, unique 캐시 만료)
+KST 자정 이후 (다음 날):
+  00:05 KST → pageviews +1, uniques +1  (새 KST 날짜, unique 캐시 키 변경)
 
 결과: pageviews=4, uniques=2 (이틀간 같은 사람)
+
+사이트 전체 (postId = NULL):
+  홈 방문 → site pageviews +1
+  글 상세 방문 → site pageviews +1 + post pageviews +1 (별도 요청)
+  태그 페이지 방문 → site pageviews +1
 ```
 
 ### 5.6 Admin 조회수 표시
@@ -180,19 +226,24 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 
 | 계층 | 파일 | 역할 |
 |---|---|---|
-| `features` | `post-detail/ui/view-counter.tsx` | 조회수 기록 (기존, 렌더링 null) |
-| `shared` | `hooks/use-view-count.ts` | 조회수 기록 훅 (기존) |
-| `entities` | `stat/api.ts` | `fetchPopularPosts` (기존) |
+| `features` | `post-detail/ui/view-counter.tsx` | 글별 조회수 기록 (기존, 렌더링 null) |
+| `features` | `site-view-counter/ui/site-view-counter.tsx` | 사이트 전체 조회수 기록 (신규, 렌더링 null) |
+| `shared` | `hooks/use-view-count.ts` | 글별 조회수 기록 훅 (기존) |
+| `shared` | `hooks/use-site-view-count.ts` | 사이트 전체 조회수 기록 훅 (신규) |
+| `entities` | `stat/api.ts` | `fetchPopularPosts`, `fetchTotalViews` |
 | `entities` | `stat/model.ts` | `PopularPost` 타입 (기존) |
 | `features` | `post-list/ui/post-list-item.tsx` | PostListItem에 조회수 표시 추가 |
 
 ### 5.8 데이터 흐름
 
 ```
+루트 레이아웃 (모든 페이지)
+  └─ SiteViewCounter → useSiteViewCount() → POST /api/stats/view {}
+
 글 상세 페이지 (Server Component)
   ├─ fetchPost(slug) → totalPageviews 포함
   ├─ 헤더 메타에 "조회 {totalPageviews}" 표시
-  └─ ViewCounter → useViewCount(postId) → POST /api/stats/view
+  └─ ViewCounter → useViewCount(postId) → POST /api/stats/view { postId }
 
 글 목록 페이지 (Server Component)
   ├─ fetchPosts() → 각 항목에 totalPageviews 포함
@@ -203,7 +254,8 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 
 | 메서드 | 경로 | 용도 | 변경 사항 |
 |---|---|---|---|
-| POST | `/api/stats/view` | 조회수 기록 | unique 캐시 분리 로직 |
+| POST | `/api/stats/view` | 조회수 기록 | postId 선택적 (없으면 사이트 전체), KST 기준 unique |
+| GET | `/api/stats/total-views` | 사이트 전체 누적 조회수 | **신규** |
 | GET | `/api/posts/:slug` | 글 상세 | `totalPageviews` 필드 추가 |
 | GET | `/api/posts` | 글 목록 | `totalPageviews` 필드 추가 |
 | GET | `/api/stats/popular` | 인기글 | 없음 (기존) |
@@ -212,7 +264,9 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 
 | 항목 | 설명 |
 |---|---|
-| `StatsService.incrementPageView()` | pageview/unique 캐시 분리, DB 업데이트 분기 |
+| `StatsService.incrementView()` | postId nullable 처리, KST 기준 날짜, unique 캐시 분리 |
+| `StatsService.getTotalViews()` | `SUM(pageviews) WHERE postId IS NULL` 반환 (신규) |
+| `StatsRoute` | `POST /api/stats/view` body에서 postId 선택적, `GET /api/stats/total-views` 추가 |
 | `PostService.getPostBySlug()` | `stats_daily_tb` JOIN으로 `totalPageviews` 포함 |
 | `PostService.getPostList()` | `stats_daily_tb` LEFT JOIN으로 `totalPageviews` 포함 |
 
@@ -221,9 +275,11 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 - [ ] 글 상세 헤더에 "조회 N" 형태로 조회수가 표시된다
 - [ ] PostListItem 메타에 "조회 N" 형태로 조회수가 표시된다
 - [ ] 숫자가 한국어 로케일로 포맷된다 (1,234)
-- [ ] 같은 IP의 같은 날 재방문 시 uniques가 증가하지 않는다
-- [ ] 같은 IP의 다른 날 방문 시 uniques가 증가한다
+- [ ] 같은 IP의 KST 같은 날 재방문 시 uniques가 증가하지 않는다
+- [ ] KST 자정 이후 방문 시 uniques가 증가한다
 - [ ] pageviews는 5분 캐시 만료 후 재방문 시 정상 증가한다
+- [ ] 모든 페이지 방문 시 사이트 전체 조회수(`postId: NULL`)가 기록된다
+- [ ] `GET /api/stats/total-views`가 사이트 전체 누적 pageviews를 반환한다
 - [ ] Public에서 uniques는 표시되지 않는다
 - [ ] Admin에서 pageviews와 uniques 모두 표시된다
 - [ ] 글 상세/목록 API 응답에 totalPageviews가 포함된다

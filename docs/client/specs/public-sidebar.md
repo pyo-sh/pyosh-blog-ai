@@ -150,14 +150,22 @@ F-06에서 사용하는 기존 엔드포인트 재사용. `period=7d&limit=5`로
 
 ### GET /api/stats/total-views
 
-신규 엔드포인트. 블로그 전체 누적 조회수 반환.
+신규 엔드포인트. `stats_daily_tb`에서 `postId IS NULL`인 행의 `SUM(pageviews)`를 반환.
+
+```json
+{ "totalPageviews": 12345 }
+```
+
+- 모든 페이지 방문이 `postId: NULL`로 기록됨 (F-10에서 처리)
+- 글 조회수 합산이 아닌 **사이트 방문 수** 기준
 
 ### 서버 변경 필요사항
 
 | 항목 | 설명 |
 |---|---|
-| 글 목록 API | `sort`, `period`, `limit` 파라미터 지원 |
+| 글 목록 API | `limit` 파라미터 지원 (기존 정렬 활용) |
 | 카테고리 API | 트리 구조 응답 + `postCount` 집계 |
+| 통계 API | `GET /api/stats/total-views` 신규 (F-10 참조) |
 | 통계 API | 전체 조회수 엔드포인트 신규 추가 |
 
 ## 7. 수용 기준
