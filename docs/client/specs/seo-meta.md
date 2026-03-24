@@ -125,7 +125,6 @@ export const metadata: Metadata = {
 | 태그 (`/tags/[slug]`) | "#{태그명} - 글 목록" | "#{태그명} 태그가 포함된 글 목록" | `website` | `generateMetadata()` |
 | 태그 목록 (`/tags`) | "태그 목록" | "모든 태그 목록" | `website` | 정적 `metadata` |
 | 방명록 (`/guestbook`) | "방명록" | "방명록" | `website` | 정적 `metadata` |
-| 인기 글 (`/popular`) | "인기 글" | "인기 글 목록" | `website` | 정적 `metadata` |
 | 검색 (`/search`) | "검색: {검색어}" | "'{검색어}' 검색 결과" | `website` | `generateMetadata()` |
 
 #### 글 상세 `generateMetadata` 예시
@@ -184,7 +183,6 @@ Twitter 전용 태그를 별도로 관리하지 않고 OpenGraph 폴백을 활�
 | 태그 | `/tags/{slug}` |
 | 태그 목록 | `/tags` |
 | 방명록 | `/guestbook` |
-| 인기 글 | `/popular` |
 | 검색 | `/search?q={query}&filter={filter}` |
 | 페이지네이션 | `?page=N` 파라미터 포함 |
 
@@ -206,7 +204,6 @@ export default async function sitemap(): Promise<MetadataSitemap> {
     { url: '/', changeFrequency: 'daily', priority: 1.0 },
     { url: '/guestbook', changeFrequency: 'weekly', priority: 0.5 },
     { url: '/tags', changeFrequency: 'weekly', priority: 0.5 },
-    { url: '/popular', changeFrequency: 'daily', priority: 0.6 },
 
     // 글 상세
     ...posts.map(post => ({
