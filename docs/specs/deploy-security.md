@@ -362,6 +362,7 @@ if (env.GITHUB_CLIENT_ID) {
 | 외부 HTTP 이미지 (prod) | CSP에 의해 차단 → Admin에게 HTTPS URL 사용 안내 |
 | OAuth 환경변수 부분 설정 (ID만, Secret 없음) | 서버 startup 시 Zod 검증 실패 → exit(1) |
 | dev에서 CSRF 토큰 없이 테스트 | CSRF는 test 환경에서 비활성 (기존 동작 유지) |
+| OAuth 활성화 시 `sameSite: strict` 충돌 | OAuth 콜백은 외부 리다이렉트이므로 `strict`에서 쿠키 누락. OAuth 활성화 시 `sameSite`를 `lax`로 변경 필요 |
 
 ## 9. 의존성
 
