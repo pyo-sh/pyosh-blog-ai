@@ -212,23 +212,24 @@ F-07에서 대댓글(depth-1)에도 답글 버튼이 추가되었다. 답글 폼
 #### API 변경
 
 ```
-DELETE /api/admin/comments/:id?hard=true
+DELETE /api/admin/comments/:id?action=soft_delete
+DELETE /api/admin/comments/:id?action=hard_delete
 ```
 
 | 파라미터 | 동작 |
 |---|---|
-| `hard` 없음 또는 `false` | 기존 soft delete |
-| `hard=true` | DB에서 완전 삭제, 대댓글 cascade 삭제 |
+| `action=soft_delete` | soft delete (status 변경) |
+| `action=hard_delete` | DB에서 완전 삭제, 대댓글 cascade 삭제 |
 
 #### 서버 로직
 
 ```
 1. commentId로 댓글 조회
-2. hard=true인 경우:
+2. action=hard_delete인 경우:
    a. 해당 댓글을 parentId로 참조하는 대댓글 전부 DELETE
    b. 해당 댓글 DELETE
    c. 트랜잭션으로 묶어 원자적 처리
-3. hard=false인 경우: 기존 soft delete
+3. action=soft_delete인 경우: 기존 soft delete
 ```
 
 #### Admin 클라이언트 경고 모달 (F-28)
@@ -323,7 +324,7 @@ function get(commentId: number): string | null {
 
 관리자 Hard delete (F-28):
   AdminCommentItem 영구삭제 버튼 → 경고 모달 표시
-    → adminDeleteComment(id, { hard: true }) → DELETE /api/admin/comments/:id?hard=true
+    → adminDeleteComment(id, { hard: true }) → DELETE /api/admin/comments/:id?action=hard_delete
     → 성공 시: 댓글 목록에서 제거
 ```
 
@@ -333,7 +334,7 @@ function get(commentId: number): string | null {
 |---|---|---|---|
 | POST | `/api/posts/:postId/comments` | 댓글 작성 | `guestEmail` 선택적 처리 |
 | DELETE | `/api/comments/:id` | 댓글 삭제 (일반) | 없음 |
-| DELETE | `/api/admin/comments/:id?hard=true` | 댓글 삭제 (관리자) | hard delete 파라미터 추가 |
+| DELETE | `/api/admin/comments/:id?action=hard_delete` | 댓글 삭제 (관리자) | hard delete 파라미터 추가 |
 
 ### 서버 변경 필요사항
 
@@ -350,7 +351,7 @@ function get(commentId: number): string | null {
 - [ ] 글자 수 카운터가 표시된다 (1500자 경고, 2000자 에러)
 - [ ] OAuth 삭제 시 확인 모달이 표시된다
 - [ ] 대댓글 있는 댓글 삭제 시 안내 문구가 표시된다
-- [ ] 관리자 hard delete가 동작한다 (`?hard=true`)
+- [ ] 관리자 hard delete가 동작한다 (`?action=hard_delete`)
 - [ ] 관리자 hard delete 시 경고 모달에 대댓글 수가 표시된다
 - [ ] 대댓글 cascade 삭제가 트랜잭션으로 처리된다
 - [ ] Rate limit(429) 에러가 Toast로 표시된다
