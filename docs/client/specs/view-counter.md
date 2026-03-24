@@ -284,6 +284,7 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 - [ ] Admin에서 pageviews와 uniques 모두 표시된다
 - [ ] 글 상세/목록 API 응답에 totalPageviews가 포함된다
 - [ ] 다크모드 자동 적용
+- [ ] 접근성: 조회수 표시에 적절한 aria-label (A-01 참조)
 - [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
