@@ -43,7 +43,7 @@
 | F-15 | 맨 위로 버튼 | `client/specs/scroll-to-top.md` | `DRAFT` | - |
 | F-16 | 목차 (TOC) | `client/specs/toc.md` | `DRAFT` | F-02, F-39 |
 | F-17 | 다크 모드 | `client/specs/dark-mode.md` | `DRAFT` | - |
-| F-18 | 반응형 레이아웃 | `client/specs/responsive.md` | `DRAFT` | - |
+| F-18 | 반응형 레이아웃 | `client/specs/responsive-layout.md` | `DRAFT` | - |
 | F-39 | Public 사이드바 레이아웃 | `client/specs/public-sidebar.md` | `DRAFT` | F-01, F-04, F-06, F-10, F-17, F-18 |
 
 ## Admin 기능
