@@ -120,7 +120,7 @@ Server Component (SSR)
 | 항목 | 현재 | 변경 |
 |---|---|---|
 | 응답 필드 | `contentMd` 포함 | `summary` 필드 추가, 목록 응답에서 `contentMd` 제외 |
-| 응답 필드 | 없음 | `viewCount` 추가 |
+| 응답 필드 | 없음 | `totalPageviews` 추가 |
 | 응답 필드 | 없음 | `commentCount` 추가 |
 | 응답 필드 | 없음 | `isPinned` 추가 |
 | 응답 필드 | 없음 | `contentModifiedAt` 추가 |
@@ -133,7 +133,7 @@ Server Component (SSR)
 | DB 스키마 | `posts` 테이블에 `is_pinned` 컬럼 추가 (BOOLEAN, default false) |
 | DB 스키마 | `posts` 테이블에 `content_modified_at` 컬럼 추가 (TIMESTAMP, nullable) |
 | 글 발행 로직 | `summary`가 비어있으면 `contentMd`에서 plain text 200자 자동 추출 |
-| 글 목록 응답 | `viewCount`, `commentCount` 집계하여 응답에 포함 |
+| 글 목록 응답 | `totalPageviews`, `commentCount` 집계하여 응답에 포함 |
 | 글 목록 정렬 | 고정 글이 최상단, 이후 `published_at` 내림차순 |
 | Admin API | 고정/해제 토글 엔드포인트 또는 글 수정 시 `isPinned` 필드 |
 | Admin API | `summary` 필드 작성/수정 가능 |

@@ -68,7 +68,7 @@
 | 제목 + 요약 | `title` + `summary` + `category.name` | - | 카테고리 배지, 요약 1줄 truncate |
 | 상태 | `status` | - | 배지 (초안/발행/보관) |
 | 공개 | `visibility` | - | 토글 스위치 (공개/비공개) |
-| 조회수 | `viewCount` | O | 숫자 |
+| 조회수 | `totalPageviews` | O | 숫자 |
 | 댓글 | `commentCount` | O | 숫자 |
 | 댓글 상태 | `commentStatus` | - | 뱃지: 열림/잠김/비활성 |
 | 발행일 | `publishedAt` | O | ko-KR 포맷, null이면 `-` |
@@ -138,7 +138,7 @@
 
 | 정렬 가능 컬럼 | 서버 파라미터 |
 |---|---|
-| 조회수 | `sort=viewCount` |
+| 조회수 | `sort=totalPageviews` |
 | 댓글 수 | `sort=commentCount` |
 | 작성일 | `sort=created_at` |
 | 발행일 | `sort=published_at` |
@@ -151,7 +151,7 @@
 
 #### 서버 변경
 
-현재 서버는 `published_at`, `created_at`만 정렬 지원. `viewCount`, `commentCount` 정렬을 추가해야 한다.
+현재 서버는 `published_at`, `created_at`만 정렬 지원. `totalPageviews`, `commentCount` 정렬을 추가해야 한다.
 
 ### 5.5 벌크 선택/작업
 
@@ -431,7 +431,7 @@ PostListPage
 
 | 메서드 | 경로 | 용도 | 변경 사항 |
 |---|---|---|---|
-| GET | `/api/admin/posts` | 글 목록 | `viewCount`, `commentCount` 응답 추가, `sort` 옵션 확장 |
+| GET | `/api/admin/posts` | 글 목록 | `totalPageviews`, `commentCount` 응답 추가, `sort` 옵션 확장 |
 | PATCH | `/api/admin/posts/:id` | 글 수정 | `isPinned`, `visibility` 인라인 토글 |
 | PATCH | `/api/admin/posts/bulk` | 벌크 작업 | **신규** - 카테고리 변경, 삭제, 복원, 영구 삭제 |
 | DELETE | `/api/admin/posts/:id` | 소프트 삭제 | 기존 유지 |
@@ -442,9 +442,9 @@ PostListPage
 
 | 항목 | 설명 |
 |---|---|
-| Admin 글 목록 응답 | `viewCount`, `commentCount` 집계 포함 |
-| `AdminPostListQuerySchema` | `sort` 옵션에 `viewCount`, `commentCount` 추가 |
-| 글 목록 정렬 | `viewCount`, `commentCount` 정렬 시 집계 서브쿼리 또는 JOIN |
+| Admin 글 목록 응답 | `totalPageviews`, `commentCount` 집계 포함 |
+| `AdminPostListQuerySchema` | `sort` 옵션에 `totalPageviews`, `commentCount` 추가 |
+| 글 목록 정렬 | `totalPageviews`, `commentCount` 정렬 시 집계 서브쿼리 또는 JOIN |
 | `hardDeletePost()` | 댓글, 조회수, 고아 태그 연쇄 삭제 추가 |
 | `PostDetailSchema` | `isPinned`, `contentModifiedAt` 필드 포함 (F-01에서 추가) |
 | `contentModifiedAt` 자동 설정 | 글 수정 API 호출 시 명시적 값 없으면 현재 시각 자동 설정, null 명시 시 제거, 메타데이터만 변경(공개 토글, 핀 토글) 시 변경하지 않음 |
@@ -455,7 +455,7 @@ Admin 글 목록 응답에 집계 필드를 추가한다.
 
 ```typescript
 interface AdminPostListItem extends Post {
-  viewCount: number;
+  totalPageviews: number;
   commentCount: number;
 }
 ```
@@ -504,7 +504,7 @@ interface AdminPostListItem extends Post {
 ## 9. 의존성
 
 - F-19 관리자 로그인 (인증)
-- F-01 홈 - 글 목록 (`isPinned`, `viewCount`, `commentCount`, `summary` 필드 - 서버 스키마 공유)
+- F-01 홈 - 글 목록 (`isPinned`, `totalPageviews`, `commentCount`, `summary` 필드 - 서버 스키마 공유)
 - F-02 글 상세 (`PostContent` 마크다운 렌더링 컴포넌트 - 미리보기 재활용)
 
 ## 10. 미해결 사항
