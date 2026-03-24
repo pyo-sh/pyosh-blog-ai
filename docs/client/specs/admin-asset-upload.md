@@ -391,6 +391,7 @@ UploadZone
 - [ ] 큐 미리보기에 파일 크기가 표시된다
 - [ ] 서버에서 magic bytes 검증이 수행된다 (MIME 위조 차단)
 - [ ] 접근성: 드래그 앤 드롭 영역에 키보드 포커스 가능, 파일 선택 aria-label (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 

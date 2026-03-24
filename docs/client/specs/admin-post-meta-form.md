@@ -492,6 +492,7 @@ PostForm (탭 레이아웃 + 폼 상태)
 - [ ] 저장 시 F-22 pending 이미지가 일괄 업로드된다
 - [ ] 페이지 이탈 시 미저장 변경이 있으면 beforeunload 경고가 표시된다
 - [ ] 접근성: 탭 키보드 네비게이션, 폼 필드 aria-label (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 

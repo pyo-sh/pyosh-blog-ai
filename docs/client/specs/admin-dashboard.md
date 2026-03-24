@@ -247,6 +247,7 @@ interface DashboardStats {
 - [ ] 에러 시 재시도 가능한 에러 상태가 표시된다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: 카드에 적절한 heading 레벨, 삭제 버튼 aria-label (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 

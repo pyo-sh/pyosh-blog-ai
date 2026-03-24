@@ -486,6 +486,7 @@ interface AdminPostListItem extends Post {
 - [ ] 초안/비공개 글도 미리보기가 가능하다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: 테이블 aria-label, 토글 aria-checked, 확인 다이얼로그 focus trap (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 

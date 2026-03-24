@@ -191,6 +191,7 @@ function TableSkeleton() {
 - [ ] `loading.tsx` 파일들이 `Skeleton` 컴포넌트를 사용한다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: Skeleton 영역에 `aria-busy="true"`, Spinner에 `role="status"` + 스크린리더 텍스트 (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 

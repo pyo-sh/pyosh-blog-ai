@@ -462,6 +462,7 @@ MarkdownEditor (CM6)
 - [ ] 실시간 프리뷰가 300ms 디바운스로 동작한다 (Web Worker 유지)
 - [ ] 다크모드에서 CM6 에디터 테마가 디자인 토큰에 맞게 적용된다
 - [ ] 접근성: 툴바 버튼 aria-label, 키보드 네비게이션 (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 

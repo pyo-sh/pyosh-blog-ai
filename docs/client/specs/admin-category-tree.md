@@ -373,6 +373,7 @@ async updateCategoryTree(changes: TreeChange[]) {
 - [ ] 카테고리별 글 개수가 "발행 N / 전체 N" 형태로 표시된다
 - [ ] 일괄 선택 모드와 배치 편집 모드가 동시에 활성화되지 않는다
 - [ ] 접근성: 키보드로 토글, 체크박스, 드래그 조작 가능 (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
 
 ## 8. 에지 케이스
 
