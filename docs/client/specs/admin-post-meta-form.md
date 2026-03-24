@@ -483,6 +483,8 @@ PostForm (탭 레이아웃 + 폼 상태)
 - [ ] 발행 확인 후 status: published로 저장된다
 - [ ] 보관 버튼으로 status: archived로 저장된다
 - [ ] 발행된 글에서 "발행 취소" 버튼으로 draft로 되돌릴 수 있다
+- [ ] commentStatus를 열림/잠김/비활성 중 선택할 수 있다
+- [ ] commentStatus 기본값이 열림(open)이다
 - [ ] summary 필드가 200자 제한으로 편집 가능하다
 - [ ] description 필드가 300자 제한으로 편집 가능하다
 - [ ] summary가 비어있을 때 CodeMirror blur 시 contentMd에서 자동 생성된다
