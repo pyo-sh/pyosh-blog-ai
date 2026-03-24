@@ -85,7 +85,7 @@ function getPostDescription(post: Post): string {
 ```
 
 - `extractPlainText`: 마크다운에서 plain text 추출 후 160자 제한
-- 현재 `post-card.tsx`에 유사 로직(200자)이 있으므로 공용 유틸로 분리
+- 현재 `post-list-item.tsx`에 유사 로직(200자)이 있으므로 공용 유틸로 분리
 
 ### 5.3 페이지별 메타데이터
 
@@ -304,7 +304,7 @@ export function extractPlainText(markdown: string, maxLength: number): string;
 export function getPostDescription(post: Post): string;
 ```
 
-- `extractPlainText`는 `post-card.tsx`의 기존 로직을 이동
+- `extractPlainText`는 `post-list-item.tsx`의 기존 로직을 이동
 - 마크다운 문법 제거: 헤딩(`#`), 링크(`[]()`), 이미지(`![]()`), 코드블록, 강조 등
 - 줄바꿈을 공백으로 치환 후 trim
 

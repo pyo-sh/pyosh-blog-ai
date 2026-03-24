@@ -26,7 +26,7 @@
 - 글 수에 하위 카테고리 글을 합산한다
 - `CategoryNav` pill 컴포넌트를 제거한다 (F-39 사이드바로 대체)
 - `findCategoryBySlug`를 entity 레이어로 이동한다
-- F-01과 공유 컴포넌트(PostCard, Pagination)를 재사용한다
+- F-01과 공유 컴포넌트(PostListItem, Pagination)를 재사용한다
 
 ## 4. 비목표
 
@@ -47,9 +47,9 @@
 │             │  JavaScript             │
 │             │  총 12개의 글            │
 │             ├─────────────────────────┤
-│             │  PostCard               │
-│             │  PostCard               │
-│             │  PostCard               │
+│             │  PostListItem               │
+│             │  PostListItem               │
+│             │  PostListItem               │
 │             │  ...                    │
 │             ├─────────────────────────┤
 │             │  Pagination             │
@@ -156,7 +156,7 @@ CategoryPage (Server Component)
   │   └─ 서버가 하위 카테고리 재귀 포함하여 필터링
   │
   ├─ 카테고리 헤더 (breadcrumb + 제목 + 글 수)
-  ├─ PostCard 목록
+  ├─ PostListItem 목록
   └─ Pagination (basePath: /categories/{slug})
 ```
 
@@ -168,14 +168,14 @@ CategoryPage (Server Component)
 | `entities` | `category/lib.ts` | `findCategoryBySlug`, `getCategoryAncestors` |
 | `entities` | `category/api.ts` | `fetchCategories` |
 | `entities` | `post/api.ts` | `fetchPosts` (기존 재사용) |
-| `features` | `post-list/ui/post-card.tsx` | 글 카드 (F-01 공유) |
+| `features` | `post-list/ui/post-list-item.tsx` | 글 카드 (F-01 공유) |
 | `shared` | `ui/libs/pagination.tsx` | 페이지네이션 (F-01 공유) |
 
 ### 5.8 공유 컴포넌트 (F-01과 동일)
 
 | 컴포넌트 | 동작 |
 |---|---|
-| `PostCard` | 썸네일 + 카테고리 + 날짜 + 제목 + 요약 + 태그 |
+| `PostListItem` | 썸네일 + 카테고리 + 날짜 + 제목 + 요약 + 태그 |
 | `Pagination` | basePath만 `/categories/{slug}`로 변경 |
 
 ### 5.9 빈 상태
@@ -211,7 +211,7 @@ CategoryPage (Server Component)
 - [ ] 카테고리 헤더에 breadcrumb 계층 경로가 표시된다
 - [ ] breadcrumb의 상위 카테고리가 클릭 가능한 링크이다
 - [ ] 글 수가 하위 카테고리 포함 합산 수로 표시된다
-- [ ] PostCard, Pagination이 F-01과 동일하게 동작한다
+- [ ] PostListItem, Pagination이 F-01과 동일하게 동작한다
 - [ ] 페이지네이션 basePath가 `/categories/{slug}`이다
 - [ ] 존재하지 않거나 비공개 카테고리 접속 시 404가 표시된다
 - [ ] 글이 없는 카테고리에서 빈 상태 메시지가 표시된다
@@ -235,7 +235,7 @@ CategoryPage (Server Component)
 
 ## 9. 의존성
 
-- F-01 홈 - 글 목록 (PostCard, Pagination 공유)
+- F-01 홈 - 글 목록 (PostListItem, Pagination 공유)
 - F-39 Public 사이드바 (CategoryNav 제거 시점 의존)
 - 서버: `PostService.getPostList()` 하위 카테고리 재귀 필터링 추가
 

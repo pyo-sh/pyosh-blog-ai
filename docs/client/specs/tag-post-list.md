@@ -40,9 +40,9 @@
 │             │  #JavaScript            │
 │             │  총 8개의 글             │
 │             ├─────────────────────────┤
-│             │  PostCard               │
-│             │  PostCard               │
-│             │  PostCard               │
+│             │  PostListItem               │
+│             │  PostListItem               │
+│             │  PostListItem               │
 │             ├─────────────────────────┤
 │             │  Pagination             │
 └─────────────┴─────────────────────────┘
@@ -76,7 +76,7 @@ TagPostsPage (Server Component)
   │   └─ 없으면 notFound()
   │
   ├─ 태그 헤더
-  ├─ PostCard 목록
+  ├─ PostListItem 목록
   └─ Pagination (basePath: /tags/{slug})
 ```
 
@@ -116,7 +116,7 @@ TagPostsPage (Server Component)
 | `app` | `tags/[slug]/page.tsx` | 페이지 컴포넌트 (SSR) |
 | `entities` | `tag/api.ts` | `fetchTags` |
 | `entities` | `post/api.ts` | `fetchPosts` (기존 재사용) |
-| `features` | `post-list/ui/post-card.tsx` | 글 카드 (F-01 공유) |
+| `features` | `post-list/ui/post-list-item.tsx` | 글 카드 (F-01 공유) |
 | `shared` | `ui/libs/pagination.tsx` | 페이지네이션 (F-01 공유) |
 
 ### 5.7 빈 상태
@@ -142,7 +142,7 @@ TagPostsPage (Server Component)
 
 - [ ] 태그 slug로 접속 시 해당 태그의 글 목록이 표시된다
 - [ ] 태그 헤더에 `#{tagName}`과 글 수가 표시된다
-- [ ] PostCard, Pagination이 F-01과 동일하게 동작한다
+- [ ] PostListItem, Pagination이 F-01과 동일하게 동작한다
 - [ ] Pagination이 조건 래핑 없이 컴포넌트에 표시 여부를 위임한다
 - [ ] 존재하지 않는 태그 slug 접속 시 404가 표시된다
 - [ ] 글이 없는 태그에서 빈 상태 메시지가 표시된다
@@ -162,7 +162,7 @@ TagPostsPage (Server Component)
 
 ## 9. 의존성
 
-- F-01 홈 - 글 목록 (PostCard, Pagination 공유)
+- F-01 홈 - 글 목록 (PostListItem, Pagination 공유)
 - F-04 태그 목록 (태그 데이터 구조 공유)
 
 ## 10. 미해결 사항

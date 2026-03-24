@@ -15,7 +15,7 @@
 
 - SQL `LIKE '%keyword%'` 방식으로 인덱스 미사용, 성능 한계
 - 검색 대상이 제목+본문으로 고정 (필터 없음)
-- 검색 결과가 PostCard 그리드 형태 - 메인 페이지와 동일한 리스트 형식으로 변경 필요
+- 검색 결과가 PostListItem 그리드 형태 - 메인 페이지와 동일한 리스트 형식으로 변경 필요
 - 검색어 하이라이팅 없음
 - 태그, 카테고리, 댓글 검색 미지원
 
@@ -110,7 +110,7 @@
 
 #### 리스트 형식
 
-검색 결과를 메인 페이지(F-01)와 동일한 리스트 형식으로 표시한다. PostCard 그리드가 아닌 세로 리스트.
+검색 결과를 메인 페이지(F-01)와 동일한 리스트 형식으로 표시한다. PostListItem 그리드가 아닌 세로 리스트.
 
 #### 검색 헤더
 
@@ -244,7 +244,7 @@ interface SearchResultItem extends PostListItem {
 | `widgets` | `header/search-bar.tsx` | 헤더 검색 입력 (기존 개선) |
 | `features` | `search/ui/search-filter.tsx` | 검색 필터 드롭다운 |
 | `features` | `search/lib/highlight.tsx` | 검색어 하이라이팅 유틸 |
-| `features` | `post-list/ui/post-card.tsx` | 글 리스트 항목 (F-01 공유) |
+| `features` | `post-list/ui/post-list-item.tsx` | 글 리스트 항목 (F-01 공유) |
 | `entities` | `post/api.ts` | `fetchPosts` (filter 파라미터 추가) |
 | `shared` | `ui/libs/pagination.tsx` | 페이지네이션 (F-01 공유) |
 
@@ -332,7 +332,7 @@ interface PostListItem {
 
 ## 9. 의존성
 
-- F-01 홈 - 글 목록 (리스트 형식, PostCard 공유)
+- F-01 홈 - 글 목록 (리스트 형식, PostListItem 공유)
 - F-39 Public 사이드바 (헤더 구조 변경 시 검색 입력 위치)
 
 ## 10. 미해결 사항

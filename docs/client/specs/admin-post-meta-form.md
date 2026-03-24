@@ -321,7 +321,7 @@ draft ↔ archived
 
 #### 미리보기용 summary 자동 추출
 
-summary 입력 필드가 비어있을 때, 정보 탭의 PostCard 미리보기에 표시할 **임시 summary**를 클라이언트에서 자동 추출한다. 이 값은 미리보기 전용이며 API에 전송하지 않는다.
+summary 입력 필드가 비어있을 때, 정보 탭의 PostListItem 미리보기에 표시할 **임시 summary**를 클라이언트에서 자동 추출한다. 이 값은 미리보기 전용이며 API에 전송하지 않는다.
 
 추출 타이밍: **CodeMirror blur 시점**
 
@@ -336,14 +336,14 @@ function handleEditorBlur(contentMd: string, userSummary: string) {
 }
 ```
 
-- `previewSummary`는 PostCard 미리보기에서만 사용
+- `previewSummary`는 PostListItem 미리보기에서만 사용
 - 폼의 summary 입력 필드에는 반영하지 않음 (비어있는 상태 유지)
 - 사용자가 summary를 직접 작성하면 해당 값이 미리보기에 표시됨
 - `extractPlainText`: 마크다운 스트립 → plain text → N자 제한 (F-01, F-30 공용 유틸)
 
 ### 5.8 정보 탭 - 글 목록 미리보기
 
-정보 탭 하단에 PostCard와 동일한 형태의 미리보기를 표시한다.
+정보 탭 하단에 PostListItem와 동일한 형태의 미리보기를 표시한다.
 
 ```
 ┌─ 정보 탭 ─────────────────────────────────────────┐
@@ -351,7 +351,7 @@ function handleEditorBlur(contentMd: string, userSummary: string) {
 │  [메타데이터 필드들...]                             │
 │                                                     │
 │  ── 글 목록 미리보기 ──────────────────────────    │
-│  ┌─ PostCard 미리보기 ──────────────────────────┐  │
+│  ┌─ PostListItem 미리보기 ──────────────────────────┐  │
 │  │ [썸네일]  카테고리 | 2026-03-23               │  │
 │  │           제목                                 │  │
 │  │           summary 텍스트 (line-clamp)          │  │
@@ -362,7 +362,7 @@ function handleEditorBlur(contentMd: string, userSummary: string) {
 
 - 현재 폼 값을 실시간 반영 (제목, 카테고리명, 태그, 썸네일)
 - summary 표시 우선순위: 사용자 입력 summary > previewSummary (에디터 blur 시 자동 추출) > "본문에서 자동 생성됩니다" placeholder
-- `PostCard` 컴포넌트를 재사용하되, 링크 동작은 비활성화 (미리보기 전용)
+- `PostListItem` 컴포넌트를 재사용하되, 링크 동작은 비활성화 (미리보기 전용)
 
 ### 5.9 저장 플로우
 
@@ -422,7 +422,7 @@ PostForm (탭 레이아웃 + 폼 상태)
   │
   ├─ 탭: 정보
   │   ├─ PostMetaFields
-  │   └─ PostCardPreview (폼 값 실시간 반영)
+  │   └─ PostListItemPreview (폼 값 실시간 반영)
   │
   ├─ 탭: 글
   │   └─ MarkdownEditor (F-22) + Preview (탭/모드 전환 포함)
@@ -486,7 +486,7 @@ PostForm (탭 레이아웃 + 폼 상태)
 - [ ] summary 필드가 200자 제한으로 편집 가능하다
 - [ ] description 필드가 300자 제한으로 편집 가능하다
 - [ ] summary가 비어있을 때 CodeMirror blur 시 contentMd에서 자동 생성된다
-- [ ] 정보 탭에서 글 목록 미리보기 (PostCard)가 폼 값을 실시간 반영한다
+- [ ] 정보 탭에서 글 목록 미리보기 (PostListItem)가 폼 값을 실시간 반영한다
 - [ ] 저장 시 F-22 pending 이미지가 일괄 업로드된다
 - [ ] 페이지 이탈 시 미저장 변경이 있으면 beforeunload 경고가 표시된다
 - [ ] 접근성: 탭 키보드 네비게이션, 폼 필드 aria-label (A-01 참조)

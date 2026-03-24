@@ -7,7 +7,7 @@
 
 ## 1. 개요
 
-글 상세 페이지(F-02) 방문 시 조회수를 기록하고, 글 상세 헤더와 글 목록(PostCard)에 조회수를 표시한다. 서버 측 uniques 카운팅을 개선하여 일별 고유 방문자 수를 정확히 집계한다.
+글 상세 페이지(F-02) 방문 시 조회수를 기록하고, 글 상세 헤더와 글 목록(PostListItem)에 조회수를 표시한다. 서버 측 uniques 카운팅을 개선하여 일별 고유 방문자 수를 정확히 집계한다.
 
 ## 2. 배경 및 동기
 
@@ -20,7 +20,7 @@
 ## 3. 목표
 
 - 글 상세 헤더에 조회수를 표시한다
-- 글 목록 PostCard에 조회수를 표시한다
+- 글 목록 PostListItem에 조회수를 표시한다
 - 서버 uniques 카운팅을 일별 고유 방문자 기준으로 개선한다
 - Public에서는 pageviews만, Admin에서는 pageviews + uniques를 표시한다
 
@@ -52,12 +52,12 @@
 - 숫자 포맷: 한국어 로케일 (`1,234`)
 - 서버에서 해당 글의 `pageviews` 합산값을 조회하여 전달
 
-### 5.2 조회수 표시 - PostCard (글 목록)
+### 5.2 조회수 표시 - PostListItem (글 목록)
 
-PostCard 메타 영역에 조회수를 추가한다.
+PostListItem 메타 영역에 조회수를 추가한다.
 
 ```
-┌─ PostCard ────────────────────────────────────────┐
+┌─ PostListItem ────────────────────────────────────────┐
 │ [썸네일]                                           │
 │ 카테고리 · 2026.03.15 · 조회 123         ← 메타   │
 │ 글 제목                                            │
@@ -184,7 +184,7 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 | `shared` | `hooks/use-view-count.ts` | 조회수 기록 훅 (기존) |
 | `entities` | `stat/api.ts` | `fetchPopularPosts` (기존) |
 | `entities` | `stat/model.ts` | `PopularPost` 타입 (기존) |
-| `features` | `post-list/ui/post-card.tsx` | PostCard에 조회수 표시 추가 |
+| `features` | `post-list/ui/post-list-item.tsx` | PostListItem에 조회수 표시 추가 |
 
 ### 5.8 데이터 흐름
 
@@ -196,7 +196,7 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 
 글 목록 페이지 (Server Component)
   ├─ fetchPosts() → 각 항목에 totalPageviews 포함
-  └─ PostCard 메타에 "조회 {totalPageviews}" 표시
+  └─ PostListItem 메타에 "조회 {totalPageviews}" 표시
 ```
 
 ## 6. API 연동
@@ -219,7 +219,7 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 ## 7. 수용 기준
 
 - [ ] 글 상세 헤더에 "조회 N" 형태로 조회수가 표시된다
-- [ ] PostCard 메타에 "조회 N" 형태로 조회수가 표시된다
+- [ ] PostListItem 메타에 "조회 N" 형태로 조회수가 표시된다
 - [ ] 숫자가 한국어 로케일로 포맷된다 (1,234)
 - [ ] 같은 IP의 같은 날 재방문 시 uniques가 증가하지 않는다
 - [ ] 같은 IP의 다른 날 방문 시 uniques가 증가한다
@@ -243,7 +243,7 @@ Public에서는 `pageviews`만 "조회 N"으로 표시하고 `uniques`는 노출
 ## 9. 의존성
 
 - F-02 글 상세 (표시 위치)
-- F-01 홈 - 글 목록 (PostCard 표시)
+- F-01 홈 - 글 목록 (PostListItem 표시)
 
 ## 10. 미해결 사항
 
