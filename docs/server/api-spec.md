@@ -365,7 +365,7 @@
 
 | 테이블 | 용도 |
 |---|---|
-| `admin_tb` | 관리자 계정 (email + bcrypt) |
+| `admin_tb` | 관리자 계정 (username + argon2) |
 | `user_tb` | OAuth 사용자 (레거시) |
 | `oauth_account_tb` | OAuth 계정 (provider별 관리) |
 | `session_tb` | 세션 저장소 |
