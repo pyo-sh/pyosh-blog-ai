@@ -88,9 +88,23 @@
 | 태그 | Chip/Badge + 자동완성 | X | 개별 태그 최대 30자, 개수 제한 없음 |
 | 상태 | 버튼으로 관리 (5.6 참조) | - | draft/published/archived |
 | 공개여부 | 드롭다운 | O | public/private |
+| 댓글 상태 | 드롭다운 | O | open/locked/disabled |
 | 썸네일 | 다중 업로드 (5.5 참조) | X | 이미지 파일 또는 URL |
 | Summary | 텍스트 입력 | X | 최대 200자 |
 | Description | 텍스트 입력 | X | 최대 300자 |
+
+#### 댓글 상태 (commentStatus)
+
+| 값 | 라벨 | 동작 |
+|---|---|---|
+| `open` | 열림 (기본) | 댓글 작성과 표시 모두 가능 |
+| `locked` | 잠김 | 기존 댓글 표시, 새 댓글 작성 불가 |
+| `disabled` | 비활성 | 댓글 영역 전체 숨김 |
+
+- DB: `posts` 테이블에 `comment_status` 컬럼 추가 (ENUM, default "open")
+- F-07 댓글 표시: `disabled` → 댓글 영역 미렌더링, `locked` → 댓글 목록만 표시
+- F-08 댓글 작성: `locked`/`disabled` → 댓글 폼 미표시, "댓글이 잠겨있습니다" 메시지
+- F-21 벌크 작업에서도 변경 가능
 
 ### 5.3 카테고리 트리 드롭다운
 
@@ -374,6 +388,7 @@ interface PostPayload {
   tags?: string[];            // Chip에서 추출
   status?: 'draft' | 'published' | 'archived';
   visibility?: 'public' | 'private';
+  commentStatus?: 'open' | 'locked' | 'disabled';
   thumbnailUrl?: string | null;
   summary?: string | null;    // 사용자 직접 입력값만. 자동 추출은 전송하지 않음
   description?: string | null;

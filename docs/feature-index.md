@@ -60,7 +60,7 @@
 | F-26 | 에셋 업로드 (드래그&드롭, 파일 검증, 업로드 큐) | `client/specs/admin-asset-upload.md` | `DRAFT` | F-19 |
 | F-27 | 에셋 갤러리/관리 (그리드, 선택, 삭제, URL 복사) | `client/specs/admin-asset-gallery.md` | `DRAFT` | F-26 |
 | F-28 | 댓글 관리 (목록, 비밀글 확인, 강제 삭제) | `client/specs/admin-comment-manager.md` | `DRAFT` | F-19 |
-| F-29 | 방명록 관리 (목록, 강제 삭제) | `client/specs/admin-guestbook-manager.md` | `SPEC` | F-19 |
+| F-29 | 방명록 관리 (목록, 강제 삭제) | `client/specs/admin-guestbook-manager.md` | `DRAFT` | F-19 |
 
 ## SEO / 웹 표준
 
