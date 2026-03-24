@@ -396,7 +396,7 @@ async hardDeletePost(id: number) {
 | `app` | `manage/posts/[id]/preview/page.tsx` | 글 미리보기 페이지 (신규) |
 | `app` | `manage/posts/[id]/edit/page.tsx` | 글 수정 페이지 (기존, 경로 변경) |
 | `app` | `manage/posts/new/page.tsx` | 새 글 작성 (기존, 경로 변경) |
-| `widgets` | `admin-post-list/ui/post-table.tsx` | 글 테이블 (기존 리팩터링) |
+| `widgets` | `admin-post-list/ui/post-table.tsx` | 글 테이블 (신규, 기존 page.tsx에서 분리) |
 | `widgets` | `admin-post-list/ui/post-filters.tsx` | 필터/검색 바 (신규) |
 | `widgets` | `admin-post-list/ui/bulk-actions.tsx` | 벌크 액션 바 (신규) |
 | `widgets` | `admin-post-preview/ui/post-preview.tsx` | 미리보기 위젯 (신규) |
