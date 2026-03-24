@@ -281,7 +281,7 @@ async function getCategoryAncestors(categoryId: number): Promise<{ name: string;
 - [ ] 서버 글 상세 API가 `category.ancestors` 배열을 반환한다
 - [ ] `JsonLd` 공용 컴포넌트가 `shared/ui/`에 분리되어 있다
 - [ ] 빌더 함수가 `shared/lib/structured-data.ts`에 분리되어 있다
-- [ ] Google Rich Results Test로 유효성을 검증한다
+- [ ] JSON-LD 출력이 schema.org 스펙 구조를 따른다 (단위 테스트로 JSON 구조 검증)
 
 ## 8. 에지 케이스
 
