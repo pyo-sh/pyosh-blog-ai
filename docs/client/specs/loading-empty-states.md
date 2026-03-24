@@ -79,12 +79,12 @@ function TableSkeleton() {
 | 현재 위치 | 로컬 정의 |
 |---|---|
 | `app/loading.tsx` | 인라인 Skeleton |
-| `app/dashboard/loading.tsx` | 인라인 Skeleton |
-| `app/dashboard/posts/page.tsx` | `TableSkeleton()` |
+| `app/manage/loading.tsx` | 인라인 Skeleton |
+| `app/manage/posts/page.tsx` | `TableSkeleton()` |
 | `features/category-manager` | `TreeSkeleton()` |
 | `features/guestbook-manager` | `TableSkeleton()` |
 | `widgets/admin-comments` | `TableSkeleton()` |
-| `widgets/dashboard` | `DashboardStatsSkeleton()` |
+| `widgets/manage` | `DashboardStatsSkeleton()` |
 
 ### 5.3 Spinner 컴포넌트
 

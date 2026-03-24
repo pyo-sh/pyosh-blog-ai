@@ -90,10 +90,10 @@
 | 페이지 | Footer |
 |---|---|
 | Public 전체 (홈, 글 상세, 태그 등) | 표시 |
-| Admin 대시보드 (`/dashboard/*`) | 숨김 |
-| Admin 로그인 (`/dashboard/login`) | 숨김 |
+| Admin 대시보드 (`/manage/*`) | 숨김 |
+| Admin 로그인 (`/manage/login`) | 숨김 |
 
-Admin에서 숨기는 방법: Admin 레이아웃(`app/dashboard/layout.tsx`)은 별도의 Provider를 사용하거나, Providers 컴포넌트에 Footer 표시 여부를 제어하는 prop을 전달한다.
+Admin에서 숨기는 방법: Admin 레이아웃(`app/manage/layout.tsx`)은 별도의 Provider를 사용하거나, Providers 컴포넌트에 Footer 표시 여부를 제어하는 prop을 전달한다.
 
 ### 5.4 URL 변경
 
@@ -135,7 +135,7 @@ Admin에서 숨기는 방법: Admin 레이아웃(`app/dashboard/layout.tsx`)은 
 - [ ] 저작권 문구가 `© {현재연도} pyo-sh` 형식으로 표시된다
 - [ ] GitHub 링크가 `https://github.com/pyo-sh`로 이동하며 "pyo-sh"로 표시된다
 - [ ] Public 페이지에서 Footer가 표시된다
-- [ ] Admin 페이지(`/dashboard/*`)에서 Footer가 숨겨진다
+- [ ] Admin 페이지(`/manage/*`)에서 Footer가 숨겨진다
 - [ ] 모바일/데스크톱 모두 중앙 정렬이 유지된다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: 링크에 적절한 텍스트, nav 랜드마크 (A-01 참조)

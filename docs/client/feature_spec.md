@@ -19,19 +19,19 @@
 | `/guestbook` | 방명록 | `GET /api/guestbook` |
 | `/search?q=keyword` | 검색 결과 | `GET /api/posts?q=keyword` |
 
-### Admin (관리자) — prefix: `/dashboard`
+### Admin (관리자) — prefix: `/manage`
 
 | 경로 | 페이지 | 데이터 소스 |
 |---|---|---|
-| `/dashboard/login` | 관리자 로그인 | `POST /api/auth/admin/login` |
-| `/dashboard` | 대시보드 (통계 요약) | `GET /api/admin/stats/dashboard` |
-| `/dashboard/posts` | 글 목록 (전체 상태) | `GET /api/admin/posts` |
-| `/dashboard/posts/new` | 글 작성 | `POST /api/admin/posts` |
-| `/dashboard/posts/[id]/edit` | 글 수정 | `PATCH /api/admin/posts/:id` |
-| `/dashboard/categories` | 카테고리 관리 | `GET /api/categories` |
-| `/dashboard/assets` | 에셋 라이브러리 | `GET /api/assets`, `POST /api/assets/upload` |
-| `/dashboard/comments` | 댓글 관리 | `GET /api/admin/comments` |
-| `/dashboard/guestbook` | 방명록 관리 | `GET /api/admin/guestbook` |
+| `/manage/login` | 관리자 로그인 | `POST /api/auth/admin/login` |
+| `/manage` | 대시보드 (통계 요약) | `GET /api/admin/stats/manage` |
+| `/manage/posts` | 글 목록 (전체 상태) | `GET /api/admin/posts` |
+| `/manage/posts/new` | 글 작성 | `POST /api/admin/posts` |
+| `/manage/posts/[id]/edit` | 글 수정 | `PATCH /api/admin/posts/:id` |
+| `/manage/categories` | 카테고리 관리 | `GET /api/categories` |
+| `/manage/assets` | 에셋 라이브러리 | `GET /api/assets`, `POST /api/assets/upload` |
+| `/manage/comments` | 댓글 관리 | `GET /api/admin/comments` |
+| `/manage/guestbook` | 방명록 관리 | `GET /api/admin/guestbook` |
 
 ---
 
@@ -141,25 +141,25 @@
 
 ## 4. Admin 기능 상세
 
-### 4.1 로그인 (`/dashboard/login`)
+### 4.1 로그인 (`/manage/login`)
 
 - 이메일 + 비밀번호 폼
 - 세션 쿠키 기반 인증
-- 미인증 시 `/dashboard/*` 접근 → `/dashboard/login` 리다이렉트
+- 미인증 시 `/manage/*` 접근 → `/manage/login` 리다이렉트
 
-### 4.2 대시보드 (`/dashboard`)
+### 4.2 대시보드 (`/manage`)
 
 - 오늘/주간/월간 조회수
 - 총 게시글 수, 총 댓글 수
 - 최근 글 목록 (quick access)
 
-### 4.3 글 관리 (`/dashboard/posts`)
+### 4.3 글 관리 (`/manage/posts`)
 
 - **목록**: 전체 상태(draft/published/archived), 가시성(public/private), 삭제된 글 포함
 - **필터**: 상태, 가시성, 카테고리별
 - **작업**: 생성, 수정, 소프트 삭제, 복원, 하드 삭제
 
-### 4.4 글 에디터 (`/dashboard/posts/new`, `/dashboard/posts/[id]/edit`)
+### 4.4 글 에디터 (`/manage/posts/new`, `/manage/posts/[id]/edit`)
 
 - **순수 textarea + 실시간 프리뷰** (좌: 마크다운 입력, 우: 렌더링 미리보기)
 - **입력 필드**:
@@ -173,7 +173,7 @@
   - 발행일 (선택)
 - **이미지 업로드**: 에디터 인라인 (드래그&드롭 또는 버튼) → `POST /api/assets/upload` → 마크다운에 `![](url)` 자동 삽입
 
-### 4.5 카테고리 관리 (`/dashboard/categories`)
+### 4.5 카테고리 관리 (`/manage/categories`)
 
 - 카테고리 트리 시각화
 - 생성: 이름, 부모 카테고리, 표시 여부
@@ -181,7 +181,7 @@
 - 순서 변경: 드래그&드롭 또는 순서 입력
 - 삭제: 자식/글이 있으면 경고
 
-### 4.6 에셋 라이브러리 (`/dashboard/assets`)
+### 4.6 에셋 라이브러리 (`/manage/assets`)
 
 - 업로드된 이미지 갤러리 (그리드)
 - 업로드: 드래그&드롭, 멀티 파일 (max 5개, 10MB/개)
@@ -189,14 +189,14 @@
 - URL 복사 기능 (마크다운/일반)
 - 삭제 기능
 
-### 4.7 댓글 관리 (`/dashboard/comments`)
+### 4.7 댓글 관리 (`/manage/comments`)
 
 - 전체 댓글 목록 (페이지네이션)
 - 비밀 댓글 내용 확인 가능
 - 강제 삭제 기능
 - 필터: 게시글별, 비밀 여부
 
-### 4.8 방명록 관리 (`/dashboard/guestbook`)
+### 4.8 방명록 관리 (`/manage/guestbook`)
 
 - 전체 방명록 목록 (페이지네이션)
 - 강제 삭제 기능
@@ -229,7 +229,7 @@
 ### 5.4 인증 (Admin)
 
 - 세션 쿠키 기반 (`POST /api/auth/admin/login`)
-- Next.js middleware로 `/dashboard/*` 보호
+- Next.js middleware로 `/manage/*` 보호
 - `GET /api/auth/me`로 세션 유효성 확인
 
 ### 5.5 이미지 처리

@@ -374,7 +374,7 @@ function handleEditorBlur(contentMd: string, userSummary: string) {
    → 플레이스홀더 마커를 실제 URL로 치환
 5. 폼 데이터 구성 (buildPayload)
 6. POST (신규) 또는 PATCH (수정) API 호출
-7. 성공 시: 토스트 알림 + 글 목록 (`/dashboard/posts`)으로 이동
+7. 성공 시: 토스트 알림 + 글 목록 (`/manage/posts`)으로 이동
 8. 실패 시: 에러 메시지 표시, 페이지 유지
 ```
 

@@ -85,7 +85,7 @@ toast.error("접근 권한이 없습니다.");
 | `features/comment-section/ui/comment-form.tsx` | `setSubmitError(msg)` (onError) | `toast.error(msg)` |
 | `features/category-manager/ui/category-manager.tsx` | `setError(msg)` (onError) | `toast.error(msg)` |
 | `features/admin-login/ui/login-form.tsx` | `setError(msg)` (onError) | `toast.error(msg)` |
-| `app/dashboard/posts/page.tsx` | `setError(msg)` (onError) | `toast.error(msg)` |
+| `app/manage/posts/page.tsx` | `setError(msg)` (onError) | `toast.error(msg)` |
 | `features/guestbook-manager/ui/guestbook-manager.tsx` | `setError(msg)` (onError) | `toast.error(msg)` |
 
 #### 인라인 유지 (변경 없음)
@@ -117,7 +117,7 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 - `features/comment-section/ui/comment-form.tsx`
 - `features/category-manager/ui/category-manager.tsx`
 - `features/admin-login/ui/login-form.tsx`
-- `app/dashboard/posts/page.tsx`
+- `app/manage/posts/page.tsx`
 - `features/guestbook-manager/ui/guestbook-manager.tsx`
 
 ### 5.6 데이터 흐름
