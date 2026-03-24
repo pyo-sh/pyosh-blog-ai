@@ -29,6 +29,7 @@
 | 021 | Docker 환경에서 HTML → Figma 캡처 방법                         | 2026-03-20 | #figma #playwright #docker #html-to-design #capture #mcp |
 | 022 | Figma captureForDesign hang 원인과 Section 배치 패턴           | 2026-03-23 | #figma #playwright #captureForDesign #section #layout #dialog #mcp |
 | 023 | captureForDesign color-mix() 미해석 및 inline 요소 높이 불일치 패턴 | 2026-03-23 | #figma #captureForDesign #color-mix #rgba #inline-block #html-to-design |
+| 024 | HTML 와이어프레임 Figma DOM 업로드 완전 가이드 | 2026-03-25 | #figma #playwright #html-to-design #dom-capture #wireframe #mcp #admin |
 
 ## 상세 문서
 
@@ -55,6 +56,7 @@
 - [findings.021-docker-figma-html-capture.md](./findings/findings.021-docker-figma-html-capture.md) - Docker headless 환경에서 HTML을 Figma로 캡처: browser_run_code + waitForTimeout(8000) 패턴, Chromium 권한 수정, 네트워크 오진단 방지
 - [findings.022-figma-capture-section-layout.md](./findings/findings.022-figma-capture-section-layout.md) - captureForDesign hang 원인(POST성공 후 status 404 폴링), 409 재발급 정책, Section API, appendChild 후 좌표 설정, Dialog 판별 패턴, figma-remote rate limit
 - [findings.023-figma-capture-color-mix-inline.md](./findings/findings.023-figma-capture-color-mix-inline.md) - color-mix() 미캡처 원인/rgba 교체 매핑표, inline 높이 불일치(inline-block 해결), exportAsync rate-limit 없음
+- [findings.024-figma-dom-wireframe-upload-guide.md](./findings/findings.024-figma-dom-wireframe-upload-guide.md) - HTTP 서버 설정, captureId 발급, fire-and-forget 패턴, IntersectionObserver 스크롤, 모달/사이드바 처리, polling 완료 확인 전체 가이드
 
 ## 주요 원칙
 
@@ -95,5 +97,8 @@
 - **Dialog 판별: x >= parentFrame.width** → navigation drawer는 frame 오른쪽 밖에 위치. 단, 사이드바 전용 프레임 내부 노드는 삭제 금지
 - **배치 Figma 조작은 figma-console figma_execute** → figma-remote MCP는 rate limit 빠름. 노드 생성/이동/삭제는 figma_execute로 Plugin API 직접 실행
 - **captureForDesign은 color-mix() 미해석** → `color-mix(in srgb, var(--X) N%, transparent)` → `rgba(R,G,B, N/100)` pre-computed 값으로 교체. RGB는 figma_tokens.json light 테마 값과 동일해야 Figma 변수 자동 연결
+- **captureForDesign은 fire-and-forget 필수** → `page.evaluate(() => window.figma.captureForDesign(...))` 에서 promise를 return하면 browser_run_code가 20분+ hang. 콜백 안에서 return/await 없이 호출 후 3초 대기 후 즉시 반환. polling으로 완료 확인
+- **HTML 와이어프레임 캡처 전 IntersectionObserver 스크롤 필수** → staggered fade-in 요소는 스크롤 전까지 opacity:0. 전체 스크롤 → 맨 위 복귀 → 1.5초 대기 후 captureForDesign 호출
+- **Mobile 캡처 시 사이드바/모달 JS로 닫기** → `#sidebar.classList.remove('open')`, backdrop `display:none`. HTML 로드 시 열려있는 모달도 동일하게 처리 후 캡처
 - **captureForDesign inline 요소는 display:inline-block 필수** → `display:inline`이면 frame.height = em-box. `inline-block`으로 변경해야 frame.height = line-height와 일치
 - **Figma 변경 직후 검증은 figma_capture_screenshot** → Plugin exportAsync API 사용으로 REST API rate limit 없이 즉시 캡처 가능
