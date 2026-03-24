@@ -83,8 +83,8 @@
 | # | 기능 | 스펙 파일 | 상태 | 의존성 |
 |---|---|---|---|---|
 | F-33 | 환경 변수 분리 (dev/production) | `specs/deploy-env.md` | `DRAFT` | - |
-| F-34 | 프로덕션 쿠키/CORS 설정 | `specs/deploy-security.md` | `SPEC` | F-33 |
-| F-35 | 에러 모니터링 | `specs/deploy-monitoring.md` | `SPEC` | F-33 |
+| F-34 | 프로덕션 쿠키/CORS 설정 | `specs/deploy-security.md` | `DRAFT` | F-33 |
+| F-35 | 로깅 및 에러 관리 | `specs/deploy-monitoring.md` | `DRAFT` | F-33 |
 | F-36 | Footer 콘텐츠 | `client/specs/footer.md` | `DRAFT` | - |
 
 ## 개발 도구
