@@ -70,6 +70,7 @@
 | 공개 | `visibility` | - | 토글 스위치 (공개/비공개) |
 | 조회수 | `viewCount` | O | 숫자 |
 | 댓글 | `commentCount` | O | 숫자 |
+| 댓글 상태 | `commentStatus` | - | 뱃지: 열림/잠김/비활성 |
 | 발행일 | `publishedAt` | O | ko-KR 포맷, null이면 `-` |
 | 수정일 | `contentModifiedAt` | O | ko-KR 포맷, null이면 `-` |
 | 작업 | - | - | 미리보기, 수정, 삭제 |
