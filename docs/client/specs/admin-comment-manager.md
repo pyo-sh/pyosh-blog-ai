@@ -340,7 +340,7 @@ AdminCommentsPage
 |---|---|---|---|
 | GET | `/api/admin/comments` | 댓글 목록 (필터 + 페이지네이션) | 응답에 post.title 추가 |
 | GET | `/api/admin/comments/:id/thread` | 스레드 조회 (부모 + 모든 답글) | **신규** |
-| DELETE | `/api/admin/comments/:id` | 단일 삭제 | `?action=soft` 또는 `?action=hard` |
+| DELETE | `/api/admin/comments/:id` | 단일 삭제 | `?action=soft_delete` 또는 `?action=hard_delete` |
 | DELETE | `/api/admin/comments/bulk` | 벌크 삭제 | **신규** |
 
 ### 서버 변경 필요사항
@@ -349,7 +349,7 @@ AdminCommentsPage
 |---|---|
 | Admin 댓글 목록 응답 | `post: { id, title }` 필드 추가 (posts 테이블 JOIN) |
 | `status` 필터 | `AdminCommentListQuerySchema`에 `status` 파라미터 추가 |
-| 단일 삭제 확장 | `action` 쿼리 파라미터로 soft/hard 구분 |
+| 단일 삭제 확장 | `action` 쿼리 파라미터로 `soft_delete`/`hard_delete` 구분 |
 | Hard delete 구현 | cascade 대댓글 삭제 트랜잭션 |
 | 스레드 조회 엔드포인트 | `GET /api/admin/comments/:id/thread` - 부모 + 답글 반환 |
 | 벌크 삭제 엔드포인트 | `DELETE /api/admin/comments/bulk` 신규 |
