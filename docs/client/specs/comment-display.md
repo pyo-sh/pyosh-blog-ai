@@ -392,6 +392,9 @@ interface CommentListResponse {
 - [ ] 삭제된 댓글은 대댓글이 있을 때만 "삭제된 댓글입니다." 표시된다
 - [ ] 삭제된 댓글에 대댓글이 없으면 표시되지 않는다
 - [ ] 댓글/대댓글 작성 후 해당 위치로 자동 스크롤된다
+- [ ] `commentStatus: open`이면 댓글 영역이 정상 표시된다
+- [ ] `commentStatus: locked`이면 기존 댓글만 표시되고, 헤더에 "댓글이 잠겼습니다" 안내가 표시된다
+- [ ] `commentStatus: disabled`이면 댓글 영역 전체가 숨겨진다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: 시맨틱 마크업, 자물쇠 아이콘 aria-label (A-01 참조)
 - [ ] Storybook story 작성 (F-38 참조)
@@ -413,6 +416,7 @@ interface CommentListResponse {
 
 - F-02 글 상세 (배치 위치)
 - F-08 댓글 작성/삭제 (작성/삭제 인터랙션)
+- F-23 글 메타데이터 폼 (commentStatus 필드 정의)
 
 ## 10. 미해결 사항
 

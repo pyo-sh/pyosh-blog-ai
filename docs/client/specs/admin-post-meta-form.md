@@ -399,8 +399,8 @@ interface PostPayload {
 
 | 계층 | 파일 | 역할 |
 |---|---|---|
-| `app` | `dashboard/posts/new/page.tsx` | 글 작성 라우트 (기존) |
-| `app` | `dashboard/posts/[id]/edit/page.tsx` | 글 수정 라우트 (기존) |
+| `app` | `manage/posts/new/page.tsx` | 글 작성 라우트 (기존) |
+| `app` | `manage/posts/[id]/edit/page.tsx` | 글 수정 라우트 (기존) |
 | `features` | `post-editor/ui/post-form.tsx` | 탭 레이아웃 + 폼 상태 관리 (리팩토링) |
 | `features` | `post-editor/ui/post-meta-fields.tsx` | 메타데이터 필드 모음 (신규) |
 | `features` | `post-editor/ui/category-tree-select.tsx` | 카테고리 트리 드롭다운 (신규) |

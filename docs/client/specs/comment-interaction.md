@@ -359,6 +359,7 @@ function get(commentId: number): string | null {
 - [ ] 게스트 비밀글 작성 시 sessionStorage에 저장된다 (최대 20개, FIFO)
 - [ ] 대댓글(depth-1)에서 답글 작성 시 같은 부모 아래 depth-1로 생성된다
 - [ ] 폼 라벨이 한국어로 통일되었다
+- [ ] `commentStatus: locked/disabled`이면 댓글 작성 폼이 숨겨진다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: 비밀글 토글 aria-pressed, 모달 포커스 트랩 (A-01 참조)
 - [ ] Storybook story 작성 (F-38 참조)
@@ -382,6 +383,7 @@ function get(commentId: number): string | null {
 
 - F-07 댓글 표시 (댓글 섹션 컨테이너, 페이지네이션)
 - F-14 Toast 알림 (Rate limit 에러 표시)
+- F-23 글 메타데이터 폼 (commentStatus 필드 정의)
 
 ## 10. 미해결 사항
 
