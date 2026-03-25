@@ -351,7 +351,7 @@
 |---|---|---|---|
 | GET | `/api/posts/:postId/comments` | optionalAuth | 댓글 목록 (계층형, 비밀글 마스킹) |
 | POST | `/api/posts/:postId/comments` | optionalAuth | 댓글 작성 |
-| DELETE | `/api/comments/:id` | optionalAuth | 댓글 삭제 (게스트: 비밀번호 필요) |
+| DELETE | `/api/comments/:id` | optionalAuth | 댓글 소프트 삭제 (게스트: 비밀번호 필요) |
 
 ### Admin (`/api/admin`)
 
@@ -359,8 +359,9 @@
 |---|---|---|---|
 | GET | `/api/admin/comments` | Admin | 댓글 목록 (필터 + 페이지네이션, post.title 포함) |
 | GET | `/api/admin/comments/:id/thread` | Admin | 스레드 조회 (부모 + 모든 답글) |
+| PUT | `/api/admin/comments/:id/restore` | Admin | 댓글 복원 (deleted → active) |
 | DELETE | `/api/admin/comments/:id` | Admin | 댓글 삭제 (`?action=soft_delete` \| `?action=hard_delete`) |
-| DELETE | `/api/admin/comments/bulk` | Admin | 댓글 벌크 삭제 |
+| DELETE | `/api/admin/comments/bulk` | Admin | 댓글 벌크 삭제/복원 |
 
 #### GET `/api/posts/:postId/comments`
 
@@ -424,13 +425,24 @@
   "guestName": "string (max 50)", "guestEmail": "string", "guestPassword": "string (min 4)" }
 ```
 
+#### PUT `/api/admin/comments/:id/restore`
+
+**Response 200:**
+```json
+{ "success": true }
+```
+
+- `status: "deleted"` → `status: "active"`, `deletedAt: null`
+
 #### DELETE `/api/admin/comments/bulk`
 
 **Request Body:**
 ```json
-{ "ids": [1, 2, 3], "action": "soft_delete | hard_delete" }
+{ "ids": [1, 2, 3], "action": "restore | soft_delete | hard_delete" }
 ```
 
+- `restore`: deleted → active 복원
+- `soft_delete`: body 보존, status/deletedAt만 변경
 - `hard_delete`: 대댓글 cascade 삭제
 
 #### CommentDetail 스키마
@@ -458,7 +470,7 @@
 |---|---|---|---|
 | GET | `/api/guestbook` | optionalAuth | 방명록 목록 (페이지네이션) |
 | POST | `/api/guestbook` | optionalAuth | 방명록 작성 (guestbook_enabled 확인) |
-| DELETE | `/api/guestbook/:id` | optionalAuth | 방명록 삭제 (게스트: 비밀번호 필요) |
+| DELETE | `/api/guestbook/:id` | optionalAuth | 방명록 소프트 삭제 (게스트: 비밀번호 필요, body 보존) |
 
 ### Admin (`/api/admin`)
 

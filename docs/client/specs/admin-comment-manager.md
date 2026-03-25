@@ -35,14 +35,14 @@
 - 글 제목을 표시하고 해당 글로의 링크를 제공한다
 - 댓글 클릭 시 상세 모달을 제공한다
 - 소프트 삭제와 영구 삭제를 선택할 수 있게 한다
+- 소프트 삭제된 댓글을 복원할 수 있게 한다
 - 영구 삭제 시 대댓글 cascade 삭제를 트랜잭션으로 처리한다
-- 벌크 선택(페이지 간 유지) + 벌크 삭제를 지원한다
-- 벌크 삭제를 서버 벌크 API로 처리한다
+- 벌크 선택(페이지 간 유지) + 벌크 삭제/복원을 지원한다
+- 벌크 작업을 서버 벌크 API로 처리한다
 
 ## 4. 비목표
 
 - 댓글 내용 수정 (Admin이 댓글을 편집하지 않음)
-- 댓글 복원 (soft delete 복원 UI)
 - 댓글 검색 (본문 텍스트 검색)
 - 댓글 신고/스팸 관리
 
@@ -225,9 +225,10 @@
 
 #### 소프트 삭제
 
-- `status: "deleted"`, `body: ""`, `deletedAt: now()`
-- 공개 페이지에서 "삭제된 댓글입니다" 플레이스홀더로 표시
-- Admin 페이지에서 상태 뱃지 "삭제됨"으로 변경
+- `status: "deleted"`, `deletedAt: now()` (body 보존)
+- 공개 페이지에서 status 기반으로 "삭제된 댓글입니다" 플레이스홀더 표시 (body를 비우지 않음)
+- Admin 페이지에서 원문 확인 가능, 상태 뱃지 "삭제됨"으로 변경
+- Admin이 복원 또는 영구 삭제를 결정
 
 #### 영구 삭제 (hard delete)
 
@@ -253,7 +254,7 @@ async hardDeleteComment(id: number) {
 테이블 체크박스로 선택. **페이지 이동해도 선택 유지.**
 
 ```
-선택됨 15개 (다른 페이지 7개 포함)  [전체 선택] [전체 해제] [소프트 삭제] [영구 삭제]
+선택됨 15개 (다른 페이지 7개 포함)  [전체 선택] [전체 해제] [복원] [소프트 삭제] [영구 삭제]
 ```
 
 #### 동작
@@ -287,13 +288,14 @@ async hardDeleteComment(id: number) {
 DELETE /api/admin/comments/bulk
 {
   ids: [1, 2, 3, ...],
-  action: "soft_delete" | "hard_delete"
+  action: "restore" | "soft_delete" | "hard_delete"
 }
 ```
 
 - 단일 트랜잭션: 전체 성공 or 전체 실패
+- restore: `status: "active"`, `deletedAt: null` 복원
 - hard_delete: 각 댓글의 대댓글도 cascade 삭제
-- 완료 후: selectedIds에서 삭제된 ID 제거, 목록 갱신
+- 완료 후: selectedIds에서 처리된 ID 제거, 목록 갱신
 
 ### 5.6 컴포넌트 구조 (FSD)
 
@@ -340,8 +342,9 @@ AdminCommentsPage
 |---|---|---|---|
 | GET | `/api/admin/comments` | 댓글 목록 (필터 + 페이지네이션) | 응답에 post.title 추가 |
 | GET | `/api/admin/comments/:id/thread` | 스레드 조회 (부모 + 모든 답글) | **신규** |
+| PUT | `/api/admin/comments/:id/restore` | 댓글 복원 (deleted → active) | **신규** |
 | DELETE | `/api/admin/comments/:id` | 단일 삭제 | `?action=soft_delete` 또는 `?action=hard_delete` |
-| DELETE | `/api/admin/comments/bulk` | 벌크 삭제 | **신규** |
+| DELETE | `/api/admin/comments/bulk` | 벌크 삭제/복원 | **신규** |
 
 ### 서버 변경 필요사항
 
@@ -350,10 +353,11 @@ AdminCommentsPage
 | Admin 댓글 목록 응답 | `post: { id, title }` 필드 추가 (posts 테이블 JOIN) |
 | `status` 필터 | `AdminCommentListQuerySchema`에 `status` 파라미터 추가 |
 | 단일 삭제 확장 | `action` 쿼리 파라미터로 `soft_delete`/`hard_delete` 구분 |
+| 단일 복원 엔드포인트 | `PUT /api/admin/comments/:id/restore` - deleted → active |
 | Hard delete 구현 | cascade 대댓글 삭제 트랜잭션 |
 | 스레드 조회 엔드포인트 | `GET /api/admin/comments/:id/thread` - 부모 + 답글 반환 |
-| 벌크 삭제 엔드포인트 | `DELETE /api/admin/comments/bulk` 신규 |
-| 벌크 삭제 스키마 | `{ ids: number[], action: "soft_delete" \| "hard_delete" }` |
+| 벌크 엔드포인트 | `DELETE /api/admin/comments/bulk` 신규 |
+| 벌크 스키마 | `{ ids: number[], action: "restore" \| "soft_delete" \| "hard_delete" }` |
 
 ## 7. 수용 기준
 
@@ -375,6 +379,8 @@ AdminCommentsPage
 - [ ] 스레드 뷰에서 다른 댓글 클릭 시 해당 댓글의 상세 뷰로 전환된다
 - [ ] [← 상세로 돌아가기]로 스레드 뷰에서 단일 상세 뷰로 복귀한다
 - [ ] 삭제 시 소프트/영구 삭제 선택 모달이 표시된다
+- [ ] 소프트 삭제 시 body가 보존되고 Admin에서 원문 확인이 가능하다
+- [ ] 삭제된 댓글을 [복원] 버튼으로 active 상태로 되돌릴 수 있다
 - [ ] 영구 삭제 시 cascade 대댓글 개수가 표시된다
 - [ ] 영구 삭제가 트랜잭션으로 처리된다
 - [ ] 체크박스로 벌크 선택이 가능하다

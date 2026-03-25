@@ -205,7 +205,7 @@ F-07에서 대댓글(depth-1)에도 답글 버튼이 추가되었다. 답글 폼
 
 #### Soft delete 동작
 
-기존과 동일: `status="deleted"`, `body=""`, `deletedAt` 설정.
+`status="deleted"`, `deletedAt` 설정. body는 보존한다 (Admin이 원문 확인 및 복원 가능).
 
 ### 5.7 삭제 - 관리자 hard delete
 

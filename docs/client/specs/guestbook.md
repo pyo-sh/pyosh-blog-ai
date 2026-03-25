@@ -98,8 +98,8 @@
 
 #### 삭제된 항목
 
-- 본문: "삭제된 방명록입니다."
-- soft delete (DB에서 status = "deleted")
+- 본문: "삭제된 방명록입니다." (status 기반 마스킹, body 데이터는 DB에 보존)
+- soft delete (DB에서 status = "deleted", body 보존 - Admin이 원문 확인 및 복원 가능)
 
 #### 빈 상태
 

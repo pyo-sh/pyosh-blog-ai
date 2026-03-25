@@ -288,6 +288,7 @@ DB 스키마 변경 없음. `replyToCommentId`와 `replyToName` 필드가 이미
 
 - 삭제된 댓글: `text-text-4`, `italic`, 작성자/날짜/버튼 미표시
 - 답글/삭제 버튼 미표시
+- 서버에서 `status: "deleted"` 기반으로 마스킹 (body 데이터는 DB에 보존되나 공개 API에서는 "삭제된 댓글입니다"로 대체)
 
 ### 5.10 댓글 작성 후 자동 스크롤
 
