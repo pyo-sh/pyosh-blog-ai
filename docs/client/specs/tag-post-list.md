@@ -61,7 +61,7 @@
 
 - 라벨: "Tag Archive" (`text-body-xs`, uppercase, `tracking-[0.24em]`, `text-text-4`)
 - 제목: `#{tag.name}` (`text-heading-md`, `text-text-1`)
-- 글 수: `meta.total` 기반 (`text-body-md`, `text-text-3`)
+- 글 수: `meta.totalCount` 기반 (`text-body-md`, `text-text-3`)
 - 컨테이너: `rounded-[2rem]`, `border border-border-3`, `bg-background-2`, `p-8 md:p-10`
 
 ### 5.3 데이터 흐름
