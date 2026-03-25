@@ -244,6 +244,7 @@ TocSection (Client Component)
 - [ ] URL `#anchor` 직접 접근 시 해당 섹션으로 이동한다
 - [ ] 데스크톱에서 기본 펼침, 접기/펼치기 토글 동작
 - [ ] 모바일에서 기본 접힘, 펼치기 가능
+- [ ] 모바일에서 TOC 항목 클릭 시 TOC가 접힌다
 - [ ] 다크모드 자동 적용
 - [ ] 접근성: TOC `nav` 요소, `aria-label="목차"` (A-01 참조)
 - [ ] Storybook story 작성 (F-38 참조)

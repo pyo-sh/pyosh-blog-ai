@@ -115,7 +115,7 @@ interface CommentListResponse {
   meta: {
     page: number;
     limit: number;
-    total: number;           // 전체 댓글 수 (대댓글 포함)
+    totalCount: number;      // 전체 댓글 수 (대댓글 포함)
     totalRootComments: number; // 루트 댓글 수 (페이지네이션 기준)
     totalPages: number;      // ceil(totalRootComments / limit)
   };
@@ -124,7 +124,7 @@ interface CommentListResponse {
 
 - `page` 미지정 시 기본값: 마지막 페이지 (`totalPages`)
 - 루트 댓글 기준 페이지네이션 후, 해당 루트 댓글의 대댓글은 전부 포함하여 반환
-- `total`은 댓글 섹션 헤더의 `댓글 (N)` 표시에 사용
+- `totalCount`는 댓글 섹션 헤더의 `댓글 (N)` 표시에 사용
 - `totalRootComments`는 Pagination 컴포넌트의 `totalPages` 계산에 사용
 
 #### 클라이언트 동작
@@ -158,7 +158,7 @@ interface CommentListResponse {
 
 - `댓글`: `text-h2`, `text-text-1`
 - `(12)`: `text-h2`, `text-text-3` — 대댓글 포함 전체 카운트
-- API 응답 `meta.total` 사용
+- API 응답 `meta.totalCount` 사용
 - 댓글 0개일 때: `댓글 (0)`
 
 기존의 영어 라벨 ("Comments"), 부연 설명 ("현재 N개의 루트 댓글이 등록되어 있습니다.") 삭제.
@@ -369,7 +369,7 @@ interface CommentListResponse {
   meta: {
     page: number;
     limit: number;
-    total: number;
+    totalCount: number;
     totalRootComments: number;
     totalPages: number;
   };

@@ -156,7 +156,7 @@
 기존 댓글 목록 API를 활용한다.
 
 ```
-GET /api/admin/comments?limit=5&sort=latest
+GET /api/admin/comments?limit=5&sort=created_at&order=desc
 ```
 
 - 정렬: 최신순 (작성일 내림차순)
@@ -193,7 +193,7 @@ DashboardHome
   │
   └─ RecentCommentsSection
       └─ useQuery('recentComments')
-          → GET /api/admin/comments?limit=5&sort=latest
+          → GET /api/admin/comments?limit=5&sort=created_at&order=desc
           → 댓글 5개 렌더링 + 삭제 mutation
           → "댓글 관리 →" 링크
 ```
@@ -203,7 +203,7 @@ DashboardHome
 | 메서드 | 경로 | 용도 | 변경 사항 |
 |---|---|---|---|
 | GET | `/api/admin/stats/dashboard` | 대시보드 통계 | 글 상태별 개수 추가 |
-| GET | `/api/admin/comments?limit=5&sort=latest` | 최근 댓글 | 기존 (변경 없음) |
+| GET | `/api/admin/comments?limit=5&sort=created_at&order=desc` | 최근 댓글 | 기존 (변경 없음) |
 
 ### 서버 변경 필요사항
 
@@ -238,6 +238,7 @@ interface DashboardStats {
 - [ ] 글 상태 요약에 전체/초안/발행/보관 개수가 표시된다
 - [ ] 글 상태 카드 클릭 시 해당 상태로 필터링된 글 관리 페이지로 이동한다
 - [ ] 최근 댓글 5개가 미리보기 형태로 표시된다
+- [ ] 최근 댓글의 글 제목 클릭 시 해당 글 페이지로 이동한다
 - [ ] 비밀 댓글이 🔒 아이콘과 함께 내용이 노출된다
 - [ ] 대댓글이 `↳ @부모작성자` 형태로 표시된다
 - [ ] 댓글 삭제 버튼이 동작한다

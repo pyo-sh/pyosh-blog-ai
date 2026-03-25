@@ -58,6 +58,7 @@
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
 | GET | `/api/posts` | - | 게시글 목록 (공개+발행 글만) |
+| GET | `/api/posts/slugs` | - | 발행된 글 slug 목록 (sitemap용) |
 | GET | `/api/posts/:slug` | - | 게시글 상세 (slug 기반) |
 
 #### GET `/api/posts`
@@ -82,6 +83,15 @@
   "data": [PostListItem],
   "meta": { "page": 1, "limit": 20, "totalCount": 100, "totalPages": 5 }
 }
+```
+
+#### GET `/api/posts/slugs`
+
+발행된 글의 slug + updatedAt만 반환하는 경량 엔드포인트 (sitemap용).
+
+**Response 200:**
+```json
+{ "slugs": [{ "slug": "...", "updatedAt": "ISO" }] }
 ```
 
 #### GET `/api/posts/:slug`
@@ -177,12 +187,17 @@
   "createdAt": "ISO",
   "updatedAt": "ISO",
   "deletedAt": null,
-  "category": { "id": 1, "name": "...", "slug": "..." },
+  "category": {
+    "id": 1, "name": "...", "slug": "...",
+    "ancestors": [{ "name": "...", "slug": "..." }]
+  },
   "tags": [{ "id": 1, "name": "...", "slug": "..." }],
   "totalPageviews": 245,
   "commentCount": 12
 }
 ```
+
+- `category.ancestors`: 루트부터 부모까지 순서. 직속 카테고리 자체는 포함하지 않음 (이미 `category.name`/`slug`로 제공).
 
 ### PostListItem 스키마
 
@@ -253,7 +268,8 @@
 {
   "categories": [{
     "id": 1, "parentId": null, "name": "...", "slug": "...",
-    "sortOrder": 0, "isVisible": true, "postCount": 5,
+    "sortOrder": 0, "isVisible": true,
+    "publishedPostCount": 3, "totalPostCount": 5,
     "createdAt": "ISO", "updatedAt": "ISO",
     "children": [CategoryTree]
   }]

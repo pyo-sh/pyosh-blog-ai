@@ -333,6 +333,7 @@ if (typeof window !== 'undefined') {
 - [ ] API 에러가 구조화된 형태로 콘솔에 로깅된다
 - [ ] 미처리 Promise rejection이 콘솔에 로깅된다
 - [ ] 헬스 체크 엔드포인트가 정상 응답한다
+- [ ] `/api/health/live`가 `{ version, uptime, memory }` 형태로 응답한다
 - [ ] `/api/health/ready`가 DB 연결 실패 시 503을 반환한다
 
 ## 8. 에지 케이스
