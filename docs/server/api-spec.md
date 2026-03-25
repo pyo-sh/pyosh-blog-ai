@@ -10,6 +10,62 @@
 | **OAuth (Google/GitHub)** | Passport 기반. `request.user`로 접근. `requireAuth` 훅으로 보호 |
 | **optionalAuth** | 인증 선택적. 비로그인 시에도 접근 가능 (게스트 댓글 등) |
 
+## CSRF 보호
+
+상태 변경 요청에 CSRF 토큰 필요. `GET /api/auth/csrf-token`으로 토큰 발급 후 요청 헤더에 포함.
+
+적용 대상:
+- `POST /api/auth/admin/logout`
+- `POST /api/posts/:postId/comments`
+- `DELETE /api/comments/:id`
+- `POST /api/guestbook`
+- `DELETE /api/guestbook/:id`
+- `POST /api/stats/view`
+
+## Rate limiting
+
+| 엔드포인트 | 제한 |
+|---|---|
+| `POST /api/auth/admin/login` | 5 req/min |
+| `POST /api/posts/:postId/comments` | 10 req/min |
+| `POST /api/guestbook` | 10 req/min |
+| `POST /api/stats/view` | 30 req/min |
+
+## 에러 응답 형식
+
+```json
+{ "statusCode": 400, "error": "Bad Request", "message": "..." }
+```
+
+---
+
+## Health check
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/health` | `{ "status": "ok", "timestamp": "ISO" }` |
+| GET | `/api/health` | 전체 헬스체크 (DB 포함) |
+| GET | `/api/health/live` | Liveness probe (DB 미확인) |
+| GET | `/api/health/ready` | Readiness probe (DB 확인, 실패 시 non-200) |
+
+### GET `/api/health/live`
+
+**Response 200:**
+```json
+{ "status": "ok", "timestamp": "ISO", "uptime": 12345, "version": "string" }
+```
+
+### GET `/api/health/ready`
+
+**Response 200:**
+```json
+{
+  "status": "ok", "timestamp": "ISO", "uptime": 12345, "version": "string",
+  "memory": { "rss": 0, "heapUsed": 0, "heapTotal": 0 },
+  "database": { "status": "ok", "latencyMs": 5 }
+}
+```
+
 ---
 
 ## Auth (`/api/auth`)
@@ -20,10 +76,18 @@
 | GET | `/api/auth/google/callback` | - | Google OAuth 콜백 |
 | GET | `/api/auth/github` | - | GitHub OAuth 리다이렉트 |
 | GET | `/api/auth/github/callback` | - | GitHub OAuth 콜백 |
-| POST | `/api/auth/admin/login` | - | 관리자 로그인 |
-| POST | `/api/auth/admin/logout` | - | 관리자 로그아웃 (세션 파기) |
+| GET | `/api/auth/csrf-token` | - | CSRF 토큰 발급 |
+| POST | `/api/auth/admin/login` | - | 관리자 로그인 (5 req/min) |
+| POST | `/api/auth/admin/logout` | CSRF | 관리자 로그아웃 (세션 파기) |
 | GET | `/api/auth/me` | - | 현재 로그인 사용자 정보 |
 | GET | `/api/auth/csrf-token` | - | CSRF 토큰 발급 |
+
+### GET `/api/auth/csrf-token`
+
+**Response 200:**
+```json
+{ "token": "string" }
+```
 
 ### POST `/api/auth/admin/login`
 
@@ -37,6 +101,10 @@
 { "admin": { "id": 1, "username": "...", "createdAt": "ISO", "updatedAt": "ISO", "lastLoginAt": "ISO" } }
 ```
 
+### POST `/api/auth/admin/logout`
+
+**Response:** 204 No Content
+
 ### GET `/api/auth/me`
 
 **Response 200 (Admin):**
@@ -48,6 +116,8 @@
 ```json
 { "type": "oauth", "id": 1, "name": "...", "email": "...", "githubId": "...", "googleEmail": "..." }
 ```
+
+**Response 401:** 미인증
 
 ---
 
@@ -63,11 +133,11 @@
 
 #### GET `/api/posts`
 
-**Query Parameters:**
+**Query parameters:**
 | Param | Type | Default | 설명 |
 |---|---|---|---|
 | page | number | 1 | 페이지 번호 |
-| limit | number (max 100) | 20 | 페이지당 개수 |
+| limit | number (1-100) | 10 | 페이지당 개수 |
 | categoryId | number | - | 카테고리 필터 |
 | tagSlug | string | - | 태그 슬러그 필터 |
 | q | string | - | 제목/내용 검색 |
@@ -75,7 +145,7 @@
 | sort | string | published_at | 정렬 기준 (`published_at` \| `created_at`) |
 | order | string | desc | 정렬 방향 (`asc` \| `desc`) |
 
-> Public API에서는 `status=published`, `visibility=public`, `includeDeleted=false`가 강제 적용됩니다.
+> Public API에서는 `status=published`, `visibility=public`, `deletedAt IS NULL`이 강제 적용됩니다.
 
 **Response 200:**
 ```json
@@ -147,13 +217,17 @@
 - `update`: `categoryId`, `commentStatus` 중 하나 이상 필수
 - 단일 트랜잭션: 전체 성공 or 전체 실패
 
+#### GET `/api/admin/posts`
+
+Public과 동일한 쿼리 파라미터. 기본 정렬: `created_at`, 기본 limit: 20. 모든 상태/가시성 조회 가능, `includeDeleted` 지원.
+
 #### POST `/api/admin/posts`
 
 **Request Body:**
 ```json
 {
-  "title": "string (max 200)",
-  "contentMd": "string",
+  "title": "string (1-200)",
+  "contentMd": "string (min 1)",
   "categoryId": 1,
   "thumbnailUrl": "/uploads/example.jpg",
   "visibility": "public | private",
@@ -165,6 +239,8 @@
   "commentStatus": "open | locked | disabled"
 }
 ```
+
+**Response 201:** `{ "post": PostDetail }`
 
 ### PostDetail 스키마
 
@@ -245,6 +321,8 @@
 }
 ```
 
+> 공개 발행 게시글에 사용된 태그만 포함됩니다.
+
 ---
 
 ## Categories (`/api/categories`)
@@ -280,8 +358,19 @@
 
 **Request Body:**
 ```json
-{ "name": "string (max 50)", "parentId": 1, "isVisible": true }
+{ "name": "string (1-50)", "parentId": 1, "isVisible": true }
 ```
+
+**Response 201:** `{ "category": Category }`
+
+#### PATCH `/api/categories/:id`
+
+**Request Body:**
+```json
+{ "name": "string (1-50)", "parentId": 1, "sortOrder": 0, "isVisible": true }
+```
+
+모든 필드 optional.
 
 #### PATCH `/api/categories/tree`
 
@@ -291,6 +380,8 @@
 ```
 
 - 단일 트랜잭션: 전체 성공 or 전체 실패
+
+**Response 200:** `{ "success": true }`
 
 #### DELETE `/api/categories/:id`
 
@@ -306,7 +397,7 @@
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
 | GET | `/api/assets` | Admin | 에셋 목록 조회 (페이지네이션) |
-| POST | `/api/assets/upload` | Admin | 이미지 업로드 (multipart, max 5개, 10MB/개) |
+| POST | `/api/assets/upload` | Admin | 이미지 업로드 (multipart) |
 | GET | `/api/assets/:id` | - | 에셋 정보 조회 |
 | DELETE | `/api/assets/:id` | Admin | 에셋 삭제 (DB + 파일) |
 | DELETE | `/api/assets/bulk` | Admin | 에셋 벌크 삭제 |
@@ -350,8 +441,8 @@
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
 | GET | `/api/posts/:postId/comments` | optionalAuth | 댓글 목록 (계층형, 비밀글 마스킹) |
-| POST | `/api/posts/:postId/comments` | optionalAuth | 댓글 작성 |
-| DELETE | `/api/comments/:id` | optionalAuth | 댓글 소프트 삭제 (게스트: 비밀번호 필요) |
+| POST | `/api/posts/:postId/comments` | optionalAuth, CSRF | 댓글 작성 (10 req/min) |
+| DELETE | `/api/comments/:id` | optionalAuth, CSRF | 댓글 소프트 삭제 (게스트: 비밀번호 필요) |
 
 ### Admin (`/api/admin`)
 
@@ -416,13 +507,20 @@
 
 **OAuth 사용자:**
 ```json
-{ "body": "string (max 2000)", "parentId": 1, "replyToCommentId": 1, "isSecret": false }
+{ "body": "string (1-2000)", "parentId": 1, "replyToCommentId": 1, "isSecret": false }
 ```
 
 **게스트:**
 ```json
 { "body": "...", "parentId": 1, "replyToCommentId": 1, "isSecret": false,
-  "guestName": "string (max 50)", "guestEmail": "string", "guestPassword": "string (min 4)" }
+  "guestName": "string (1-50)", "guestEmail": "string (email)", "guestPassword": "string (4-100)" }
+```
+
+#### DELETE `/api/comments/:id`
+
+**Body (게스트만):**
+```json
+{ "guestPassword": "string (min 4)" }
 ```
 
 #### PUT `/api/admin/comments/:id/restore`
@@ -469,8 +567,8 @@
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
 | GET | `/api/guestbook` | optionalAuth | 방명록 목록 (페이지네이션) |
-| POST | `/api/guestbook` | optionalAuth | 방명록 작성 (guestbook_enabled 확인) |
-| DELETE | `/api/guestbook/:id` | optionalAuth | 방명록 소프트 삭제 (게스트: 비밀번호 필요, body 보존) |
+| POST | `/api/guestbook` | optionalAuth, CSRF | 방명록 작성 (guestbook_enabled 확인, 10 req/min) |
+| DELETE | `/api/guestbook/:id` | optionalAuth, CSRF | 방명록 소프트 삭제 (게스트: 비밀번호 필요, body 보존) |
 
 ### Admin (`/api/admin`)
 
@@ -492,6 +590,26 @@
 }
 ```
 
+#### POST `/api/guestbook`
+
+**OAuth 사용자:**
+```json
+{ "body": "string (1-2000)", "parentId": 1, "isSecret": false }
+```
+
+**게스트:**
+```json
+{ "body": "...", "parentId": 1, "isSecret": false,
+  "guestName": "string (1-50)", "guestEmail": "string (email)", "guestPassword": "string (4-100)" }
+```
+
+#### DELETE `/api/guestbook/:id`
+
+**Body (게스트만):**
+```json
+{ "guestPassword": "string (min 4)" }
+```
+
 #### GET `/api/admin/guestbook`
 
 **Query Parameters:**
@@ -504,6 +622,14 @@
 | q | string | - | 작성자 이름 + 본문 검색 |
 | startDate | string | - | 시작일 (YYYY-MM-DD) |
 | endDate | string | - | 종료일 (YYYY-MM-DD) |
+
+**Response 200:**
+```json
+{
+  "data": [GuestbookEntryDetail],
+  "meta": { "page": 1, "limit": 20, "totalCount": 50, "totalPages": 3 }
+}
+```
 
 #### DELETE `/api/admin/guestbook/bulk`
 
@@ -543,7 +669,7 @@
 
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
-| POST | `/api/stats/view` | - | 조회수 기록 (postId 선택적, 같은 IP 5분 내 중복 제거, KST 기준 unique) |
+| POST | `/api/stats/view` | CSRF | 조회수 기록 (postId 선택적, 같은 IP 5분 내 중복 제거, KST 기준 unique, 30 req/min) |
 | GET | `/api/stats/popular` | - | 인기 게시글 |
 | GET | `/api/stats/total-views` | - | 사이트 전체 누적 조회수 |
 
@@ -599,13 +725,31 @@
 
 ## User (`/api/user`)
 
-> 주의: 현재 인증 가드 미적용 (레거시)
-
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
-| GET | `/api/user/:id` | - | 사용자 정보 조회 |
-| PUT | `/api/user/:id` | - | 사용자 정보 수정 |
-| DELETE | `/api/user/:id` | - | 사용자 소프트 삭제 |
+| GET | `/api/user/me` | requireAuth | 현재 OAuth 사용자 프로필 |
+| PUT | `/api/user/me` | requireAuth | 사용자 프로필 수정 |
+| DELETE | `/api/user/me` | requireAuth | 사용자 소프트 삭제 (세션 파기) |
+
+### GET `/api/user/me`
+
+**Response 200:**
+```json
+{
+  "id": 1, "provider": "github", "email": "...",
+  "displayName": "...", "avatarUrl": "...",
+  "createdAt": "ISO", "updatedAt": "ISO"
+}
+```
+
+### PUT `/api/user/me`
+
+**Request Body:**
+```json
+{ "displayName": "string (1-100)", "avatarUrl": "string (URL, max 500) | null" }
+```
+
+모든 필드 optional. **Response 200:** 위와 동일.
 
 ---
 
@@ -615,16 +759,6 @@
 |---|---|---|
 | GET | `/sitemap.xml` | XML 사이트맵 (Cache: 3600s) |
 | GET | `/rss.xml` | RSS 2.0 피드 - 최신 20개 공개 글 (Cache: 3600s) |
-
----
-
-## Health Check
-
-| Method | Path | 설명 |
-|---|---|---|
-| GET | `/health` | `{ "status": "ok", "timestamp": "ISO" }` |
-| GET | `/api/health/live` | `{ "version": "...", "uptime": 123, "memory": {...} }` |
-| GET | `/api/health/ready` | 200 (DB OK) or 503 (DB fail) |
 
 ---
 

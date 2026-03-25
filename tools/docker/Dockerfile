@@ -29,6 +29,22 @@ RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
 # Codex CLI
 RUN npm install -g @openai/codex
 
+# Chromium for Playwright MCP (ARM64 네이티브 — 자율 Figma 캡처용)
+# Ubuntu 24.04에서 chromium-browser는 snap wrapper이므로 Playwright 전용 Chromium 사용.
+# PLAYWRIGHT_BROWSERS_PATH를 /opt/ms-playwright로 고정하여 빌드·런타임 모두 동일 경로 참조.
+# chrome 채널 shim(/opt/google/chrome/chrome): Playwright MCP 기본 설정(chrome channel)이
+# 해당 경로를 탐색하므로 settings.json 변경 없이 연결.
+# --no-sandbox: Docker 컨테이너는 user namespace가 없어 sandbox 없이 실행 필요.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN npm install -g playwright \
+    && playwright install --with-deps chromium \
+    && CHROME=$(find /opt/ms-playwright -name chrome -type f | head -1) \
+    && mkdir -p /opt/google/chrome \
+    && printf '#!/bin/sh\nexec "%s" --no-sandbox "$@"\n' "$CHROME" \
+       > /opt/google/chrome/chrome \
+    && chmod +x /opt/google/chrome/chrome \
+    && chmod -R a+rx /opt/ms-playwright
+
 # entrypoint 스크립트
 COPY tools/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

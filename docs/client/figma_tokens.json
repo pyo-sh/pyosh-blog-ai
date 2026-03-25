@@ -1,0 +1,163 @@
+{
+  "color": {
+    "light": {
+      "background": {
+        "1": "#f9f9fa",
+        "2": "#f1f2f3",
+        "3": "#e6e8e9",
+        "4": "#dbdde0"
+      },
+      "text": {
+        "1": "#232629",
+        "2": "#4b5158",
+        "3": "#838c95",
+        "4": "#babfc4"
+      },
+      "border": {
+        "1": "#33383c",
+        "2": "#a6adb3",
+        "3": "#dbdde0",
+        "4": "#f1f2f3"
+      },
+      "primary": {
+        "1": "#8a6fe0",
+        "2": "#b09ee9"
+      },
+      "secondary": {
+        "1": "#6b49b5",
+        "2": "#9983cc"
+      },
+      "tertiary": {
+        "1": "#8d9eff",
+        "2": "#b0bcff"
+      },
+      "quaternary": {
+        "1": "#b9e0ff",
+        "2": "#cee9ff"
+      },
+      "positive": {
+        "1": "#0da96b",
+        "2": "#41d69b"
+      },
+      "negative": {
+        "1": "#e21223",
+        "2": "#f15966"
+      },
+      "grey": {
+        "1": "#f1f2f3",
+        "2": "#c7ccd0",
+        "3": "#9099a1",
+        "4": "#596068"
+      },
+      "yellow": {
+        "1": "#ffbe3d",
+        "2": "#f2a116"
+      },
+      "overlay": {
+        "1": "#131415"
+      }
+    },
+    "dark": {
+      "background": {
+        "1": "#131415",
+        "2": "#1d1e20",
+        "3": "#26282a",
+        "4": "#303335"
+      },
+      "text": {
+        "1": "#e9eaeb",
+        "2": "#c4c6c9",
+        "3": "#999ea2",
+        "4": "#656b70"
+      },
+      "border": {
+        "1": "#ced1d3",
+        "2": "#a1a5aa",
+        "3": "#54595d",
+        "4": "#35383a"
+      },
+      "primary": {
+        "1": "#a591e8",
+        "2": "#c7bbf0"
+      },
+      "secondary": {
+        "1": "#8c72c5",
+        "2": "#b9aadc"
+      },
+      "tertiary": {
+        "1": "#a5b2ff",
+        "2": "#c7d0ff"
+      },
+      "quaternary": {
+        "1": "#c7e6ff",
+        "2": "#ddf0ff"
+      },
+      "positive": {
+        "1": "#10c67d",
+        "2": "#78e2b8"
+      },
+      "negative": {
+        "1": "#f15966",
+        "2": "#feccd0"
+      },
+      "grey": {
+        "1": "#484c50",
+        "2": "#797f85",
+        "3": "#aeb2b6",
+        "4": "#dee0e1"
+      },
+      "yellow": {
+        "1": "#ffbb32",
+        "2": "#ffd470"
+      },
+      "overlay": {
+        "1": "#000000"
+      }
+    },
+    "special": {
+      "code-surface": "#0d1117"
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "sans": ["Gothic A1", "ui-sans-serif", "system-ui", "sans-serif"]
+    },
+    "scale": {
+      "display": {
+        "xl":   { "size": "4.4rem",   "lineHeight": "5.469rem", "weight": 900 },
+        "lg":   { "size": "4rem",     "lineHeight": "5rem",     "weight": 900 },
+        "md":   { "size": "3.6rem",   "lineHeight": "4.5rem",   "weight": 900 },
+        "base": { "size": "3.2rem",   "lineHeight": "4.031rem", "weight": 900 },
+        "sm":   { "size": "2.8rem",   "lineHeight": "3.469rem", "weight": 900 },
+        "xs":   { "size": "2.4rem",   "lineHeight": "3rem",     "weight": 900 }
+      },
+      "heading": {
+        "h1": { "size": "1.875rem", "lineHeight": "2.375rem", "weight": 700 },
+        "h2": { "size": "1.625rem", "lineHeight": "2.063rem", "weight": 700 },
+        "h3": { "size": "1.375rem", "lineHeight": "1.75rem",  "weight": 700 },
+        "h4": { "size": "1.25rem",  "lineHeight": "1.625rem", "weight": 700 },
+        "h5": { "size": "1.063rem", "lineHeight": "1.375rem", "weight": 700 },
+        "h6": { "size": "0.938rem", "lineHeight": "1.25rem",  "weight": 700 }
+      },
+      "body": {
+        "xl":   { "size": "1.688rem", "lineHeight": "2.125rem", "weight": 400 },
+        "lg":   { "size": "1.5rem",   "lineHeight": "1.938rem", "weight": 400 },
+        "md":   { "size": "1.313rem", "lineHeight": "1.688rem", "weight": 400 },
+        "base": { "size": "1.125rem", "lineHeight": "1.5rem",   "weight": 400 },
+        "sm":   { "size": "0.875rem", "lineHeight": "1.188rem", "weight": 400 },
+        "xs":   { "size": "0.688rem", "lineHeight": "1rem",     "weight": 400 }
+      },
+      "ui": {
+        "base": { "size": "1rem",     "lineHeight": "1.5rem",   "weight": 400 },
+        "sm":   { "size": "0.813rem", "lineHeight": "1.125rem", "weight": 400 },
+        "xs":   { "size": "0.75rem",  "lineHeight": "1rem",     "weight": 400 }
+      }
+    }
+  },
+  "_meta": {
+    "source": "client/src/app-layer/style/theme.css + typography.css",
+    "figmaCollection": "Theme",
+    "figmaTextStyles": 21,
+    "note": "Dark mode requires Figma Professional plan (addMode limit on Starter)"
+  }
+}
