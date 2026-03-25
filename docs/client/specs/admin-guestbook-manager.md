@@ -270,7 +270,7 @@ GuestbookManager
 | 메서드 | 경로 | 용도 | 비고 |
 |---|---|---|---|
 | GET | `/api/admin/guestbook` | 방명록 목록 | `status`, `q` 파라미터 추가 |
-| DELETE | `/api/admin/guestbook/:id` | 단일 삭제 | `?action=hide\|soft\|hard` |
+| DELETE | `/api/admin/guestbook/:id` | 단일 삭제 | `?action=hide\|soft_delete\|hard_delete` |
 | DELETE | `/api/admin/guestbook/bulk` | 벌크 삭제/숨김 | **신규** |
 | GET | `/api/settings/guestbook` | 방명록 활성 상태 조회 | **신규** (Public) |
 | PATCH | `/api/admin/settings/guestbook` | 방명록 활성 상태 변경 | **신규** (Admin) |
