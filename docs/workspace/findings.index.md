@@ -23,6 +23,14 @@
 | 015 | agent-tracker 과도 설계 - `/proc` BFS가 tmux API보다 나쁜 이유 | 2026-03-08 | #agent-tracker #proc #tmux #overengineering #process-detection |
 | 017 | pipeline_run_headless_core CLAUDECODE 환경변수 전파 버그 | 2026-03-09 | #pipeline #headless #claude-p #claudecode #env-var #nested-session |
 | 016 | Pipeline cwd 혼용 진단 및 3-way 분리 | 2026-03-09 | #pipeline #cwd #worktree #monorepo #skill-discovery #merge-lock |
+| 018 | agent-tracker sidecar v2 namespace design | 2026-03-13 | #agent-tracker #sidecar #namespace #tmux #multi-session |
+| 019 | Tarjan SCC vs Kahn for dependency cycle quarantine | 2026-03-14 | #orchctl #cycle-detection #tarjan #scc #scheduling |
+| 020 | OpenAI --output-schema requires all properties in required array | 2026-03-14 | #codex #openai #structured-output #schema #json-schema |
+| 021 | Docker 환경에서 HTML → Figma 캡처 방법                         | 2026-03-20 | #figma #playwright #docker #html-to-design #capture #mcp |
+| 022 | Figma captureForDesign hang 원인과 Section 배치 패턴           | 2026-03-23 | #figma #playwright #captureForDesign #section #layout #dialog #mcp |
+| 023 | captureForDesign color-mix() 미해석 및 inline 요소 높이 불일치 패턴 | 2026-03-23 | #figma #captureForDesign #color-mix #rgba #inline-block #html-to-design |
+| 024 | HTML 와이어프레임 Figma DOM 업로드 완전 가이드 | 2026-03-25 | #figma #playwright #html-to-design #dom-capture #wireframe #mcp #admin |
+| 025 | Figma plugin node orphan 방지 패턴 | 2026-03-25 | #figma #figma-execute #node-lifecycle #orphan #try-catch #plugin-api |
 
 ## 상세 문서
 
@@ -43,6 +51,14 @@
 - [findings.015-agent-tracker-overengineering.md](./findings/findings.015-agent-tracker-overengineering.md) - agent-tracker 과도 설계: /proc BFS vs tmux API, AI 행동 패턴 분석, 단순화 원칙
 - [findings.017-pipeline-headless-claudecode-env.md](./findings/findings.017-pipeline-headless-claudecode-env.md) - pipeline_run_headless_core CLAUDECODE 미해제: Claude Code 세션 안에서 claude -p 호출 시 중첩 세션 오류, unset CLAUDECODE 해결
 - [findings.016-pipeline-cwd-separation.md](./findings/findings.016-pipeline-cwd-separation.md) - Pipeline cwd 혼용 진단: skill cwd / repo dir / worktree dir 3-way 분리, TTL merge lock, area-scoped 경로
+- [findings.018-sidecar-v2-namespace.md](./findings/findings.018-sidecar-v2-namespace.md) - agent-tracker sidecar v2: socket-hash/session/pane 3레벨 경로, immediate cutover, source precedence, md5sum Linux-only 주의
+- [findings.019-tarjan-scc-cycle-quarantine.md](./findings/findings.019-tarjan-scc-cycle-quarantine.md) - Tarjan SCC correctly isolates cycle members only; Kahn's algorithm incorrectly quarantines downstream dependents; rate-limit detection scoped to discovery pass
+- [findings.020-openai-output-schema-required-contract.md](./findings/findings.020-openai-output-schema-required-contract.md) - OpenAI --output-schema rejects schemas where any property is absent from required; nullable fields must use type union ["T", "null"]
+- [findings.021-docker-figma-html-capture.md](./findings/findings.021-docker-figma-html-capture.md) - Docker headless 환경에서 HTML을 Figma로 캡처: browser_run_code + waitForTimeout(8000) 패턴, Chromium 권한 수정, 네트워크 오진단 방지
+- [findings.022-figma-capture-section-layout.md](./findings/findings.022-figma-capture-section-layout.md) - captureForDesign hang 원인(POST성공 후 status 404 폴링), 409 재발급 정책, Section API, appendChild 후 좌표 설정, Dialog 판별 패턴, figma-remote rate limit
+- [findings.023-figma-capture-color-mix-inline.md](./findings/findings.023-figma-capture-color-mix-inline.md) - color-mix() 미캡처 원인/rgba 교체 매핑표, inline 높이 불일치(inline-block 해결), exportAsync rate-limit 없음
+- [findings.024-figma-dom-wireframe-upload-guide.md](./findings/findings.024-figma-dom-wireframe-upload-guide.md) - HTTP 서버 설정, captureId 발급, fire-and-forget 패턴, IntersectionObserver 스크롤, 모달/사이드바 처리, polling 완료 확인 전체 가이드
+- [findings.025-figma-node-orphan-cleanup.md](./findings/findings.025-figma-node-orphan-cleanup.md) - 생성 즉시 appendChild, try/catch 롤백 목록, 사후 audit 패턴으로 orphan 노드 방지
 
 ## 주요 원칙
 
@@ -73,3 +89,19 @@
 - **gh 명령은 explicit repo 사용** → cwd 의존 제거. `-R owner/repo` 또는 `repos/owner/repo/...` 명시
 - **merge lock은 한 프로세스에서 acquire/release 완결** → 별도 Bash tool 호출 분리 금지. TTL 기반 stale 판단
 - **모든 transient 파일 경로에 area 포함** → client/server 번호 충돌 방지. worktree, log, message, state 전부 area-scoped
+- **OpenAI --output-schema는 draft-07 superset** → 모든 properties 키가 required에 포함되어야 함. optional 필드는 `["T", "null"]` 타입 유니온으로 표현. nullable 필드의 maxLength/minimum 제약은 제거할 것
+- **Docker Figma 캡처 = browser_run_code + waitForTimeout(8000)** → `browser_navigate` 후 별도 도구 호출은 타이밍 방해로 실패. 단일 `browser_run_code` 안에서 goto + 8초 대기가 필수. `/opt/ms-playwright` 쓰기 권한 선행 확보
+- **Chromium fetch HEAD to root → ERR_FAILED는 네트워크 이상 아님** → mcp.figma.com GET/POST는 정상 작동. HEAD 요청 실패를 네트워크 차단으로 오진단하지 말 것
+- **captureForDesign은 항상 timeout됨 - POST 관찰로 성공 판단** → 함수는 status endpoint 404 폴링으로 반환 불가. 15s 타임아웃 + `page.on('response')` POST 관찰로 성공 여부 판단
+- **captureId는 세션마다 새로 발급** → 재사용 시 409 CAPTURE_ID_ALREADY_SUBMITTED. 세션 시작 시 전량 재발급 필수
+- **SECTION 리사이즈는 resizeWithoutConstraints** → SECTION 타입에는 `resize()` 없음. `resizeWithoutConstraints(w, h)` 사용
+- **section.appendChild 후 x/y 설정** → reparent 전 좌표는 무의미. appendChild 이후에만 상대 좌표 설정 유효
+- **Dialog 판별: x >= parentFrame.width** → navigation drawer는 frame 오른쪽 밖에 위치. 단, 사이드바 전용 프레임 내부 노드는 삭제 금지
+- **배치 Figma 조작은 figma-console figma_execute** → figma-remote MCP는 rate limit 빠름. 노드 생성/이동/삭제는 figma_execute로 Plugin API 직접 실행
+- **captureForDesign은 color-mix() 미해석** → `color-mix(in srgb, var(--X) N%, transparent)` → `rgba(R,G,B, N/100)` pre-computed 값으로 교체. RGB는 figma_tokens.json light 테마 값과 동일해야 Figma 변수 자동 연결
+- **captureForDesign은 fire-and-forget 필수** → `page.evaluate(() => window.figma.captureForDesign(...))` 에서 promise를 return하면 browser_run_code가 20분+ hang. 콜백 안에서 return/await 없이 호출 후 3초 대기 후 즉시 반환. polling으로 완료 확인
+- **HTML 와이어프레임 캡처 전 IntersectionObserver 스크롤 필수** → staggered fade-in 요소는 스크롤 전까지 opacity:0. 전체 스크롤 → 맨 위 복귀 → 1.5초 대기 후 captureForDesign 호출
+- **Mobile 캡처 시 사이드바/모달 JS로 닫기** → `#sidebar.classList.remove('open')`, backdrop `display:none`. HTML 로드 시 열려있는 모달도 동일하게 처리 후 캡처
+- **captureForDesign inline 요소는 display:inline-block 필수** → `display:inline`이면 frame.height = em-box. `inline-block`으로 변경해야 frame.height = line-height와 일치
+- **Figma 변경 직후 검증은 figma_capture_screenshot** → Plugin exportAsync API 사용으로 REST API rate limit 없이 즉시 캡처 가능
+- **figma.createXxx() 생성 즉시 appendChild 필수** → 생성 함수는 페이지 루트에 즉시 등록. append 전 실패 시 orphan 발생. 생성 → append → 프로퍼티 설정 순서 고정. try/catch + 생성 목록 롤백으로 오류 시 자동 제거

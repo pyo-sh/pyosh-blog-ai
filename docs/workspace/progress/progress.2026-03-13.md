@@ -1,5 +1,401 @@
 # Progress 2026-03-13
 
+## orchctl integration / chaos test suite (#102, PR #195)
+
+- **목적**: 운영 환경 실패 시나리오 10개에 대한 자동화 resilience 테스트 구현 (Stage 4)
+- **`tools/orchctl/tests/test_chaos.py`**: 28개 테스트, 10개 시나리오 전체 커버
+  1. Post-dispatch controller crash - 고아 dispatched+running 행 idempotent 처리
+  2. Stale terminal file - `state_mtime` 신호 부재 시 threshold 초과 검증
+  3. PID reuse - 재활용된 PID가 살아있는 것처럼 보일 때 lease 유지(문서화된 한계)
+  4. GitHub API timeout - discovery pass 비치명 오류; 기존 이슈 미변경
+  5. PR open, worker dead - 2개 신호 부재 시 두 번째 heartbeat cycle에서 stall 감지
+  6. Worker alive, log frozen - 1개 신호 부재 → stall 미감지
+  7. Retry budget exhaustion - `infra_crash` 클래스 budget 내 재시도, 소진 후 needs-human
+  8. Dependency cycle - hard dep 양방향 blocked 이슈들이 reconcile 통과 후에도 blocked 유지
+  9. Manual hold before dispatch - `area_paused` / `drain_mode`로 신규 dispatch 차단
+  10. Scheduler overlap - CLI 수준 lease 검사(overlap=false) + `_record_dispatch` 원자적 maxOpenPR 가드
+- **3라운드 리뷰**: R1 - 자명한 assertion + dead code 수정; R2 - log file 경로(attempt_dir_path), _pid_alive mock, 동일 pid 재사용으로 원자적 가드 검증; R3 - APPROVE
+- **결과**: 402 tests pass (374 기존 + 28 신규)
+
+## orchctl crash/timeout/flaky auto-retry playbook (#97, PR #193)
+
+- **목적**: FailureClass 기반 자동 재시도 - 실패 분류 후 클래스별 budget 내에서 재큐, 소진 시 needs-human 전이 (Stage 4)
+- **`db/schema.py` v10 마이그레이션**: `retry_budget_by_class` 기본값 설정 (`infra_crash:3, timeout:3, flaky_test:2, default:1`); v9가 origin/main(stall_threshold_s)과 충돌하여 v10으로 번호 재조정
+- **`db/config.py` `get_config_json()` 버그 수정**: `isinstance(parsed, list)` 가드가 dict 반환 차단 - `isinstance(parsed, (list, dict))`로 확장
+- **`models.py`**: `DISPATCHED → PENDING` 전이 추가 (자동 재시도 경로)
+- **`github.py` `post_issue_comment()`**: 재시도/소진 GitHub 코멘트 게시; `subprocess.TimeoutExpired` 외 `Exception` broad catch 추가(gh 미설치 시 reconcile 중단 방지)
+- **`commands/reconcile.py`**:
+  - `_next_action_to_state()`: per-class budget 조회(`get_config_json`), `retry_count < budget` → `PENDING` + retry 코멘트; 소진 → `NEEDS_HUMAN` + exhaustion 코멘트; `int()` null guard
+  - `_post_retry_comment()` / `_post_budget_exhausted_comment()` 헬퍼 추가
+- **테스트 339개 통과**:
+  - `test_retry_playbook_schema_v10_default_budgets` - v10 마이그레이션 기본값 검증
+  - `test_retry_playbook_timeout_re_enqueues` - timed-out → TIMEOUT → RETRY → pending
+  - `test_retry_playbook_budget_exhausted_escalates_to_needs_human` - budget 소진 → needs-human
+  - `test_retry_playbook_dry_run_does_not_mutate` - dry-run 불변성
+  - `test_retry_playbook_first_attempt_routing` - parametrize by expected_state (infra_crash→pending, unknown→needs-human)
+  - `test_state_machine.py::test_dispatched_can_retry_to_pending` - 새 전이 검증
+- **리뷰 3라운드**: R1 broad exception catch + isinstance guard; R2 unused budget param + contradictory comment; R3 parametrize by outcome (skip re-review)
+- **충돌 해결**: v9 번호 충돌(origin/main stall detection) → 재시도 budget migration v10으로 renumber
+
+## orchctl multi-signal heartbeat + stall detection (#96, PR #192)
+
+- **목적**: 단일 PID keepalive 대신 4가지 신호 기반 stall 감지로 false positive/negative 방지 (Stage 3)
+- **`heartbeat.py` 신규** (`tools/orchctl/orchctl/heartbeat.py`):
+  - `SIGNAL_THRESHOLD_S = 600` - 활동 판정 윈도우(초). `heartbeat_ttl`(리스 갱신)과 독립적
+  - `STALL_MIN_ABSENT = 2` - 부재 신호 2개 이상이면 stall 선언
+  - `SignalSnapshot` dataclass: `pr_activity`(GitHub API updatedAt), `state_mtime`(pipeline state 파일), `log_mtime`(worker.log), `cpu_delta`(/proc/{pid}/stat jiffies 변화량); `.absent_count`, `.is_stalled()`, `.to_json()`
+  - `_read_cpu_jiffies(pid)`: comm 필드 공백 처리를 위해 `rfind(')')` 사용; fields[11]+fields[12] 합산
+  - `_check_pr_activity()`: state 파일에서 PR 번호 읽기 → `gh pr view --json updatedAt` → elapsed < threshold_s
+  - `collect_signals()`: 4가지 신호 수집 조합
+  - `record_heartbeat()`: heartbeats 테이블에 snapshot INSERT + commit
+  - `get_last_cpu_jiffies()`: 직전 heartbeat에서 `cpu_jiffies` 읽기
+  - `attempt_dir_path()`: `.workspace/orchestrate/{area}/issues/{N}/attempts/{attempt_id}/` 컨벤션
+  - `check_stall()`: `has_prior = EXISTS(heartbeats WHERE attempt_id=?)` 로 첫 사이클 판별 (PID-less 워커 regression 방지); `stall_threshold_s` DB config 우선, fallback `SIGNAL_THRESHOLD_S`; 첫 사이클은 `(False, snapshot)` 반환
+- **첫 사이클 보호 설계**: `pid is None` 기반 판별이 아닌 heartbeats 행 존재 여부 사용 - PID-less 워커에서 `cpu_jiffies`가 항상 None이므로 기존 방식은 stall 감지 영구 비활성화 버그 발생
+- **`reconcile.py` `_heartbeat_pass` 추가** (`tools/orchctl/orchctl/commands/reconcile.py`):
+  - `_mark_complete_pass` 이전에 실행; dispatched 이슈 순회
+  - `check_stall()` 예외 per-issue try/except/continue (단일 오류가 전체 pass 중단 방지)
+  - stall 감지 시: `with conn:` 블록 내에서 `apply_attempt_transition_tx(... "timed-out")` + `apply_issue_transition_tx(... "failed-terminal")` 원자적 처리
+- **`state_machine.py` `apply_attempt_transition_tx` 추가**: commit 없는 tx 변형 추출 (원자적 multi-step 트랜잭션 지원)
+- **Schema v9** (`tools/orchctl/orchctl/db/schema.py`): `stall_threshold_s = '600'` config 기본값 추가 (v8은 PR #191 failure classification이 선점)
+- **테스트 35개 신규** (`tools/orchctl/tests/test_heartbeat.py`) - 322개 전체 pass:
+  - `TestSignalSnapshot`: absent_count, is_stalled, custom min_absent
+  - `TestHeartbeatDB`: record/retrieve cpu_jiffies, null 처리, 최신값 반환
+  - `TestCollectSignals`: 신호별 독립 조합, CPU delta 로직, PID-less
+  - `TestCheckStall`: 첫 사이클 보호, 두 번째 사이클 stall 감지, **PID-less 워커 regression** (연속 2호출에서 두 번째가 stall 반환 확인)
+  - `TestHeartbeatPassInReconcile`: stall → failed-terminal 전이, not-stalled → dispatched 유지, dry-run, first-cycle
+- **4라운드 리뷰**:
+  - R1: 비원자 stall 전이 (apply_attempt_transition_tx 추가), check_stall 예외 미처리 (try/except/continue)
+  - R1 (Suggestion): `/proc/{pid}/stat` comm 공백 문제 (rfind 사용), `pr_commit` → `pr_activity` rename (updatedAt은 PR 전체 활동)
+  - R2: 첫 사이클 false-stall (worker 파일 미생성 시 신호 3개 부재), `SIGNAL_THRESHOLD_S` 미문서화 분리
+  - R3 (Critical): `prev_cpu is None` 기반 첫 사이클 판별 - PID-less 워커에서 영구 비활성화. EXISTS 쿼리로 교체, `stall_threshold_s` DB config 추가
+  - R4: suggestion-only 4개 → resolve-skip → merge
+- **schema 충돌**: PR #191이 먼저 main merge되어 v8 선점. 충돌 해소 후 v9로 renumber
+
+## orchctl failure classification system (#95, PR #191)
+
+- **목적**: 실패를 단일 `failed-terminal` 대신 10개 유형으로 분류하여 playbook 기반 자동 대응의 기반 마련
+- **`FailureClass` + `NextAction` enum** (`tools/orchctl/orchctl/models.py`):
+  - 11개 값: `infra_crash`, `timeout`, `git_conflict`, `flaky_test`, `deterministic_test_failure`, `permission_auth`, `dependency_unresolved`, `issue_spec_ambiguous`, `ci_external_outage`, `rate_limit`, `unknown`
+  - `NextAction` 4개 값: `retry`, `repair`, `escalate`, `pause`
+  - `FAILURE_CLASS_NEXT_ACTION` dict - 각 class별 기본 next_action 매핑
+- **`failure_classifier.py` 신규** (`tools/orchctl/orchctl/failure_classifier.py`):
+  - `classify(attempt_status, terminal_json_text, log_text)` - 순수 함수, `timed-out` 단축 + 정렬된 regex 패턴 매칭
+  - `next_action_for_class(fc)` - `FAILURE_CLASS_NEXT_ACTION` 조회
+  - `record_failure_class(conn, issue_id, attempt_id, fc)` - `attempts` + `issues` 양쪽에 기록
+  - `classify_and_record(...)` - 분류 + 기록 일괄 처리 (편의 함수)
+  - INFRA_CRASH를 DETERMINISTIC_TEST_FAILURE보다 앞에 배치 - OOM/signal 신호가 test failure로 오분류 방지
+  - `\boom\b` 단어 경계 사용 - `bloom`/`room` 등 부분 문자열 false positive 방지
+- **Schema v8** (`tools/orchctl/orchctl/db/schema.py`):
+  - `attempts.failure_class TEXT` 컬럼 추가 (per-attempt 분류 기록용)
+  - `issues.failure_class` (v1부터 존재) - 최신 attempt 분류를 issue 레벨에도 기록
+- **`reconcile.py` `_mark_complete_pass` 수정**:
+  - `failed`/`timed-out` attempt 발생 시 `classify()` 호출 (dry-run 포함 - 순수 함수이므로 무조건 호출)
+  - `record_failure_class()` - `not dry_run`일 때만 DB 기록
+  - `_next_action_to_state()` 신규 헬퍼 - `retry_budget_by_class` 정책 조회, 예산 소진 시 `failed-terminal`, `pause` → `blocked-external`, `escalate` → `needs-human`
+  - `retry_count` 증가도 `dry_run` guard 적용
+  - budget-exhausted 로그 메시지를 `'escalating'` → `'marking failed-terminal'`으로 수정 (실제 상태와 일치)
+  - `int()` null guard 추가 - `budget_by_class[key] = null` 설정 시 `TypeError` 방지
+- **테스트 45개 신규** (`tools/orchctl/tests/test_failure_classifier.py`):
+  - 28개 parametrize - 11개 class 전체 경로, `timed-out` 단축, invalid JSON, INFRA_CRASH/DETERMINISTIC 순서 검증
+  - `test_oom_word_boundary_no_false_positive` - `bloom`/`room` false positive + `out of memory`/`oom` 정상 매칭 검증
+  - `test_infra_crash_not_shadowed_by_test_failure` - `pytest failed: process killed by signal 9` → INFRA_CRASH
+  - DB 기록 검증 2개
+- **6라운드 리뷰**:
+  - R1: dry-run에서 UNKNOWN/ESCALATE 하드코딩 → 실제 `classify()` 호출로 수정, `_next_action_to_state` dry-run guard 누락
+  - R2: `classify()` 이중 호출 → `record_failure_class()` 분리, 테스트 추가, docstring 수정, `pnpm test` 패턴 축소
+  - R3: dry-run 지표 누락 (`(dry-run)` suffix), INFRA_CRASH < DETERMINISTIC_TEST_FAILURE 순서 버그
+  - R4: budget-exhausted 로그 오해(`escalating` vs `failed-terminal`), 미사용 `import json` 제거
+  - R5: bare `\boom\b` false positive, `int(None)` TypeError 가드
+  - R6: clean (Critical 0, Warning 0)
+
+## Legacy cutover / shell compatibility migration (#94, PR #190)
+
+- **목적**: 기존 shell orchestrator(`batch.state.json`)에서 orchctl/SQLite로 안전하게 전환하는 migration 도구, cutover flag, single-writer 보장, rollback 절차 구현
+- **`orchctl import-state` 신규 커맨드** (`tools/orchctl/orchctl/commands/import_state.py`):
+  - `batch.state.json` → SQLite 13가지 legacy state 매핑 (dispatched→pending, needs-spec→needs-human, cycle-isolated→cancelled, skipped_dep_failed→blocked-failed-dependency)
+  - `--dry-run` - DB 쓰기 없이 매핑 결과 미리보기
+  - `--overwrite` - 기존 DB 레코드 덮어쓰기
+  - `--state-file` - 기본 경로 `$MONOREPO_ROOT/.workspace/orchestrate/{area}/batch.state.json` (MONOREPO_ROOT env 기반)
+  - DAG/dagTypes에서 per-issue `dependency_type` 자동 추출 (all-soft→soft, otherwise→hard)
+  - `area` 필드 불일치 시 stderr 경고
+- **Schema v7** (`tools/orchctl/orchctl/db/schema.py`): 에어리어별 `legacy_mode` config 키 3개 (`client.legacy_mode`, `server.legacy_mode`, `workspace.legacy_mode`) 기본값 `true`
+- **`orchctl control cutover <area>`** - orchctl 전환 활성화:
+  - DB `{area}.legacy_mode` → `false` 설정
+  - `.workspace/orchestrate/{area}/.orchctl-active` sentinel 파일 생성 (MONOREPO_ROOT 기반 경로)
+  - import-state 없이 호출 시 오류 (--skip-import-check로 우회 가능)
+  - 이미 cutover된 경우 멱등 처리
+- **`orchctl control rollback <area> --confirm`** - legacy 모드 복귀:
+  - DB `{area}.legacy_mode` → `true` 설정
+  - sentinel 파일 제거 (`missing_ok=True` TOCTOU 안전)
+  - legacy shell orchestrator 즉시 시작 가능 상태 복구
+- **`orch_assert_legacy_active()` + `orch_init()` 가드** (`.agents/skills/dev-orchestrator/scripts/orchestrate-helpers.sh`):
+  - `orch_assert_legacy_active <area>`: sentinel 파일 존재 시 exit 1 + 오류 메시지 (단일 writer 보장)
+  - `orch_init()` 첫 번째 실행 단계로 가드 호출 (dispatch 진입 전 차단)
+- **전환 절차** (5단계): shell batch 완료 대기 → `orchctl init` → `orchctl import-state --area <area>` → `orchctl control cutover <area>` → `orchctl doctor && orchctl status`
+- **테스트 25개 신규** (`tools/orchctl/tests/test_import_state.py`):
+  - 13가지 legacy state 매핑 parametrize, dep type 도출, skip/overwrite, dry-run, sentinel 생성/제거 검증
+  - `test_cutover_sets_flag_and_creates_sentinel`: MONOREPO_ROOT env 설정으로 sentinel 경로 결정론적 검증
+  - 전체 287 tests pass
+- **3라운드 리뷰**:
+  - R1: `orch_assert_legacy_active()` 미호출(Critical) - `orch_init()` 가드 추가, `_sentinel_path()` cwd-relative→MONOREPO_ROOT 기반으로 수정, dead code 제거, 테스트 assertion 수정
+  - R2: dispatched 이슈 가드 한계 명확화(WARNING) - import 후 dispatched→pending 매핑으로 가드 효과 없음 주석 추가, sentinel 테스트 실제 파일 생성 검증, default state-file 경로 MONOREPO_ROOT 기반 통일
+  - R3: suggestion-only 4개 (MONOREPO_ROOT 미설정 경고, TOCTOU, area 불일치 경고, orch_poll_cycle 가드) → count=4 초과 → merge
+
+## dev-orchestrator SKILL.md thin wrapper over orchctl (#93, PR #189)
+
+- **목적**: SKILL.md를 orchctl 호출 인터페이스로 축소 - 운영 로직은 controller에, 사용자 상호작용은 skill에 담당
+- **변경 내용**: `SKILL.md` 240줄 → 210줄, shell-helper(`orchestrate-helpers.sh`) 의존성 완전 제거
+- **명령 매핑**: start/resume/status/doctor/reconcile/pause/drain/stop/requeue/merge-gate → 각각 orchctl 서브커맨드 호출
+- **Agent selection 섹션 추가**: native orchctl 지원은 계획 단계, 현재 비기본 라우팅은 /dev-pipeline 직접 호출로 안내
+- **Policy 섹션 추가**: 9개 policy.yaml 키 설명 테이블 (discovery_enabled, max_concurrent, merge_enabled 등)
+- **Invariants 섹션 복원**: "never merge PRs", "never modify code" 안전 불변식 재적용
+- **References 복원**: dependency-resolution.md, state-detection.md, recovery.md 링크 유지
+- **Poll loop 개선**: MAX_POLLS=120(1시간 타임아웃), REMAINING 에러 핸들링(`|| continue`), JSON 스키마 주석
+- **resume 개선**: `orchctl doctor` pre-flight 체크 추가 (crash 후 상태 일관성 검증)
+- **5라운드 리뷰** - 최종 APPROVE (Critical 0, Warning 0, Suggestion 0)
+
+## orchctl policy config + operational commands + merge gate (#92, PR #187)
+
+- **목적**: orchctl Stage 2 - YAML policy 로더, operational control 커맨드, 5-check merge gate, 안전장치
+- **Policy YAML 로더** (`orchctl/policy.py`):
+  - `find_policy_file()` - `.workspace/orchestrate/policy.yaml` 자동 탐지 또는 `$ORCHCTL_POLICY` env
+  - `load_policy(path)` - YAML 파싱
+  - `apply_policy(conn, policy)` - DB config 동기화, 변경된 키 반환
+  - reconcile pass 시작마다 자동 로드
+- **Operational control 커맨드** (`orchctl/commands/control.py`):
+  - `control pause <area>` / `control resume <area>` - 영역별 dispatch 일시정지
+  - `control drain` / `control undrain` - 전역 drain mode (신규 dispatch 차단/해제 대칭 쌍)
+  - `control stop <area> --confirm` - 영역 내 dispatched 이슈 전체 cancelled (단일 트랜잭션)
+  - `control cancel-attempt --area --issue` - 활성 attempt 취소 (attempt UPDATE + issue 상태변경 원자적 처리)
+  - `control requeue --area --issue` - failed-terminal/cancelled/needs-human/blocked-failed-dependency → pending
+- **Merge gate** (`orchctl/commands/merge_gate.py`):
+  - 5개 체크: `checks_pass`, `sha_match`, `no_conflict`, `no_blocking_labels`, `branch_protection`
+  - `merge_enabled=false` 시 `reason="merge_disabled"` 조기 반환 (명확한 진단)
+  - 평가 결과를 `issues.merge_state` 컬럼에 자동 기록 (eligible/rejected)
+  - Exit 0=pass, 1=fail, 2=error
+- **Guardrails** (`orchctl/commands/reconcile.py`):
+  - `repo_allowlist` - 허용 레포 목록, 미설정 시 제한 없음, `{area}.repo` 미설정 시 fail-closed
+  - `scheduler_overlap=true` - 두 번째 reconciler가 lease를 취득하지 않아도 dispatch 진행 (`owns_lease` 플래그)
+  - `max_concurrent_repair` - 동시 retry 제한
+  - `area_paused` - 영역별 일시정지 체크
+- **Schema v6** (`orchctl/db/schema.py`):
+  - `issues.retry_count INTEGER NOT NULL DEFAULT 0` - 재시도 횟수
+  - `issues.merge_state TEXT NOT NULL DEFAULT 'none'` - merge gate 결과 (CHECK 5가지 값)
+  - policy config 기본값 12개 추가 (merge_enabled, protected_branches, repo_allowlist 등)
+  - main의 schema v5 (discovery/scope)와 clean merge
+- **State machine 확장** (`orchctl/models.py`):
+  - needs-human → pending, blocked-failed-dependency → pending (requeue 지원)
+  - completed → pending (main PR #185의 re-open 이벤트 지원)
+- **테스트**: 201개 신규(control 22 + merge_gate 24 + policy 18 + state_machine 갱신), 262개 전체 통과
+- **리뷰 4라운드**: cancel-attempt 원자성, owns_lease, merge_disabled reason, undrain, merge_state 와이어업
+
+## agent-tracker regression / fixture / portability suite (#113, PR #188)
+
+- **목적**: regression test 체계화, Python fixture suite 구축, GNU 전용 도구를 Python stdlib adapter로 교체
+- **Bash regression tests 6개 신규** (`tools/agent-tracker/tests/`):
+  - `test-list-panes-failure.sh` - list-panes 빈 결과 시 v2 sidecar cleanup 스킵 (race condition 방어)
+  - `test-sidecar-partial-write.sh` - 잘린 JSON/빈 파일/바이너리 가비지 → `status=fault`, no crash
+  - `test-dead-orchestrator.sh` - 존재하지 않는 PID → `batch_status=dead` (숨김 방지)
+  - `test-stale-token.sh` - `tokens_updated_at` 30s 임계값 경계 조건 (fallback, 29s/30s/31s)
+  - `test-control-char-sanitize.sh` - ANSI/OSC/제어문자가 `@base64` 프로토콜 파손 없이 통과
+  - `test-path-traversal.sh` - `%../../../etc` 형식 pane_id 차단, 숫자 외 문자 모두 거부
+- **Python pytest fixture suite 105개** (`tools/agent-tracker/backend/tests/`):
+  - `test_file_adapter.py` - read_json(partial write/zero-byte/binary garbage), atomic_write, list helpers
+  - `test_process_adapter.py` - is_running, get_create_time (psutil + /proc fallback 경로 분리)
+  - `test_collector.py` - `_collect_claude_pane`(path traversal/fault/stale token), `_parse_batch`(dead orch/done/counts)
+  - `test_models.py` - AgentState/BatchState/Snapshot schema contract (EXPORT_FIELDS/AGENT_FIELDS/TOKEN_FIELDS)
+  - `test_display_adapter.py` - east_asian_display_width (CJK 2-wide, ASCII 1-wide, fullwidth)
+- **Platform adapter 신규** (`display_adapter.py`, `lib/display_width.py`):
+  - GNU 전용 `wc -L` 대체 - `unicodedata.east_asian_width()` 기반 CJK width 계산
+  - `lib/util.sh::display_width()` - Python 우선, fallback `wc -L` 유지 (macOS/WSL 호환)
+- **버그 수정 2건**:
+  - `agent-tracker.sh` - list-panes 빈 결과 시 `_active_panes` 비어 전체 sidecar 삭제되는 race condition 방어
+  - `file_adapter.read_json` - `UnicodeDecodeError` 추가 catch (바이너리 가비지 입력)
+- **리뷰 2라운드** - 1라운드: pytest를 runtime requirements.txt에 추가한 문제 수정(dev-only로 이동), 2라운드: suggestion-only(중복 로직 low-priority, PR description 불일치 cosmetic) → skip
+
+## agent-tracker orchctl normalized export contract + adapter (#112, PR #186)
+
+- **목적**: agent-tracker가 orchctl SQLite를 직접 읽지 않고 orchctl이 생성한 normalized export JSON만 소비하도록 contract와 adapter 구현
+- **`tools/orchctl/orchctl/contract.py` 신규** - 퍼-에어리어 export 스키마 contract:
+  - `EXPORT_SCHEMA_VERSION = "v1"`, `EXPORT_PATH_TEMPLATE`, `EXPORT_BATCH_FIELDS`(started_at 포함), `EXPORT_ISSUE_FIELDS`, `EXPORT_WORKER_FIELDS`
+  - liveness 상수 (`alive`/`dead`/`unknown`), issue state 상수 (orchctl.models 의존 없이 트래커에서 직접 사용 가능)
+  - `validate_export()` - top-level/issue/batch/worker 필드 검증, liveness 값 검증, schema_version 검증
+  - `ExportValidationError` 사용자 정의 예외
+- **`tools/orchctl/orchctl/commands/export.py` 신규** - `orchctl export --area` CLI 커맨드:
+  - SQLite에서 issues/attempts 읽어 normalized JSON 생성 및 atomic write
+  - `batches[].started_at`: 에어리어 내 이슈 중 가장 오래된 `created_at` - 정확한 배치 경과 시간 계산용
+  - `active_workers[]`: dispatched 상태 이슈의 실행 중 attempt (PID + liveness 포함)
+  - `--validate/--no-validate`, `--print` 플래그, `--output` 커스텀 경로
+- **`tools/orchctl/orchctl/cli.py` 수정** - `cmd_export` 등록
+- **`tools/agent-tracker/backend/adapters/orchctl_adapter.py` 신규** - 트래커 어댑터:
+  - `load_exports(export_dir)`: 실제 export 파일 우선, 없으면 built-in fixture로 fallback
+  - `read_exports(export_dir)`: 실제 export만 읽음
+  - `read_exports_from_fixture(fixture_path)`: fixture 직접 읽기
+  - export → BatchState/DispatchedIssue 매핑, `batch.started_at`으로 elapsed 계산
+  - pipeline state 보강: worktree 경로 있으면 DispatchedIssue.step/pr_num 채움
+- **`tools/agent-tracker/backend/fixtures/orchctl_export.json` 신규** - 개발/테스트용 fixture
+- **`tools/agent-tracker/backend/contract.py` 수정** - orchctl export 스키마 상수 추가 (`ORCHCTL_EXPORT_SCHEMA_VERSION`, `ORCHCTL_EXPORT_DIR`, `ORCHCTL_EXPORT_TOP_FIELDS`)
+- **`tools/agent-tracker/backend/collector.py` 수정** - `_collect_orchestrators()` 교체:
+  - 기존 `batch.state.json` 직접 읽기 → `orchctl_adapter.load_exports()` 사용
+  - `export_dir` 파라미터 추가, `_resolve_export_dir()` (monorepo root `.agents/` 탐색 기반)
+  - legacy `_parse_batch()` 함수 제거
+- **테스트 35개** (orchctl 19 + adapter 16):
+  - `test_export.py` (19개): `TestValidateExport`(10), `TestCmdExport`(9)
+  - `test_orchctl_adapter.py` (16개): `TestReadExports`(6), `TestBatchStatus`(3), `TestCounts`(2), `TestDispatchedIssues`(2), `TestFixtureFallback`(3)
+- **2라운드 리뷰**:
+  - R1: `ORCHCTL_EXPORT_SCHEMA_VERSION` → 어댑터에서 직접 참조, `_ACTIVE_STATES` dead code 제거, `batch.started_at` 추가 (elapsed 정확도)
+  - R2: hardcoded area choices, PID reuse deferral, fixture timestamp 코멘트 (모두 P3, merge)
+- **pipeline runner 버그 수정** (review_runner.py): `--max-turns 15→30`, `Write` tool을 allowedTools에 추가
+
+## orchctl issue discovery + auto-enqueue + configurable scope (#89, PR #185)
+
+- **목적**: orchctl reconcile 사이클에 discovery phase 추가 - GitHub open 이슈를 자동 감지하여 큐에 추가하고, scope를 설정으로 제어
+- **`tools/orchctl/orchctl/github.py` 신규 모듈**:
+  - `list_open_issues(repo, *, include_labels, exclude_labels, milestone, allow_unassigned, limit)` - `gh issue list` subprocess 래핑
+  - OR-semantics include_labels: `gh` CLI의 AND-only 제약을 Python 후처리로 우회
+  - `timeout=30`: subprocess stall 시 lease TTL(60s) 초과 방지, `TimeoutExpired` → `GitHubError` 변환
+  - limit 도달 시 stderr 경고 (`hit issue limit ({limit}) for {repo}`)
+  - 필터 비대칭 주석: milestone은 gh CLI 전달, label은 Python 처리 (이유 문서화)
+  - `AREA_REPOS` - `.agents/references/monorepo-layout.md`와 동기화 필요 주석 포함
+- **`orchctl/commands/reconcile.py` discovery pass 추가**:
+  - `_discovery_pass()` - `_mark_complete_pass` 이전 실행, `discovery_enabled=false`이면 skip
+  - `_enqueue_or_reopen()` - 신규 이슈: `pending`으로 INSERT; 재오픈(`completed`/`failed-terminal`/`cancelled`): `apply_issue_transition(... "pending")`
+  - `_REOPEN_STATES` - `ISSUE_TRANSITIONS`에서 programmatic 도출 (수동 유지 제거, 자동 동기화)
+  - lease renew 배치화: 이슈당 1회 → 50개마다 1회 (lease-table write churn 감소)
+  - discovery 후 `issues_by_state` 재조회 - 동일 사이클에서 새 이슈 즉시 dispatch 가능
+  - GitHub 오류 non-fatal: `GitHubError` catch 후 existing queue로 계속 진행
+- **`orchctl/models.py` re-open 전이 추가**:
+  - `completed`, `failed-terminal`, `cancelled` → `pending` 전이 허용 (GitHub re-open 이벤트 모델)
+  - `needs-human`, `blocked-failed-dependency`는 여전히 완전 terminal (operator 개입 필요)
+- **schema migration v5**: `discovery_enabled=false`, `scope_include_labels=[]`, `scope_exclude_labels=[]`, `scope_milestone=""`, `scope_allow_unassigned=true` config 기본값
+- **`db/config.py` - `get_config_json()`** 신규: JSON array 저장값 파싱, malformed 시 default 반환
+- **테스트 174개** (신규 +41 + 기존 4개 re-open 전이 반영 업데이트):
+  - `test_discovery.py` 신규 (43개) - scope filter 유닛, enqueue/reopen DB, discovery pass 통합 (scope forwarding, lease loss, dry-run, GitHub 오류 non-fatal, unmapped area skip, AREA_REPOS drift guard, _REOPEN_STATES 동기화 smoke test), timeout/limit warning, 미매핑 area skip
+  - `test_state_machine.py` 업데이트 - `completed`/`failed-terminal`/`cancelled` terminal 재정의 반영
+- **3라운드 리뷰**:
+  - R1: subprocess timeout 30s 추가, limit warning, AREA_REPOS 주석
+  - R2: `_REOPEN_STATES` programmatic 도출, AREA_REPOS drift test, renew 배치화(50/iter), 필터 비대칭 주석
+  - R3: suggestion-only (unmapped area test + limit 설정 가능성 follow-up) → resolve-skip 후 merge
+
+## agent-tracker Python backend + normalized domain model (#111, PR #183)
+
+- **목적**: Python 기반 tracker backend 구축, normalized domain model 정의. 장기적으로 이 backend가 tracker의 truth source
+- **`tools/agent-tracker/backend/`** 신규 패키지 - 8라운드 리뷰 통과 후 머지
+- **contract.py** - 공유 계약 모듈: AgentStatus/TokenSource/BatchStatus/Engine/ProvenanceSource enum, field name set, STALE_THRESHOLD_SECS. 비즈니스 로직 없음
+- **models.py** - 정규화 도메인 모델: AgentState, TokenState, BatchState, Freshness, Liveness, Provenance, Snapshot, SourceInfo
+- **adapters/process_adapter.py** - psutil 기반 (is_running + PID 재사용 방지 create_time 비교, get_create_time); /proc fallback (spaces-in-comm 처리를 위한 rfind ')' 파서, PermissionError EPERM 분리)
+- **adapters/tmux_adapter.py** - tmux CLI 래핑: list_panes, capture_pane, pane_tty, socket_hash; returncode!=0 시 stderr 로깅
+- **adapters/file_adapter.py** - pathlib/json: read_json(utf-8), list_sidecar_files, list_batch_files, read_pipeline_state, atomic_write(tmp+rename, utf-8)
+- **collector.py** - sidecar v2 수집 (상태 enum 검증, staleness 감지, done prefix), orchestrator batch state (issue_keys 범위 제한, PID 재사용 방지, dispatchedAt 기반 dispatched 프로세스 liveness), Codex pane status=UNKNOWN
+- **exporter.py** - Snapshot → current.json atomic write
+- **__main__.py** - CLI 진입점: `python3 -m backend [--session] [--root] [--interval] [--print]`; 폴링 루프 예외 처리
+- **requirements.txt** - `psutil>=6.0`
+- **export 경로**: `.workspace/agent-tracker/state/current.json`
+
+## orchctl reconcile loop + admission control (#88, PR #184)
+
+- **목적**: observe → diff → act 패턴의 idempotent reconcile 명령 구현 + 기본 admission control
+- **`orchctl reconcile --area {area}`** - lease 획득 후 mark-complete / unblock / dispatch 3단계 act
+- **mark-complete pass** - dispatched 이슈 중 attempt가 terminal 상태(`completed`/`failed`/`timed-out`)인 것을 자동 전환 (`completed` 또는 `failed-terminal`)
+- **unblock pass** - `dependency_type=none` blocked 이슈를 즉시 `pending`으로 전환; soft/hard dep는 deps 테이블 구현 후 처리 예정
+- **dispatch pass** - admission control 4단계: drain mode 체크 → per-area `maxConcurrent` → global `maxOpenPR` → per-issue active attempt dedup
+- **원자적 dispatch** - `_record_dispatch`에서 conditional `INSERT ... SELECT ... WHERE count < max_open_pr` 로 TOCTOU 레이스 방지 (SQLite write serialization 활용); attempt INSERT + issue state 전환을 단일 commit으로 묶음
+- **`apply_issue_transition_tx`** - 기존 `apply_issue_transition`에서 commit 없는 tx 변형 추출, `_record_dispatch`에서 활용
+- **schema migration v4** - `max_open_pr=2`, `drain_mode=false` config 기본값 추가
+- **`db/config.py`** - `get_config_int`/`get_config_bool`/`set_config`/`count_dispatched` 헬퍼 신규; `get_config_int` malformed 값 안전 처리(try/except)
+- **서브패스 lease-loss 전파** - 각 서브패스가 `bool` 반환, lease 손실 시 후속 패스 중단
+- **테스트 13개 신규** (총 132개 통과) - maxConcurrent, maxOpenPR, drain mode, mark-complete(failed/timed-out parametrize), unblock, idempotency, dry-run, lease-loss 전파, concurrent cap 강제
+- **3라운드 리뷰** - R1: lease-loss 전파 + atomic dispatch; R2: TOCTOU maxOpenPR + config int 방어 + transition_tx; R3: rollback 명시 + concurrent cap 테스트 + dead guard 제거
+
+## Skill Python 호출 경로 + 부수 버그 5건 수정 (#181, PR #182)
+
+- **목적**: dev-pipeline 실행 중 반복 발생한 5가지 오류 수정
+- **Bug A-1** - 패키지 모듈 경로: `cd ... && python3 -m <pkg>` 패턴에서 에이전트가 `cd` 누락 시 `No module named` 오류. CLI hint를 `PYTHONPATH=$MONOREPO_ROOT/...` 방식으로 변경, MONOREPO_ROOT 판단 방법 명시 (headless: `$PIPELINE_MONOREPO_ROOT` / interactive: `monorepo-helpers.sh`). dev-archive, dev-log, dev-pipeline SKILL.md + references 적용
+- **Bug A-2** - 상대경로 standalone 스크립트: dev-build, dev-resolve SKILL.md의 `python3 .agents/...` 상대경로를 `$MONOREPO_ROOT/...` 절대경로로 변경
+- **Bug B** - `step review-dispatch --model` 미지원: `cli.py` p_step에 `--model` 인수 추가, `steps.py` `step_review_dispatch()` 시그니처에 `model` 파라미터 추가, dispatch action data에 `model` 포함
+- **Bug C** - `gh issue view` exit 1: GitHub Projects (classic) deprecated 오류. dev-pipeline, dev-build SKILL.md Invariants에 `--json number,title,body,state,labels` 필수 제약 추가
+- **Bug D** - worktree 제거 실패 pipeline crash: `merge → log` 구조에서 `merge → cleanup_wt → log → finalize` 3단계로 분리. `controller.py`에서 `cleanup()` → `cleanup_worktree()` + `cleanup_state()` 분리, `models.py`에 `CLEANUP_WT` step 추가, `steps.py`에 `step_cleanup_wt()` 추가
+- **Bug E** - codex review_runner 데드코드: `schema_path` 변수 삭제 (`codex exec review`는 `--output-schema` 미지원), `_fail_parse()`에 `raw_content` 파라미터 추가하여 파싱 실패 시 원본 출력 snippet stderr 기록
+- **SKILL 압축 최적화**: PYTHONPATH prefix 18회 반복 → CLI hint 1회 + "Prepend" 지시 1줄로 압축 (dev-pipeline, dev-archive, dev-log). process-lifecycle.md에 `cleanup-wt` single-call 등록
+- **테스트**: `test_steps.py` 업데이트 - merge→cleanup_wt 전이, step_cleanup_wt coverage, log_finalize cleanup_state 분리. 47 tests pass
+- 1라운드 리뷰 (CRITICAL 1 - 테스트 미갱신), resolve 후 merge 완료
+
+## 확장 terminal states + claim/hold 라벨 (#91, PR #179)
+
+- **목적**: orchestrator 상태 머신에 신규 terminal state 4종 추가 + GitHub issue 라벨 자동 관리
+- **구현**:
+  - `orchestrate-helpers.sh`: `failed-terminal`, `needs-human`, `needs-spec`, `cancelled` 신규 terminal state 추가
+  - `orchestrate-helpers.sh`: `orch_set_terminal()` 래퍼 신규 - 단일 진입점으로 상태 설정 + issue 라벨 side-effect 처리
+  - `orchestrate-helpers.sh`: `orch_issue_add_label()` / `orch_issue_remove_label()` / `orch_issue_post_comment()` 신규 - best-effort issue 라벨 관리 (bare gh 사용, provider health 비관여)
+  - `orchestrate-helpers.sh`: `orch_check_manual_hold()` 신규 - dispatch 전 `manual-hold` 라벨 체크 (orch_gh 사용, provider health 관여)
+  - `orchestrate-helpers.sh`: `orch_dispatch()` - dispatch 전 `manual-hold` 체크 추가, 성공 시 `claimed-by-orch` 라벨 부착
+  - `orchestrate-helpers.sh`: `orch_set_terminal()` - `claimed-by-orch` 제거는 dispatched 맵 확인 후 실행 (never-dispatched 이슈의 불필요한 API 호출 방지)
+  - `orch_unblock()` / `_orch_mark_failed_and_unblock()` / `orch_poll_cycle()` - `orch_status_set` → `orch_set_terminal` 전환
+  - `state-detection.md`: 상태 머신 다이어그램 업데이트, GitHub issue 라벨 관리 섹션 신규
+  - `dependency-resolution.md`: terminal non-completed statuses 목록 업데이트
+- **라벨 정책**: `claimed-by-orch`(dispatch 시 부착/terminal 시 제거), `needs-human`(전이 시 부착 + 코멘트), `needs-spec`(전이 시 부착), `manual-hold`(human이 설정 - orchestrator skip)
+- **결과**: 1라운드 warning(never-dispatched API 호출 최적화) → fix, 2라운드 suggestion-only → skip, merge
+
+## Agent tracker writer contract alignment (#110, PR #180)
+
+- **목적**: agent-tracker hooks/writer/reader 계약을 sidecar v2 schema와 일관되게 강화
+- **구현**:
+  - `hooks/on-status.sh`: task(UserPromptSubmit) 및 key_arg(PreToolUse) 처리 시 ANSI CSI/OSC/ESC 시퀀스 제거 3단계(`\\u001b\\[...[A-Za-z]` → `\\u001b]...\\u0007` → `\\u001b.`) 추가, 기존 `[[:cntrl:]]` strip 이전에 수행
+  - `hooks/on-statusline.sh`: model fallback을 `"Claude"` 하드코딩 → `$existing.model // "unknown"` 조건부 보존으로 변경; `tokens_updated_at`는 `$used_tokens > 0`일 때만 갱신하여 토큰 데이터 없는 경우 허위 freshness 방지
+  - `statusline-wrapper.sh`: `TRANSCRIPT_LAST_MSG` jq 파이프라인에 ANSI/OSC sanitization 추가
+  - `lib/collect.sh`: model reader fallback `"Claude"` → `"unknown"` (default 및 jq fallback 모두)
+  - `setup.sh`: sidecar directory 출력을 v2 namespace 형식으로 업데이트; v1 flat sidecar 파일(`.workspace/agent-tracker/*.json`) 자동 마이그레이션 추가
+  - `.agents/skills/dev-pipeline/scripts/dev_pipeline/models.py`: `issue` 필드 로드 시 `int(d.get("issue") or 0)`으로 정규화 - 구 bash 기반 writer가 생성한 string 타입("30") → int 타입(30) 자동 변환
+- **결과**: review clean (critical 0, warning 0, suggestion 0), 1라운드 통과
+
+## Hard/soft dependency + cross-area policy (#90, PR #176)
+
+- **목적**: dev-orchestrator Stage 2 - dependency 유형을 hard/soft로 구분하고 cross-area 및 SCC cycle 격리 정책 정의
+- **구현**:
+  - `parse-dependencies.sh`: `--parse-typed` 모드 신규 (fenced orchestrator 블록 우선 파싱, `### Dependencies` fallback) - JSON 반환 `{hard:[...], soft:[...], crossArea:[...]}`
+  - `parse-dependencies.sh`: `--find-sccs` 모드 신규 - BFS 기반 정확한 SCC cycle 노드 검출 (downstream 의존 노드 미포함)
+  - `orchestrate-helpers.sh`: `orch_init` SCC 격리(`cycle-isolated` 상태 부여, 배치 전체 abort 대신), `dagTypes`/`crossAreaDeps` 상태 필드 추가, cross-area hard dep -> `blocked-external` 초기화
+  - `orchestrate-helpers.sh`: `orch_unblock` dep-type-aware 분기 - hard dep 실패 -> `blocked-failed-dependency`, soft dep 실패 -> `pending`, cross-area hard dep -> `blocked-external`
+  - 신규 terminal 상태: `blocked-failed-dependency`, `blocked-external`, `cycle-isolated` (`orch_doctor` 검증 포함)
+  - `orch_init` 선택적 파라미터 6번/7번으로 backward compat 유지 (`skipped_dep_failed` legacy 유지)
+- **Fenced block 형식**: ````orchestrator` 블록 - `hard:`, `soft:`, `cross-area:`, `cross-area soft:` 라인
+- **테스트**: `test-dep-policy.sh` 25개 - mock `gh`로 실제 `--parse-typed` 호출, `orch_unblock` 통합 6케이스, `--find-sccs` cycle 격리 검증
+- **리뷰 수정**: doc 예제 `issues_json` 루프 전 선언 오류 수정, test 1 inline jq → 실제 스크립트 호출, 테스트 5-7 `orch_unblock` 통합 테스트로 교체
+- 2라운드 리뷰, PR #176 머지 완료
+
+## orchctl leader lease + dispatch idempotency (#87, PR #173)
+
+- **목적**: 다중 프로세스 환경에서 reconcile 루프 중복 실행 방지 및 attempt 중복 dispatch 차단
+- **schema migration v3**:
+  - `ALTER TABLE leases ADD COLUMN heartbeat_at TEXT` (simple ALTER TABLE - atomic, no intermediate state)
+  - `CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_active_unique ON attempts(issue_id) WHERE status = 'running'` (partial unique index)
+  - migration 번호 v3으로 변경 - PR #172(issue #85 follow-up)가 main에 먼저 merge되어 v2 충돌 발생, origin/main 합병 후 재번호화
+- **`orchctl/db/lease.py` 신규 모듈**: `acquire` / `renew` / `release` / `cleanup_stale` / `has_active_attempt`
+  - `_utcnow()`: SQLite `datetime()` 출력과 일치하도록 `"%Y-%m-%d %H:%M:%S"` 공백 구분자 사용 (ISO T-format 아님)
+  - `_pid_alive()`: `PermissionError` → alive(프로세스 존재, signal 권한 없음), `ProcessLookupError` → dead
+  - `acquire()`: `cleanup_stale()` 후 `conn.commit()` 호출 - IntegrityError rollback이 cleanup 삭제를 되돌리지 않도록
+  - `cleanup_stale()`: commit 미포함 - caller 책임. expiry는 atomic SQL DELETE, dead-PID는 `(area, holder_pid, expires_at)` 정밀 predicate
+- **reconcile 커맨드**: area 리스 취득 후 진입, version guard(스키마 버전 미달 시 ClickException), 이슈별 renew, 리스 분실 시 abort
+- **테스트**: 41개 신규 (test_lease.py 17개 + test_cli.py 업데이트), v2 vocabulary 적용(`state='pending'`, `status='completed'`/`'failed'`)
+- **리뷰 8라운드**: migration 멱등성, cleanup_stale TOCTOU, version guard, datetime format, commit 책임 분리, schema vocabulary 호환
+
+## dev-pipeline/dev-log 파이프라인 안정성 버그 10건 수정 (#177, PR #178)
+
+- **범위**: dev-pipeline 실행 중 실증 확인된 10개 버그 - issue #87, #109 파이프라인에서 각각 수동 개입 필요
+- **Bug A (High)** - dev-log rebase 오류: `worktree.py:create_worktree()`의 `base="docs"` (로컬 브랜치)가 `origin/docs`와 gap이 생겨 checkout 거부. `base="origin/docs"`로 변경하여 fetch된 remote ref에서 직접 분기
+- **Bug B (High)** - `failed_postcondition` 폴백 부재: `step_review_wait`에서 `FAILED_POSTCONDITION` 전용 분기가 없어 무조건 escalate. `_FAILED_STATUSES` 체크 앞에 전용 retry 블록 추가. 단, Bug D(dispatch reset)와의 상호작용으로 `"review_postcondition"` 전용 stage key 사용하여 무한 루프 방지
+- **Bug C (Medium)** - merge conflict 진단 부족: `git_ops.py`에 `get_conflict_files()` 헬퍼 추가, `controller.py`에 `MergeConflictError` 클래스 도입, `step_merge()` retry/escalate data에 `errorKind` + `conflictFiles` 포함
+- **Bug D (Medium)** - `stageRetries` 라운드 간 이월: `step_review_dispatch()`에서 `review_wait` 전이 시 `stageRetries["review_dispatch"]`를 0으로 리셋. `state_update`의 deep merge 특성 활용하여 다른 stage 카운터 유지
+- **Bug E (Medium)** - `round_limit` 복구 경로 없음: `models.py`에 `round_limit_reached_at` 필드 추가, `step_review_process()`에서 round_limit 반환 시 state에 타임스탬프 기록
+- **Bug F+G (Medium/Low)** - dispatch cwd 누락 + review-wait 의무 미명시: SKILL.md Step 2a dispatch 명령에 `cd .agents/skills/dev-pipeline/scripts &&` 추가, Step 2b 헤더를 `(call unconditionally on any task-notification)`으로 변경
+- **Bug H (Low)** - approve verdict 시 publish 미호출: dev-review SKILL.md Invariants에 "All verdicts publish" 규칙을 Invariant 3으로 추가
+- **Bug I (Medium)** - `pr_helpers.py` `--head` 미지정: `gh pr create -R {repo}` 호출 시 브랜치 자동 감지 실패. `cmd_create()`에 optional `--head` 인자 추가
+- **Bug J (Low)** - `gh` CLI 버전 미갱신: `tools/docker/.bash_aliases` `dev-update()`에 `[2/5] GitHub CLI (gh)` 업그레이드 단계 추가, 전체 단계 [N/5]로 갱신
+- **파이프라인 실행 중 추가 발견**: `step_resolve_finalize()`가 staged changes 없을 때 push를 건너뛰어 remote가 구버전을 보는 문제. `push_safely()`를 if 블록 밖으로 이동하여 항상 push 보장
+- **3라운드 리뷰**: round 1 - B/D 상호작용 infinite loop Critical 발견 및 수정, round 2 - 이미 수정된 커밋 기준 (push 타이밍 버그로 구버전 리뷰), round 3 - clean 통과
+- PR #178 squash merge 완료
+
 ## dev-pipeline: log → merge 순서 변경 (#164, PR #165)
 
 - **문제**: dev-pipeline 상태 머신이 `merge → log → done` 순서로 실행되어, dev-log가 standalone 모드의 `lock_merge`로 local main에 커밋하지만 push하지 않음. 다음 PR squash merge 시 origin/main과 발산하여 `ff-only` 실패 100% 재현
@@ -36,6 +432,71 @@
 - **테스트**: 16개 tests (DB 초기화, schema, CRUD, 멱등성, CLI 명령, doctor dirty-data 탐지)
 - **리뷰**: 5라운드 - `_current_version` 공개 API 승격, heartbeats FK 인덱스, `check_same_thread=False` 제거, `run_migrations()` hardcoded constant 수정, try/finally 패턴, 탐지 테스트 추가
 - PR #167 5라운드 리뷰 resolve 완료
+
+## dev-pipeline 4개 버그 수정 (#170, PR #171)
+
+- **배경**: PR #167 (issue #85) 파이프라인 5라운드 실행 중 실증 확인된 4개 버그를 handoff 문서로 인수받아 수정
+- **Bug 1 (Critical) - review-wait pending 분기 누락**:
+  - task-notification 도착 시 `claude -p` 프로세스는 아직 RUNNING → GitHub에 review 없음 → 최하단 fallthrough `escalate`
+  - `_FAILED_STATUSES` 체크 이후 `RUNNING` 분기를 추가하여 `action="pending"` 반환, SKILL.md 테이블에 `pending` 행 추가
+  - 결과: 매 리뷰 라운드마다 수동 개입 필요하던 문제 해소, 파이프라인 자동화 복원
+- **Bug 2 (Medium) - suggestion_only round 카운터 미증가**:
+  - `suggestion_only` 경로에서 `round_num` 그대로 반환하여 실제 회차와 불일치 (2회차→1 반환, 5회차→4 반환)
+  - `"round": round_num` → `"round": round_num + 1` 수정 (state 업데이트는 `suggestion_decide`에서 유지)
+- **Bug 3 (Medium) - review_normalizer 들여쓰기 오파싱**:
+  - `stripped` 기준 `^\d+\.` 매칭으로 들여쓰인 번호 하위 목록을 최상위 항목으로 카운트
+  - 원본 `line`으로 들여쓰기 체크 (`not line.startswith((" ", "\t"))`) 조건 추가
+- **Bug 4 (Low) - suggestion_only data에 reviewBody 없음**:
+  - AI 결정에 리뷰 내용이 필요하지만 counts만 반환하여 `resolve --phase setup` 우회 필요
+  - suggestion_only data에 `"reviewBody": body` 추가
+- **회귀 테스트**: 4개 신규 테스트 추가 (264 → 268 passed)
+- 1라운드 리뷰, 클린 통과, PR #171 머지 완료
+
+## orchctl core state machine Python 이전 + 기본 테스트 (#86, PR #172)
+
+- **목적**: issue lifecycle과 attempt tracking의 핵심 상태 전이 로직을 Python으로 이전하고, 기본 테스트 작성 (Stage 2)
+- **구현**: `tools/orchctl/` 2개 모듈 + schema migration v2
+  - `models.py`: `IssueState`/`AttemptStatus`/`DependencyType` str enums, `ISSUE_TRANSITIONS`/`ATTEMPT_TRANSITIONS` frozenset 맵, `TERMINAL_*` 집합
+  - `state_machine.py`: `InvalidTransitionError`/`StaleStateError` 예외 클래스, `transition_issue`/`transition_attempt`(pure), `resolve_blocked_issue`(dep 타입별 분기), `try_acquire_lease`(DELETE + INSERT ON CONFLICT DO UPDATE WHERE), `release_lease`, `can_dispatch`, `apply_issue_transition`/`apply_attempt_transition`(optimistic-lock predicate)
+  - `db/schema.py` migration v2: `issues` 상태 어휘 확장(pending/dispatched/completed/failed-terminal/needs-human/blocked-external/cancelled/blocked/blocked-failed-dependency), `attempts` 상태 어휘 교체(created/running/completed/failed/timed-out), 데이터 마이그레이션(running→dispatched, done→completed 등), `idx_issues_state` 인덱스 추가
+- **테스트**: `tests/test_state_machine.py` 신규 - 93 tests pass 전체 (90 state machine)
+  - issue/attempt 전이 유효성(모든 edge), 잘못된 전이 거부, `StaleStateError` vs `InvalidTransitionError` 구분
+  - `resolve_blocked_issue`: soft/hard dep, NEEDS_HUMAN/BLOCKED_FAILED_DEP 포함 모든 terminal state
+  - `apply_*_transition` DB-backed optimistic-lock, 누락 row ValueError
+  - `can_dispatch` 상태별 eligibility, 중복 dispatch 방지
+  - Reconcile idempotency (3회 반복 안정), golden-path integration (register→dispatch→complete→unblock)
+  - Lease conflict: acquire/renew/release/expire/다중 area 독립성
+- **리뷰 주요 수정 (5라운드)**:
+  - R1: `has_failure` NEEDS_HUMAN 누락(hard dep → 모든 non-completed terminal을 failure로 처리), `INSERT OR IGNORE` → renewal 지원 upsert
+  - R2: `apply_*_transition` non-atomic SELECT+UPDATE → `WHERE ... AND state=?` predicate + rowcount 체크, `idx_issues_state` 인덱스 추가
+  - R3: terminal state comment에 deferred retry path 명시(retry_budget 컬럼 예약), UPSERT CASE ELSE dead branch 제거
+  - R4: `StaleStateError` 신규 예외 클래스(optimistic-lock race용), `conn` fixture `return` → `yield` + `conn.close()` teardown
+  - R5: suggestion_only (1-line doc) → auto-merge
+- PR #172 5라운드 리뷰 resolve 완료, squash merge
+
+## Agent tracker Bash safety hotfix (#108, PR #174)
+
+- **목적**: Bash tracker의 운영상 오판을 줄이기 위한 최소 범위 correctness hotfix (live 버그 6개 수정)
+- **Bug 1 - @tsv 필드 밀림**: `IFS=$'\t' read`는 bash whitespace-IFS 규칙으로 연속 탭을 하나로 축소. `activity`가 비어 있으면 `updated_at`이 `activity` 열에 노출. `join("\u001e")` + `IFS=$'\x1e'`(비공백 구분자) + `@base64`(task/activity)로 교체
+- **Bug 2 - dead orchestrator 은닉**: `_check_pid_alive || continue`로 죽은 배치가 완전 숨겨짐. `batch_alive=false` 추적으로 변경, `batch_status="dead"` 설정 후 ROSE 색상 + `[DEAD]` 레이블로 표시
+- **Bug 3 - 토큰 0/0 source 오표시**: 사이드카 존재하지만 토큰 미기록 시 `source=sidecar, fresh=true` 표시. `tok_used==0 && tok_total==0`이면 `tok_source="unknown"` 설정
+- **Bug 4 - done 태스크 working으로 오표시**: `_infer_status_from_pane` 스피너 감지가 `(Done) ` prefix 확인보다 먼저 실행되어 `idle→working` 덮어씀. `(Done) ` prefix 확인을 무조건적(status 조건 제거)으로 변경
+- **Bug 5 - pane_id 경로 탐색 취약점**: `pane_id`를 직접 파일 경로에 사용. `^%[0-9]+$` 형식 검증 guard 추가
+- **Bug 6 - stale/fault/dead/unknown idle 혼입**: stale(갱신 초과 비idle) → `status="stale"`, 파싱 실패 → `status="fault"`, done은 staleness 체크 제외. `n_stale` 카운터 분리, `status_badge`에 `stale`(GOLD)/`fault`(ROSE) 추가
+- 클린 리뷰 통과(0/0/0), PR #174 머지 완료
+
+## agent-tracker: sidecar v2 contract + immediate cutover (#109, PR #175)
+
+- **목적**: sidecar JSON schema를 v2로 업그레이드하고 namespace를 multi-server/multi-session 안전 구조로 변경
+- **신규 필드**: `schema_version: "v2"`, `session_name` (tmux session 이름), `tmux_server` (소켓 경로)
+- **namespace 변경**: `.workspace/agent-tracker/{pane_id}.json` - `.workspace/agent-tracker/<socket-hash>/<session>/<pane>.json`
+  - `socket-hash`: `$TMUX` 소켓 경로의 MD5 앞 6자 - 다중 tmux 서버 충돌 방지
+  - `session`: tmux session 이름 (예: `lab`)
+  - `pane`: pane id % prefix 제거 (예: `5`)
+- **즉시 cutover**: `agent-tracker.sh` 시작 시 v1 flat 파일(`SIDECAR_DIR/*.json`) 자동 정리
+- **reader 업데이트**: `collect.sh`에서 socket hash + session 계산 후 v2 경로로 sidecar 조회. source precedence 문서화 추가
+- **리뷰 피드백 수정**: `_pid` unset 누락 수정, `md5sum` Linux-only 주석 추가, 활성 세션 orphan 삭제 테스트 신규 추가 (4 - 6개)
+- **병렬 수정**: origin/main에 #108 변경(path traversal guard, `status: "stale"/"fault"` 신규, base64 인코딩)이 선반영되어 merge conflict 해소 후 PR merge
 
 ## dev-log detect-context area 검증 (#164, PR #166)
 

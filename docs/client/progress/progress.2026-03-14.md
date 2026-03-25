@@ -1,0 +1,486 @@
+# Progress: 2026-03-14
+
+## Completed
+- [x] #48 공개 방명록 페이지 PR #165 머지
+  - PR: `feat: add guestbook page (#48)`
+  - merge target: `main`
+  - 구현: `src/app/guestbook/page.tsx`, `src/features/guestbook-form/index.ts`, `src/features/guestbook-form/ui/guestbook-page-content.tsx`, `src/features/comment-section/ui/comment-form.tsx`
+  - initial change: `/guestbook`를 SSR 데이터 로더 + client page content 구조로 재구성하고, 기존 guestbook entity API 위에 방명록 작성 폼, 삭제 모달, 페이지네이션, local optimistic state를 연결
+  - reuse: `CommentForm`을 guestbook variant까지 확장해 게스트/OAuth 공용 입력 UX와 validation 흐름을 그대로 재사용
+  - review fix 1: viewer lookup이 non-401 auth 실패를 무조건 guest로 숨기거나 반대로 페이지 전체를 죽이지 않도록, 게스트 fallback과 non-blocking warning 배너를 함께 제공
+  - review fix 2: SSR 단계에서 cookie header를 한 번만 계산하고 `fetchGuestbook` + viewer lookup을 `Promise.all`로 병렬화해 추가 latency를 줄였으며, `admin` 세션의 public guestbook 처리도 명시적으로 guest mode로 정리
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 warning 1 -> resolve, round 3 suggestion 2 -> resolve, round 4 clean
+  - merge: squash merge, PR #165
+  - branch: `feat/issue-48-guestbook-page` (remote branch deleted, local issue worktree cleaned up)
+- [x] #37 카테고리별 글 목록 페이지 PR #163 머지
+  - PR: `feat: add category archive page (#37)`
+  - merge target: `main`
+  - 구현: `src/app/categories/[slug]/page.tsx`
+  - initial change: `/categories/[slug]` placeholder를 SSR 카테고리 archive로 교체하고, slug 기반 카테고리 조회, `categoryId` 필터 게시글 목록, `CategoryNav`/`PostCard`/`Pagination` 렌더링을 연결
+  - policy: 카테고리 트리를 재귀 탐색해 nested category slug도 찾고, 숨김 카테고리/없는 slug/음수·0·비정수·범위 초과 `page`는 모두 `notFound()`로 404 처리
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, PR #163
+  - branch: `feat/issue-37-category-page` (remote branch deleted, local issue worktree cleaned up)
+- [x] #70 Admin 댓글 관리 페이지 PR #162 머지
+  - PR: `feat: add admin comments page (#70)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/comments/page.tsx`, `src/widgets/admin-comments/index.ts`, `src/widgets/admin-comments/ui/admin-comments-page.tsx`
+  - initial change: `/dashboard/comments` 관리자 댓글 관리 페이지를 추가하고, 댓글 목록 테이블에 작성자/본문 요약/비밀 여부/상태/작성일/강제 삭제 액션을 연결
+  - review fix 1: 숨김 댓글도 관리자 화면에서는 원문을 검토할 수 있도록 표시하고, 긴 댓글은 `전체 보기` 토글로 확장 가능하게 보완
+  - review fix 2: `src/app/dashboard/comments/page.tsx`는 라우팅 래퍼만 남기고 실제 구현을 `src/widgets/admin-comments`로 이동해 FSD app 레이어 규칙 준수
+  - review fix 3: 마지막 페이지에서 마지막 댓글 삭제 시 이전 페이지로 선이동해 out-of-range 에러 상태에 갇히지 않도록 페이지 보정 로직 추가
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm compile:types && pnpm lint`
+  - review: round 1 warning 2 -> resolve, round 2 warning 1 -> resolve, round 3 warning 1 -> resolve, round 4 clean
+  - merge: squash merge, PR #162
+  - branch: `feat/issue-70-admin-comments` (remote branch deleted, local issue worktree cleaned up)
+- [x] #53 Admin 글 작성/수정 페이지 PR #161 머지
+  - PR: `feat: add post create and edit pages (#53)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/posts/new/page.tsx`, `src/app/dashboard/posts/[id]/edit/page.tsx`, `src/app/dashboard/posts/page.tsx`
+  - initial change: `/dashboard/posts/new`에 빈 `PostForm` 기반 작성 페이지를 추가하고, `/dashboard/posts/[id]/edit`에서 `useParams` + `fetchAdminPost`로 기존 글을 로드해 수정 페이지를 구성
+  - UX: 수정 페이지에 로딩 skeleton, fetch 실패 재시도, 잘못된 `id` 가드 추가; 글 목록 페이지에는 새 글 작성 CTA와 행별 수정 링크를 연결
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm compile:types`, `pnpm lint`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `c4aa63fdbc902e8693ce1c93c467a9658e873555`, merged at `2026-03-14T12:52:58Z`
+  - branch: `feat/issue-53-post-editor-pages` (remote branch deleted, local issue worktree cleaned up)
+- [x] #61 인기 글 페이지 기간 필터 PR #160 머지
+  - PR: `feat: add popular page filter (#61)`
+  - merge target: `main`
+  - 구현: `src/app/popular/page.tsx`, `src/app/popular/popular-page-content.tsx`
+  - initial change: `/popular` 페이지를 SSR 유지 상태로 `days` 쿼리 파라미터 기반 기간 필터로 전환하고, `7일 / 30일` pill 탭과 랭킹 리스트를 페이지 로컬 프레젠테이션 컴포넌트로 분리
+  - policy: `days`가 없거나 `7`, `30` 이외 값이면 `redirect('/popular?days=7')`로 canonical URL 정정
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `641741f6f58a072542a54cddac404e769cba4175`, merged at `2026-03-14T12:49:48Z`
+  - branch: `feat/issue-61-popular-page` (remote branch deleted, local issue worktree cleaned up)
+- [x] #64 헤더 검색바 PR #157 머지
+  - PR: `feat: add header search bar (#64)`
+  - merge target: `main`
+  - 구현: `src/widgets/header/search-bar.tsx`, `src/widgets/header/index.tsx`
+  - initial change: 헤더 액션 영역에 토글형 검색 UI를 추가하고, 입력 후 Enter 또는 검색 아이콘으로 `/search?q=...`로 이동하는 흐름을 연결
+  - review fix 1: 전역 헤더에서 `useSearchParams()`를 제거해 App Router static shell이 client-render bailout 되지 않도록 조정
+  - review fix 2: `/search`에서는 현재 `q` 값을 다시 열 때 반영하고, 열려 있는 상태의 검색 아이콘은 submit으로 동작하도록 상호작용을 보완
+  - review fix 3: 비검색 route에서 stale query가 남지 않도록 open 시 입력값을 초기화하고, collapsed input은 `disabled`/`tabIndex={-1}`로 숨김 상태에서 tab order에 남지 않게 처리
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 warning 1 -> resolve, round 4 warning 1 -> resolve, round 5 clean
+  - merge: squash merge, merge commit `f8634c6ddad067e87abf1827b44d9175785fe6be`, merged at `2026-03-14T12:38:33Z`
+  - branch: `feat/issue-64-header-search` (remote branch deleted, local issue worktree cleaned up)
+- [x] #60 에셋 라이브러리 feature + 페이지 PR #159 머지
+  - PR: `feat: add asset library page (#60)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/assets/page.tsx`, `src/features/asset-uploader/index.ts`, `src/features/asset-uploader/ui/asset-uploader.tsx`, `src/features/asset-uploader/ui/asset-grid.tsx`, `src/features/asset-uploader/ui/upload-zone.tsx`, `src/entities/asset/api.ts`
+  - initial change: `/dashboard/assets` 관리 페이지와 asset-uploader feature를 추가하고, 업로드 대기열, drag-and-drop/파일 선택, 수동 업로드 버튼, paginated gallery, URL/마크다운 복사, 단건/다중 삭제 확인 모달을 연결
+  - review fix 1: 배치 삭제를 `Promise.allSettled`로 바꿔 부분 성공 시에도 목록 invalidate와 선택 상태 정리를 수행하고, 실패 개수는 별도 에러 메시지로 안내
+  - review fix 2: 모바일/터치 환경에서도 per-item 액션이 보이도록 overlay를 small screen 기본 노출 + hover/focus 확장으로 조정하고, malformed asset URL에도 render가 깨지지 않게 filename decode fallback 추가
+  - review fix 3: settled mutation의 stale variables가 `삭제 중...` 상태를 남기지 않도록 deleting ids를 `deleteMutation.isPending`으로 게이트
+  - verification: issue worktree에서 base `client/node_modules` symlink 후 `pnpm build && pnpm compile:types && pnpm lint`
+  - review: round 1 warning 2 / suggestion 1 -> resolve, round 2 warning 1 -> resolve, round 3 clean
+  - merge: squash merge, merge commit `4c63858c44d4e1c9b7fbd1944b9c164f0adf43f8`, merged at `2026-03-14T12:35:57Z`
+  - branch: `feat/issue-60-assets-library` (remote branch deleted, local issue worktree cleaned up)
+- [x] #68 Admin 방명록 관리 페이지 PR #158 머지
+  - PR: `feat: add admin guestbook page (#68)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/guestbook/page.tsx`, `src/features/guestbook-manager/index.ts`, `src/features/guestbook-manager/ui/guestbook-manager.tsx`
+  - initial change: `/dashboard/guestbook` 라우트와 guestbook-manager feature를 추가하고, 작성자/내용/비밀 여부/작성일/삭제 액션이 포함된 관리자 방명록 테이블과 클라이언트 페이지네이션을 연결
+  - review fix: 이미 `deleted` 상태인 방명록 row에는 삭제 버튼 대신 `삭제됨` 상태 표시를 렌더해 중복 삭제 요청과 혼란을 방지
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 clean
+  - merge: squash merge, PR #158
+  - branch: `feat/issue-68-admin-guestbook` (remote branch deleted, local issue worktree cleaned up)
+- [x] #55 댓글 섹션 feature PR #155 머지
+  - PR: `feat: add comment section feature (#55)`
+  - merge target: `main`
+  - 구현: `src/app/posts/[slug]/page.tsx`, `src/features/comment-section/index.ts`, `src/features/comment-section/ui/comment-form.tsx`, `src/features/comment-section/ui/comment-item.tsx`, `src/features/comment-section/ui/comment-list.tsx`
+  - initial change: 글 상세 페이지에 댓글 목록/작성 폼/대댓글/삭제 확인 모달을 연결하고, 게스트와 OAuth viewer 모두를 지원하는 local comment interaction 흐름을 추가
+  - review fix 1: 부모 댓글 삭제 시 subtree를 제거하지 않고 `status: "deleted"` placeholder를 유지하도록 local tree update를 보정하고, root/nested list markup ownership을 정리
+  - review fix 2: comment create/delete payload를 viewer/comment author type에 따라 guest/OAuth로 분기하고, deleted placeholder 댓글에는 reply/delete action을 숨김
+  - review fix 3: post page viewer detection을 shared auth contract 기반으로 맞추고, delete modal backdrop를 `bg-grey-2/50`로 바꿔 dialog opacity regression을 제거
+  - review fix 4: comments fetch 실패가 post SSR 전체를 깨뜨리지 않도록 graceful fallback과 non-blocking error state를 추가하고, whitespace-only comment submit을 client-side에서 차단
+  - verification: issue worktree에서 `pnpm lint && pnpm compile:types && pnpm build`
+  - review: round 1 warning 1 / suggestion 1 -> resolve, round 2 warning 2 -> resolve, round 3 warning 1 / suggestion 1 -> resolve, round 4 warning 1 / suggestion 1 -> resolve
+  - merge: squash merge, merge commit `049e1fa57507d3d879aebd4cbe3bcead92751426`, merged at `2026-03-14T12:09:39Z`
+  - branch: `feat/issue-55-comment-section` (remote branch deleted, local issue worktree cleaned up)
+- [x] #57 카테고리 관리 feature + 페이지 PR #156 머지
+  - PR: `feat: add category admin page (#57)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/categories/page.tsx`, `src/features/category-manager/index.ts`, `src/features/category-manager/ui/category-tree.tsx`, `src/features/category-manager/ui/category-form-modal.tsx`, `src/features/category-manager/ui/category-manager.tsx`
+  - initial change: `/dashboard/categories` 관리 페이지와 category-manager feature를 추가하고, 재귀 트리 렌더링, 추가/수정 공용 모달, 삭제 확인 모달, TanStack Query 기반 CRUD 흐름을 연결
+  - policy: 자식 카테고리가 있는 항목은 삭제 요청 전에 차단하고 안내만 표시하며, 수정 모드에서는 현재 노드와 descendant를 부모 후보에서 제외해 순환 구조를 방지
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm lint`, `pnpm build`, `pnpm compile:types`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, PR #156
+  - branch: `feat/issue-57-category-admin` (remote branch deleted, local issue worktree cleaned up)
+- [x] #59 태그 목록/태그별 글 목록 페이지 PR #154 머지
+  - PR: `feat: implement tag pages (#59)`
+  - merge target: `main`
+  - 구현: `src/app/tags/page.tsx`, `src/app/tags/[slug]/page.tsx`
+  - initial change: `/tags`의 태그 pill을 각 태그 archive 링크로 연결하고, `/tags/[slug]`에서 `fetchPosts({ tagSlug, page })` 기반의 SSR 목록/빈 상태/페이지네이션을 추가
+  - review fix: 범위를 벗어난 `page` query가 misleading empty state를 렌더하지 않도록 홈 목록과 동일한 out-of-range `notFound()` 검증 추가
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 clean
+  - merge: squash merge, PR #154
+  - branch: `feat/issue-59-tag-pages` (remote branch deleted, local issue worktree cleaned up)
+- [x] #67 헤더 네비게이션 업데이트 PR #152 머지
+  - PR: `feat: update header navigation (#67)`
+  - merge target: `main`
+  - 구현: `src/widgets/header/index.tsx`, `src/widgets/header/navigation.tsx`, `src/app/popular/page.tsx`, `src/app/tags/page.tsx`, `src/app/guestbook/page.tsx`
+  - initial change: 헤더 공개 네비게이션을 `홈/인기/태그/방명록` 4개 링크로 확장하고, 누락돼 있던 public route 3개를 App Router 페이지로 추가
+  - review fix 1: `/popular`, `/tags`, `/guestbook`가 실제 route로 존재하도록 각 페이지를 server-rendered public page로 구현
+  - review fix 2: 태그 요약 copy를 unique post count처럼 보이지 않도록 `태그 연결` 기준으로 수정하고, 모바일 헤더는 2-row layout + wrapped nav로 전환
+  - review fix 3: guestbook page는 서버가 반환한 secret body를 그대로 신뢰하고, `sessionId` cookie만 선택적으로 전달해 권한 기반 응답과 cookie scope를 모두 보존
+  - review fix 4: fixed header spacer를 `ResizeObserver` 기반 실측 높이와 동기화해 mobile wrapping 시에도 본문이 헤더 뒤로 가려지지 않게 보완
+  - verification: fresh issue worktree에서 base `client/node_modules`를 symlink한 뒤 `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 warning 2 -> resolve, round 4 warning 1 -> resolve, round 5 warning 1 -> resolve, round 6 clean
+  - merge: squash merge, merge commit `33e06861dc31a73e7b7c60b70bcdcbb645528061`, merged at `2026-03-14T11:24:55Z`
+  - branch: `feat/issue-67-header-nav` (remote branch deleted, local issue worktree cleaned up)
+- [x] #36 홈 페이지 SSR PR #153 머지
+  - PR: `feat: implement SSR home page (#36)`
+  - merge target: `main`
+  - 구현: `src/app/page.tsx`, `src/widgets/home-page/index.ts`, `src/widgets/home-page/ui/home-page.tsx`
+  - initial change: 홈 페이지를 서버 렌더링 목록 화면으로 구현하고 `page` query parsing, `fetchPosts({ page })`, `PostCard` 목록, 빈 상태 문구, `Pagination` 연동 추가
+  - policy: `page` 미지정은 1로 처리하고, 음수/0/비정수/범위 초과 페이지는 `notFound()`로 404 처리, 총 페이지 수가 1 이하일 때는 페이지네이션 숨김
+  - review fix 1: 게시글이 없는 경우에도 `/?page=2` 이상은 invalid page로 간주하도록 `totalPages === 0` 경로를 별도로 검증
+  - review fix 2: `src/app/page.tsx`는 routing entry만 남기고, 데이터 로드/검증/렌더링 로직은 `src/widgets/home-page/ui/home-page.tsx`로 이동해 app 레이어 규칙 준수
+  - verification: fresh issue worktree에서 `pnpm install`, `pnpm lint`, `pnpm build`, `pnpm compile:types`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 clean
+  - merge: squash merge, PR #153
+  - branch: `feat/issue-36-home-ssr` (remote branch deleted, local issue worktree cleaned up)
+- [x] #66 검색 결과 페이지 SSR PR #151 머지
+  - PR: `feat: add search results page (#66)`
+  - merge target: `main`
+  - 구현: `src/app/search/page.tsx`
+  - initial change: `/search` SSR 페이지 추가, `q`/`page` query parsing, `fetchPosts({ q, page })` 연동, `PostCard`/`Pagination` 재사용, 결과 수/빈 상태 UI 구현
+  - policy: 빈 검색어는 안내 화면을 보여주고, 검색어가 있을 때만 `page`를 검증하며 양의 정수가 아닌 `page`는 `notFound()`로 404 처리
+  - review fix: 빈 검색 상태에서 `page`가 의미 없는데도 먼저 검증해 404가 나던 흐름을 수정해, `q`가 없을 때는 `page`를 무시하고 정상 empty state를 렌더하도록 순서 조정
+  - verification: fresh issue worktree에서 `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 -> resolve, round 2 clean
+  - merge: squash merge, merge commit `3789b4cc2598cad8975c3ccb172ef39a36ff078b`
+  - branch: `feat/issue-66-search-page` (remote branch deleted, local issue worktree cleaned up)
+- [x] #65 Admin 댓글/방명록 API functions PR #150 머지
+  - PR: `feat: add admin comment and guestbook api functions (#65)`
+  - merge target: `main`
+  - 구현: `src/entities/comment/api.ts`, `src/entities/comment/index.ts`, `src/entities/guestbook/api.ts`, `src/entities/guestbook/index.ts`
+  - initial change: 관리자 댓글/방명록 목록 조회와 강제 삭제 helper, 관리자 전용 item/query 타입 추가
+  - contract alignment: 서버 admin route 스키마 기준으로 댓글은 `postId` 필터와 `hidden` 상태를 포함하고, 댓글/방명록 목록 함수 모두 server/client 호출 경로를 지원하도록 `cookieHeader?` 분기 추가
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, PR #150
+  - branch: `feat/issue-65-admin-comment-guestbook` (remote branch deleted, local issue worktree cleaned up)
+- [x] #62 Category Admin API functions PR #148 머지
+  - PR: `feat: add category admin api (#62)`
+  - merge target: `main`
+  - 구현: `src/entities/category/model.ts`, `src/entities/category/api.ts`, `src/entities/category/index.ts`
+  - initial change: admin 카테고리 조회/생성/수정/순서 변경/삭제 helper와 request body 타입 추가
+  - contract alignment: 카테고리 목록 응답을 `{ categories: [...] }` shape로 unwrap하고 reorder body는 서버 계약 기준 `items`로 구현
+  - review fix: `UpdateCategoryBody`에 `parentId`를 추가하고 `fetchCategoriesAdmin(cookieHeader?)`로 server/client 양쪽 호출 지원
+  - verification: `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 1 / suggestion 1 -> resolve, round 2 clean
+  - merge: squash merge, PR #148
+  - branch: `feat/issue-62-category-admin-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #58 Asset entity types + API PR #149 머지
+  - PR: `feat: add asset entity api (#58)`
+  - merge target: `main`
+  - 구현: `src/entities/asset/model.ts`, `src/entities/asset/api.ts`, `src/entities/asset/index.ts`
+  - initial change: asset list item 타입, paginated `fetchAssets(page)`, CSRF 토큰 기반 multipart `uploadAssets(files)`, `deleteAsset(id)` helper 추가
+  - contract alignment: 업로드 응답은 서버 계약상 `createdAt` 없이 `{ assets: UploadedAsset[] }`를 반환하므로 list item `Asset`과 upload result `UploadedAsset`을 분리
+  - verification: `pnpm install`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `6a1f6bd8f9f02217a96367e5a2d1ab172c1da18a`
+  - branch: `feat/issue-58-asset-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #54 마크다운 에디터 + 프리뷰 feature PR #147 머지
+  - PR: `feat: add markdown editor feature (#54)`
+  - merge target: `main`
+  - 구현: `src/entities/category/api.ts`, `src/entities/category/index.ts`, `src/features/post-editor/index.ts`, `src/features/post-editor/ui/markdown-editor.tsx`, `src/features/post-editor/ui/markdown-preview.tsx`, `src/features/post-editor/ui/markdown-preview.worker.ts`, `src/features/post-editor/ui/post-form.tsx`
+  - initial change: admin 글 작성용 `MarkdownEditor`/`MarkdownPreview`/`PostForm` feature 추가, 카테고리 목록 query, create/update mutation, 60vh editor-preview layout 구현
+  - review fix 1: category SSR 호출이 stale cache 경로로 바뀌지 않도록 `fetchCategoriesClient()`를 분리하고, preview는 shared renderer 기반 worker로 옮겨 main thread blocking을 제거
+  - review fix 2: `PostForm` hydration을 post identity와 prop refresh 기준으로만 동기화하도록 조정해 편집 중 refetch나 저장 직후 stale props가 로컬 입력값을 덮어쓰지 않게 보완
+  - review fix 3: initial snapshot/signature 계산을 memoize하고 `onCancel`이 없을 때 cancel button을 렌더링하지 않도록 정리
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 2 -> resolve, round 2 warning 2 -> resolve, round 3 warning 1 -> resolve, round 4 warning 1 -> resolve, round 5 warning 1 / suggestion 1 -> resolve, round 6 clean
+  - merge: squash merge, merge commit `842a51b2dcaf1a68734ba5d1244fe16bfe98eb75`
+  - branch: `feat/issue-54-markdown-editor` (remote branch deleted, local issue worktree cleaned up)
+- [x] #56 PopularPost API PR #146 머지
+  - PR: `feat: add popular post api (#56)`
+  - merge target: `main`
+  - 구현: `src/entities/stat/model.ts`, `src/entities/stat/api.ts`, `src/entities/stat/index.ts`
+  - initial change: `PopularPost` 타입 추가, public stats endpoint `/api/stats/popular`를 위한 `fetchPopularPosts(days, cookieHeader?)` helper 추가, backend `data` wrapper unwrap
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 0
+  - merge: squash merge, merge commit `f4cd3ca5f56b0a5e9a21477ae42c2feb6f0234ce`
+  - branch: `feat/issue-56-popular-post-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #52 Comment entity types + API PR #145 머지
+  - PR: `feat: add comment entity api (#52)`
+  - merge target: `main`
+  - 구현: `src/entities/comment/model.ts`, `src/entities/comment/api.ts`, `src/entities/comment/index.ts`
+  - initial change: public comment entity 타입과 `fetchComments`/`createComment`/`deleteComment` helper 추가
+  - review fix 1: create/delete mutation contract를 guest/oauth 양쪽을 표현하는 union으로 확장해 authenticated comment flow를 지원
+  - review fix 2: guest payload가 compile time에 강제되도록 `authorType` discriminated union으로 재구성하고, API helper에서 discriminator를 제거한 뒤 서버 계약에 맞는 body만 전송
+  - verification: `pnpm build && pnpm compile:types && pnpm lint`
+  - review: round 1 warning 1 -> resolve, round 2 warning 2 -> resolve, round 3 clean
+  - merge: squash merge, PR #145
+  - branch: `feat/issue-52-comment-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #40 Dashboard 인증 미들웨어 PR #144 머지
+  - PR: `feat: add dashboard auth middleware (#40)`
+  - merge target: `main`
+  - 구현: `src/middleware.ts`, `.env.local.example`
+  - initial change: `/dashboard/:path*` matcher 추가, `/dashboard/login` allowlist, 백엔드 `API_URL` + `/api/auth/me`로 쿠키 전달 인증 확인, 실패 시 로그인 리다이렉트
+  - review fix 1: 로그인 리다이렉트에 `returnTo`를 포함하고, `/api/auth/me` 인증 fetch에 `AbortSignal.timeout(3000)`을 추가
+  - review fix 2: 운영 환경에서 `API_URL` 미설정 시 접근을 거부하도록 fail-closed 처리하고, 인증된 사용자가 `/dashboard/login`으로 직접 들어오면 `/dashboard`로 되돌리도록 보완
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 warning 3 / suggestion 1 -> resolve, round 2 warning 1 / suggestion 1 -> resolve, round 3 suggestion-only -> merge
+  - merge: squash merge, merge commit `7ba93bdf0a53e221251f06fbddb5032d1d0fba24`
+  - branch: `feat/issue-40-dashboard-auth` (remote branch deleted, local issue worktree cleaned up)
+- [x] #51 Guestbook entity types + API PR #142 머지
+  - PR: `feat: add guestbook entity api (#51)`
+  - merge target: `main`
+  - 구현: `src/entities/guestbook/model.ts`, `src/entities/guestbook/api.ts`, `src/entities/guestbook/index.ts`
+  - review fix 1: `CreateGuestbookBody`를 guest/oauth discriminated union으로 재구성하고, `api.ts`에서 `authorType`은 전송 전에 제거해 서버 계약을 유지
+  - review fix 2: `DeleteGuestbookBody`를 guest 비밀번호/ oauth 빈 body union으로 보완하고, `CommentAuthor`도 `oauth`/`guest` discriminated union으로 정제
+  - verification: `pnpm install --frozen-lockfile`, `pnpm compile:types && pnpm lint && pnpm build`
+  - review: round 1 suggestion-only -> resolve, round 2 warning 1 / suggestion 2 -> resolve, round 3 clean
+  - merge: squash merge, merge commit `c10551960f7d4c44faeef10cfbd4d672c012f73a`
+  - branch: `feat/issue-51-guestbook-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #41 Admin 로그인 페이지 PR #141 머지
+  - PR: `feat: add admin login page (#41)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/login/layout.tsx`, `src/app/dashboard/login/page.tsx`, `src/app/dashboard/layout.tsx`, `src/app/dashboard/layout-shell.tsx`, `src/features/admin-login/index.ts`, `src/features/admin-login/ui/login-form.tsx`
+  - initial change: `/dashboard/login` 전용 레이아웃과 로그인 페이지 추가, `LoginForm`에서 `login()` 호출 후 성공 시 `/dashboard`로 이동
+  - review fix 1: `await login()` 구간도 커버하도록 `isLoading`과 `busy` 상태를 추가해 중복 로그인 요청을 방지
+  - review fix 2: `useSelectedLayoutSegment` 로직을 `src/app/dashboard/layout-shell.tsx`로 분리해 `dashboard/layout.tsx`를 server component로 유지
+  - suggestion fix: 로그인 실패 메시지에 `role="alert"`를 추가해 screen reader가 동적으로 오류를 읽도록 보완
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - merge: squash merge, merge commit `3a7d7ea543efc81ff475ee372747a6209fc0c846`
+  - branch: `feat/issue-41-admin-login` (remote branch deleted, local issue worktree cleaned up)
+- [x] #49 Tag entity types + API PR #143 머지
+  - PR: `feat: add tag entity api (#49)`
+  - merge target: `main`
+  - 구현: `src/entities/tag/model.ts`, `src/entities/tag/api.ts`, `src/entities/tag/index.ts`
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - review: CRITICAL 0 / WARNING 0 / SUGGESTION 1
+  - review note: 서버 `GET /api/tags` 계약은 이미 camelCase `postCount`를 사용함 (`server/src/routes/tags/tag.schema.ts`, `server/src/routes/tags/tag.service.ts`)
+  - merge: squash merge, merge commit `0614d26ca584d55ff4294cb1a52d76390761c4dc`
+  - branch: `feat/issue-49-tags-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #35 마크다운 타이포그래피 스타일링 PR #140 머지
+  - PR: `feat: add markdown typography (#35)`
+  - merge target: `main`
+  - 구현: `package.json`, `src/app-layer/style/index.css`, `src/app-layer/style/typography.css`, `src/features/post-detail/ui/post-content.tsx`
+  - initial change: `@tailwindcss/typography` 플러그인 추가, global CSS에 `@plugin` 등록, `PostContent`에 `prose max-w-none` 적용
+  - review fix: `prose-neutral`를 제거하고 `.markdown-content`에서 Tailwind Typography `--tw-prose-*` 변수를 기존 design token(`--text*`, `--border*`, `--primary1`, `--background2`)에 매핑해 다크 모드 색상 불일치 제거
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - merge: squash merge, merge commit `edb0fe0e7587ebf2f26957bb09631f4589aa730b`
+  - branch: `feat/issue-35-markdown-style` (remote branch deleted, local issue worktree cleaned up)
+- [x] #39 글 상세 페이지 SSR PR #139 머지
+  - PR: `feat: add post detail page (#39)`
+  - merge target: `main`
+  - 구현: `src/app/posts/[slug]/page.tsx`, `next.config.js`
+  - review fix: `/tags/[slug]` route가 아직 없어서 태그를 링크에서 비상호작용 배지로 전환
+  - verification: `pnpm lint && pnpm compile:types`
+  - merge: squash merge, merge commit `4e00e3ea036d115b83a6c6e8398c4988aa70c897`
+  - branch: `feat/issue-39-post-detail-ssr` (remote branch deleted, local issue worktree cleaned up)
+- [x] #33 PostCard PR #138 머지
+  - PR: `feat: add post card (#33)`
+  - merge target: `main`
+  - 구현: `src/features/post-list/ui/post-card.tsx`, `src/features/post-list/index.ts`
+  - review fix 1: `thumbnailUrl`가 `next.config.js`에 없는 원격 호스트를 가리켜도 렌더가 깨지지 않도록, 허용된 경로만 `next/image`를 사용하고 나머지는 일반 `<img>` fallback으로 처리
+  - review fix 2: 게시일 포맷터에 `timeZone: "UTC"`를 고정해 SSR/브라우저 환경별 날짜 흔들림과 hydration mismatch 가능성을 제거
+  - verification: `pnpm lint && pnpm compile:types`
+  - merge: squash merge, merge commit `6740670622e7066967957af24e16980ac18fcc97`
+  - branch: `feat/issue-33-post-card` (remote branch deleted, local issue worktree cleaned up)
+- [x] #43 Admin 대시보드 페이지 PR #136 머지
+  - PR: `feat: implement dashboard page (#43)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/page.tsx`, `src/app/dashboard/loading.tsx`, `src/widgets/dashboard/ui/dashboard-home.tsx`, `src/widgets/dashboard/index.ts`
+  - review fix 1: 존재하지 않는 `/dashboard/stats` CTA와 pending quick-action 링크를 제거하고, 실제 경로가 준비될 때까지 비동작 상태/안내 섹션으로 전환
+  - review fix 2: 최신 댓글 샘플 데이터를 제거하고, 실제 API 연결 전까지 명시적인 준비 중 empty state로 교체
+  - review fix 3: misleading한 `빠른 이동` 섹션을 `관리 메뉴 준비 현황`으로 재구성하고 undefined typography token `text-heading-md`를 `text-h2`로 교체
+  - verification: `pnpm lint && pnpm build && pnpm compile:types`
+  - merge: squash merge, merge commit `b9e1bc851ae623511dbbebbc59af820e589279e7`
+  - branch: `feat/issue-43-dashboard-page` (remote branch deleted, local issue worktree cleanup pending at log time)
+- [x] #45 Admin 글 목록 페이지 PR #137 머지
+  - PR: `feat: add admin posts page (#45)`
+  - merge target: `main`
+  - 구현: `src/app/dashboard/posts/page.tsx`
+  - supporting fix: `src/entities/post/api.ts`에서 관리자 단건/목록 조회가 클라이언트 컴포넌트에서도 `clientFetch`를 사용하도록 보완
+  - review fix: 존재하지 않는 `/dashboard/posts/new`, `/dashboard/posts/[id]` 링크를 제거하고 후속 이슈 연결 전까지 비활성 안내로 전환
+  - verification: `pnpm lint && pnpm build && pnpm compile:types`
+  - merge: squash merge, merge commit `382e2bc6ada1c69dfa9a8a012e52343c651d9bf2`
+  - branch: `feat/issue-45-admin-posts` (remote branch deleted, local issue worktree cleanup pending at log time)
+- [x] #44 Admin Post API functions PR #135 머지
+  - PR: `feat: add admin post api functions (#44)`
+  - merge target: `main`
+  - 구현: `src/entities/post/api.ts`, `src/entities/post/model.ts`, `src/entities/post/index.ts`
+  - supporting fix: `src/shared/api/client.ts`에서 `204/205 No Content` 응답을 허용하도록 보완
+  - verification: `pnpm compile:types && pnpm lint && pnpm build`
+  - merge: squash merge, merge commit `05f05395c74b2185d033c807d71242cc312509a8`
+  - branch: `feat/issue-44-admin-post-api` (remote branch deleted, local issue worktree cleaned up)
+- [x] #28 CategoryNav 위젯 PR #134 머지
+  - PR: `feat: add category nav widget (#28)`
+  - merge target: `main`
+  - 구현: `src/widgets/category-nav/ui/category-nav.tsx`, `src/widgets/category-nav/index.ts`
+  - review fix: `src/app/categories/[slug]/page.tsx` 추가로 CategoryNav pill 링크가 실제 public route로 해석되도록 보완
+  - merge: squash merge, merge commit `c1432e09b72b9fc504c372444c82cd4d5ccff7d1`
+  - branch: `feat/issue-28-category-nav` (remote branch deleted, local issue worktree cleanup pending at log time)
+- [x] #27 글로벌 loading/error/not-found 페이지 PR #133 머지
+  - PR: `feat: add global app states (#27)`
+  - merge target: `main`
+  - 구현: `src/app/loading.tsx`, `src/app/error.tsx`, `src/app/not-found.tsx`
+  - review fix 1: `src/app/dashboard/loading.tsx` 추가로 대시보드가 public feed skeleton을 상속하지 않도록 분리
+  - review fix 2: `src/app/global-error.tsx` 추가로 root layout / provider 초기화 실패에도 커스텀 전역 에러 UI 제공
+  - merge: squash merge, merge commit `7a7e21c58f0a4ba4a4407de78a58749fb837919f`
+  - branch: `feat/issue-27-app-states` (PR merge 후 remote branch deleted, local issue worktree cleanup pending at log time)
+- [x] #26 Public Post API functions PR #131 머지
+  - PR: `feat: add post API functions (#26)`
+  - merge: squash merge, merge commit `b56d8d2d9e25e095c8bfe1f81876ce5f779e3e05`
+  - branch: `feat/issue-26-post-api-functions` (issue worktree cleaned up after merge)
+- [x] #32 Pagination 공통 컴포넌트 PR #128 머지
+  - PR: `feat: Pagination 공통 컴포넌트 (#32)`
+  - merge: squash merge, merge commit `da8901d7ab14efbf3bfd97daa7bd6e7e57e0dd00`
+  - branch: `feat/pagination-component` (remote branch deleted attempt completed, local branch deletion skipped because the branch is still attached to `/workspace/.workspace/worktrees/client/feat-pagination-component`)
+- [x] #30 PostContent + PostNavigation PR #132 머지
+  - PR: `feat: PostContent + PostNavigation 컴포넌트 (#30)`
+  - merge target: `main`
+  - review fix: replace undefined `prose` usage with project-owned `markdown-content` styles in `src/app-layer/style/typography.css`
+  - merge: squash merge, merge commit `d2067fcd6fb88fb9b3b2b343329b4f2fcebb6f19`
+  - branch: `feat/issue-30-post-content-nav` (remote branch deleted, local worktrees cleaned up)
+
+## Discoveries
+- The backend asset upload endpoint `POST /api/assets/upload` returns `{ assets: UploadedAsset[] }` without `createdAt`, while `GET /api/assets` returns paginated list items with `createdAt`, so the client entity layer should model those as separate types.
+- The public stats backend contract at `GET /api/stats/popular` returns `{ data: PopularPost[] }`, so the client entity helper should unwrap `response.data` rather than expose the transport wrapper upstream.
+- In a fresh client issue worktree, `pnpm install --frozen-lockfile` was still required before `pnpm compile:types && pnpm lint && pnpm build` because the worktree did not start with its own `node_modules`.
+- The admin comment backend contract at `GET /api/admin/comments` returns flat paginated items with `status: "active" | "deleted" | "hidden"` plus optional filters like `postId`, `authorType`, `startDate`, and `endDate`, so the client admin helper should model that full query surface instead of just page/postId.
+- The admin guestbook backend contract at `GET /api/admin/guestbook` follows the same paginated pattern as admin comments but without `postId` or `replyToName`, so the client guestbook entity can reuse the same server/client dual-fetch pattern already used by admin post reads.
+- Comment create/delete client payloads need the same `authorType`-discriminated union pattern as guestbook; without a discriminator, the OAuth subset weakens the union enough that guest-only required fields like `guestPassword` stop being enforced by TypeScript.
+- In this client repo, public comment endpoints still use the server's original body contract, so the entity API should strip client-only discriminators before sending to `/api/posts/:postId/comments` and `/api/comments/:id`.
+- In this repo, dashboard route protection can live entirely in `src/middleware.ts`; forwarding the incoming `Cookie` header to the existing backend `/api/auth/me` endpoint was enough to reuse the auth contract from issue #38 without adding a new client entity layer.
+- `pnpm compile:types && pnpm lint && pnpm build` should be run sequentially in a fresh Next.js worktree here; running `compile:types` in parallel with `build` can race on `.next/types/**` generation because `tsconfig.json` includes those generated route type files.
+- The initial `CreateGuestbookBody` shape from the issue description was too guest-specific for the actual `optionalAuth` backend contract; the client entity layer needed to model guest and OAuth creation separately even though both hit the same `/api/guestbook` endpoint.
+- Adding a discriminant like `authorType` is still compatible with the existing backend contract as long as the client API helper strips that field before serializing the request payload.
+- `DeleteGuestbookBody` also needs dual-mode typing because OAuth-authenticated deletes rely on session cookies and do not send `guestPassword`.
+- React 18의 `useTransition`에서 `isPending`은 `startTransition()` 내부의 라우터 전환 구간만 추적하므로, 로그인 같은 선행 async API 호출을 막으려면 별도의 `isLoading` 상태를 합쳐서 submit 중복을 차단해야 한다.
+- `src/app/dashboard/layout.tsx`에서 login segment만 예외 처리하려고 전체 레이아웃을 client component로 바꾸는 대신, `useSelectedLayoutSegment()`를 thin client shell로 분리하면 서버 레이아웃을 유지하면서도 sidebar-free login route를 만들 수 있다.
+- 동적으로 나타나는 로그인 오류 메시지는 시각적으로만 렌더하면 screen reader에 바로 전달되지 않으므로 `role="alert"` 같은 live region 속성이 필요하다.
+- The `GET /api/tags` backend contract already exposes camelCase `postCount`, so the client `Tag` entity can safely model that field without a mapping layer.
+- Tailwind Typography를 이 repo에 도입할 때 `prose-neutral` 같은 palette modifier를 그대로 쓰면, `.markdown-content`가 아직 다루지 않는 `strong`, `table`, `figcaption`, `kbd` 등의 요소가 Tailwind 고정 회색값을 사용해 dark mode token 시스템과 어긋난다.
+- 이 client 테마 구조에서는 `prose`를 유지하더라도 `.markdown-content`에 `--tw-prose-*` CSS 변수를 project design token으로 연결하면 typography plugin의 기본 요소들까지 light/dark 테마를 일관되게 맞출 수 있다.
+- The post detail page could render safely without a tag route only if tags stayed non-interactive; linking them before `src/app/tags/[slug]/page.tsx` exists creates a guaranteed 404 path from the new SSR page.
+- Next.js `next/image`는 `next.config.js`의 `images.remotePatterns`에 없는 원격 호스트를 즉시 거부하므로, API가 임의 CDN URL을 줄 수 있는 카드 UI에서는 사전 allowlist 검사나 `<img>` fallback이 필요하다.
+- `Intl.DateTimeFormat`를 timezone 없이 서버/클라이언트 양쪽에서 쓰면 자정 근처 timestamp가 다른 날짜로 렌더될 수 있어, list card 같은 SSR 텍스트에는 timezone pinning이 필요하다.
+- Admin landing pages should not advertise unavailable routes as primary CTAs or shortcut cards; if the backing route is missing, the dashboard needs explicit status/coming-soon presentation instead of broken or dead navigation.
+- In this repo, `text-heading-md` is referenced in app code but is not defined in `src/app-layer/style/typography.css`; dashboard headings need to use the existing `text-h*` or `text-body-*` utility set.
+- Admin list UI could not call the existing admin read helpers from a client component until `fetchAdminPost` and `fetchAdminPosts` supported a browser `clientFetch` path when no server cookie header is provided.
+- The initial `#45` UI matched the issue text but exposed `/dashboard/posts/new` and `/dashboard/posts/[id]` targets that do not exist yet in this branch, so the review required removing those navigation links instead of advertising broken flows.
+- Admin post mutations are not usable with the current shared client fetch path unless empty `204/205` responses are handled before unconditional JSON parsing.
+- For this repo, a fresh issue worktree can reuse `/workspace/client/node_modules` via symlink to run verification without a second full dependency install.
+- The initial `CategoryNav` widget matched the issue text but still needed a real `src/app/categories/[slug]` route in this app tree; otherwise every category pill except "전체" would land on a 404.
+- In this repo, `pnpm compile:types` can fail in a fresh worktree before a build because `tsconfig.json` includes `.next/types/**/*.ts`; running `pnpm build` first generates the missing route type files, after which `tsc --noEmit` succeeds.
+- Next.js App Router에서 `app/error.tsx`는 root layout 위에서 발생한 실패를 잡지 않으므로, 진짜 전역 런타임 에러 화면이 필요하면 `app/global-error.tsx`를 별도로 둬야 한다.
+- root `app/loading.tsx`는 하위 모든 세그먼트에 전파되므로, public 영역 전용 스켈레톤을 둘 때는 dashboard 같은 별도 섹션에 route-local loading boundary를 추가해야 fallback mismatch를 막을 수 있다.
+- Public post reads fit cleanly into the existing `src/entities/post/api.ts` module; a separate public/admin split was unnecessary for this scope.
+- A fresh issue worktree did not have dependencies installed, so `pnpm install --frozen-lockfile` was required before `pnpm compile:types && pnpm lint && pnpm build` could run.
+- The Codex review on PR #131 reported `[CRITICAL]=0`, `[WARNING]=0`, `[SUGGESTION]=0`, so the pipeline advanced directly to merge without a resolve round.
+- Pagination UI was already re-reviewed after the token-name fix and had no remaining CRITICAL/WARNING/SUGGESTION findings before merge.
+- GitHub merged the PR at `2026-03-13T19:02:47Z`, which is `2026-03-14 04:02:47` in KST.
+- The original `#30` implementation existed on a stacked branch that had been merged into `feat/issue-24-markdown-renderer`, but not opened as a clean PR against `main`.
+- Replaying only the isolated `#30` commit onto a fresh `main` branch produced a clean PR path and avoided carrying stale stacked-branch changes.
+- The review on PR #132 surfaced a real styling gap: this repo does not define Tailwind Typography’s `prose` class, so markdown rendering needed project-owned CSS utilities instead.
+- The verification flow in both the fresh issue worktree and the resolve worktree required `pnpm install` before `pnpm compile:types && pnpm lint && pnpm build`.
+- GitHub marked PR #132 as merged at `2026-03-13T20:48:25Z`, which is `2026-03-14 05:48:25` in KST.
+- GitHub marked PR #135 as merged at `2026-03-13T21:35:57Z`, which is `2026-03-14 06:35:57` in KST.
+- Issue #67 showed that header-only navigation changes can still require companion route work when `main` is missing pages assumed by the issue text; in this case `/popular`, `/tags`, and `/guestbook` had to be added before the nav was safe to expose.
+- For this repo, forwarding the entire `cookies()` jar from a Next.js server component to `NEXT_PUBLIC_API_URL` is too broad; permission-aware server fetches should pass only the specific auth cookie (`sessionId`) that the Fastify session plugin actually consumes.
+
+## Issues & Resolutions
+- **Issue**: 이슈 설명의 reorder payload 키는 `orders`로 적혀 있었지만 서버 카테고리 스키마는 `items`를 사용했다.
+- **Resolution**: `src/entities/category/model.ts`와 `src/entities/category/api.ts`를 서버 route/schema 기준 `items` payload로 맞췄다.
+- **Issue**: The first `#52` implementation modeled comment mutations as guest-only bodies, so authenticated OAuth comment create/delete flows could not be represented through the client entity API.
+- **Resolution**: expanded `CreateCommentBody` and `DeleteCommentBody` to cover guest and OAuth callers, while keeping the outgoing HTTP payload aligned with the existing backend schema.
+- **Issue**: Fresh client issue worktrees still did not have local dependencies installed, so the initial verification attempt for `#65` failed immediately with `tsc: not found`.
+- **Resolution**: ran `pnpm install --frozen-lockfile` inside the issue worktree before the standard `pnpm compile:types && pnpm lint && pnpm build` verification sequence.
+- **Issue**: The second `#52` review found that a plain guest|oauth union still allowed invalid guest requests to compile because the OAuth shape was a subset of the guest shape.
+- **Resolution**: changed comment mutation bodies to `authorType`-discriminated unions and stripped the discriminator in `src/entities/comment/api.ts` before sending the request.
+- **Issue**: The first middleware pass redirected unauthenticated users to `/dashboard/login` but dropped the original destination, had no explicit timeout on `/api/auth/me`, and hard-threw on missing `API_URL` during module initialization.
+- **Resolution**: added a `returnTo` query param, bounded the auth fetch with `AbortSignal.timeout(3000)`, changed production misconfiguration handling to log and deny access, and redirected already authenticated admins away from `/dashboard/login`.
+- **Issue**: The first guestbook entity pass made `CreateGuestbookBody` and `DeleteGuestbookBody` guest-only, which forced impossible password/name/email fields into OAuth call sites even though the server route supports authenticated OAuth requests without them.
+- **Resolution**: changed the entity contracts to discriminated unions for guest vs. OAuth authors, stripped `authorType` before `POST /api/guestbook`, and allowed empty delete bodies for OAuth callers while keeping guest password support.
+- **Issue**: 첫 `#41` 리뷰에서 로그인 폼이 `await login()` 네트워크 요청 동안 비활성화되지 않아 사용자가 submit을 연속으로 눌러 중복 로그인 요청을 보낼 수 있었다.
+- **Resolution**: `src/features/admin-login/ui/login-form.tsx`에 `isLoading` 상태를 추가하고 `isPending`과 합친 `busy` 플래그로 입력과 submit 버튼을 모두 잠그도록 수정했다.
+- **Issue**: `/dashboard/login`만 sidebar를 숨기기 위해 `src/app/dashboard/layout.tsx` 전체를 client component로 바꾸면 admin 레이아웃이 불필요하게 클라이언트 번들로 승격된다.
+- **Resolution**: `src/app/dashboard/layout-shell.tsx`를 새로 만들어 segment 판별 로직만 client로 분리하고, `dashboard/layout.tsx`는 server component로 되돌렸다.
+- **Issue**: 로그인 실패 오류 박스가 동적으로 나타나도 보조기기에는 자동으로 공지되지 않았다.
+- **Resolution**: 오류 컨테이너에 `role="alert"`를 추가해 screen reader가 즉시 오류 메시지를 읽도록 보완했다.
+- **Issue**: 첫 구현에서 `PostContent`에 `prose prose-neutral max-w-none`와 기존 `.markdown-content`를 같이 적용해, `.markdown-content`가 직접 스타일링하지 않는 markdown 요소들이 Tailwind 고정 neutral palette를 사용하면서 dark mode에서 색상 불일치가 생길 수 있었다.
+- **Resolution**: `prose-neutral`를 제거하고 `src/app-layer/style/typography.css`의 `.markdown-content`에 `--tw-prose-*` 변수를 design token 기반으로 선언해 typography plugin과 기존 theme system을 정렬했다.
+- **Issue**: The first `#39` review found that the new post detail page linked tags to `/tags/[slug]`, but this app tree does not implement that route yet, so every tag click would land on a 404.
+- **Resolution**: removed the tag links in `src/app/posts/[slug]/page.tsx` and kept tags as static pills until a real tag page is implemented.
+- **Issue**: 첫 PR #138 리뷰에서 `PostCard`가 모든 원격 `thumbnailUrl`을 `next/image`로 렌더해, `github.com` 외 호스트에서는 런타임 에러가 발생할 수 있었다.
+- **Resolution**: 허용된 로컬/`github.com` 이미지만 `next/image`를 사용하고, 그 외 URL은 plain `<img>`로 fallback 하도록 `src/features/post-list/ui/post-card.tsx`를 보완했다.
+- **Issue**: `PostCard` 날짜 포맷터가 런타임 기본 timezone을 사용해 SSR과 브라우저 사이에서 날짜 문자열이 달라질 수 있었다.
+- **Resolution**: `Intl.DateTimeFormat("ko-KR", { ..., timeZone: "UTC" })`로 고정해 hydration mismatch와 off-by-one 날짜 노출 위험을 제거했다.
+- **Issue**: The first `#43` dashboard implementation exposed `/dashboard/stats` and several admin shortcuts before those app routes existed, which made the new landing page send users directly into 404 states.
+- **Resolution**: replaced the broken CTA/shortcut links with explicit ready-state messaging and reframed the lower section as `관리 메뉴 준비 현황` until real admin routes are implemented.
+- **Issue**: The original `최신 댓글` panel in `#43` rendered hard-coded sample entries as if they were real moderation data.
+- **Resolution**: removed the fabricated list and replaced it with a clear empty/coming-soon state until a real recent-comments API and screen exist.
+- **Issue**: `#45` needed to fetch admin posts inside a `use client` page, but the existing admin read helpers only used `serverFetch`, which expects a server-side cookie header.
+- **Resolution**: updated `src/entities/post/api.ts` so admin read helpers use `clientFetch` in browser contexts and keep `serverFetch` for server-side callers.
+- **Issue**: The first review on PR #137 identified that the list page linked to `/dashboard/posts/new` and `/dashboard/posts/[id]`, but those routes are not implemented yet and caused immediate 404s.
+- **Resolution**: removed the broken links, kept the list page read-only for navigation, and changed the header CTA to a non-interactive `준비 중` indicator until the actual create/edit routes land.
+- **Issue**: Admin post delete endpoints return `204 No Content`, but the shared `clientFetch` path always attempted `response.json()` on success.
+- **Resolution**: added an early return for `204/205` responses in `src/shared/api/client.ts` so `deletePost` and `hardDeletePost` can resolve safely.
+- **Issue**: The fresh `issue-44` worktree had no local `node_modules`, so `pnpm compile:types` initially failed with `tsc: not found`.
+- **Resolution**: linked the existing `/workspace/client/node_modules` into the worktree and reran `pnpm compile:types && pnpm lint && pnpm build` successfully.
+- **Issue**: `CategoryNav` 위젯의 `/categories/[slug]` 링크가 실제 app router 경로와 맞지 않아 PR review에서 즉시 404 위험이 지적되었다.
+- **Resolution**: `src/app/categories/[slug]/page.tsx`를 추가하고, visible category slug를 검증한 뒤 유효하지 않은 slug에는 `notFound()`를 반환하도록 보완했다.
+- **Issue**: review fix 검증 시 fresh worktree의 `pnpm compile:types`가 `.next/types/app/...` 파일이 없다는 이유로 먼저 실패했다.
+- **Resolution**: worktree에서 `pnpm build`로 Next route types를 생성한 뒤 `pnpm compile:types`를 재실행해 통과시켰다.
+- **Issue**: Root `src/app/loading.tsx` 때문에 `/dashboard` 로딩 시 public post-list skeleton이 잠시 표시되었다.
+- **Resolution**: `src/app/dashboard/loading.tsx`를 추가해 admin 라우트 트리에 전용 loading fallback을 분리했다.
+- **Issue**: `src/app/error.tsx`만으로는 `src/app/layout.tsx` 또는 전역 provider 초기화 단계에서 발생한 런타임 에러를 처리할 수 없었다.
+- **Resolution**: `src/app/global-error.tsx`를 추가해 앱 전체에 적용되는 runtime error boundary를 제공했다.
+- **Issue**: `gh pr merge --delete-branch` could not remove the local branch because `feat/pagination-component` is checked out in an existing client worktree.
+- **Resolution**: kept the active worktree branch intact and verified that the PR itself was merged successfully on GitHub.
+- **Issue**: The original `#30` branch was stacked on top of `#24`, so the already-merged feature work was not represented by a clean PR to `main`.
+- **Resolution**: created a fresh issue branch from `main`, cherry-picked only the `#30` feature commit, opened PR #132, then addressed the review warning with project-owned markdown styles before merge.
+
+## Next Steps
+- [ ] Add `src/app/tags/[slug]/page.tsx` so post tags can become real navigation targets again.
+- [ ] Update the admin login success flow to consume the new `returnTo` query param and send authenticated users back to their originally requested dashboard route.
+- [ ] Add actual `/dashboard/posts/new` and `/dashboard/posts/[id]` admin routes, then reconnect the create/edit navigation removed during PR #137 review.
+- [ ] Wire `PostContent` and `PostNavigation` into the actual post detail route once the page composition task is active.
+
+## Notes
+- Related PR: #165
+- Related Issue: #48
+- Related PR: #149
+- Related Issue: #58
+- Related PR: #145
+- Related Issue: #52
+- Related PR: #144
+- Related Issue: #40
+- Related PR: #142
+- Related Issue: #51
+- Related PR: #141
+- Related Issue: #41
+- Related PR: #143
+- Related Issue: #49
+- Related PR: #140
+- Related Issue: #35
+- Related PR: #139
+- Related Issue: #39
+- Related PR: #138
+- Related Issue: #33
+- Related PR: #137
+- Related Issue: #45
+- Related PR: #135
+- Related Issue: #44
+- Related PR: #134
+- Related Issue: #28
+- Related PR: #133
+- Related Issue: #27
+- Related PR: #131
+- Related Issue: #26
+- Related PR: #128
+- Related PR: #132
+- Related Issue: #32
+- Related Issue: #30

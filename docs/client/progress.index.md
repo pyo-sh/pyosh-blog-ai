@@ -6,6 +6,21 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-15 | #63 SEO 메타데이터 + Open Graph PR #166 머지 | ✅   |
+| 2026-03-15 | #69 조회수 기록 hook + ViewCounter PR #164 머지 | ✅   |
+| 2026-03-14 | #48 공개 방명록 페이지 PR #165 머지 | ✅   |
+| 2026-03-14 | #37 카테고리별 글 목록 페이지 PR #163 머지 | ✅   |
+| 2026-03-14 | #70 Admin 댓글 관리 페이지 PR #162 머지 | ✅   |
+| 2026-03-14 | #53 Admin 글 작성/수정 페이지 PR #161 머지 | ✅   |
+| 2026-03-14 | #61 인기 글 페이지 기간 필터 PR #160 머지 | ✅   |
+| 2026-03-14 | #64 헤더 검색바 PR #157 머지 | ✅   |
+| 2026-03-14 | #60 에셋 라이브러리 feature + 페이지 PR #159 머지 | ✅   |
+| 2026-03-14 | #68 Admin 방명록 관리 페이지 PR #158 머지 | ✅   |
+| 2026-03-14 | #55 댓글 섹션 feature PR #155 머지 | ✅   |
+| 2026-03-14 | #57 카테고리 관리 feature + 페이지 PR #156 머지 | ✅   |
+| 2026-03-14 | #59 태그 목록/태그별 글 목록 페이지 PR #154 머지 | ✅   |
+| 2026-03-14 | #67 헤더 네비게이션 업데이트 PR #152 머지 | ✅   |
+| 2026-03-14 | #36 홈 페이지 SSR PR #153 머지, #66 검색 결과 페이지 SSR PR #151 머지, #65 Admin 댓글/방명록 API functions PR #150 머지, #62 Category Admin API functions PR #148 머지, #58 Asset entity types + API PR #149 머지, #54 마크다운 에디터 + 프리뷰 feature PR #147 머지, #56 PopularPost API PR #146 머지, #52 Comment entity types + API PR #145 머지, #40 Dashboard 인증 미들웨어 PR #144 머지, #51 Guestbook entity types + API PR #142 머지, #49 Tag entity types + API PR #143 머지, #41 Admin 로그인 페이지 PR #141 머지, #35 마크다운 타이포그래피 스타일링 PR #140 머지, #39 글 상세 페이지 SSR PR #139 머지, #33 PostCard PR #138 머지, #43 Admin 대시보드 페이지 PR #136 머지, #45 Admin 글 목록 페이지 PR #137 머지, #44 Admin Post API functions PR #135 머지, #28 CategoryNav 위젯 PR #134 머지, #27 글로벌 loading/error/not-found 페이지 PR #133 머지, #26 Public Post API functions PR #131 머지, #32 Pagination 공통 컴포넌트 PR #128 머지, #30 PostContent + PostNavigation PR #132 머지 | ✅   |
 | 2026-03-09 | #24 PR #127 리뷰 코멘트 대응 (processor 모듈화, sanitizeSchema 코멘트), #29 Category entity PR #129 머지 | ✅   |
 | 2026-03-08 | #24 마크다운 렌더링 유틸리티 (shiki), #29 Category entity 타입 + API, #30 PostContent + PostNavigation 컴포넌트 | ✅   |
 | 2026-03-07 | #25 Post entity - PostNavigation 타입 추가 | ✅   |
@@ -19,6 +34,21 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
+- [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #37 카테고리별 글 목록 페이지 PR #163 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #70 Admin 댓글 관리 페이지 PR #162 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #53 Admin 글 작성/수정 페이지 PR #161 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #61 인기 글 페이지 기간 필터 PR #160 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #64 헤더 검색바 PR #157 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #60 에셋 라이브러리 feature + 페이지 PR #159 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #68 Admin 방명록 관리 페이지 PR #158 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #55 댓글 섹션 feature PR #155 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #57 카테고리 관리 feature + 페이지 PR #156 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #59 태그 목록/태그별 글 목록 페이지 PR #154 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #67 헤더 네비게이션 업데이트 PR #152 머지
+- [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #36 홈 페이지 SSR PR #153 머지, #66 검색 결과 페이지 SSR PR #151 머지, #65 Admin 댓글/방명록 API functions PR #150 머지, #62 Category Admin API functions PR #148 머지, #58 Asset entity types + API PR #149 머지, #54 마크다운 에디터 + 프리뷰 feature PR #147 머지, #56 PopularPost API PR #146 머지, #52 Comment entity types + API PR #145 머지, #40 Dashboard 인증 미들웨어 PR #144 머지, #51 Guestbook entity types + API PR #142 머지, #49 Tag entity types + API PR #143 머지, #41 Admin 로그인 페이지 PR #141 머지, #35 마크다운 타이포그래피 스타일링 PR #140 머지, #39 글 상세 페이지 SSR PR #139 머지, #33 PostCard PR #138 머지, #43 Admin 대시보드 페이지 PR #136 머지, #45 Admin 글 목록 페이지 PR #137 머지, #44 Admin Post API functions PR #135 머지, #28 CategoryNav 위젯 PR #134 머지, #27 글로벌 loading/error/not-found 페이지 PR #133 머지, #26 Public Post API functions PR #131 머지, #32 Pagination 공통 컴포넌트 PR #128 머지, #30 PostContent + PostNavigation PR #132 머지
 - [progress.2026-03-09.md](./progress/progress.2026-03-09.md) - #24 PR #127 리뷰 코멘트 대응, #29 Category entity PR #129 머지
 - [progress.2026-03-08.md](./progress/progress.2026-03-08.md) - #24 마크다운 렌더링 유틸리티 (shiki), #29 Category entity 타입 + API, #30 PostContent + PostNavigation 컴포넌트
 - [progress.2026-03-07.md](./progress/progress.2026-03-07.md) - #25 Post entity - PostNavigation 타입 추가
