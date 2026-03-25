@@ -319,7 +319,7 @@ interface UploadedAsset {
 
 | 계층 | 파일 | 역할 |
 |---|---|---|
-| `app` | `dashboard/assets/page.tsx` | 에셋 관리 라우트 (기존) |
+| `app` | `manage/assets/page.tsx` | 에셋 관리 라우트 (기존) |
 | `features` | `asset-uploader/ui/asset-uploader.tsx` | 업로드 + 갤러리 오케스트레이션 (기존) |
 | `features` | `asset-uploader/ui/upload-zone.tsx` | 드래그 앤 드롭 + 큐 (기존, 진행률 추가) |
 | `features` | `asset-uploader/ui/asset-grid.tsx` | 갤러리 그리드 (기존, F-27 스펙) |

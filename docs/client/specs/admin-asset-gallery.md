@@ -261,7 +261,7 @@ interface AssetPickerModalProps {
 
 | 계층 | 파일 | 역할 |
 |---|---|---|
-| `app` | `dashboard/assets/page.tsx` | 에셋 관리 라우트 (기존) |
+| `app` | `manage/assets/page.tsx` | 에셋 관리 라우트 (기존) |
 | `features` | `asset-uploader/ui/asset-uploader.tsx` | 업로드 + 갤러리 오케스트레이션 (기존 리팩토링) |
 | `features` | `asset-uploader/ui/asset-grid.tsx` | 갤러리 그리드 (기존 리팩토링) |
 | `features` | `asset-uploader/ui/asset-detail-modal.tsx` | 상세 모달 (신규) |
