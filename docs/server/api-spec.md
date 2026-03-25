@@ -150,6 +150,7 @@
   "tags": ["tag1", "tag2"],
   "publishedAt": "ISO datetime",
   "summary": "string (max 200)",
+  "description": "string (max 300)",
   "commentStatus": "open | locked | disabled"
 }
 ```
@@ -164,6 +165,7 @@
   "slug": "...",
   "contentMd": "...",
   "summary": "...",
+  "description": "...",
   "thumbnailUrl": "/uploads/example.jpg",
   "visibility": "public",
   "status": "published",
@@ -192,6 +194,7 @@
   "title": "...",
   "slug": "...",
   "summary": "...",
+  "description": "...",
   "thumbnailUrl": "/uploads/example.jpg",
   "visibility": "public",
   "status": "published",
