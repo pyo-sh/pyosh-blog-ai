@@ -259,7 +259,7 @@ DELETE /api/admin/comments/:id?action=hard_delete
 변경 후: Toast 알림 "너무 많은 요청을 보냈습니다. 잠시 후 다시 시도해 주세요."
 ```
 
-- Toast 타입: `warning`
+- Toast 타입: `error`
 - 429 외 서버 에러(400, 403, 500 등)는 기존대로 폼 내 인라인 에러 표시
 
 ### 5.9 게스트 비밀글 sessionStorage 관리

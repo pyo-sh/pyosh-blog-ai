@@ -70,6 +70,7 @@
 | categoryId | number | - | 카테고리 필터 |
 | tagSlug | string | - | 태그 슬러그 필터 |
 | q | string | - | 제목/내용 검색 |
+| filter | string | title_content | 검색 범위 (`title_content` \| `title` \| `content` \| `tag` \| `category` \| `comment`) |
 | sort | string | published_at | 정렬 기준 (`published_at` \| `created_at`) |
 | order | string | desc | 정렬 방향 (`asc` \| `desc`) |
 
