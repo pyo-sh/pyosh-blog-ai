@@ -10,14 +10,14 @@
       "text": {
         "1": "#232629",
         "2": "#4b5158",
-        "3": "#838c95",
-        "4": "#babfc4"
+        "3": "#6b7780",
+        "4": "#a3aab1"
       },
       "border": {
         "1": "#33383c",
         "2": "#a6adb3",
         "3": "#dbdde0",
-        "4": "#f1f2f3"
+        "4": "#eaebed"
       },
       "primary": {
         "1": "#8a6fe0",
@@ -27,21 +27,21 @@
         "1": "#6b49b5",
         "2": "#9983cc"
       },
-      "tertiary": {
+      "info": {
         "1": "#8d9eff",
         "2": "#b0bcff"
       },
-      "quaternary": {
-        "1": "#b9e0ff",
-        "2": "#cee9ff"
-      },
       "positive": {
-        "1": "#0da96b",
+        "1": "#078556",
         "2": "#41d69b"
       },
       "negative": {
         "1": "#e21223",
         "2": "#f15966"
+      },
+      "warning": {
+        "1": "#c67a0a",
+        "2": "#fef3e0"
       },
       "grey": {
         "1": "#f1f2f3",
@@ -50,8 +50,8 @@
         "4": "#596068"
       },
       "yellow": {
-        "1": "#ffbe3d",
-        "2": "#f2a116"
+        "1": "#f2a116",
+        "2": "#ffbe3d"
       },
       "overlay": {
         "1": "#131415"
@@ -67,14 +67,14 @@
       "text": {
         "1": "#e9eaeb",
         "2": "#c4c6c9",
-        "3": "#999ea2",
-        "4": "#656b70"
+        "3": "#a8adb1",
+        "4": "#919799"
       },
       "border": {
-        "1": "#ced1d3",
+        "1": "#a6abb0",
         "2": "#a1a5aa",
         "3": "#54595d",
-        "4": "#35383a"
+        "4": "#3e4245"
       },
       "primary": {
         "1": "#a591e8",
@@ -84,13 +84,9 @@
         "1": "#8c72c5",
         "2": "#b9aadc"
       },
-      "tertiary": {
+      "info": {
         "1": "#a5b2ff",
         "2": "#c7d0ff"
-      },
-      "quaternary": {
-        "1": "#c7e6ff",
-        "2": "#ddf0ff"
       },
       "positive": {
         "1": "#10c67d",
@@ -99,6 +95,10 @@
       "negative": {
         "1": "#f15966",
         "2": "#feccd0"
+      },
+      "warning": {
+        "1": "#f0a030",
+        "2": "#3d2e18"
       },
       "grey": {
         "1": "#484c50",
@@ -158,6 +158,8 @@
     "source": "client/src/app-layer/style/theme.css + typography.css",
     "figmaCollection": "Theme",
     "figmaTextStyles": 21,
-    "note": "Dark mode requires Figma Professional plan (addMode limit on Starter)"
+    "note": "Dark mode requires Figma Professional plan (addMode limit on Starter)",
+    "lastUpdated": "2026-03-26",
+    "changes": "quaternary deleted, tertiary→info renamed, warning added, neutral/semantic contrast fixes"
   }
 }
