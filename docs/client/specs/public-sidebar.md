@@ -146,7 +146,7 @@ F-06에서 사용하는 기존 엔드포인트 재사용. `days=7&limit=5`로 �
 | 항목 | 현재 | 변경 |
 |---|---|---|
 | 응답 구조 | flat list | 트리 구조 (parent-child 관계 포함) |
-| 응답 필드 | 없음 | 각 카테고리별 `postCount` 추가 |
+| 응답 필드 | 없음 | 각 카테고리별 `publishedPostCount`, `totalPostCount` 추가 |
 
 ### GET /api/stats/total-views
 
@@ -164,7 +164,7 @@ F-06에서 사용하는 기존 엔드포인트 재사용. `days=7&limit=5`로 �
 | 항목 | 설명 |
 |---|---|
 | 글 목록 API | `limit` 파라미터 지원 (기존 정렬 활용) |
-| 카테고리 API | 트리 구조 응답 + `postCount` 집계 |
+| 카테고리 API | 트리 구조 응답 + `publishedPostCount`, `totalPostCount` 집계 |
 | 통계 API | `GET /api/stats/total-views` 신규 (F-10 참조) |
 | 통계 API | 전체 조회수 엔드포인트 신규 추가 |
 

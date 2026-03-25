@@ -290,7 +290,7 @@ CategoryManager
 
 | 메서드 | 경로 | 용도 | 비고 |
 |---|---|---|---|
-| GET | `/api/categories?include_hidden=true` | 카테고리 트리 (글 개수 포함) | 응답에 postCount 추가 |
+| GET | `/api/categories?include_hidden=true` | 카테고리 트리 (글 개수 포함) | 응답에 publishedPostCount, totalPostCount 추가 |
 | PATCH | `/api/categories/tree` | 배치 트리 변경 (순서 + 부모) | **신규** |
 | PATCH | `/api/categories/:id` | 개별 공개/숨김 변경 | 기존 (일괄 선택에서 사용) |
 
