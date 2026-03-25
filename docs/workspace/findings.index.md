@@ -30,6 +30,7 @@
 | 022 | Figma captureForDesign hang 원인과 Section 배치 패턴           | 2026-03-23 | #figma #playwright #captureForDesign #section #layout #dialog #mcp |
 | 023 | captureForDesign color-mix() 미해석 및 inline 요소 높이 불일치 패턴 | 2026-03-23 | #figma #captureForDesign #color-mix #rgba #inline-block #html-to-design |
 | 024 | HTML 와이어프레임 Figma DOM 업로드 완전 가이드 | 2026-03-25 | #figma #playwright #html-to-design #dom-capture #wireframe #mcp #admin |
+| 025 | Figma plugin node orphan 방지 패턴 | 2026-03-25 | #figma #figma-execute #node-lifecycle #orphan #try-catch #plugin-api |
 
 ## 상세 문서
 
@@ -57,6 +58,7 @@
 - [findings.022-figma-capture-section-layout.md](./findings/findings.022-figma-capture-section-layout.md) - captureForDesign hang 원인(POST성공 후 status 404 폴링), 409 재발급 정책, Section API, appendChild 후 좌표 설정, Dialog 판별 패턴, figma-remote rate limit
 - [findings.023-figma-capture-color-mix-inline.md](./findings/findings.023-figma-capture-color-mix-inline.md) - color-mix() 미캡처 원인/rgba 교체 매핑표, inline 높이 불일치(inline-block 해결), exportAsync rate-limit 없음
 - [findings.024-figma-dom-wireframe-upload-guide.md](./findings/findings.024-figma-dom-wireframe-upload-guide.md) - HTTP 서버 설정, captureId 발급, fire-and-forget 패턴, IntersectionObserver 스크롤, 모달/사이드바 처리, polling 완료 확인 전체 가이드
+- [findings.025-figma-node-orphan-cleanup.md](./findings/findings.025-figma-node-orphan-cleanup.md) - 생성 즉시 appendChild, try/catch 롤백 목록, 사후 audit 패턴으로 orphan 노드 방지
 
 ## 주요 원칙
 
@@ -102,3 +104,4 @@
 - **Mobile 캡처 시 사이드바/모달 JS로 닫기** → `#sidebar.classList.remove('open')`, backdrop `display:none`. HTML 로드 시 열려있는 모달도 동일하게 처리 후 캡처
 - **captureForDesign inline 요소는 display:inline-block 필수** → `display:inline`이면 frame.height = em-box. `inline-block`으로 변경해야 frame.height = line-height와 일치
 - **Figma 변경 직후 검증은 figma_capture_screenshot** → Plugin exportAsync API 사용으로 REST API rate limit 없이 즉시 캡처 가능
+- **figma.createXxx() 생성 즉시 appendChild 필수** → 생성 함수는 페이지 루트에 즉시 등록. append 전 실패 시 orphan 발생. 생성 → append → 프로퍼티 설정 순서 고정. try/catch + 생성 목록 롤백으로 오류 시 자동 제거
