@@ -342,6 +342,55 @@
 | DELETE | `/api/admin/comments/:id` | Admin | 댓글 삭제 (`?action=soft_delete` \| `?action=hard_delete`) |
 | DELETE | `/api/admin/comments/bulk` | Admin | 댓글 벌크 삭제 |
 
+#### GET `/api/posts/:postId/comments`
+
+**Query Parameters:**
+| Param | Type | Default | 설명 |
+|---|---|---|---|
+| page | number | 1 | 페이지 번호 (루트 댓글 기준) |
+| limit | number (max 50) | 10 | 페이지당 루트 댓글 수 |
+
+**Response 200:**
+```json
+{
+  "data": [CommentDetail],
+  "meta": { "page": 1, "limit": 10, "totalCount": 50, "totalRootComments": 30, "totalPages": 3 }
+}
+```
+
+#### GET `/api/admin/comments`
+
+**Query Parameters:**
+| Param | Type | Default | 설명 |
+|---|---|---|---|
+| page | number | 1 | 페이지 번호 |
+| limit | number (max 100) | 20 | 페이지당 개수 |
+| status | string | - | 상태 필터 (`active` \| `deleted` \| `hidden`) |
+| authorType | string | - | 작성자 유형 (`oauth` \| `guest`) |
+| postId | number | - | 특정 글의 댓글만 |
+| startDate | string | - | 시작일 (YYYY-MM-DD) |
+| endDate | string | - | 종료일 (YYYY-MM-DD) |
+| sort | string | created_at | 정렬 기준 (`created_at`) |
+| order | string | desc | 정렬 방향 (`asc` \| `desc`) |
+
+**Response 200:**
+```json
+{
+  "data": [{ ...CommentDetail, "post": { "id": 1, "title": "..." } }],
+  "meta": { "page": 1, "limit": 20, "totalCount": 100, "totalPages": 5 }
+}
+```
+
+#### GET `/api/admin/comments/:id/thread`
+
+**Response 200:**
+```json
+{
+  "parent": CommentDetail,
+  "replies": [CommentDetail]
+}
+```
+
 #### POST `/api/posts/:postId/comments`
 
 **OAuth 사용자:**
@@ -410,6 +459,19 @@
   "meta": { "page": 1, "limit": 20, "totalCount": 50, "totalPages": 3 }
 }
 ```
+
+#### GET `/api/admin/guestbook`
+
+**Query Parameters:**
+| Param | Type | Default | 설명 |
+|---|---|---|---|
+| page | number | 1 | 페이지 번호 |
+| limit | number (max 100) | 20 | 페이지당 개수 |
+| status | string | - | 상태 필터 (`active` \| `deleted` \| `hidden`) |
+| authorType | string | - | 작성자 유형 (`oauth` \| `guest`) |
+| q | string | - | 작성자 이름 + 본문 검색 |
+| startDate | string | - | 시작일 (YYYY-MM-DD) |
+| endDate | string | - | 종료일 (YYYY-MM-DD) |
 
 #### DELETE `/api/admin/guestbook/bulk`
 
