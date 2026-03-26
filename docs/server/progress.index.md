@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-27 | Issue #41 Posts admin CRUD: 통합 테스트 16건 추가 (GET list/detail, POST, PATCH), buildPaginatedResponse 파라미터 순서 버그 수정 + PR #62 머지 | ✅   |
 | 2026-03-27 | Issue #42 Stats API: POST /api/stats/view (postId 선택적, KST 날짜, CSRF, rate limit), GET /api/stats/popular, GET /api/stats/total-views, GET /api/admin/stats/dashboard (postsByStatus), postId=0 센티넬 전략(MySQL NULL unique bug), NOT NULL 마이그레이션, 13개 통합 테스트 + PR #59 머지 | ✅   |
 | 2026-03-27 | Issue #43 SEO endpoints: sitemap.xml + rss.xml integration tests (14 tests); implementation was already on main + PR #60 머지 | ✅   |
 | 2026-03-26 | Issue #39 Production security: httpOnly/sameSite-lax/secure cookies, CORS methods+headers+maxAge, admin CSRF sub-plugin (safe-methods set), Swagger prod disable, Helmet CSP false + PR #57 머지 | ✅   |
@@ -47,6 +48,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - Issue #41 Posts admin CRUD: 통합 테스트 16건 + buildPaginatedResponse 버그 수정 + PR #62 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #34 Categories API: 5 endpoints + batch tree update + delete actions + nullable categoryId migration + PR #52 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #35 Guestbook + settings API: 8 endpoints + settings service + PR #53 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #30 app bootstrap: /api/health memory 필드 추가 + PR #47 머지
