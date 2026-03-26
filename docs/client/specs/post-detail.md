@@ -284,7 +284,8 @@ export function CodeBlockEnhancer({ children }: PropsWithChildren) {
 - 카드 호버: `translateY(-3px)` + `box-shadow` + 썸네일 `scale(1.05)`
 - 가로 스크롤: `overflow-x: auto`, `scroll-snap-type: x mandatory`, 스크롤바 숨김
 - 관련 글 선정: 같은 카테고리의 최신 글 최대 5개 (서버에서 조회)
-- 관련 글이 없으면 섹션 미표시
+- 카테고리 미설정 시: 관련 글 컴포넌트를 렌더링하지 않는다 - API 요청 자체가 발생하지 않음
+- 관련 글이 없으면 (같은 카테고리 글이 없음) 섹션 미표시
 
 ### 5.9 코드블록 가로 스크롤 (모바일)
 
@@ -354,6 +355,7 @@ PostDetailPage (Server Component)
 - [ ] 외부 링크가 새 탭에서 열리며 `rel="noopener noreferrer"`가 적용된다
 - [ ] 마크다운 내 이미지에 `loading="lazy"` `decoding="async"`가 적용된다
 - [ ] 관련 글이 가로 스크롤 카드 리스트로 표시된다 (최대 5개)
+- [ ] 카테고리 미설정 글에서는 관련 글 컴포넌트가 렌더링되지 않고, API 요청도 발생하지 않는다
 - [ ] 모바일에서 코드블록이 페이지 레이아웃을 깨지 않고 가로 스크롤된다
 - [ ] rehypeSanitize로 XSS 공격이 차단된다
 - [ ] 다크모드 자동 적용 (typography.css 시맨틱 토큰)
@@ -371,6 +373,7 @@ PostDetailPage (Server Component)
 | 마크다운 내 `<script>` 태그 | rehypeSanitize가 제거 |
 | 외부 이미지 URL 깨짐 | 브라우저 기본 깨진 이미지 아이콘 |
 | 썸네일 없는 글 | 썸네일 영역 미표시, 바로 메타데이터 표시 |
+| 카테고리 미설정 글 | 관련 글 컴포넌트 미렌더링 (API 미호출) |
 | 관련 글 없음 (같은 카테고리 글이 없음) | 관련 글 섹션 미표시 |
 | 댓글 로드 실패 | 에러 메시지 표시, 글 본문은 정상 표시 |
 | 클립보드 API 미지원 브라우저 | 복사 버튼 숨김 또는 폴백 처리 |
