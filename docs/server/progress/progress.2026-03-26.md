@@ -341,3 +341,26 @@ Docker Compose `env_file: ../../.env` was already in place.
 ### Review outcome
 
 Clean (0 critical, 0 warning, 0 suggestion).
+
+## Issue #43 - SEO endpoints (PR #60)
+
+**Status**: Merged
+
+### What was done
+
+`GET /sitemap.xml` and `GET /rss.xml` were already fully implemented on `main` from prior development (`src/routes/seo/seo.route.ts`, registered in `src/app.ts` without prefix). This PR added the missing integration test coverage.
+
+**New file:**
+- `test/routes/seo.test.ts` - 14 integration tests covering:
+  - Sitemap: 200 status, `application/xml` Content-Type, `Cache-Control: public, max-age=3600`, published+public posts included, draft excluded, private excluded, valid `<urlset>` XML structure
+  - RSS: 200 status, `application/rss+xml` Content-Type, cache header, published+public posts included, private excluded, draft excluded, RSS 2.0 structure, channel metadata fields, exactly 20-post limit
+
+### Key notes
+
+- Sitemap includes category URLs and static page URLs in addition to post URLs - broader than the issue spec but consistent with the implementation
+- RSS limit test seeds 25 posts and asserts count equals exactly 20 (`toBe(20)` not `<=`)
+- Content-Type assertion uses `/application\/rss\+xml/` (strict, not accepting plain `application/xml` fallback)
+
+### Review outcome
+
+1 round. 0 critical, 0 warning, 3 suggestions. All applied: added `visibility: 'private'` RSS exclusion test, tightened RSS Content-Type regex, changed RSS limit assertion from `<=` to exact `toBe(20)`. Merged without re-review (skipReview).
