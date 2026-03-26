@@ -1,5 +1,40 @@
 # Server Progress - 2026-03-26
 
+## Issue #35 - Guestbook + settings API (PR #53)
+
+**Status**: Merged
+
+### What was done
+
+Implemented the full guestbook public/admin API (8 endpoints) and site settings API (2 endpoints).
+
+**New files:**
+- `src/db/schema/settings.ts` - `site_settings_tb` singleton table (`id=1`, `guestbook_enabled boolean`)
+- `drizzle/0005_site_settings.sql` - migration creating the table + seeding the default row
+- `src/routes/settings/settings.schema.ts` - `GuestbookSettingsResponseSchema`, `UpdateGuestbookSettingsBodySchema`
+- `src/routes/settings/settings.service.ts` - `SettingsService` with `getGuestbookEnabled` / `setGuestbookEnabled` (upsert pattern)
+- `src/routes/settings/settings.route.ts` - `GET /api/settings/guestbook` (public), `PATCH /api/admin/settings/guestbook` (admin)
+
+**Modified files:**
+- `src/db/schema/index.ts` - re-exported settings schema
+- `src/routes/guestbook/guestbook.schema.ts` - added admin schemas: `AdminGuestbookDeleteQuerySchema` (`soft_delete|hard_delete`), `AdminGuestbookPatchQuerySchema` (`hide|restore`), `AdminGuestbookBulkDeleteBodySchema`, `AdminGuestbookBulkPatchBodySchema` (max 100 ids); fixed `AdminGuestbookItemSchema` status to include `"hidden"`; added `status` and `q` to `AdminGuestbookListQuerySchema`
+- `src/routes/guestbook/guestbook.service.ts` - added `adminDeleteEntry`, `adminPatchEntry`, `bulkDeleteEntries`, `bulkPatchEntries`; updated `getAdminGuestbook` with status filter, LIKE search (metachar-escaped), date range
+- `src/routes/guestbook/guestbook.route.ts` - added guestbook-enabled check on POST, added admin single/bulk PATCH (hide/restore) and DELETE (soft_delete/hard_delete) routes
+- `src/app.ts` - registered settings routes, wired `settingsService` into guestbook route
+
+### Key design decisions
+
+- DELETE endpoints handle only irreversible actions (soft_delete, hard_delete); PATCH handles reversible state changes (hide, restore) - applied to both single and bulk routes
+- All state transitions include source-status guards: hide only from `active`, restore only from `hidden`, soft_delete skips already-deleted rows to preserve original `deletedAt`
+- Settings upsert uses Drizzle `onDuplicateKeyUpdate` with typed values (not deprecated `VALUES()` SQL syntax)
+- LIKE metacharacters (`%`, `_`, `\`) escaped in search queries
+
+### Review outcome
+
+6 rounds. Key corrections: HTTP method separation for reversible/irreversible actions, restore narrowed to `hidden`-only (not undoing soft_delete), `hide` guard against overwriting `deleted` status, soft_delete idempotency to preserve audit trail `deletedAt`. Round 6 warnings fixed and merged without re-review (round limit).
+
+See [findings.015-guestbook-settings-api.md](../findings/findings.015-guestbook-settings-api.md).
+
 ## Issue #32 - Logging and error management (PR #50)
 
 **Status**: Merged
