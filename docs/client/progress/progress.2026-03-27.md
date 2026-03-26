@@ -30,3 +30,19 @@ Server Component (SSR) → fetchPosts({ page }) → initialData
 - 고정 글만 있을 때: 페이지네이션 미표시
 
 **리뷰 라운드:** 3회 (Warning 2건 수정, Suggestion 6건 수정)
+
+### #168 [F-04] 태그 목록 (PR #212 머지)
+
+태그 목록 기능을 구현했다. `/tags` 및 `/tags/[slug]` 페이지는 이전 PR에서 이미 구현되어 있었으며, 이번 PR에서는 `PostListItem` 태그 배지와 `TagCloud` feature 컴포넌트를 추가했다.
+
+**주요 변경 사항:**
+
+- `features/post-list/ui/post-list-item.tsx` — stats 행 아래에 텍스트 전용 태그 배지 추가; `rounded-full border border-border-3 px-3 py-1 text-body-xs`; 링크 없음
+- `features/tag-cloud/ui/tag-cloud.tsx` — 새 `TagCloud` 컴포넌트: 상위 20개 태그를 `/tags/{slug}` 링크 배지로 표시, 하단 "태그 전체보기" 링크(`/tags`); F-39 사이드바 위젯에서 소비 예정
+- `features/tag-cloud/index.ts` — barrel export
+
+**스코프 참고:**
+
+사이드바 통합(AC 2건)은 F-39 이슈 #185에서 처리. PR은 `Closes` 대신 `Refs #168`로 변경하여 이슈가 F-39 완료 시까지 열린 상태를 유지.
+
+**리뷰 라운드:** 2회 (Critical 1건 - PR body Closes→Refs 수정)

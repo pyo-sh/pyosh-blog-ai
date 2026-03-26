@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #168 태그 목록 - PostListItem 배지 + TagCloud feature PR #212 머지 | ✅   |
 | 2026-03-27 | #167 홈 글 목록 (리스트형 + 고정 글 + 페이지네이션) PR #211 머지 | ✅   |
 | 2026-03-15 | #63 SEO 메타데이터 + Open Graph PR #166 머지 | ✅   |
 | 2026-03-15 | #69 조회수 기록 hook + ViewCounter PR #164 머지 | ✅   |
@@ -35,6 +36,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
 - [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지
