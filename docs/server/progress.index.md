@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-26 | Issue #28 Env Zod validation: `Object.freeze()` 추가, `constants/env.ts` 삭제, `.env.example` 갱신 + PR #48 머지 | ✅   |
 | 2026-03-26 | Issue #30 App bootstrap + health check: `GET /api/health` memory 필드 누락 수정 + PR #47 머지 | ✅   |
 | 2026-02-28 | Issue #10 로깅 체계화: PR #22 리뷰 2라운드 반영 + squash merge (routeOptions.url 보안, pino err 키 일관성) | ✅   |
 | 2026-02-27 | Issue #10 로깅 체계화: buildLoggerOptions(env 레벨/redact), loggerPlugin, 에러 핸들러 컨텍스트 강화, uncaughtException/unhandledRejection 처리 | ✅   |
