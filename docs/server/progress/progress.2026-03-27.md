@@ -201,3 +201,49 @@ Public 댓글 API 페이지네이션 + 전체 Admin CRUD 구현. 기존 구현�
 **status guard 일관성**: restore(deleted→active), soft_delete(active→deleted) 모두 status 조건으로 hidden 댓글 보호. hidden 상태는 별도 관리 플로우로 취급.
 
 **Hard delete 원자성**: 자식 댓글 삭제 + 부모 삭제를 트랜잭션으로 묶어 중간 실패 시 고아 레코드 방지.
+
+---
+
+## Issue #46 Swagger documentation (PR #65)
+
+**관련 이슈:** #46 [S-16] Swagger documentation
+**PR:** pyo-sh/pyosh-blog-be#65 (merged)
+
+### 작업 내용
+
+전체 Fastify 코드베이스에 포괄적인 OpenAPI/Swagger 문서를 추가.
+
+**구현 범위:**
+- Zod 스키마 필드 전체에 `.describe()` 추가 (9개 스키마 파일)
+- 인증 필요 라우트 22개+에 `security: [{ cookieAuth: [] }]` 추가
+- 상태 변경 라우트에 CSRF 설명 추가
+- rate-limit 라우트에 rate limit 설명 추가
+- swagger 플러그인: spec은 항상 등록, UI는 non-production에서만 등록
+- tags 목록 확장 (2개 → 12개 리소스)
+- 파일 업로드 스키마: Swagger 2.0 `consumes` 제거, OpenAPI 3.0 description 방식으로 대체
+- 전체 라우트에 일관된 에러 응답 (400/401/403/404/429) 추가
+- 인라인 `ErrorResponseSchema` 정의를 `@src/schemas/common` 공유 스키마 임포트로 교체
+
+### 변경 파일 (19개)
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/plugins/swagger.ts` | spec 항상 등록; UI는 non-production 전용; tags 12개로 확장 |
+| `src/schemas/common.ts` | 공유 스키마 전체 필드에 `.describe()` 추가 |
+| `src/routes/posts/post.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/posts/post.route.ts` | admin 라우트에 security/CSRF 문서 + 에러 응답 추가 |
+| `src/routes/comments/comment.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/comments/comment.route.ts` | security/CSRF/rate-limit 문서 + 에러 응답 추가 |
+| `src/routes/guestbook/guestbook.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/guestbook/guestbook.route.ts` | security/CSRF/rate-limit 문서 + 에러 응답 추가 |
+| `src/routes/categories/category.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/categories/category.route.ts` | security/CSRF 문서 + 에러 응답 추가; DELETE에 `204: {}` 추가 |
+| `src/routes/assets/asset.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/assets/asset.route.ts` | `consumes` 제거; OpenAPI 3.0 description + security + 에러 응답 추가 |
+| `src/routes/tags/tag.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/stats/stats.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/stats/stats.route.ts` | security/CSRF/rate-limit 문서; 인라인 에러 스키마 → 공유 임포트 |
+| `src/routes/user/user.schema.ts` | 전체 필드 `.describe()` 추가 |
+| `src/routes/user/user.route.ts` | 인라인 에러 스키마 → 공유 임포트; security + 400 응답 추가 |
+| `src/routes/auth/auth.route.ts` | 인라인 에러 스키마 → 공유 임포트; rate-limit 문서 + security + 429 응답 추가 |
+| `src/routes/settings/settings.route.ts` | 인라인 에러 스키마 → 공유 임포트; security + CSRF 문서 + 에러 응답 추가 |

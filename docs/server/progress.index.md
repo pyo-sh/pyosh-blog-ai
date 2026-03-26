@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-27 | Issue #46 Swagger documentation: Zod `.describe()` 전체 적용, security/CSRF/rate-limit 문서, swagger spec 항상 등록(UI는 non-prod 전용), tags 12개, 공유 ErrorResponseSchema 통일 + PR #65 머지 | ✅   |
 | 2026-03-27 | Issue #44 Posts admin lifecycle: PATCH /bulk 신규, hardDeletePost cascade 수정 (댓글/통계/고아태그), cleanOrphanTags 헬퍼 추출, 통합 테스트 16건 추가 + PR #63 머지 | ✅   |
 | 2026-03-27 | Issue #45 Admin comment API: authorType/order 필터 테스트 추가, seedComment 헬퍼(createdAt 오버라이드) 추가 + PR #64 머지 | ✅   |
 | 2026-03-27 | Issue #40 Comments public API: GET pagination(루트 기준), POST/DELETE CSRF, Admin thread/restore/hard-delete/bulk + status guard + N+1 제거 + PR #61 머지 | ✅   |
@@ -51,6 +52,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - Issue #46 Swagger documentation: Zod describe 전체 적용, security/CSRF/rate-limit 문서, swagger 분리 등록 + PR #65 머지
 - [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - Issue #41 Posts admin CRUD: 통합 테스트 16건 + buildPaginatedResponse 버그 수정 + PR #62 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #34 Categories API: 5 endpoints + batch tree update + delete actions + nullable categoryId migration + PR #52 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #35 Guestbook + settings API: 8 endpoints + settings service + PR #53 머지
