@@ -21,6 +21,7 @@
 | 013 | Rate Limiting & CSRF 보호 전략                        | 2026-02-22 | #rate-limit #csrf #security #fastify |
 | 014 | 게시글 검색 전략 (MySQL LIKE)                         | 2026-02-22 | #search #mysql #like #drizzle |
 | 015 | Guestbook + settings API (Issue #35)                  | 2026-03-26 | #guestbook #settings #drizzle #http-semantics #soft-delete |
+| 016 | Categories API (Issue #34)                            | 2026-03-26 | #categories #drizzle #toctou #tree #migration |
 
 ## 🔗 상세 문서
 
@@ -39,6 +40,7 @@
 - [findings.013-rate-limiting-csrf.md](./findings/findings.013-rate-limiting-csrf.md) - Rate Limiting & CSRF 보호 전략
 - [findings.014-post-search-strategy.md](./findings/findings.014-post-search-strategy.md) - 게시글 검색 전략 (MySQL LIKE)
 - [findings.015-guestbook-settings-api.md](./findings/findings.015-guestbook-settings-api.md) - Guestbook + settings API 설계 (Issue #35)
+- [findings.016-categories-api.md](./findings/findings.016-categories-api.md) - Categories API 설계 (Issue #34)
 
 ## 📊 요약
 

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-26 | Issue #34 Categories API: GET tree with post counts, POST, PATCH /tree (batch + cycle detection), PATCH /:id, DELETE (action=move/trash), nullable categoryId migration + PR #52 머지 | ✅   |
 | 2026-03-26 | Issue #36 Tags API: GET /api/tags already implemented on main; added empty-state test + PR #55 머지 | ✅   |
 | 2026-03-26 | Issue #37 Posts public API: GET /api/posts/slugs, PostListItem/PostDetail schemas (totalPageviews, commentCount, ancestors), filter param, batch enrichment + PR #54 머지 | ✅   |
 | 2026-03-26 | Issue #35 Guestbook + settings API: 8 guestbook endpoints + 2 settings endpoints, DELETE/PATCH HTTP semantics split, status-guard filters, soft_delete idempotency + PR #53 머지 | ✅   |
@@ -41,6 +42,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #34 Categories API: 5 endpoints + batch tree update + delete actions + nullable categoryId migration + PR #52 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #35 Guestbook + settings API: 8 endpoints + settings service + PR #53 머지
 - [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #30 app bootstrap: /api/health memory 필드 추가 + PR #47 머지
 - [progress.2026-02-28.md](./progress/progress.2026-02-28.md) - Issue #10 PR #22 리뷰 반영 + squash merge 완료

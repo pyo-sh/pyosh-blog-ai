@@ -1,5 +1,45 @@
 # Server Progress - 2026-03-26
 
+## Issue #34 - Categories API (PR #52)
+
+**Status**: Merged
+
+### What was done
+
+Implemented the full Categories API (5 endpoints) with post count aggregation, batch tree update, and category delete with post migration actions.
+
+**New files:**
+- `src/routes/categories/category.schema.ts` - added `CategoryDeleteQuerySchema` (action enum + moveTo refinement), `CategoryTreeUpdateBodySchema` (changes array min 1/max 200), `publishedPostCount`/`totalPostCount` in all response schemas, `CategoryTreeResponse` type with children
+- `src/routes/categories/category.service.ts` - `CategoryWithCounts` interface, `getAllCategoriesTree` with single GROUP BY post count query, `updateCategoryTree` with in-memory target-state cycle detection + FOR SHARE locking inside transaction, `deleteCategory` with action=move/trash handling both live and soft-deleted posts
+- `src/routes/categories/category.route.ts` - 5 routes: GET `/`, POST `/`, PATCH `/tree` (before `/:id`), PATCH `/:id`, DELETE `/:id`; conditional Cache-Control on GET based on includeHidden flag
+
+**Schema/migration changes:**
+- `src/db/schema/posts.ts` - `categoryId` made nullable (removed `.notNull()`)
+- `drizzle/0005_post_nullable_category.sql` - `ALTER TABLE post_tb MODIFY COLUMN category_id int`
+- `drizzle/meta/0005_snapshot.json` - new snapshot with proper UUID chain
+- `drizzle/meta/0004_snapshot.json` - fixed snapshot ID from string to UUID format
+
+**Tests added (`test/routes/categories.test.ts`):**
+- GET: empty list, tree structure, publishedPostCount/totalPostCount, slug-path removed (404)
+- POST: admin create 201 with counts, unauthenticated 403
+- PATCH /:id: name update
+- PATCH /tree: batch reorder, 403, direct cycle 400, parent-child swap 200, self-parent 400
+- DELETE: child exists 409, empty category 204, action=trash DB verification (deletedAt + null categoryId), action=move DB verification (categoryId = target), moveTo missing 400, action missing 400, moveTo===id 400, moveTo not found 400
+
+### Key design decisions
+
+- Cycle detection uses target-state map (batch changes applied before walking) so valid parent-child position swaps are allowed - DB-state approach falsely rejects them
+- `allCategories` fetched inside transaction with `FOR SHARE` to close TOCTOU window between existence check and UPDATE batch
+- `categoryId` made nullable to handle orphaned FK references when deleting categories
+- `action=move`: live posts moved to target; already-soft-deleted posts get `categoryId = null` (not moved to target - preserves semantic that deleted posts are uncategorized)
+- `action=trash`: all posts (live and already-deleted) get `deletedAt = sql\`NOW()\`` and `categoryId = null`
+- `Cache-Control: no-store` when `include_hidden=true`; `public, max-age=300` for public responses
+- PATCH `/tree` registered before PATCH `/:id` to prevent static path being captured as id
+
+### Review outcome
+
+12 rounds (11 standard + 1 suggestion-only skip). Final state: 0 critical, 0 warning, 0 suggestion. See [findings.016-categories-api.md](../findings/findings.016-categories-api.md).
+
 ## Issue #36 - Tags API (PR #55)
 
 **Status**: Merged
