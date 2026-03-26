@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-27 | Issue #40 Comments public API: GET pagination(루트 기준), POST/DELETE CSRF, Admin thread/restore/hard-delete/bulk + status guard + N+1 제거 + PR #61 머지 | ✅   |
 | 2026-03-27 | Issue #41 Posts admin CRUD: 통합 테스트 16건 추가 (GET list/detail, POST, PATCH), buildPaginatedResponse 파라미터 순서 버그 수정 + PR #62 머지 | ✅   |
 | 2026-03-27 | Issue #42 Stats API: POST /api/stats/view (postId 선택적, KST 날짜, CSRF, rate limit), GET /api/stats/popular, GET /api/stats/total-views, GET /api/admin/stats/dashboard (postsByStatus), postId=0 센티넬 전략(MySQL NULL unique bug), NOT NULL 마이그레이션, 13개 통합 테스트 + PR #59 머지 | ✅   |
 | 2026-03-27 | Issue #43 SEO endpoints: sitemap.xml + rss.xml integration tests (14 tests); implementation was already on main + PR #60 머지 | ✅   |

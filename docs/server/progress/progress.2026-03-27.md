@@ -81,3 +81,52 @@ return buildPaginatedResponse(postsWithDetails, total, page, limit);
 ### 핵심 기술 결정
 
 **postId=0 센티넬 전략**: MySQL unique index에서 `NULL != NULL`로 처리되어 `ON DUPLICATE KEY UPDATE`가 사이트 전체 조회수 행에 동작하지 않는 버그 수정. `NULL` 대신 `postId=0`을 사이트 전체 센티넬 값으로 사용하고, DB 컬럼을 NOT NULL로 변경.
+
+---
+
+## Issue #40 Comments public API - PR #61 머지
+
+**관련 이슈:** #40 [S-05a] Comments public API
+**PR:** pyo-sh/pyosh-blog-be#61 (merged)
+
+### 작업 내용
+
+Public 댓글 API 페이지네이션 + 전체 Admin CRUD 구현. 기존 구현에서 누락된 기능들을 완성.
+
+**구현 범위:**
+- `GET /api/posts/:postId/comments` - 루트 댓글 기준 페이지네이션, replies 인라인 포함
+- `POST /api/posts/:postId/comments` - 게스트/OAuth, 대댓글(depth 1 제한), 비밀글
+- `DELETE /api/comments/:id` - 게스트 비밀번호 검증, OAuth 본인 확인, CSRF
+- `GET /api/admin/comments` - status/sort/order 필터 추가, post.title 포함
+- `GET /api/admin/comments/:id/thread` - 루트 댓글 + 모든 답글 반환 (답글 ID 전달 시 루트로 정규화)
+- `PUT /api/admin/comments/:id/restore` - deleted → active 복원 (status guard)
+- `DELETE /api/admin/comments/:id` - `?action=soft_delete|hard_delete` 파라미터
+- `DELETE /api/admin/comments/bulk` - restore/soft_delete/hard_delete 벌크 작업
+
+### 주요 변경 사항
+
+**`src/routes/comments/comment.schema.ts`**
+- `CommentsQuerySchema` - page/limit (루트 댓글 기준 페이지네이션)
+- `CommentsPaginationMetaSchema` - totalCount, totalRootComments, totalPages
+- `AdminCommentListQuerySchema`에 status, sort, order 필드 추가
+- `AdminCommentItemSchema`에 `post: { id, title }` 필드 추가
+- `AdminCommentThreadResponseSchema`, `AdminCommentDeleteQuerySchema`, `AdminCommentRestoreResponseSchema`, `AdminCommentBulkBodySchema` 신규 추가
+
+**`src/routes/comments/comment.service.ts`**
+- `getCommentsByPostId` - 루트 댓글만 페이지네이션, replies 별도 조회 후 계층 병합
+- `getAdminComments` - status/sort/order 필터, 게시글 N+1 제거 (postId batch fetch → Map)
+- `getAdminCommentThread` - 루트 ID 정규화 로직 포함
+- `restoreComment` - status='deleted' guard
+- `deleteComment` - hardDelete 파라미터 추가, 트랜잭션으로 cascade 삭제
+- `bulkOperateComments` - restore/soft_delete/hard_delete; restore는 status='deleted' 조건, soft_delete는 status='active' 조건으로 hidden 댓글 보호; hard_delete는 트랜잭션 처리
+
+**`test/routes/comments.test.ts`**
+- 24건 → 28건: 페이지네이션 메타, status 필터, thread (루트/답글 ID), restore 왕복, soft/hard delete, bulk cascade 테스트 추가
+
+### 핵심 기술 결정
+
+**루트 댓글 기준 페이지네이션**: 페이지네이션은 depth=0(루트) 댓글에만 적용. 현재 페이지의 루트 IDs를 수집 후 replies를 별도 IN-clause 쿼리로 가져와 계층 병합. totalCount(전체)와 totalRootComments(페이지 기준)를 분리 제공.
+
+**status guard 일관성**: restore(deleted→active), soft_delete(active→deleted) 모두 status 조건으로 hidden 댓글 보호. hidden 상태는 별도 관리 플로우로 취급.
+
+**Hard delete 원자성**: 자식 댓글 삭제 + 부모 삭제를 트랜잭션으로 묶어 중간 실패 시 고아 레코드 방지.
