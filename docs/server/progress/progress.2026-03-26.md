@@ -48,6 +48,26 @@ Added `memory: getMemoryUsage()` to the `/api/health` response in `src/app.ts` t
 
 Clean (0 critical, 0 warning, 0 suggestion).
 
+## Issue #31 - Auth system (PR #51)
+
+**Status**: Merged
+
+### What was done
+
+Most of the auth system (routes, services, hooks, type declarations) was already present on `main` from prior development. This PR completed the remaining requirements:
+
+- `src/shared/env.ts`: Made `GOOGLE_CLIENT_ID/SECRET` and `GITHUB_CLIENT_ID/SECRET` optional (changed from `z.string().min(1)` to `z.string().default("")`) - server can now start without OAuth credentials configured
+- `src/plugins/passport.ts`: Google and GitHub strategies now registered conditionally only when both credential env vars are non-empty
+- `src/routes/auth/auth.route.ts`: Google and GitHub OAuth routes (`/google`, `/google/callback`, `/github`, `/github/callback`) now registered conditionally - routes are absent when credentials are not configured
+- `src/hooks/auth.hook.ts`: `optionalAuth` hook now explicitly sets `request.user = null` when unauthenticated (previously left it `undefined`)
+- `src/types/fastify.d.ts`: Widened `FastifyRequest.user` type to `OAuthAccount | null` to reflect `optionalAuth` behavior
+
+All 13 acceptance criteria passed. 7/7 auth integration tests green.
+
+### Review outcome
+
+Clean (0 critical, 0 warning, 0 suggestion). Approved and auto-merged.
+
 ## Issue #28 - Environment variable configuration (PR #48)
 
 **Status**: Merged
