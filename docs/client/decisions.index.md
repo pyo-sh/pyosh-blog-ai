@@ -14,6 +14,14 @@
 
 <!-- 새 항목은 아래에 추가 -->
 
+## 003 - SPEC 기반 Client Issue 생성 전략
+
+- **File**: `decisions/decision-003-spec-to-issue-strategy.md`
+- **Date**: 2026-03-26
+- **Status**: draft
+- **Summary**: 35개 client spec 파일을 1:1로 Issue에 매핑하고, 공유 deployment spec의 client 부분 3개를 추가하여 총 38개 Client Issue를 생성한다.
+- **Keywords**: spec, issue, feature-index, reimplementation, 1:1 mapping
+
 ## 002 - Category admin feature structure
 
 - **File**: `decisions/2026-03-14-category-admin-design.md`
