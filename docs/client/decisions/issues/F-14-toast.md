@@ -6,6 +6,10 @@
 
 - `docs/client/specs/toast.md`
 
+## 와이어프레임
+
+와이어프레임 없음. `docs/client/designs/DESIGN_SYSTEM.md`의 컬러/타이포그래피 규칙을 따른다.
+
 ## 상세 설계
 
 ### Toast 유형

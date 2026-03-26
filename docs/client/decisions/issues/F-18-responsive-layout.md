@@ -6,6 +6,12 @@
 
 - `docs/client/specs/responsive-layout.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/home-page.html` - Public 레이아웃 (네비게이션, 컨테이너, footer)
+- `docs/client/designs/admin/_admin-shell.html` - Admin 레이아웃 (사이드바, 헤더)
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 브레이크포인트

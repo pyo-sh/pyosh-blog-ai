@@ -6,6 +6,10 @@
 
 - `docs/specs/deploy-monitoring.md` (섹션 5.4 클라이언트 에러 수집)
 
+## 와이어프레임
+
+해당 없음 (비시각적 기능). Error Boundary 폴백 UI는 F-12 에러 페이지를 재사용한다.
+
 ## 상세 설계
 
 ### React Error Boundary

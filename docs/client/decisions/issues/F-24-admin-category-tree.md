@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-category-tree.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-category.html` - 카테고리 관리 페이지 (트리 표시 영역)
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 트리 렌더링

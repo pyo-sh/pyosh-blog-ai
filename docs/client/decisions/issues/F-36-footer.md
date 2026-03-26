@@ -6,6 +6,11 @@
 
 - `docs/client/specs/footer.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/home-page.html` - Footer 영역 참조
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 콘텐츠 구성

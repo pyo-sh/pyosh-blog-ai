@@ -6,6 +6,11 @@
 
 - `docs/client/specs/toc.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/post-detail.html` - 글 상세 페이지 내 목차(TOC) 영역
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### TOC 표시 조건

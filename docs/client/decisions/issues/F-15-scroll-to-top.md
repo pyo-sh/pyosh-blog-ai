@@ -6,6 +6,11 @@
 
 - `docs/client/specs/scroll-to-top.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/home-page.html` - 홈 페이지 내 맨 위로 버튼 참조
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 사용자 흐름

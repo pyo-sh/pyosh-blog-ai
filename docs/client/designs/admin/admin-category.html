@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog Admin - 카테고리 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+            tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+            bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+            primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+            secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+            info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+            positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+            negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+            grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+            yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+            'code-surface': 'var(--code-surface)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ═══ Admin Sidebar ═══ */
+    .admin-sidebar{
+      position:fixed;left:0;top:0;bottom:0;z-index:30;
+      width:240px;display:flex;flex-direction:column;
+      background:var(--background2);border-right:1px solid var(--border3);
+      transition:width .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-sidebar.collapsed{width:64px;}
+    .admin-sidebar.collapsed .nav-label,
+    .admin-sidebar.collapsed .sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap;}
+    .admin-sidebar.collapsed .admin-nav-item{justify-content:center;padding:8px 0;}
+    .admin-sidebar.collapsed .sidebar-logo-area .admin-badge{display:none;}
+    .admin-sidebar.collapsed~#sidebarOverlay~#contentWrapper{margin-left:64px!important;}
+
+    .admin-nav-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 12px;border-radius:8px;
+      font-size:14px;color:var(--text2);text-decoration:none;
+      transition:all .15s ease;
+    }
+    .admin-nav-item:hover{background:var(--background3);}
+    .admin-nav-item.active{
+      background:rgba(138,111,224,0.10);
+      color:var(--primary1);font-weight:500;
+    }
+    .nav-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+    .admin-nav-item iconify-icon{display:flex;flex-shrink:0;align-items:center;}
+    iconify-icon{display:inline-block;vertical-align:middle;}
+
+    .admin-content{
+      margin-left:240px;
+      transition:margin-left .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-topbar{
+      position:sticky;top:0;z-index:10;
+      display:flex;align-items:center;height:56px;padding:0 24px;gap:16px;
+      background:rgba(249,249,250,0.80);
+      backdrop-filter:blur(16px) saturate(1.4);
+      -webkit-backdrop-filter:blur(16px) saturate(1.4);
+      border-bottom:1px solid var(--border4);
+    }
+    body[data-theme="dark"] .admin-topbar{background:rgba(19,20,21,0.85);}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .admin-topbar{background:rgba(19,20,21,0.85);}}
+
+    @media(max-width:767px){
+      .admin-sidebar{transform:translateX(-100%);width:240px!important;}
+      .admin-sidebar.mobile-open{transform:translateX(0);}
+      .admin-content{margin-left:0!important;}
+    }
+
+    /* ═══ Admin Components ═══ */
+
+    /* Form */
+    .admin-input{
+      width:100%;padding:8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-input:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+    .admin-input::placeholder{color:var(--text4);}
+
+    .admin-select{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;
+    }
+    .admin-select:focus{border-color:var(--primary1);}
+
+    /* ═══ Custom Select ═══ */
+    .custom-select{position:relative;display:inline-flex;}
+    .custom-select.w-full{display:flex;width:100%;}
+    .custom-select-trigger{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C%2Fsvg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;display:block;text-align:left;white-space:nowrap;
+    }
+    .custom-select.w-full .custom-select-trigger{width:100%;}
+    .custom-select.open .custom-select-trigger,.custom-select-trigger:focus{border-color:var(--primary1);}
+    .custom-select-dropdown{
+      position:absolute;top:calc(100% + 4px);left:0;min-width:100%;
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);
+      z-index:200;display:none;overflow:hidden;
+    }
+    .custom-select.open .custom-select-dropdown{display:block;}
+    .custom-select-option{padding:8px 12px;font-size:14px;cursor:pointer;color:var(--text1);transition:background .15s;}
+    .custom-select-option:hover{background:var(--background2);}
+    .custom-select-option.selected{color:var(--primary1);font-weight:500;}
+
+
+    .admin-textarea{
+      width:100%;padding:10px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;resize:vertical;min-height:80px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-textarea:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+
+    .admin-checkbox{
+      width:16px;height:16px;border-radius:4px;cursor:pointer;
+      accent-color:var(--primary1);
+    }
+
+    /* Buttons */
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--primary1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-primary:hover{opacity:.9;}.btn-primary:active{transform:scale(.97);}
+
+    .btn-secondary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:transparent;color:var(--text2);border:1px solid var(--border3);cursor:pointer;
+      transition:background .2s,transform .15s;
+    }
+    .btn-secondary:hover{background:var(--background3);}.btn-secondary:active{transform:scale(.97);}
+
+    .btn-danger{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--negative1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-danger:hover{opacity:.9;}
+
+    .btn-ghost{
+      display:inline-flex;align-items:center;justify-content:center;gap:4px;
+      padding:6px 10px;border-radius:6px;font-size:13px;
+      background:transparent;color:var(--text3);border:none;cursor:pointer;
+      transition:background .15s,color .15s;
+    }
+    .btn-ghost:hover{background:var(--background3);color:var(--text2);}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;}
+    .badge-published{background:rgba(13,169,107,0.12);color:var(--positive1);}
+    .badge-draft{background:rgba(144,153,161,0.12);color:var(--grey3);}
+    .badge-archived{background:rgba(255,190,61,0.12);color:var(--yellow1);}
+    .badge-deleted{background:rgba(226,18,35,0.12);color:var(--negative1);}
+    .badge-private{background:rgba(107,73,181,0.12);color:var(--secondary1);}
+    .badge-public{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .badge-category{background:rgba(138,111,224,0.12);color:var(--primary1);}
+
+    /* Table */
+    .admin-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+    .admin-table th{
+      padding:10px 12px;text-align:left;font-weight:600;font-size:12px;
+      color:var(--text3);background:var(--background2);
+      border-bottom:1px solid var(--border3);white-space:nowrap;
+    }
+    .admin-table td{
+      padding:12px;color:var(--text2);
+      border-bottom:1px solid var(--border4);vertical-align:middle;
+    }
+    .admin-table tbody tr{transition:background .15s;}
+    .admin-table tbody tr:hover{background:var(--background2);}
+
+    /* Card */
+    .admin-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;transition:border-color .2s;
+    }
+    .admin-card:hover{border-color:var(--border3);}
+
+    /* Stat Card */
+    .stat-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:8px;
+      transition:border-color .2s,transform .2s;
+    }
+    .stat-card:hover{border-color:var(--border3);transform:translateY(-2px);}
+    .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+    .stat-value{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.75rem;font-weight:700;color:var(--text1);letter-spacing:-.02em;line-height:1;}
+    .stat-label{font-size:13px;color:var(--text3);}
+
+    /* Pagination */
+    .page-btn{
+      width:36px;height:36px;border-radius:8px;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:500;color:var(--text2);
+      background:transparent;border:none;cursor:pointer;
+      transition:all .25s cubic-bezier(.16,1,.3,1);
+    }
+    .page-btn:hover:not(:disabled):not(.active){transform:scale(1.08);background:var(--background3);}
+    .page-btn:active:not(:disabled){transform:scale(.95);}
+    .page-btn.active{background:var(--primary1);color:#fff;font-weight:700;}
+    .page-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:50;
+      background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .modal-overlay.open{display:flex;}
+    .modal-content{
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:16px;padding:24px;width:100%;
+      max-height:90vh;overflow-y:auto;
+      animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);
+    }
+
+    /* Toggle Switch */
+    .toggle-switch{
+      position:relative;width:44px;height:24px;
+      background:var(--border3);border-radius:12px;cursor:pointer;
+      transition:background .2s;flex-shrink:0;
+    }
+    .toggle-switch.active{background:var(--primary1);}
+    
+    
+
+    .toggle-switch-sm{
+      position:relative;width:36px;height:20px;
+      background:var(--border3);border-radius:10px;cursor:pointer;
+      transition:background .2s;flex-shrink:0;
+    }
+    .toggle-switch-sm.active{background:var(--primary1);}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#ffffff;transition:transform .2s cubic-bezier(.16,1,.3,.1);}.toggle-switch-sm .toggle-knob{width:16px;height:16px;border-radius:8px;}.toggle-switch.active .toggle-knob{transform:translateX(20px);}.toggle-switch-sm.active .toggle-knob{transform:translateX(16px);}
+    
+    
+
+    /* Dropzone */
+    .dropzone{
+      border:2px dashed var(--border3);border-radius:12px;
+      padding:40px 24px;text-align:center;
+      transition:border-color .2s,background .2s;cursor:pointer;
+    }
+    .dropzone:hover,.dropzone.dragover{
+      border-color:var(--primary1);
+      background:rgba(138,111,224,0.04);
+    }
+
+    /* Tab */
+    .admin-tab{
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      color:var(--text3);background:transparent;border:none;cursor:pointer;
+      transition:all .2s;
+    }
+    .admin-tab:hover{color:var(--text2);}
+    .admin-tab.active{background:rgba(138,111,224,0.10);color:var(--primary1);}
+
+    /* ═══ Page-Specific Styles ═══ */
+
+    /* Category Tree */
+    .tree-item{
+      border-bottom:1px solid var(--border4);
+      transition:background .15s;
+      cursor:pointer;
+    }
+    .tree-item:last-child{border-bottom:none;}
+    .tree-item:hover{background:var(--background3);}
+
+    .tree-item-row{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 16px;gap:8px;
+    }
+
+    .tree-children{
+      padding-left:24px;
+      border-left:2px solid var(--border4);
+      margin-left:16px;
+    }
+    .tree-children .tree-item:first-child{border-top:1px solid var(--border4);}
+
+    .expand-toggle{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:24px;height:24px;border-radius:6px;
+      background:transparent;border:none;cursor:pointer;
+      color:var(--text3);transition:all .2s;flex-shrink:0;
+    }
+    .expand-toggle:hover{background:var(--background3);color:var(--text2);}
+    .expand-toggle iconify-icon{transition:transform .2s cubic-bezier(.16,1,.3,1);}
+    .expand-toggle.open iconify-icon{transform:rotate(90deg);}
+
+    .drag-handle{
+      display:none;align-items:center;justify-content:center;
+      width:20px;height:20px;cursor:grab;color:var(--text4);flex-shrink:0;
+    }
+    .edit-mode .drag-handle{display:inline-flex;}
+
+    .post-count-badge{
+      display:inline-flex;align-items:center;
+      padding:1px 6px;border-radius:4px;
+      font-size:12px;line-height:1rem;
+      color:var(--text3);
+      background:rgba(219,221,224,0.30);
+    }
+
+    .hidden-badge{
+      display:inline-flex;align-items:center;
+      color:var(--text4);
+    }
+
+    /* Radio group */
+    .radio-option{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 12px;border-radius:8px;cursor:pointer;
+      transition:background .15s;
+    }
+    .radio-option:hover{background:var(--background2);}
+    .radio-option input[type="radio"]{
+      accent-color:var(--primary1);width:16px;height:16px;cursor:pointer;
+    }
+
+    /* Mobile: action buttons icon-only */
+    @media(max-width:639px){
+      .action-bar .btn-label{display:none;}
+      .action-bar .btn-secondary,
+      .action-bar .btn-primary{padding:8px 10px;}
+      .modal-content{
+        max-width:100%!important;
+        border-radius:16px 16px 0 0;
+        align-self:flex-end;
+      }
+      .tree-item-actions .btn-ghost span{display:none;}
+    }
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Admin Sidebar ═══ -->
+  <aside id="sidebar" class="admin-sidebar" aria-label="관리자 메뉴">
+    <div class="sidebar-logo-area flex items-center h-14 px-4 gap-2 shrink-0" style="border-bottom:1px solid var(--border4);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7 shrink-0" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+      <span class="admin-badge sidebar-text text-xs font-medium px-1.5 py-0.5 rounded" style="background:rgba(138,111,224,0.12); color:var(--primary1);">Admin</span>
+      <button onclick="toggleSidebar()" class="ml-auto flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="사이드바 접기"
+        onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+        <iconify-icon icon="solar:sidebar-minimalistic-linear" width="18" style="display:flex"></iconify-icon>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+      <a href="admin-dashboard.html" class="admin-nav-item" data-page="dashboard">
+        <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
+        <span class="nav-label">대시보드</span>
+      </a>
+      <a href="admin-post-list.html" class="admin-nav-item" data-page="posts">
+        <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+        <span class="nav-label">글</span>
+      </a>
+      <a href="admin-post-editor.html" class="admin-nav-item" data-page="editor">
+        <iconify-icon icon="solar:pen-new-round-linear" width="20"></iconify-icon>
+        <span class="nav-label">글 작성</span>
+      </a>
+      <a href="admin-category.html" class="admin-nav-item" data-page="categories">
+        <iconify-icon icon="solar:folder-open-linear" width="20"></iconify-icon>
+        <span class="nav-label">카테고리</span>
+      </a>
+      <a href="admin-comment.html" class="admin-nav-item" data-page="comments">
+        <iconify-icon icon="solar:chat-round-dots-linear" width="20"></iconify-icon>
+        <span class="nav-label">댓글</span>
+      </a>
+      <a href="admin-guestbook.html" class="admin-nav-item" data-page="guestbook">
+        <iconify-icon icon="solar:notebook-linear" width="20"></iconify-icon>
+        <span class="nav-label">방명록</span>
+      </a>
+      <a href="admin-asset.html" class="admin-nav-item" data-page="assets">
+        <iconify-icon icon="solar:gallery-wide-linear" width="20"></iconify-icon>
+        <span class="nav-label">에셋</span>
+      </a>
+    </nav>
+    <div class="px-3 pb-4 shrink-0">
+      <a href="../public/home-page.html" class="admin-nav-item" style="color:var(--text3);">
+        <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+        <span class="nav-label">블로그로 돌아가기</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Mobile Overlay -->
+  <div id="sidebarOverlay" class="fixed inset-0 z-20 hidden" style="background:rgba(0,0,0,.4);backdrop-filter:blur(2px);" onclick="closeMobileSidebar()"></div>
+
+  <!-- ═══ Content Wrapper ═══ -->
+  <div id="contentWrapper" class="admin-content">
+    <!-- Top Bar -->
+    <header class="admin-topbar">
+      <button onclick="openMobileSidebar()" class="p-1.5 rounded-lg md:hidden transition-colors" style="color:var(--text2);" aria-label="메뉴">
+        <iconify-icon icon="solar:hamburger-menu-linear" width="22" style="display:flex"></iconify-icon>
+      </button>
+      <h1 class="text-lg font-bold break-keep" style="color:var(--text1);">카테고리 관리</h1>
+            <div class="ml-auto flex items-center gap-1">
+        <span class="text-sm hidden sm:inline" style="color:var(--text3);">관리자</span>
+        <button onclick="toggleTheme()" class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="테마 전환"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:sun-2-linear" width="18" id="sunIcon" style="display:flex"></iconify-icon>
+          <iconify-icon icon="solar:moon-linear" width="18" id="moonIcon" style="display:none"></iconify-icon>
+        </button>
+        <button class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="로그아웃"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:logout-2-linear" width="18" style="display:flex"></iconify-icon>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-6" style="min-height:calc(100dvh - 56px);">
+
+      <!-- ═══ Top Action Bar ═══ -->
+      <!-- Normal mode toolbar -->
+      <div id="toolbarNormal" class="action-bar flex flex-wrap items-center justify-between gap-3 mb-6">
+        <!-- Left: Category count + expand/collapse + hidden filter -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-body-sm font-medium" style="color:var(--text2);">전체 <strong style="color:var(--text1);">6개</strong> 카테고리</span>
+          <div class="flex items-center gap-1" style="border-left:1px solid var(--border4);padding-left:12px;">
+            <button id="expandAllBtn" class="btn-secondary" onclick="expandAll()" style="padding:6px 10px;">
+              <iconify-icon icon="solar:alt-arrow-down-linear" width="16"></iconify-icon>
+              <span class="btn-label">전체 펼침</span>
+            </button>
+            <button id="collapseAllBtn" class="btn-secondary" onclick="collapseAll()" style="padding:6px 10px;">
+              <iconify-icon icon="solar:alt-arrow-up-linear" width="16"></iconify-icon>
+              <span class="btn-label">전체 접힘</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-2" style="border-left:1px solid var(--border4);padding-left:12px;">
+            <span class="text-ui-sm" style="color:var(--text3);">숨김 표시</span>
+            <div id="hiddenFilterToggle" class="toggle-switch-sm" onclick="toggleHiddenFilter(this)" role="switch" aria-label="숨김 카테고리 표시"><span class="toggle-knob"></span></div>
+          </div>
+        </div>
+        <!-- Right: Action buttons -->
+        <div class="flex items-center gap-2">
+          <button id="selectModeBtn" class="btn-secondary" onclick="enterSelectMode()">
+            <iconify-icon icon="solar:check-square-linear" width="18"></iconify-icon>
+            <span class="btn-label">일괄 선택</span>
+          </button>
+          <button id="batchEditBtn" class="btn-secondary" onclick="enterBatchEditMode()">
+            <iconify-icon icon="solar:sort-vertical-linear" width="18"></iconify-icon>
+            <span class="btn-label">배치 편집</span>
+          </button>
+          <button class="btn-primary" onclick="openModal('categoryModal')">
+            <iconify-icon icon="solar:add-linear" width="18"></iconify-icon>
+            <span class="btn-label">카테고리 추가</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Select mode toolbar -->
+      <div id="toolbarSelect" class="action-bar flex flex-wrap items-center justify-between gap-3 mb-6" style="display:none;">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button class="btn-secondary" onclick="toggleSelectAll()" style="padding:6px 10px;">
+            <iconify-icon icon="solar:check-square-linear" width="16"></iconify-icon>
+            <span class="btn-label">전체 선택</span>
+          </button>
+          <button class="btn-secondary" onclick="batchHide()" style="padding:6px 10px;">
+            <iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon>
+            <span class="btn-label">숨기기</span>
+          </button>
+          <button class="btn-secondary" onclick="batchShow()" style="padding:6px 10px;">
+            <iconify-icon icon="solar:eye-linear" width="16"></iconify-icon>
+            <span class="btn-label">보이기</span>
+          </button>
+          <span id="selectCounter" class="text-ui-sm font-medium" style="color:var(--primary1);margin-left:4px;">0개 선택됨</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn-secondary" onclick="clearSelection()" style="padding:6px 10px;">
+            <span class="btn-label">선택 해제</span>
+          </button>
+          <button class="btn-primary" onclick="exitSelectMode()" style="padding:6px 10px;">
+            <span class="btn-label">완료</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Batch edit mode toolbar -->
+      <div id="toolbarBatchEdit" class="action-bar flex flex-wrap items-center justify-between gap-3 mb-6" style="display:none;">
+        <div class="flex items-center gap-2">
+          <span id="changeCounter" class="badge" style="background:rgba(138,111,224,0.12);color:var(--primary1);font-size:13px;padding:4px 10px;">변경사항: 0건</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn-secondary" onclick="cancelBatchEdit()">
+            <span class="btn-label">취소</span>
+          </button>
+          <button class="btn-primary" onclick="saveBatchEdit()">
+            <iconify-icon icon="solar:check-read-linear" width="18"></iconify-icon>
+            <span class="btn-label">저장</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══ Category Tree ═══ -->
+      <div id="categoryTree" class="admin-card" style="padding:0; overflow:hidden;">
+
+        <!-- Frontend (expanded) -->
+        <div class="tree-item" data-category="frontend" data-published="18" data-total="23" onclick="openEditModal('Frontend','없음 (최상위)',true,'frontend')">
+          <div class="tree-item-row">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+              <div class="drag-handle" onclick="event.stopPropagation()">
+                <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+              </div>
+              <button class="expand-toggle open" onclick="event.stopPropagation();toggleTreeItem(this)" aria-label="하위 카테고리 펼치기/접기">
+                <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+              </button>
+              <span class="text-body-sm font-medium" style="color:var(--text1);">Frontend</span>
+              <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">frontend</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="post-count-badge">발행 18 / 전체 23</span>
+              <div class="tree-item-actions flex items-center gap-1">
+                <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('Frontend', 23)" title="삭제" style="color:var(--text4);"
+                  onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                  <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Children -->
+          <div class="tree-children" id="children-frontend">
+            <!-- React -->
+            <div class="tree-item" data-category="react" data-published="10" data-total="12" onclick="event.stopPropagation();openEditModal('React','Frontend',true,'react')">
+              <div class="tree-item-row">
+                <div class="flex items-center gap-2 min-w-0">
+                  <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+                  <div class="drag-handle" onclick="event.stopPropagation()">
+                    <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+                  </div>
+                  <div style="width:24px;flex-shrink:0;"></div>
+                  <span class="text-body-sm font-medium" style="color:var(--text1);">React</span>
+                  <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">react</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="post-count-badge">발행 10 / 전체 12</span>
+                  <div class="tree-item-actions flex items-center gap-1">
+                    <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                    <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('React', 12)" title="삭제" style="color:var(--text4);"
+                      onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                      <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Next.js -->
+            <div class="tree-item" data-category="nextjs" data-published="4" data-total="6" onclick="event.stopPropagation();openEditModal('Next.js','Frontend',true,'nextjs')">
+              <div class="tree-item-row">
+                <div class="flex items-center gap-2 min-w-0">
+                  <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+                  <div class="drag-handle" onclick="event.stopPropagation()">
+                    <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+                  </div>
+                  <div style="width:24px;flex-shrink:0;"></div>
+                  <span class="text-body-sm font-medium" style="color:var(--text1);">Next.js</span>
+                  <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">nextjs</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="post-count-badge">발행 4 / 전체 6</span>
+                  <div class="tree-item-actions flex items-center gap-1">
+                    <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                    <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('Next.js', 6)" title="삭제" style="color:var(--text4);"
+                      onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                      <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- CSS -->
+            <div class="tree-item" data-category="css" data-published="5" data-total="5" onclick="event.stopPropagation();openEditModal('CSS','Frontend',true,'css')">
+              <div class="tree-item-row">
+                <div class="flex items-center gap-2 min-w-0">
+                  <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+                  <div class="drag-handle" onclick="event.stopPropagation()">
+                    <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+                  </div>
+                  <div style="width:24px;flex-shrink:0;"></div>
+                  <span class="text-body-sm font-medium" style="color:var(--text1);">CSS</span>
+                  <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">css</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="post-count-badge">발행 5 / 전체 5</span>
+                  <div class="tree-item-actions flex items-center gap-1">
+                    <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                    <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('CSS', 5)" title="삭제" style="color:var(--text4);"
+                      onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                      <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Backend (expanded) -->
+        <div class="tree-item" data-category="backend" data-published="10" data-total="14" onclick="openEditModal('Backend','없음 (최상위)',true,'backend')">
+          <div class="tree-item-row">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+              <div class="drag-handle" onclick="event.stopPropagation()">
+                <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+              </div>
+              <button class="expand-toggle open" onclick="event.stopPropagation();toggleTreeItem(this)" aria-label="하위 카테고리 펼치기/접기">
+                <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+              </button>
+              <span class="text-body-sm font-medium" style="color:var(--text1);">Backend</span>
+              <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">backend</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="post-count-badge">발행 10 / 전체 14</span>
+              <div class="tree-item-actions flex items-center gap-1">
+                <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('Backend', 14)" title="삭제" style="color:var(--text4);"
+                  onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                  <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Children -->
+          <div class="tree-children" id="children-backend">
+            <!-- Node.js -->
+            <div class="tree-item" data-category="nodejs" data-published="6" data-total="8" onclick="event.stopPropagation();openEditModal('Node.js','Backend',true,'nodejs')">
+              <div class="tree-item-row">
+                <div class="flex items-center gap-2 min-w-0">
+                  <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+                  <div class="drag-handle" onclick="event.stopPropagation()">
+                    <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+                  </div>
+                  <div style="width:24px;flex-shrink:0;"></div>
+                  <span class="text-body-sm font-medium" style="color:var(--text1);">Node.js</span>
+                  <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">nodejs</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="post-count-badge">발행 6 / 전체 8</span>
+                  <div class="tree-item-actions flex items-center gap-1">
+                    <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                    <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('Node.js', 8)" title="삭제" style="color:var(--text4);"
+                      onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                      <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Database -->
+            <div class="tree-item" data-category="database" data-published="4" data-total="6" onclick="event.stopPropagation();openEditModal('Database','Backend',true,'database')">
+              <div class="tree-item-row">
+                <div class="flex items-center gap-2 min-w-0">
+                  <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+                  <div class="drag-handle" onclick="event.stopPropagation()">
+                    <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+                  </div>
+                  <div style="width:24px;flex-shrink:0;"></div>
+                  <span class="text-body-sm font-medium" style="color:var(--text1);">Database</span>
+                  <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">database</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="post-count-badge">발행 4 / 전체 6</span>
+                  <div class="tree-item-actions flex items-center gap-1">
+                    <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                    <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('Database', 6)" title="삭제" style="color:var(--text4);"
+                      onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                      <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DevOps (leaf node, hidden category) -->
+        <div class="tree-item hidden-category" data-category="devops" data-published="0" data-total="1" data-hidden="true" style="display:none;" onclick="openEditModal('DevOps','없음 (최상위)',false,'devops')">
+          <div class="tree-item-row" style="opacity:0.5;">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+              <div class="drag-handle" onclick="event.stopPropagation()">
+                <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+              </div>
+              <div style="width:24px;flex-shrink:0;"></div>
+              <span class="text-body-sm font-medium" style="color:var(--text1);">DevOps</span>
+              <span class="text-ui-xs" style="color:var(--text4);">(숨김)</span>
+              <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">devops</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="post-count-badge">발행 0 / 전체 1</span>
+              <div class="tree-item-actions flex items-center gap-1">
+                <div class="toggle-switch-sm" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('DevOps', 1)" title="삭제" style="color:var(--text4);"
+                  onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                  <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DevOps (visible version, shown by default) -->
+        <div class="tree-item visible-category" data-category="devops-visible" data-published="5" data-total="6" onclick="openEditModal('DevOps','없음 (최상위)',true,'devops')">
+          <div class="tree-item-row">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+              <div class="drag-handle" onclick="event.stopPropagation()">
+                <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+              </div>
+              <div style="width:24px;flex-shrink:0;"></div>
+              <span class="text-body-sm font-medium" style="color:var(--text1);">DevOps</span>
+              <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">devops</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="post-count-badge">발행 5 / 전체 6</span>
+              <div class="tree-item-actions flex items-center gap-1">
+                <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('DevOps', 6)" title="삭제" style="color:var(--text4);"
+                  onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                  <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TypeScript (leaf node) -->
+        <div class="tree-item" data-category="typescript" data-published="3" data-total="4" onclick="openEditModal('TypeScript','없음 (최상위)',true,'typescript')">
+          <div class="tree-item-row">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="admin-checkbox select-checkbox" style="display:none;" onchange="updateSelectCount()" onclick="event.stopPropagation()">
+              <div class="drag-handle" onclick="event.stopPropagation()">
+                <iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon>
+              </div>
+              <div style="width:24px;flex-shrink:0;"></div>
+              <span class="text-body-sm font-medium" style="color:var(--text1);">TypeScript</span>
+              <span class="slug-badge text-ui-xs" style="padding:1px 6px;border-radius:4px;background:var(--background3);color:var(--text4);">typescript</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="post-count-badge">발행 3 / 전체 4</span>
+              <div class="tree-item-actions flex items-center gap-1">
+                <div class="toggle-switch-sm active" onclick="event.stopPropagation();this.classList.toggle('active')" title="표시 여부" role="switch" aria-label="표시 여부"><span class="toggle-knob"></span></div>
+                <button class="btn-ghost" onclick="event.stopPropagation();openDeleteModal('TypeScript', 4)" title="삭제" style="color:var(--text4);"
+                  onmouseover="this.style.color='var(--negative1)'" onmouseout="this.style.color='var(--text4)'">
+                  <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══ Create/Edit Category Modal ═══ -->
+  <div class="modal-overlay open" id="categoryModal" onclick="if(event.target===this)closeModal('categoryModal')">
+    <div class="modal-content" style="max-width:28rem;">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <h3 id="categoryModalTitle" style="font-size:1.125rem;">카테고리 추가</h3>
+        <button class="btn-ghost" onclick="closeModal('categoryModal')" aria-label="닫기" style="color:var(--text3);">
+          <iconify-icon icon="solar:close-circle-linear" width="22"></iconify-icon>
+        </button>
+      </div>
+      <!-- Form -->
+      <form onsubmit="return false;" class="flex flex-col gap-5">
+        <!-- 이름 -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-ui-sm font-medium" style="color:var(--text2);">이름</label>
+          <input type="text" id="categoryName" class="admin-input" placeholder="카테고리 이름">
+        </div>
+        <!-- 부모 카테고리 -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-ui-sm font-medium" style="color:var(--text2);">부모 카테고리</label>
+          <div class="custom-select w-full">
+            <button type="button" class="custom-select-trigger"><span class="custom-select-value">없음 (최상위)</span></button>
+            <div class="custom-select-dropdown">
+              <div class="custom-select-option selected">없음 (최상위)</div>
+              <div class="custom-select-option">Frontend</div>
+              <div class="custom-select-option">Backend</div>
+              <div class="custom-select-option">DevOps</div>
+              <div class="custom-select-option">TypeScript</div>
+            </div>
+          </div>
+        </div>
+        <!-- 표시 여부 -->
+        <div class="flex items-center justify-between">
+          <label class="text-ui-sm font-medium" style="color:var(--text2);">목록에 표시</label>
+          <div id="categoryVisibility" class="toggle-switch active" onclick="this.classList.toggle('active')" role="switch" aria-label="목록에 표시"><span class="toggle-knob"></span></div>
+        </div>
+        <!-- 슬러그 -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-ui-sm font-medium" style="color:var(--text2);">슬러그</label>
+          <input type="text" id="categorySlug" class="admin-input" value="" readonly
+            style="color:var(--text3);background:var(--background2);cursor:default;" placeholder="자동 생성">
+        </div>
+        <!-- Footer -->
+        <div class="flex items-center justify-end gap-2 pt-2" style="border-top:1px solid var(--border4);">
+          <button type="button" class="btn-secondary" onclick="closeModal('categoryModal')">취소</button>
+          <button type="submit" class="btn-primary">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══ Delete Confirmation Modal (with posts) ═══ -->
+  <div class="modal-overlay" id="deleteModal" onclick="if(event.target===this)closeModal('deleteModal')">
+    <div class="modal-content" style="max-width:26rem;">
+      <!-- Warning icon -->
+      <div class="flex justify-center mb-4">
+        <div class="flex items-center justify-center" style="width:48px;height:48px;">
+          <iconify-icon icon="solar:danger-triangle-linear" width="48" style="color:var(--negative1);"></iconify-icon>
+        </div>
+      </div>
+      <!-- Title -->
+      <h3 class="text-center font-bold mb-2" style="font-size:1.125rem;">카테고리 삭제</h3>
+      <!-- Message: has posts -->
+      <div id="deleteHasPosts">
+        <p class="text-center mb-1" style="color:var(--text2);font-size:14px;">
+          "<span id="deleteTargetName">Backend</span>" 카테고리에 <span id="deleteTargetCount">5</span>개의 글이 있습니다.
+        </p>
+        <p class="text-center text-ui-sm mb-5" style="color:var(--text3);">
+          삭제 전 글 처리 방법을 선택해 주세요.
+        </p>
+        <!-- Radio options for post handling -->
+        <div class="flex flex-col gap-2 mb-5">
+          <label class="radio-option">
+            <input type="radio" name="deleteAction" value="move" checked>
+            <span class="text-body-sm" style="color:var(--text2);">다른 카테고리로 이동</span>
+          </label>
+          <div class="pl-8 pr-3 pb-1" id="moveTargetWrap">
+            <div class="custom-select w-full">
+              <button type="button" class="custom-select-trigger"><span class="custom-select-value">Frontend</span></button>
+              <div class="custom-select-dropdown">
+                <div class="custom-select-option selected">Frontend</div>
+                <div class="custom-select-option">Next.js</div>
+                <div class="custom-select-option">CSS</div>
+                <div class="custom-select-option">Backend</div>
+                <div class="custom-select-option">Node.js</div>
+                <div class="custom-select-option">Database</div>
+                <div class="custom-select-option">DevOps</div>
+                <div class="custom-select-option">TypeScript</div>
+              </div>
+            </div>
+          </div>
+          <label class="radio-option">
+            <input type="radio" name="deleteAction" value="trash">
+            <span class="text-body-sm" style="color:var(--text2);">휴지통으로 이동</span>
+          </label>
+        </div>
+      </div>
+      <!-- Message: no posts (simple confirmation) -->
+      <div id="deleteNoPosts" style="display:none;">
+        <p class="text-center mb-5" style="color:var(--text2);font-size:14px;">
+          "<span id="deleteTargetNameSimple">DevOps</span>" 카테고리를 삭제하시겠습니까?
+        </p>
+      </div>
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-2 pt-4" style="border-top:1px solid var(--border4);">
+        <button class="btn-secondary" onclick="closeModal('deleteModal')">취소</button>
+        <button id="deleteConfirmBtn" class="btn-danger" onclick="closeModal('deleteModal')">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    function getPreferredTheme(){
+      const stored=localStorage.getItem('theme');
+      if(stored) return stored;
+      return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    function applyTheme(theme){
+      document.body.setAttribute('data-theme',theme);
+      localStorage.setItem('theme',theme);
+      document.getElementById('sunIcon').style.display=theme==='dark'?'none':'';
+      document.getElementById('moonIcon').style.display=theme==='dark'?'':'none';
+    }
+    function toggleTheme(){
+      applyTheme((document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+    }
+    applyTheme(getPreferredTheme());
+
+    // ─── Sidebar ───
+    function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+    function openMobileSidebar(){
+      document.getElementById('sidebar').classList.add('mobile-open');
+      document.getElementById('sidebarOverlay').classList.remove('hidden');
+      document.body.style.overflow='hidden';
+    }
+    function closeMobileSidebar(){
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+      document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'&&document.getElementById('sidebar').classList.contains('mobile-open'))closeMobileSidebar();
+    });
+
+    // ─── Active Nav ───
+    document.querySelectorAll('.admin-nav-item[data-page]').forEach(el=>{
+      if(el.dataset.page==='categories') el.classList.add('active');
+    });
+
+    // ─── Staggered Reveal ───
+    const revealObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}
+      });
+    },{threshold:0.08,rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('.reveal-stagger').forEach((el,i)=>{
+      el.style.animationDelay=`${i*80}ms`;
+      revealObserver.observe(el);
+    });
+
+    // ─── Modal ───
+    function openModal(id){document.getElementById(id).classList.add('open');}
+    function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+    // Close modals on Escape
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){
+        document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+      }
+    });
+
+    // ─── Tree: Expand / Collapse ───
+    function toggleTreeItem(btn){
+      btn.classList.toggle('open');
+      const treeItem=btn.closest('.tree-item');
+      const children=treeItem.querySelector('.tree-children');
+      if(children){
+        children.style.display=btn.classList.contains('open')?'':'none';
+      }
+    }
+
+    // ─── Expand All / Collapse All (separate buttons) ───
+    function expandAll(){
+      document.querySelectorAll('.expand-toggle').forEach(t=>{
+        t.classList.add('open');
+        const children=t.closest('.tree-item').querySelector('.tree-children');
+        if(children) children.style.display='';
+      });
+    }
+    function collapseAll(){
+      document.querySelectorAll('.expand-toggle').forEach(t=>{
+        t.classList.remove('open');
+        const children=t.closest('.tree-item').querySelector('.tree-children');
+        if(children) children.style.display='none';
+      });
+    }
+
+    // ─── Hidden Category Filter Toggle ───
+    let hiddenFilterOn=false;
+    function toggleHiddenFilter(el){
+      el.classList.toggle('active');
+      hiddenFilterOn=el.classList.contains('active');
+      document.querySelectorAll('.hidden-category').forEach(item=>{
+        item.style.display=hiddenFilterOn?'':'none';
+      });
+    }
+
+    // ─── Toolbar Mode Switching ───
+    let currentMode='normal'; // 'normal' | 'select' | 'batchEdit'
+
+    function showToolbar(mode){
+      document.getElementById('toolbarNormal').style.display=mode==='normal'?'':'none';
+      document.getElementById('toolbarSelect').style.display=mode==='select'?'':'none';
+      document.getElementById('toolbarBatchEdit').style.display=mode==='batchEdit'?'':'none';
+      currentMode=mode;
+    }
+
+    // ─── Select Mode ───
+    function enterSelectMode(){
+      showToolbar('select');
+      document.querySelectorAll('.select-checkbox').forEach(cb=>{
+        cb.style.display='';
+        cb.checked=false;
+      });
+      updateSelectCount();
+    }
+
+    function exitSelectMode(){
+      showToolbar('normal');
+      document.querySelectorAll('.select-checkbox').forEach(cb=>{
+        cb.style.display='none';
+        cb.checked=false;
+      });
+    }
+
+    function toggleSelectAll(){
+      const checkboxes=document.querySelectorAll('.select-checkbox');
+      const visibleCheckboxes=Array.from(checkboxes).filter(cb=>cb.closest('.tree-item').style.display!=='none');
+      const allChecked=visibleCheckboxes.every(cb=>cb.checked);
+      visibleCheckboxes.forEach(cb=>{cb.checked=!allChecked;});
+      updateSelectCount();
+    }
+
+    function clearSelection(){
+      document.querySelectorAll('.select-checkbox').forEach(cb=>{cb.checked=false;});
+      updateSelectCount();
+    }
+
+    function updateSelectCount(){
+      const count=document.querySelectorAll('.select-checkbox:checked').length;
+      document.getElementById('selectCounter').textContent=count+'개 선택됨';
+    }
+
+    function batchHide(){
+      const checked=document.querySelectorAll('.select-checkbox:checked');
+      checked.forEach(cb=>{
+        const row=cb.closest('.tree-item-row');
+        const toggle=row.querySelector('.toggle-switch-sm');
+        if(toggle) toggle.classList.remove('active');
+      });
+      alert(checked.length+'개 카테고리를 숨김 처리했습니다.');
+    }
+
+    function batchShow(){
+      const checked=document.querySelectorAll('.select-checkbox:checked');
+      checked.forEach(cb=>{
+        const row=cb.closest('.tree-item-row');
+        const toggle=row.querySelector('.toggle-switch-sm');
+        if(toggle) toggle.classList.add('active');
+      });
+      alert(checked.length+'개 카테고리를 공개 처리했습니다.');
+    }
+
+    // ─── Batch Edit Mode ───
+    let pendingChanges=0;
+
+    function enterBatchEditMode(){
+      showToolbar('batchEdit');
+      const tree=document.getElementById('categoryTree');
+      tree.classList.add('edit-mode');
+      // Auto expand all when entering edit mode
+      expandAll();
+      pendingChanges=0;
+      updateChangeCounter();
+    }
+
+    function cancelBatchEdit(){
+      if(pendingChanges>0){
+        if(!confirm('변경사항을 취소하시겠습니까?')) return;
+      }
+      exitBatchEditMode();
+    }
+
+    function saveBatchEdit(){
+      alert('변경사항 '+pendingChanges+'건을 저장했습니다.');
+      exitBatchEditMode();
+    }
+
+    function exitBatchEditMode(){
+      showToolbar('normal');
+      const tree=document.getElementById('categoryTree');
+      tree.classList.remove('edit-mode');
+      pendingChanges=0;
+    }
+
+    function updateChangeCounter(){
+      document.getElementById('changeCounter').textContent='변경사항: '+pendingChanges+'건';
+    }
+
+    // Demo: simulate a pending change on drag handle click
+    document.querySelectorAll('.drag-handle').forEach(handle=>{
+      handle.addEventListener('click',function(){
+        if(currentMode==='batchEdit'){
+          pendingChanges++;
+          updateChangeCounter();
+        }
+      });
+    });
+
+    // ─── Category Modal: Create / Edit ───
+    function openEditModal(name, parent, visible, slug){
+      document.getElementById('categoryModalTitle').textContent='카테고리 수정';
+      document.getElementById('categoryName').value=name;
+      // Set visibility
+      const vis=document.getElementById('categoryVisibility');
+      if(visible) vis.classList.add('active');
+      else vis.classList.remove('active');
+      // Set slug
+      document.getElementById('categorySlug').value=slug||'';
+      openModal('categoryModal');
+    }
+
+    // Reset modal to "create" when opened via top button
+    document.querySelector('[onclick="openModal(\'categoryModal\')"]').addEventListener('click',function(){
+      document.getElementById('categoryModalTitle').textContent='카테고리 추가';
+      document.getElementById('categoryName').value='';
+      document.getElementById('categoryVisibility').classList.add('active');
+      document.getElementById('categorySlug').value='';
+    });
+
+    // ─── Delete Modal ───
+    function openDeleteModal(name, totalPostCount){
+      document.getElementById('deleteTargetName').textContent=name;
+      document.getElementById('deleteTargetNameSimple').textContent=name;
+      if(totalPostCount>0){
+        document.getElementById('deleteTargetCount').textContent=totalPostCount;
+        document.getElementById('deleteHasPosts').style.display='';
+        document.getElementById('deleteNoPosts').style.display='none';
+        // Reset radio to "move"
+        var radios=document.querySelectorAll('input[name="deleteAction"]');
+        radios.forEach(function(r){r.checked=(r.value==='move');});
+        document.getElementById('moveTargetWrap').style.display='';
+      } else {
+        document.getElementById('deleteHasPosts').style.display='none';
+        document.getElementById('deleteNoPosts').style.display='';
+      }
+      openModal('deleteModal');
+    }
+
+    // Show/hide move target dropdown based on radio selection
+    document.querySelectorAll('input[name="deleteAction"]').forEach(radio=>{
+      radio.addEventListener('change',function(){
+        document.getElementById('moveTargetWrap').style.display=this.value==='move'?'':'none';
+      });
+    });
+  </script>
+  <script>
+  /* Custom Select */
+  (function(){
+    function init(){
+      document.querySelectorAll('.custom-select').forEach(function(sel){
+        var trigger=sel.querySelector('.custom-select-trigger');
+        var valueEl=sel.querySelector('.custom-select-value');
+        var opts=sel.querySelectorAll('.custom-select-option');
+        trigger.addEventListener('click',function(e){
+          e.stopPropagation();
+          document.querySelectorAll('.custom-select.open').forEach(function(s){if(s!==sel)s.classList.remove('open');});
+          sel.classList.toggle('open');
+        });
+        opts.forEach(function(opt){
+          opt.addEventListener('click',function(){
+            if(valueEl)valueEl.textContent=opt.textContent;
+            opts.forEach(function(o){o.classList.remove('selected');});
+            opt.classList.add('selected');
+            sel.classList.remove('open');
+          });
+        });
+      });
+      document.addEventListener('click',function(){
+        document.querySelectorAll('.custom-select.open').forEach(function(s){s.classList.remove('open');});
+      });
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
+    else{init();}
+  })();
+  </script>
+</body>
+</html>

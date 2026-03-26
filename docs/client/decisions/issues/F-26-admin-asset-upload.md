@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-asset-upload.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-asset.html` - 에셋 관리 페이지 (업로드 영역)
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 업로드 영역 (기존 구현 문서화)

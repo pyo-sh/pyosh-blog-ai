@@ -6,6 +6,11 @@
 
 - `docs/client/specs/view-counter.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/post-detail.html` - 글 상세 페이지 조회수 표시 영역
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 조회수 표시 - 글 상세 헤더

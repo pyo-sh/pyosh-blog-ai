@@ -6,6 +6,11 @@
 
 - `docs/client/specs/category-post-list.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/category-tag-list.html` - 카테고리/태그별 글 목록 페이지
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 페이지 구조

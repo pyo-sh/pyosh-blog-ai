@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog - Home</title>
+  <meta name="description" content="개발 블로그 홈 페이지. 최신 기술 글과 인사이트를 만나보세요.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+                  fontFamily: {
+          sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        },
+                  colors: {
+          bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+          tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+          bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+          primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+          secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+          info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+          positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+          negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+          grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+          yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+          'code-surface': 'var(--code-surface)',
+        },
+        },
+      },
+    }
+  </script>
+  <style>
+        /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+/* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    @keyframes pinFloat{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-3px) rotate(-8deg)}}
+    .pin-icon{animation:pinFloat 2.5s ease-in-out infinite}
+
+    /* ═══ Post Item ═══ */
+    .post-item{transition:transform .3s cubic-bezier(.16,1,.3,1),background-color .25s}
+    .post-item:hover{transform:translateX(4px)}
+    .thumb-wrap img{transition:transform .5s cubic-bezier(.16,1,.3,1)}
+    .post-item:hover .thumb-wrap img{transform:scale(1.05)}
+    .category-badge{position:relative;overflow:hidden}
+    .category-badge::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);transform:translateX(-100%);transition:transform .6s}
+    .post-item:hover .category-badge::after{transform:translateX(100%)}
+
+    /* ═══ Pagination ═══ */
+    .page-btn{transition:all .25s cubic-bezier(.16,1,.3,1)}
+    .page-btn:hover:not(:disabled):not(.active){transform:scale(1.08)}
+    .page-btn:active:not(:disabled){transform:scale(.95)}
+
+    /* ═══ Nav ═══ */
+    .nav-glass{background:rgba(249,249,250,.80);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border-bottom:1px solid rgba(219,221,224,.50);box-shadow:0 1px 0 rgba(255,255,255,.05)}
+    body[data-theme="dark"] .nav-glass{background:rgba(19,20,21,0.85);border-bottom-color:rgba(62,66,69,.50);box-shadow:0 1px 0 rgba(0,0,0,.15)}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .nav-glass{background:rgba(19,20,21,0.85);border-bottom-color:rgba(62,66,69,.50);box-shadow:0 1px 0 rgba(0,0,0,.15)}}
+    .theme-toggle{transition:transform .4s cubic-bezier(.16,1,.3,1)}
+    .theme-toggle:hover{transform:rotate(30deg) scale(1.1)}
+
+    /* ═══ 2-Column Layout (1080px breakpoint) ═══ */
+    .layout-wrapper{display:flex;gap:0}
+    .sidebar-desktop{display:none;width:240px;flex-shrink:0}
+    .main-content{flex:1;min-width:0}
+
+    @media(min-width:1080px){
+      .sidebar-desktop{display:block}
+      .hamburger-btn{display:none !important}
+    }
+
+    /* ═══ Desktop Sidebar ═══ */
+    .sidebar-inner{position:sticky;top:70px}
+
+    /* ═══ Sidebar Section ═══ */
+    .sidebar-section{padding:16px 0;border-bottom:1px solid var(--border4)}
+    .sidebar-section:last-child{border-bottom:none}
+    .sidebar-section-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text4);margin-bottom:10px}
+
+    /* ═══ Sidebar Tab ═══ */
+    .sidebar-tab{padding:4px 12px;border-radius:6px;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text3);background:transparent}
+    .sidebar-tab.active{background:rgba(138,111,224,.12);color:var(--primary1);font-weight:600}
+    .sidebar-tab:hover:not(.active){color:var(--text2)}
+
+    /* ═══ Sidebar Post Item ═══ */
+    .sidebar-post{display:block;padding:6px 0;transition:color .2s;cursor:pointer}
+    .sidebar-post:hover .sidebar-post-title{color:var(--primary1)}
+    .sidebar-post-title{font-size:.813rem;font-weight:500;color:var(--text2);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s}
+    .sidebar-post-date{font-size:.688rem;color:var(--text4);margin-top:2px}
+
+    /* ═══ Category Tree ═══ */
+    .cat-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;cursor:pointer;transition:color .2s;font-size:.813rem;color:var(--text2)}
+    .cat-item:hover{color:var(--primary1)}
+    .cat-count{font-size:.688rem;color:var(--text4);font-weight:400}
+    .cat-children{padding-left:14px;overflow:hidden;max-height:0;transition:max-height .3s cubic-bezier(.16,1,.3,1)}
+    .cat-children.open{max-height:500px}
+    .cat-toggle{transition:transform .25s cubic-bezier(.16,1,.3,1);color:var(--text4);flex-shrink:0}
+    .cat-toggle.open{transform:rotate(90deg)}
+
+    /* ═══ Tag Cloud ═══ */
+    .tag-item{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:500;transition:all .2s;cursor:pointer;border:1px solid var(--border3);color:var(--text3)}
+    .tag-item:hover{border-color:var(--primary1);color:var(--primary1);background:rgba(138,111,224,.06)}
+
+    /* ═══ Total Views ═══ */
+    .view-counter{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.5rem;font-weight:700;color:var(--text1);letter-spacing:-.02em}
+
+    /* ═══ Mobile Slide-In ═══ */
+    .mobile-overlay{position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s}
+    .mobile-overlay.open{opacity:1;pointer-events:auto}
+
+    .mobile-sidebar{position:fixed;top:0;right:0;bottom:0;z-index:46;width:min(320px,85vw);background:var(--background1);transform:translateX(100%);transition:transform .35s cubic-bezier(.16,1,.3,1);overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.1);padding:0 20px 32px}
+    .mobile-sidebar.open{transform:translateX(0)}
+
+    .mobile-sidebar-header{display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:2;background:var(--background1)}
+    .mobile-sidebar-close{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:background .2s}
+    .mobile-sidebar-close:hover{background:var(--background3)}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    .text-h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    .text-h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    .text-h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    .text-h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    .text-h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-display-xl{font-size:4.4rem;line-height:5.469rem;font-weight:900}
+    .text-display-lg{font-size:4rem;line-height:5rem;font-weight:900}
+    .text-display-md{font-size:3.6rem;line-height:4.5rem;font-weight:900}
+    .text-display-base{font-size:3.2rem;line-height:4.031rem;font-weight:900}
+    .text-display-sm{font-size:2.8rem;line-height:3.469rem;font-weight:900}
+    .text-display-xs{font-size:2.4rem;line-height:3rem;font-weight:900}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Navigation ═══ -->
+  <nav class="nav-glass fixed top-0 left-0 right-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14">
+        <a href="/" class="flex items-center gap-2" aria-label="pyosh blog 홈">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+          <span class="text-body-sm font-bold tracking-tight" style="color:var(--text1)">pyosh blog</span>
+        </a>
+        <div class="flex items-center gap-1">
+          <button class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="검색">
+            <iconify-icon icon="solar:magnifer-linear" width="18"></iconify-icon>
+          </button>
+          <button id="themeToggle" class="theme-toggle w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="테마 전환">
+            <iconify-icon icon="solar:sun-2-linear" width="18" class="sun-icon"></iconify-icon>
+            <iconify-icon icon="solar:moon-linear" width="18" class="moon-icon" style="display:none"></iconify-icon>
+          </button>
+          <!-- Hamburger (< 1080px) -->
+          <button id="hamburgerBtn" class="hamburger-btn w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="메뉴 열기">
+            <iconify-icon icon="solar:hamburger-menu-linear" width="20"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="h-14"></div>
+
+  <!-- ═══ 2-Column Layout ═══ -->
+  <div class="layout-wrapper max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- ─── Desktop Sidebar (left, >= 1080px) ─── -->
+    <aside class="sidebar-desktop" aria-label="사이드바">
+      <div class="sidebar-inner pr-6 pt-8 pb-16">
+
+        <!-- Section 1: 최근글 / 인기글 -->
+        <div class="sidebar-section" style="padding-top:0">
+          <div class="flex items-center gap-1 mb-3">
+            <button class="sidebar-tab active" data-tab="recent" onclick="switchTab('recent')">최근글</button>
+            <button class="sidebar-tab" data-tab="popular" onclick="switchTab('popular')">인기글</button>
+          </div>
+          <!-- Recent posts list -->
+          <div id="recentList" class="sidebar-tab-content">
+            <a href="/posts/nextjs-app-router-caching" class="sidebar-post">
+              <div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div>
+              <div class="sidebar-post-date">2026. 3. 17.</div>
+            </a>
+            <a href="/posts/css-container-queries-real-world" class="sidebar-post">
+              <div class="sidebar-post-title">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</div>
+              <div class="sidebar-post-date">2026. 3. 14.</div>
+            </a>
+            <a href="/posts/zustand-vs-jotai-state-management" class="sidebar-post">
+              <div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div>
+              <div class="sidebar-post-date">2026. 3. 12.</div>
+            </a>
+            <a href="/posts/node-stream-backpressure" class="sidebar-post">
+              <div class="sidebar-post-title">Node.js Stream 백프레셔를 이해하면 보이는 것들</div>
+              <div class="sidebar-post-date">2026. 3. 10.</div>
+            </a>
+            <a href="/posts/vitest-mock-patterns" class="sidebar-post">
+              <div class="sidebar-post-title">Vitest 모킹 패턴 8가지</div>
+              <div class="sidebar-post-date">2026. 3. 8.</div>
+            </a>
+          </div>
+          <!-- Popular posts list (hidden) -->
+          <div id="popularList" class="sidebar-tab-content" style="display:none">
+            <a href="/posts/react-server-components-deep-dive" class="sidebar-post">
+              <div class="sidebar-post-title">React Server Components 실전 가이드</div>
+              <div class="sidebar-post-date">조회 3,847</div>
+            </a>
+            <a href="/posts/zustand-vs-jotai-state-management" class="sidebar-post">
+              <div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div>
+              <div class="sidebar-post-date">조회 2,341</div>
+            </a>
+            <a href="/posts/typescript-5-pattern-matching" class="sidebar-post">
+              <div class="sidebar-post-title">TypeScript 5.x 패턴 매칭 완전 정복</div>
+              <div class="sidebar-post-date">조회 2,156</div>
+            </a>
+            <a href="/posts/docker-multi-stage-optimization" class="sidebar-post">
+              <div class="sidebar-post-title">Docker 멀티스테이지 빌드로 이미지 크기를 87% 줄인 이야기</div>
+              <div class="sidebar-post-date">조회 2,089</div>
+            </a>
+            <a href="/posts/nextjs-app-router-caching" class="sidebar-post">
+              <div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div>
+              <div class="sidebar-post-date">조회 1,923</div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Section 2: 분류 (카테고리) -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title flex items-center gap-1.5">
+            <iconify-icon icon="solar:folder-2-linear" width="13"></iconify-icon>
+            분류 전체보기 (47)
+          </div>
+          <!-- Category tree -->
+          <div>
+            <!-- Frontend -->
+            <div>
+              <div class="cat-item" onclick="toggleCategory(this)">
+                <span class="flex items-center gap-1.5 font-medium">
+                  <iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>
+                  Frontend
+                </span>
+                <span class="cat-count">23</span>
+              </div>
+              <div class="cat-children">
+                <a href="/categories/react" class="cat-item" style="padding-left:4px">
+                  <span>React</span>
+                  <span class="cat-count">12</span>
+                </a>
+                <a href="/categories/nextjs" class="cat-item" style="padding-left:4px">
+                  <span>Next.js</span>
+                  <span class="cat-count">6</span>
+                </a>
+                <a href="/categories/css" class="cat-item" style="padding-left:4px">
+                  <span>CSS</span>
+                  <span class="cat-count">5</span>
+                </a>
+              </div>
+            </div>
+            <!-- Backend -->
+            <div>
+              <div class="cat-item" onclick="toggleCategory(this)">
+                <span class="flex items-center gap-1.5 font-medium">
+                  <iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>
+                  Backend
+                </span>
+                <span class="cat-count">14</span>
+              </div>
+              <div class="cat-children">
+                <a href="/categories/nodejs" class="cat-item" style="padding-left:4px">
+                  <span>Node.js</span>
+                  <span class="cat-count">8</span>
+                </a>
+                <a href="/categories/database" class="cat-item" style="padding-left:4px">
+                  <span>Database</span>
+                  <span class="cat-count">6</span>
+                </a>
+              </div>
+            </div>
+            <!-- DevOps -->
+            <a href="/categories/devops" class="cat-item">
+              <span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">DevOps</span>
+              <span class="cat-count">6</span>
+            </a>
+            <!-- TypeScript -->
+            <a href="/categories/typescript" class="cat-item">
+              <span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">TypeScript</span>
+              <span class="cat-count">4</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Section 3: 태그 -->
+        <div class="sidebar-section">
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="sidebar-section-title flex items-center gap-1.5" style="margin-bottom:0">
+              <iconify-icon icon="solar:tag-linear" width="13"></iconify-icon>
+              태그
+            </div>
+            <a href="/tags" class="text-ui-xs font-medium hover:underline underline-offset-4 flex items-center gap-0.5" style="color:var(--primary1)">
+              전체보기 <iconify-icon icon="solar:alt-arrow-right-linear" width="10"></iconify-icon>
+            </a>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <a href="/tags/react" class="tag-item">React</a>
+            <a href="/tags/nextjs" class="tag-item">Next.js</a>
+            <a href="/tags/typescript" class="tag-item">TypeScript</a>
+            <a href="/tags/css" class="tag-item">CSS</a>
+            <a href="/tags/tailwind" class="tag-item">Tailwind</a>
+            <a href="/tags/nodejs" class="tag-item">Node.js</a>
+            <a href="/tags/docker" class="tag-item">Docker</a>
+            <a href="/tags/testing" class="tag-item">Testing</a>
+            <a href="/tags/postgresql" class="tag-item">PostgreSQL</a>
+            <a href="/tags/github-actions" class="tag-item">GitHub Actions</a>
+            <a href="/tags/rsc" class="tag-item">RSC</a>
+            <a href="/tags/vitest" class="tag-item">Vitest</a>
+            <a href="/tags/zustand" class="tag-item">Zustand</a>
+            <a href="/tags/performance" class="tag-item">Performance</a>
+            <a href="/tags/architecture" class="tag-item">Architecture</a>
+          </div>
+        </div>
+
+        <!-- Section 4: 블로그 조회수 -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title flex items-center gap-1.5">
+            <iconify-icon icon="solar:eye-linear" width="13"></iconify-icon>
+            블로그 조회수
+          </div>
+          <div class="view-counter">128,347</div>
+          <div class="text-ui-xs mt-0.5" style="color:var(--text4)">Total Visitors</div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ─── Main Content (right) ─── -->
+    <main class="main-content pt-8 pb-16">
+
+      <!-- Page header -->
+      <header class="mb-8 reveal" style="animation-delay:100ms">
+        <h1 class="text-body-lg md:text-h1 font-bold tracking-tight break-keep" style="color:var(--text1)">최근 글</h1>
+        <p class="mt-2 text-body-sm" style="color:var(--text3)">개발과 기술에 대한 생각들을 기록합니다</p>
+      </header>
+
+      <!-- ─── Pinned Posts ─── -->
+      <section class="mb-2" aria-label="고정된 글">
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/react-server-components-deep-dive" class="absolute inset-0 z-10" aria-label="React Server Components 실전 가이드"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)">
+              <img src="https://picsum.photos/seed/react-rsc/256/192" alt="React Server Components 시각화" class="w-full h-full object-cover" loading="lazy" decoding="async">
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="pin-icon inline-flex items-center" style="color:var(--primary1)"><iconify-icon icon="solar:pin-bold" width="14"></iconify-icon></span>
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">React</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 18.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">React Server Components 실전 가이드 - 서버와 클라이언트의 경계를 설계하는 방법</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">RSC를 단순히 사용하는 것을 넘어, 컴포넌트 트리에서 서버와 클라이언트의 경계를 어떻게 나눠야 하는지에 대한 실무적인 판단 기준을 정리했습니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>3,847</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>24</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/typescript-5-pattern-matching" class="absolute inset-0 z-10" aria-label="TypeScript 5.x 패턴 매칭 완전 정복"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)">
+              <img src="https://picsum.photos/seed/ts-pattern/256/192" alt="TypeScript 코드 스니펫" class="w-full h-full object-cover" loading="lazy" decoding="async">
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="pin-icon inline-flex items-center" style="color:var(--primary1)"><iconify-icon icon="solar:pin-bold" width="14"></iconify-icon></span>
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">TypeScript</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 15.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">TypeScript 5.x 패턴 매칭 완전 정복</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">ts-pattern 라이브러리를 활용한 안전한 분기 처리부터, TypeScript 자체의 타입 내로잉과 결합하는 고급 패턴까지 실제 프로덕션 코드 사례를 중심으로 살펴봅니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>2,156</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>18</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- Divider -->
+      <div class="mx-4 sm:mx-5 mb-2 reveal"><div class="h-px" style="background:var(--border3)"></div></div>
+
+      <!-- ─── Regular Posts ─── -->
+      <section aria-label="글 목록">
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/nextjs-app-router-caching" class="absolute inset-0 z-10" aria-label="Next.js App Router 캐싱 전략 A to Z"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/nextjs-cache/256/192" alt="Next.js 캐시 레이어 다이어그램" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">Next.js</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 17.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Next.js App Router 캐싱 전략 A to Z</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">Request Memoization, Data Cache, Full Route Cache, Router Cache까지 4가지 캐시 레이어의 동작 원리와 무효화 타이밍을 정리합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>1,923</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>12</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/css-container-queries-real-world" class="absolute inset-0 z-10" aria-label="Container Queries로 진짜 컴포넌트 기반 반응형 만들기"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/container-q/256/192" alt="CSS Container Queries 비교" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">CSS</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 14.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">미디어 쿼리에 의존하던 반응형 설계를 컨테이너 쿼리로 전환하면서 얻은 실질적인 이점과 주의할 점을 공유합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>1,478</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>9</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/zustand-vs-jotai-state-management" class="absolute inset-0 z-10" aria-label="Zustand와 Jotai, 어떤 상태 관리가 맞을까"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/zustand-jotai/256/192" alt="상태 관리 비교 차트" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">React</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 12.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Zustand와 Jotai, 어떤 상태 관리가 맞을까</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">두 라이브러리의 철학적 차이부터 실제 성능 벤치마크, 프로젝트 규모별 적합성까지 비교합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>2,341</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>31</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/node-stream-backpressure" class="absolute inset-0 z-10" aria-label="Node.js Stream 백프레셔를 이해하면 보이는 것들"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/node-stream/256/192" alt="Node.js Stream 흐름" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">Node.js</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 10.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Node.js Stream 백프레셔를 이해하면 보이는 것들</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">대용량 파일 처리에서 메모리 사용량이 치솟는 원인을 백프레셔 관점에서 분석합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>987</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>7</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/vitest-mock-patterns" class="absolute inset-0 z-10" aria-label="Vitest 모킹 패턴 8가지"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/vitest-mock/256/192" alt="Vitest 테스트 코드" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">Testing</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 8.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Vitest 모킹 패턴 8가지 - 테스트 코드를 깔끔하게 유지하는 방법</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">vi.mock, vi.spyOn, vi.fn의 차이를 명확히 하고, 외부 모듈 모킹, 타이머 제어, MSW 연동까지 실전에서 바로 쓸 수 있는 8가지 패턴을 정리합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>1,562</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>14</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/docker-multi-stage-optimization" class="absolute inset-0 z-10" aria-label="Docker 멀티스테이지 빌드로 이미지 크기를 87% 줄인 이야기"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/docker-multi/256/192" alt="Docker 이미지 레이어" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">DevOps</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 5.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Docker 멀티스테이지 빌드로 이미지 크기를 87% 줄인 이야기</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">1.2GB짜리 Node.js 이미지를 156MB로 줄이기까지의 과정을 단계별로 기록합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>2,089</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>19</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/postgresql-index-strategy" class="absolute inset-0 z-10" aria-label="PostgreSQL 인덱스 설계"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/pg-index/256/192" alt="PostgreSQL EXPLAIN ANALYZE" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">Database</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 2.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">PostgreSQL 인덱스 설계 - 쿼리 플랜을 읽고 올바른 인덱스를 고르는 법</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">EXPLAIN ANALYZE 출력을 해석하는 방법부터 B-tree, GIN, GiST 인덱스의 적합한 사용 시나리오까지 정리합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>1,234</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>8</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item reveal-stagger group relative rounded-xl px-4 py-5 sm:px-5 cursor-pointer hover:bg-bg-2">
+          <a href="/posts/tailwind-v4-migration" class="absolute inset-0 z-10" aria-label="Tailwind CSS v4 마이그레이션"></a>
+          <div class="flex gap-4 sm:gap-5">
+            <div class="thumb-wrap flex-shrink-0 w-20 h-16 sm:w-32 sm:h-24 rounded-lg overflow-hidden" style="background:var(--background3)"><img src="https://picsum.photos/seed/tw-v4/256/192" alt="Tailwind CSS v4 설정" class="w-full h-full object-cover" loading="lazy" decoding="async"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="category-badge inline-flex items-center px-2 py-0.5 rounded-md text-ui-xs font-medium" style="background:rgba(138,111,224,.12);color:var(--primary1)">CSS</span>
+                <span class="text-ui-xs" style="color:var(--text4)">2026. 2. 27.</span>
+              </div>
+              <h2 class="text-base sm:text-lg font-bold leading-snug overflow-hidden text-ellipsis whitespace-nowrap" style="color:var(--text1)">Tailwind CSS v4로 마이그레이션하면서 배운 것들</h2>
+              <p class="mt-1 text-body-sm leading-relaxed line-clamp-2 break-keep hidden sm:block" style="color:var(--text3)">JavaScript 설정 파일에서 CSS-first 접근으로의 전환 과정을 기록합니다.</p>
+              <div class="flex items-center gap-3 mt-2">
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>1,847</span>
+                <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)"><iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>22</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- ─── Pagination ─── -->
+      <nav class="mt-10 flex items-center justify-center gap-1 reveal" aria-label="페이지 탐색">
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm disabled:opacity-30 disabled:cursor-not-allowed" style="color:var(--text3);background:transparent" disabled aria-label="5페이지 이전으로">
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon><iconify-icon icon="solar:alt-arrow-left-linear" width="16" style="margin-left:-8px"></iconify-icon>
+        </button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm disabled:opacity-30 disabled:cursor-not-allowed" style="color:var(--text3);background:transparent" disabled aria-label="이전 페이지">
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon>
+        </button>
+        <button class="page-btn active w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-bold" style="background:var(--primary1);color:var(--background1)" aria-label="1 페이지" aria-current="page">1</button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)" aria-label="2 페이지">2</button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)" aria-label="3 페이지">3</button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)" aria-label="4 페이지">4</button>
+        <span class="w-9 h-9 flex items-center justify-center text-body-sm" style="color:var(--text4)"><iconify-icon icon="solar:menu-dots-linear" width="16"></iconify-icon></span>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)" aria-label="19 페이지">19</button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)" aria-label="20 페이지">20</button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm hover:bg-bg-3" style="color:var(--text3)" aria-label="다음 페이지">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+        </button>
+        <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm hover:bg-bg-3" style="color:var(--text3)" aria-label="5페이지 이후로">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon><iconify-icon icon="solar:alt-arrow-right-linear" width="16" style="margin-left:-8px"></iconify-icon>
+        </button>
+      </nav>
+
+    </main>
+  </div>
+
+  <!-- ═══ Mobile Overlay + Slide-In Sidebar ═══ -->
+  <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
+  <aside id="mobileSidebar" class="mobile-sidebar" role="dialog" aria-label="사이드바 메뉴" aria-modal="true">
+    <div class="mobile-sidebar-header">
+      <span class="text-body-sm font-bold" style="color:var(--text1)">메뉴</span>
+      <button id="mobileSidebarClose" class="mobile-sidebar-close" aria-label="메뉴 닫기">
+        <iconify-icon icon="solar:close-circle-linear" width="20"></iconify-icon>
+      </button>
+    </div>
+
+    <!-- Mobile sidebar content (same sections as desktop) -->
+
+    <!-- Section 1: 최근글 / 인기글 -->
+    <div class="sidebar-section" style="padding-top:0">
+      <div class="flex items-center gap-1 mb-3">
+        <button class="sidebar-tab active" data-tab="m-recent" onclick="switchMobileTab('m-recent')">최근글</button>
+        <button class="sidebar-tab" data-tab="m-popular" onclick="switchMobileTab('m-popular')">인기글</button>
+      </div>
+      <div id="m-recentList" class="sidebar-tab-content">
+        <a href="/posts/nextjs-app-router-caching" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">2026. 3. 17.</div></a>
+        <a href="/posts/css-container-queries-real-world" class="sidebar-post"><div class="sidebar-post-title">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</div><div class="sidebar-post-date">2026. 3. 14.</div></a>
+        <a href="/posts/zustand-vs-jotai-state-management" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">2026. 3. 12.</div></a>
+        <a href="/posts/node-stream-backpressure" class="sidebar-post"><div class="sidebar-post-title">Node.js Stream 백프레셔를 이해하면 보이는 것들</div><div class="sidebar-post-date">2026. 3. 10.</div></a>
+        <a href="/posts/vitest-mock-patterns" class="sidebar-post"><div class="sidebar-post-title">Vitest 모킹 패턴 8가지</div><div class="sidebar-post-date">2026. 3. 8.</div></a>
+      </div>
+      <div id="m-popularList" class="sidebar-tab-content" style="display:none">
+        <a href="/posts/react-server-components-deep-dive" class="sidebar-post"><div class="sidebar-post-title">React Server Components 실전 가이드</div><div class="sidebar-post-date">조회 3,847</div></a>
+        <a href="/posts/zustand-vs-jotai-state-management" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">조회 2,341</div></a>
+        <a href="/posts/typescript-5-pattern-matching" class="sidebar-post"><div class="sidebar-post-title">TypeScript 5.x 패턴 매칭 완전 정복</div><div class="sidebar-post-date">조회 2,156</div></a>
+        <a href="/posts/docker-multi-stage-optimization" class="sidebar-post"><div class="sidebar-post-title">Docker 멀티스테이지 빌드로 이미지 87% 감량</div><div class="sidebar-post-date">조회 2,089</div></a>
+        <a href="/posts/nextjs-app-router-caching" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">조회 1,923</div></a>
+      </div>
+    </div>
+
+    <!-- Section 2: 분류 -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title flex items-center gap-1.5">
+        <iconify-icon icon="solar:folder-2-linear" width="13"></iconify-icon>
+        분류 전체보기 (47)
+      </div>
+      <div>
+        <div>
+          <div class="cat-item" onclick="toggleCategory(this)">
+            <span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Frontend</span>
+            <span class="cat-count">23</span>
+          </div>
+          <div class="cat-children">
+            <a href="/categories/react" class="cat-item" style="padding-left:4px"><span>React</span><span class="cat-count">12</span></a>
+            <a href="/categories/nextjs" class="cat-item" style="padding-left:4px"><span>Next.js</span><span class="cat-count">6</span></a>
+            <a href="/categories/css" class="cat-item" style="padding-left:4px"><span>CSS</span><span class="cat-count">5</span></a>
+          </div>
+        </div>
+        <div>
+          <div class="cat-item" onclick="toggleCategory(this)">
+            <span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Backend</span>
+            <span class="cat-count">14</span>
+          </div>
+          <div class="cat-children">
+            <a href="/categories/nodejs" class="cat-item" style="padding-left:4px"><span>Node.js</span><span class="cat-count">8</span></a>
+            <a href="/categories/database" class="cat-item" style="padding-left:4px"><span>Database</span><span class="cat-count">6</span></a>
+          </div>
+        </div>
+        <a href="/categories/devops" class="cat-item"><span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">DevOps</span><span class="cat-count">6</span></a>
+        <a href="/categories/typescript" class="cat-item"><span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">TypeScript</span><span class="cat-count">4</span></a>
+      </div>
+    </div>
+
+    <!-- Section 3: 태그 -->
+    <div class="sidebar-section">
+      <div class="flex items-center justify-between mb-2.5">
+        <div class="sidebar-section-title flex items-center gap-1.5" style="margin-bottom:0">
+          <iconify-icon icon="solar:tag-linear" width="13"></iconify-icon>
+          태그
+        </div>
+        <a href="/tags" class="text-ui-xs font-medium hover:underline underline-offset-4 flex items-center gap-0.5" style="color:var(--primary1)">
+          전체보기 <iconify-icon icon="solar:alt-arrow-right-linear" width="12"></iconify-icon>
+        </a>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <a href="/tags/react" class="tag-item">React</a>
+        <a href="/tags/nextjs" class="tag-item">Next.js</a>
+        <a href="/tags/typescript" class="tag-item">TypeScript</a>
+        <a href="/tags/css" class="tag-item">CSS</a>
+        <a href="/tags/tailwind" class="tag-item">Tailwind</a>
+        <a href="/tags/nodejs" class="tag-item">Node.js</a>
+        <a href="/tags/docker" class="tag-item">Docker</a>
+        <a href="/tags/testing" class="tag-item">Testing</a>
+        <a href="/tags/postgresql" class="tag-item">PostgreSQL</a>
+        <a href="/tags/github-actions" class="tag-item">GitHub Actions</a>
+        <a href="/tags/rsc" class="tag-item">RSC</a>
+        <a href="/tags/vitest" class="tag-item">Vitest</a>
+        <a href="/tags/zustand" class="tag-item">Zustand</a>
+        <a href="/tags/performance" class="tag-item">Performance</a>
+        <a href="/tags/architecture" class="tag-item">Architecture</a>
+      </div>
+    </div>
+
+    <!-- Section 4: 블로그 조회수 -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title flex items-center gap-1.5">
+        <iconify-icon icon="solar:eye-linear" width="13"></iconify-icon>
+        블로그 조회수
+      </div>
+      <div class="view-counter">128,347</div>
+      <div class="text-ui-xs mt-0.5" style="color:var(--text4)">Total Visitors</div>
+    </div>
+  </aside>
+
+  <!-- ═══ Footer ═══ -->
+  <footer style="border-top:1px solid var(--border4);background:var(--background2)">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-5 h-5" style="fill:var(--text4)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+          <span class="text-ui-xs" style="color:var(--text4)">&copy; 2026 pyosh. All rights reserved.</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="/guestbook" class="text-ui-xs hover:underline underline-offset-4" style="color:var(--text3)">방명록</a>
+          <a href="https://github.com/pyo-sh" class="text-ui-xs hover:underline underline-offset-4 flex items-center gap-1" style="color:var(--text3)">
+            <iconify-icon icon="solar:link-minimalistic-2-linear" width="12"></iconify-icon>GitHub
+          </a>
+          <a href="mailto:pyo@pyosh.dev" class="text-ui-xs hover:underline underline-offset-4 flex items-center gap-1" style="color:var(--text3)">
+            <iconify-icon icon="solar:letter-linear" width="12"></iconify-icon>Email
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    const themeToggle = document.getElementById('themeToggle');
+    const sunIcon = themeToggle.querySelector('.sun-icon');
+    const moonIcon = themeToggle.querySelector('.moon-icon');
+
+    function getPreferredTheme() {
+      const stored = localStorage.getItem('theme');
+      if (stored) return stored;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function applyTheme(theme) {
+      document.body.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      sunIcon.style.display = theme === 'dark' ? 'none' : '';
+      moonIcon.style.display = theme === 'dark' ? '' : 'none';
+    }
+    applyTheme(getPreferredTheme());
+    themeToggle.addEventListener('click', () => {
+      const current = document.body.getAttribute('data-theme') || 'light';
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    });
+
+    // ─── Staggered Reveal ───
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) { entry.target.classList.add('visible'); revealObserver.unobserve(entry.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal-stagger').forEach((el, i) => {
+      el.style.animationDelay = `${i * 80}ms`;
+      revealObserver.observe(el);
+    });
+
+    // ─── Desktop Sidebar Tab Switch ───
+    function switchTab(tab) {
+      document.querySelectorAll('.sidebar-desktop .sidebar-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.getElementById('recentList').style.display = tab === 'recent' ? '' : 'none';
+      document.getElementById('popularList').style.display = tab === 'popular' ? '' : 'none';
+    }
+
+    // ─── Mobile Sidebar Tab Switch ───
+    function switchMobileTab(tab) {
+      document.querySelectorAll('.mobile-sidebar .sidebar-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.getElementById('m-recentList').style.display = tab === 'm-recent' ? '' : 'none';
+      document.getElementById('m-popularList').style.display = tab === 'm-popular' ? '' : 'none';
+    }
+
+    // ─── Category Tree Toggle ───
+    function toggleCategory(el) {
+      const children = el.nextElementSibling;
+      const toggle = el.querySelector('.cat-toggle');
+      if (children && children.classList.contains('cat-children')) {
+        children.classList.toggle('open');
+        toggle && toggle.classList.toggle('open');
+      }
+    }
+
+    // ─── Mobile Slide-In ───
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarClose = document.getElementById('mobileSidebarClose');
+
+    function openMobileSidebar() {
+      mobileOverlay.classList.add('open');
+      mobileSidebar.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      mobileSidebar.setAttribute('aria-hidden', 'false');
+      // Focus trap: focus close button
+      mobileSidebarClose.focus();
+    }
+    function closeMobileSidebar() {
+      mobileOverlay.classList.remove('open');
+      mobileSidebar.classList.remove('open');
+      document.body.style.overflow = '';
+      mobileSidebar.setAttribute('aria-hidden', 'true');
+      hamburgerBtn.focus();
+    }
+
+    hamburgerBtn.addEventListener('click', openMobileSidebar);
+    mobileSidebarClose.addEventListener('click', closeMobileSidebar);
+    mobileOverlay.addEventListener('click', closeMobileSidebar);
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mobileSidebar.classList.contains('open')) closeMobileSidebar();
+    });
+
+    // Auto-close on resize >= 1080px
+    const desktopMQ = window.matchMedia('(min-width: 1080px)');
+    desktopMQ.addEventListener('change', (e) => {
+      if (e.matches && mobileSidebar.classList.contains('open')) closeMobileSidebar();
+    });
+
+    // Close mobile sidebar on link click
+    mobileSidebar.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', closeMobileSidebar);
+    });
+
+    // ─── Pagination (demo) ───
+    document.querySelectorAll('.page-btn:not(:disabled)').forEach(btn => {
+      btn.addEventListener('click', function() {
+        if (this.classList.contains('active')) return;
+        document.querySelectorAll('.page-btn.active').forEach(a => {
+          a.classList.remove('active'); a.style.background='transparent'; a.style.color='var(--text2)'; a.style.fontWeight='500';
+        });
+        this.classList.add('active'); this.style.background='var(--primary1)'; this.style.color='var(--background1)'; this.style.fontWeight='700';
+      });
+    });
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var s = document.getElementById('mobileSidebar');
+      if (s) s.classList.add('open');
+      var o = document.getElementById('sidebarOverlay') || document.querySelector('.sidebar-overlay');
+      if (o) o.classList.add('open');
+    });
+  </script>
+</body>
+</html>

@@ -6,6 +6,11 @@
 
 - `docs/client/specs/dark-mode.md`
 
+## 와이어프레임
+
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md` - 컬러 토큰 시스템, light/dark 전환 규칙
+- (Note: all wireframe HTML files implement dark mode - any can be used as reference)
+
 ## 상세 설계
 
 ### 사용자 흐름

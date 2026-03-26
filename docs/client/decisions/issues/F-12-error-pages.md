@@ -6,6 +6,11 @@
 
 - `docs/client/specs/error-pages.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/error-page.html` - 에러 페이지 (404, 글로벌 에러)
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 사용자 흐름

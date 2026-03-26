@@ -6,6 +6,11 @@
 
 - `docs/client/specs/public-sidebar.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/home-page-sidebar.html` - 사이드바 포함 홈 페이지 레이아웃
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 사용자 흐름

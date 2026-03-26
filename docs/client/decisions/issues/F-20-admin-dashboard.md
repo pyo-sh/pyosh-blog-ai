@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-dashboard.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-dashboard.html` - 대시보드 통계 페이지
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 라우트 경로 변경

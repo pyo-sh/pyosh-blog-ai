@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-asset-gallery.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-asset.html` - 에셋 관리 페이지 (갤러리 그리드, 선택, 삭제)
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 그리드 레이아웃

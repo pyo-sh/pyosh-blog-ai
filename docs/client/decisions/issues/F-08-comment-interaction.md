@@ -6,6 +6,11 @@
 
 - `docs/client/specs/comment-interaction.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/post-detail.html` - 댓글 작성 폼, 대댓글, 삭제 UI
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 댓글 작성 폼

@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-comment-manager.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-comment.html` - 댓글 관리 페이지
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 테이블 구성

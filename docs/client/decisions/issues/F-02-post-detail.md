@@ -6,6 +6,11 @@
 
 - `docs/client/specs/post-detail.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/post-detail.html` - 글 상세 페이지 전체 (마크다운 렌더링, 코드 하이라이팅, 이전/다음 글)
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 페이지 구조

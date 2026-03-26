@@ -6,6 +6,10 @@
 
 - `docs/client/specs/storybook-setup.md`
 
+## 와이어프레임
+
+해당 없음 (개발 도구 설정).
+
 ## 상세 설계
 
 ### 패키지 구성

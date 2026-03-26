@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-login.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-login.html` - 관리자 로그인 페이지
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 사용자 흐름

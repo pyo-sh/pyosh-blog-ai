@@ -6,6 +6,10 @@
 
 - `docs/client/specs/favicon-manifest.md`
 
+## 와이어프레임
+
+해당 없음 (비시각적 기능).
+
 ## 상세 설계
 
 ### favicon 에셋 구성

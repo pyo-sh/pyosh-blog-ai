@@ -6,6 +6,10 @@
 
 - `docs/specs/deploy-env.md` (섹션 5.3 Client 환경 변수)
 
+## 와이어프레임
+
+해당 없음 (비시각적 기능).
+
 ## 상세 설계
 
 ### Client 환경 변수

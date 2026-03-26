@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-guestbook-manager.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-guestbook.html` - 방명록 관리 페이지
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 방명록 on/off 토글

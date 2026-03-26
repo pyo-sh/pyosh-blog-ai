@@ -6,6 +6,10 @@
 
 - `docs/client/specs/seo-jsonld.md`
 
+## 와이어프레임
+
+해당 없음 (비시각적 기능).
+
 ## 상세 설계
 
 ### BlogPosting (글 상세 페이지)

@@ -6,6 +6,11 @@
 
 - `docs/client/specs/guestbook.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/guestbook.html` - 방명록 페이지 전체
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 사용자 흐름

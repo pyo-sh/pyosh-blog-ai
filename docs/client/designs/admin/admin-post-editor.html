@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog Admin - 새 글 작성</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+            tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+            bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+            primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+            secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+            info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+            positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+            negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+            grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+            yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+            'code-surface': 'var(--code-surface)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ═══ Admin Sidebar ═══ */
+    .admin-sidebar{
+      position:fixed;left:0;top:0;bottom:0;z-index:30;
+      width:240px;display:flex;flex-direction:column;
+      background:var(--background2);border-right:1px solid var(--border3);
+      transition:width .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-sidebar.collapsed{width:64px;}
+    .admin-sidebar.collapsed .nav-label,
+    .admin-sidebar.collapsed .sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap;}
+    .admin-sidebar.collapsed .admin-nav-item{justify-content:center;padding:8px 0;}
+    .admin-sidebar.collapsed .sidebar-logo-area .admin-badge{display:none;}
+    .admin-sidebar.collapsed~#sidebarOverlay~#contentWrapper{margin-left:64px!important;}
+
+    .admin-nav-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 12px;border-radius:8px;
+      font-size:14px;color:var(--text2);text-decoration:none;
+      transition:all .15s ease;
+    }
+    .admin-nav-item:hover{background:var(--background3);}
+    .admin-nav-item.active{
+      background:rgba(138,111,224,0.10);
+      color:var(--primary1);font-weight:500;
+    }
+    .nav-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+    .admin-nav-item iconify-icon{display:flex;flex-shrink:0;align-items:center;}
+    iconify-icon{display:inline-block;vertical-align:middle;}
+
+    .admin-content{
+      margin-left:240px;
+      transition:margin-left .3s cubic-bezier(.16,1,.3,1);
+      height:100dvh;overflow:hidden;display:flex;flex-direction:column;
+    }
+    .admin-topbar{
+      position:sticky;top:0;z-index:10;
+      display:flex;align-items:center;height:56px;padding:0 24px;gap:16px;
+      background:rgba(249,249,250,0.80);
+      backdrop-filter:blur(16px) saturate(1.4);
+      -webkit-backdrop-filter:blur(16px) saturate(1.4);
+      border-bottom:1px solid var(--border4);
+    }
+    body[data-theme="dark"] .admin-topbar{background:rgba(19,20,21,0.85);}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .admin-topbar{background:rgba(19,20,21,0.85);}}
+
+    @media(max-width:767px){
+      .admin-sidebar{transform:translateX(-100%);width:240px!important;}
+      .admin-sidebar.mobile-open{transform:translateX(0);}
+      .admin-content{margin-left:0!important;}
+    }
+
+    /* ═══ Admin Components ═══ */
+
+    /* Form */
+    .admin-input{
+      width:100%;padding:8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-input:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+    .admin-input::placeholder{color:var(--text4);}
+
+    .admin-select{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;
+    }
+    .admin-select:focus{border-color:var(--primary1);}
+
+    /* ═══ Custom Select ═══ */
+    .custom-select{position:relative;display:inline-flex;}
+    .custom-select.w-full{display:flex;width:100%;}
+    .custom-select-trigger{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C%2Fsvg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;display:block;text-align:left;white-space:nowrap;
+    }
+    .custom-select.w-full .custom-select-trigger{width:100%;}
+    .custom-select.open .custom-select-trigger,.custom-select-trigger:focus{border-color:var(--primary1);}
+    .custom-select-dropdown{
+      position:absolute;top:calc(100% + 4px);left:0;min-width:100%;
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);
+      z-index:200;display:none;overflow:hidden;
+    }
+    .custom-select.open .custom-select-dropdown{display:block;}
+    .custom-select-option{padding:8px 12px;font-size:14px;cursor:pointer;color:var(--text1);transition:background .15s;}
+    .custom-select-option:hover{background:var(--background2);}
+    .custom-select-option.selected{color:var(--primary1);font-weight:500;}
+
+
+    .admin-textarea{
+      width:100%;padding:10px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;resize:vertical;min-height:80px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-textarea:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+
+    .admin-checkbox{
+      width:16px;height:16px;border-radius:4px;cursor:pointer;
+      accent-color:var(--primary1);
+    }
+
+    /* Buttons */
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--primary1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-primary:hover{opacity:.9;}.btn-primary:active{transform:scale(.97);}
+
+    .btn-secondary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:transparent;color:var(--text2);border:1px solid var(--border3);cursor:pointer;
+      transition:background .2s,transform .15s;
+    }
+    .btn-secondary:hover{background:var(--background3);}.btn-secondary:active{transform:scale(.97);}
+
+    .btn-danger{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--negative1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-danger:hover{opacity:.9;}
+
+    .btn-ghost{
+      display:inline-flex;align-items:center;justify-content:center;gap:4px;
+      padding:6px 10px;border-radius:6px;font-size:13px;
+      background:transparent;color:var(--text3);border:none;cursor:pointer;
+      transition:background .15s,color .15s;
+    }
+    .btn-ghost:hover{background:var(--background3);color:var(--text2);}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;}
+    .badge-published{background:rgba(13,169,107,0.12);color:var(--positive1);}
+    .badge-draft{background:rgba(144,153,161,0.12);color:var(--grey3);}
+    .badge-archived{background:rgba(255,190,61,0.12);color:var(--yellow1);}
+    .badge-deleted{background:rgba(226,18,35,0.12);color:var(--negative1);}
+    .badge-private{background:rgba(107,73,181,0.12);color:var(--secondary1);}
+    .badge-public{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .badge-category{background:rgba(138,111,224,0.12);color:var(--primary1);}
+
+    /* Table */
+    .admin-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+    .admin-table th{
+      padding:10px 12px;text-align:left;font-weight:600;font-size:12px;
+      color:var(--text3);background:var(--background2);
+      border-bottom:1px solid var(--border3);white-space:nowrap;
+    }
+    .admin-table td{
+      padding:12px;color:var(--text2);
+      border-bottom:1px solid var(--border4);vertical-align:middle;
+    }
+    .admin-table tbody tr{transition:background .15s;}
+    .admin-table tbody tr:hover{background:var(--background2);}
+
+    /* Card */
+    .admin-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;transition:border-color .2s;
+    }
+    .admin-card:hover{border-color:var(--border3);}
+
+    /* Stat Card */
+    .stat-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:8px;
+      transition:border-color .2s,transform .2s;
+    }
+    .stat-card:hover{border-color:var(--border3);transform:translateY(-2px);}
+    .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+    .stat-value{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.75rem;font-weight:700;color:var(--text1);letter-spacing:-.02em;line-height:1;}
+    .stat-label{font-size:13px;color:var(--text3);}
+
+    /* Pagination */
+    .page-btn{
+      width:36px;height:36px;border-radius:8px;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:500;color:var(--text2);
+      background:transparent;border:none;cursor:pointer;
+      transition:all .25s cubic-bezier(.16,1,.3,1);
+    }
+    .page-btn:hover:not(:disabled):not(.active){transform:scale(1.08);background:var(--background3);}
+    .page-btn:active:not(:disabled){transform:scale(.95);}
+    .page-btn.active{background:var(--primary1);color:#fff;font-weight:700;}
+    .page-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:50;
+      background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .modal-overlay.open{display:flex;}
+    .modal-content{
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:16px;padding:24px;width:100%;
+      max-height:90vh;overflow-y:auto;
+      animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);
+    }
+
+    /* Toggle Switch */
+    .toggle-switch{
+      position:relative;width:44px;height:24px;
+      background:var(--border3);border-radius:12px;cursor:pointer;
+      transition:background .2s;
+    }
+    .toggle-switch.active{background:var(--primary1);}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#ffffff;transition:transform .2s cubic-bezier(.16,1,.3,.1);}.toggle-switch-sm .toggle-knob{width:16px;height:16px;border-radius:8px;}.toggle-switch.active .toggle-knob{transform:translateX(20px);}.toggle-switch-sm.active .toggle-knob{transform:translateX(16px);}
+    
+    
+
+    /* Dropzone */
+    .dropzone{
+      border:2px dashed var(--border3);border-radius:12px;
+      padding:40px 24px;text-align:center;
+      transition:border-color .2s,background .2s;cursor:pointer;
+    }
+    .dropzone:hover,.dropzone.dragover{
+      border-color:var(--primary1);
+      background:rgba(138,111,224,0.04);
+    }
+
+    /* Tab */
+    .admin-tab{
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      color:var(--text3);background:transparent;border:none;cursor:pointer;
+      transition:all .2s;
+    }
+    .admin-tab:hover{color:var(--text2);}
+    .admin-tab.active{background:rgba(138,111,224,0.10);color:var(--primary1);}
+
+    /* ═══ Page-Specific Styles ═══ */
+
+    /* Editor monospace font */
+    .editor-mono{font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono',ui-monospace,monospace;}
+
+    /* Title input */
+    .title-input{
+      width:100%;border:none;background:transparent;outline:none;
+      color:var(--text1);padding:12px 0;
+      font-size:1.5rem;line-height:2rem;font-weight:700;
+      border-bottom:2px solid transparent;
+      transition:border-color .2s;
+    }
+    .title-input::placeholder{color:var(--text4);}
+    .title-input:focus{border-bottom-color:var(--primary1);}
+    @media(min-width:768px){
+      .title-input{font-size:1.875rem;line-height:2.375rem;}
+    }
+
+    /* Tag chip */
+    .tag-chip{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:2px 8px;border-radius:9999px;font-size:12px;
+      background:rgba(138,111,224,0.12);
+      color:var(--primary1);
+    }
+    .tag-chip button{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:14px;height:14px;border-radius:50%;border:none;background:transparent;
+      color:var(--primary1);cursor:pointer;font-size:11px;line-height:1;
+      transition:background .15s;
+    }
+    .tag-chip button:hover{background:rgba(138,111,224,0.20);}
+
+    /* Tag input */
+    .tag-input{
+      border:none;background:transparent;outline:none;
+      color:var(--text1);font-size:12px;min-width:80px;max-width:120px;
+    }
+    .tag-input::placeholder{color:var(--text4);}
+
+    /* Status radio buttons */
+    .status-btn{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500;
+      border:1px solid var(--border3);background:transparent;color:var(--text3);
+      cursor:pointer;transition:all .2s;
+    }
+    .status-btn.active-draft{
+      background:rgba(144,153,161,0.12);
+      color:var(--grey3);border-color:rgba(144,153,161,0.30);
+    }
+    .status-btn.active-published{
+      background:rgba(13,169,107,0.12);
+      color:var(--positive1);border-color:rgba(13,169,107,0.30);
+    }
+
+    /* Editor split panel */
+    .editor-split{
+      display:flex;gap:0;
+      flex:1;overflow:hidden;min-height:0;
+    }
+
+    /* Toolbar divider */
+    .toolbar-divider{
+      width:1px;height:20px;background:var(--border4);margin:0 4px;flex-shrink:0;
+    }
+
+    /* Line numbers */
+    .line-numbers{
+      user-select:none;
+      font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono',ui-monospace,monospace;
+      font-size:13px;line-height:1.6;
+      color:var(--text4);text-align:right;
+      padding:16px 12px 16px 16px;
+      border-right:1px solid var(--border4);
+      min-width:44px;
+    }
+
+    /* Editor textarea */
+    .editor-textarea{
+      width:100%;height:100%;resize:none;border:none;outline:none;
+      background:transparent;color:#e9eaeb;
+      font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono',ui-monospace,monospace;
+      font-size:13px;line-height:1.6;
+      padding:16px;
+    }
+    .editor-textarea::placeholder{color:var(--text4);}
+
+    /* Code block syntax colors */
+    .syntax-keyword{color:#ff7b72;}
+    .syntax-string{color:#a5d6ff;}
+    .syntax-comment{color:#8b949e;}
+    .syntax-function{color:#d2a8ff;}
+    .syntax-variable{color:#ffa657;}
+    .syntax-tag{color:#7ee787;}
+    .syntax-attr{color:#79c0ff;}
+
+    /* Preview rendered markdown styles */
+    .preview-content h2{
+      font-size:1.375rem;line-height:1.75rem;font-weight:700;
+      color:var(--text1);margin:24px 0 12px;padding-bottom:8px;
+      border-bottom:1px solid var(--border4);
+    }
+    .preview-content h3{
+      font-size:1.125rem;line-height:1.5rem;font-weight:700;
+      color:var(--text1);margin:20px 0 8px;
+    }
+    .preview-content p{
+      color:var(--text2);line-height:1.75;margin:12px 0;
+    }
+    .preview-content code:not(.code-block code){
+      background:rgba(138,111,224,0.10);
+      color:var(--primary1);padding:1px 6px;border-radius:4px;font-size:0.875em;
+      font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono',ui-monospace,monospace;
+    }
+    .preview-content .code-block{
+      background:var(--code-surface);border-radius:8px;padding:16px;margin:16px 0;
+      overflow-x:auto;font-size:13px;line-height:1.6;
+      font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono',ui-monospace,monospace;
+    }
+    .preview-content .code-block code{
+      color:#e9eaeb;background:none;padding:0;
+    }
+    .preview-content blockquote{
+      border-left:4px solid var(--primary1);
+      background:rgba(138,111,224,0.04);
+      padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;
+    }
+    .preview-content blockquote p{margin:0;color:var(--text2);}
+    .preview-content ul{
+      list-style:disc;padding-left:24px;margin:12px 0;color:var(--text2);
+    }
+    .preview-content ul li{margin:6px 0;line-height:1.75;}
+    .preview-content ul li strong{color:var(--text1);}
+
+    /* Bottom action bar */
+    .bottom-action-bar{
+      position:sticky;bottom:0;z-index:5;
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 24px;gap:16px;
+      background:var(--background2);
+      border-top:1px solid var(--border3);
+    }
+
+    /* Mobile editor tabs */
+    .editor-tab{
+      flex:1;padding:8px 0;border:none;background:transparent;
+      font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;
+      border-bottom:2px solid transparent;transition:all .2s;
+    }
+    .editor-tab.active{color:var(--primary1);border-bottom-color:var(--primary1);}
+
+    /* Mobile responsive */
+    @media(max-width:767px){
+      .editor-split{flex-direction:column;}
+      .editor-split .preview-panel{display:none;}
+      .editor-split[data-mode="split"] .preview-panel{display:flex;}
+      .meta-row{flex-direction:column!important;flex-shrink:0;}
+      .bottom-action-bar{padding:12px 16px;}
+    }
+
+    /* ═══ Page Tabs (F-23) ═══ */
+    .page-tab{
+      padding:5px 14px;border:none;background:transparent;font-size:13px;font-weight:500;
+      color:var(--text3);cursor:pointer;border-radius:6px;transition:all .2s;
+    }
+    .page-tab:hover{background:var(--background3);color:var(--text1);}
+    .page-tab.active{background:var(--primary1);color:#fff;}
+
+    /* Tab content visibility */
+    .tab-content{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+    .tab-content.active{display:flex;}
+
+    /* ═══ Preview Mode Bar (F-22) ═══ */
+    .preview-mode-bar{
+      display:flex;align-items:center;gap:2px;padding:6px 16px;
+      border-bottom:1px solid var(--border4);background:var(--background2);flex-shrink:0;
+    }
+    .preview-mode-btn{
+      padding:4px 12px;border:none;background:transparent;font-size:12px;font-weight:500;
+      color:var(--text3);cursor:pointer;border-radius:5px;transition:all .2s;
+    }
+    .preview-mode-btn:hover{background:var(--background3);color:var(--text1);}
+    .preview-mode-btn.active{background:var(--background3);color:var(--primary1);}
+    .preview-modal-trigger{
+      margin-left:auto;padding:4px 10px;border:none;background:transparent;font-size:12px;font-weight:500;
+      color:var(--text3);cursor:pointer;border-radius:5px;transition:all .2s;
+      display:flex;align-items:center;gap:5px;
+    }
+    .preview-modal-trigger:hover{background:var(--background3);color:var(--text1);}
+
+    /* Preview mode: editor only */
+    .editor-split[data-mode="editor-only"] .preview-panel{display:none!important;}
+    .editor-split[data-mode="editor-only"] .split-divider{display:none!important;}
+
+    /* ═══ Meta Form - 정보 tab (F-23) ═══ */
+    .meta-row-bar{flex-shrink:0;}
+    .meta-form-area{
+      display:grid;grid-template-columns:1fr 320px;gap:0;
+      overflow:hidden;flex:1;min-height:0;
+    }
+    @media(max-width:1023px){.meta-form-area{grid-template-columns:1fr;overflow:auto;}}
+    .meta-form-fields{padding:24px;overflow:auto;min-height:0;}
+    .meta-form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:20px;}
+    .meta-form-label{font-size:12px;font-weight:600;color:var(--text2);}
+    .meta-form-field{
+      padding:8px 12px;border-radius:8px;border:1px solid var(--border3);
+      background:var(--background2);color:var(--text1);font-size:14px;
+      outline:none;transition:border-color .2s;width:100%;box-sizing:border-box;
+      font-family:inherit;
+    }
+    .meta-form-field:focus{border-color:var(--primary1);}
+    textarea.meta-form-field{resize:vertical;min-height:72px;}
+    .meta-form-char{font-size:11px;color:var(--text4);text-align:right;margin-top:2px;}
+    .meta-form-toggle-row{display:flex;align-items:center;gap:10px;}
+    .meta-form-toggle-label{font-size:13px;color:var(--text2);}
+
+    /* ═══ PostListItem Preview Panel ═══ */
+    .post-preview-panel{
+      padding:20px;border-left:1px solid var(--border4);overflow:auto;min-height:0;
+    }
+    @media(max-width:1023px){.post-preview-panel{border-left:none;border-top:1px solid var(--border4);}}
+    .post-preview-label{font-size:11px;font-weight:600;color:var(--text4);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;}
+    /* post-detail.html .related-card 구조와 동일하게 맞춤 */
+    .post-list-item-card{
+      border:1px solid var(--border3);border-radius:.75rem;overflow:hidden;background:var(--background2);
+      transition:all .3s cubic-bezier(.16,1,.3,1);
+    }
+    .post-list-item-card:hover{border-color:var(--primary1);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.06);}
+    .post-list-item-card .pli-thumb{width:100%;aspect-ratio:16/10;overflow:hidden;background:var(--background3);}
+    .post-list-item-card .pli-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.16,1,.3,1);}
+    .post-list-item-card:hover .pli-thumb img{transform:scale(1.05);}
+    .post-list-item-card .pli-body{padding:10px 12px;}
+    .post-list-item-card .pli-cat{font-size:.6875rem;font-weight:600;color:var(--primary1);margin-bottom:4px;}
+    .post-list-item-card .pli-title{
+      font-size:.75rem;font-weight:600;color:var(--text1);line-height:1.4;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }
+    .post-list-item-card .pli-date{font-size:.6875rem;color:var(--text4);margin-top:5px;}
+
+    /* ═══ PostListItem Row (horizontal list preview) ═══ */
+    /* home-page.html .post-item 구조와 동일하게 맞춤 */
+    .post-list-item-row{
+      display:flex;gap:12px;
+      border-radius:12px;padding:12px 14px;
+      transition:background-color .2s;
+    }
+    .post-list-item-row:hover{background:var(--background3);}
+    .post-list-item-row .plr-thumb-wrap{
+      flex-shrink:0;width:80px;height:64px;border-radius:8px;overflow:hidden;background:var(--background3);
+    }
+    .post-list-item-row .plr-thumb-wrap img{
+      width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.16,1,.3,1);
+    }
+    .post-list-item-row:hover .plr-thumb-wrap img{transform:scale(1.05);}
+    .post-list-item-row .plr-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+    .post-list-item-row .plr-top{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+    .post-list-item-row .plr-cat{
+      display:inline-flex;align-items:center;padding:1px 6px;border-radius:4px;
+      font-size:11px;font-weight:600;
+      background:rgba(138,111,224,.12);color:var(--primary1);
+    }
+    .post-list-item-row .plr-date{font-size:11px;color:var(--text4);}
+    .post-list-item-row .plr-title{
+      font-size:14px;font-weight:700;color:var(--text1);line-height:1.4;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }
+    .post-list-item-row .plr-summary{
+      font-size:12px;color:var(--text3);line-height:1.5;
+      display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;
+    }
+    .post-list-item-row .plr-metrics{
+      display:flex;align-items:center;gap:10px;font-size:11px;color:var(--text4);margin-top:2px;
+    }
+    .preview-section-label{
+      font-size:11px;font-weight:600;color:var(--text4);
+      text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;
+    }
+
+    /* Category tree depth */
+    .custom-select-option.depth-0{font-weight:600;color:var(--text1);}
+    .custom-select-option.depth-1{padding-left:24px;font-size:12px;color:var(--text3);}
+
+    /* ═══ Preview Full Modal (F-22) ═══ */
+    .preview-full-modal{
+      display:none;position:fixed;inset:0;z-index:100;
+      background:var(--background1);flex-direction:column;
+    }
+    .preview-full-modal.open{display:flex;}
+    .preview-full-modal-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 24px;border-bottom:1px solid var(--border4);background:var(--background2);flex-shrink:0;
+    }
+    .preview-full-modal-body{flex:1;overflow:auto;padding:32px 24px;max-width:800px;margin:0 auto;width:100%;}
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Admin Sidebar ═══ -->
+  <aside id="sidebar" class="admin-sidebar" aria-label="관리자 메뉴">
+    <div class="sidebar-logo-area flex items-center h-14 px-4 gap-2 shrink-0" style="border-bottom:1px solid var(--border4);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7 shrink-0" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+      <span class="admin-badge sidebar-text text-xs font-medium px-1.5 py-0.5 rounded" style="background:rgba(138,111,224,0.12); color:var(--primary1);">Admin</span>
+      <button onclick="toggleSidebar()" class="ml-auto flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="사이드바 접기"
+        onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+        <iconify-icon icon="solar:sidebar-minimalistic-linear" width="18" style="display:flex"></iconify-icon>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+      <a href="admin-dashboard.html" class="admin-nav-item" data-page="dashboard">
+        <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
+        <span class="nav-label">대시보드</span>
+      </a>
+      <a href="admin-post-list.html" class="admin-nav-item" data-page="posts">
+        <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+        <span class="nav-label">글</span>
+      </a>
+      <a href="admin-post-editor.html" class="admin-nav-item" data-page="editor">
+        <iconify-icon icon="solar:pen-new-round-linear" width="20"></iconify-icon>
+        <span class="nav-label">글 작성</span>
+      </a>
+      <a href="admin-category.html" class="admin-nav-item" data-page="categories">
+        <iconify-icon icon="solar:folder-open-linear" width="20"></iconify-icon>
+        <span class="nav-label">카테고리</span>
+      </a>
+      <a href="admin-comment.html" class="admin-nav-item" data-page="comments">
+        <iconify-icon icon="solar:chat-round-dots-linear" width="20"></iconify-icon>
+        <span class="nav-label">댓글</span>
+      </a>
+      <a href="admin-guestbook.html" class="admin-nav-item" data-page="guestbook">
+        <iconify-icon icon="solar:notebook-linear" width="20"></iconify-icon>
+        <span class="nav-label">방명록</span>
+      </a>
+      <a href="admin-asset.html" class="admin-nav-item" data-page="assets">
+        <iconify-icon icon="solar:gallery-wide-linear" width="20"></iconify-icon>
+        <span class="nav-label">에셋</span>
+      </a>
+    </nav>
+    <div class="px-3 pb-4 shrink-0">
+      <a href="../public/home-page.html" class="admin-nav-item" style="color:var(--text3);">
+        <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+        <span class="nav-label">블로그로 돌아가기</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Mobile Overlay -->
+  <div id="sidebarOverlay" class="fixed inset-0 z-20 hidden" style="background:rgba(0,0,0,.4);backdrop-filter:blur(2px);" onclick="closeMobileSidebar()"></div>
+
+  <!-- ═══ Content Wrapper ═══ -->
+  <div id="contentWrapper" class="admin-content">
+    <!-- Top Bar -->
+    <header class="admin-topbar">
+      <button onclick="openMobileSidebar()" class="p-1.5 rounded-lg md:hidden transition-colors" style="color:var(--text2);" aria-label="메뉴">
+        <iconify-icon icon="solar:hamburger-menu-linear" width="22" style="display:flex"></iconify-icon>
+      </button>
+      <h1 class="text-lg font-bold break-keep" style="color:var(--text1);">새 글 작성</h1>
+            <div class="ml-auto flex items-center gap-1">
+        <span class="text-sm hidden sm:inline" style="color:var(--text3);">관리자</span>
+        <button onclick="toggleTheme()" class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="테마 전환"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:sun-2-linear" width="18" id="sunIcon" style="display:flex"></iconify-icon>
+          <iconify-icon icon="solar:moon-linear" width="18" id="moonIcon" style="display:none"></iconify-icon>
+        </button>
+        <button class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="로그아웃"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:logout-2-linear" width="18" style="display:flex"></iconify-icon>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex flex-col flex-1 overflow-hidden">
+
+      <!-- ═══ Page Tab Bar (F-23) ═══ -->
+      <div class="flex items-center gap-1 px-4 py-2" style="border-bottom:1px solid var(--border4);background:var(--background2);">
+        <button class="page-tab active" onclick="switchPageTab('all')">전체</button>
+        <button class="page-tab" onclick="switchPageTab('info')">정보</button>
+        <button class="page-tab" onclick="switchPageTab('editor-split')">에디터 + 프리뷰</button>
+        <button class="page-tab" onclick="switchPageTab('editor-only')">에디터</button>
+      </div>
+
+      <!-- ═══ Tab: 전체 ═══ -->
+      <div id="tab-all" class="tab-content active">
+
+        <!-- Title Input -->
+        <div class="px-6 pt-4 pb-3 flex-shrink-0" style="border-bottom:1px solid var(--border4);">
+          <input type="text" class="title-input" placeholder="제목을 입력하세요" value="React Server Components 완벽 가이드">
+        </div>
+
+        <!-- Compact Meta Row -->
+        <div class="meta-row flex flex-wrap items-center gap-4 px-6 py-3 flex-shrink-0" style="border-bottom:1px solid var(--border4);">
+          <!-- 카테고리 -->
+          <div class="flex items-center gap-2">
+            <label class="text-ui-xs" style="color:var(--text3);white-space:nowrap;">카테고리</label>
+            <div class="custom-select" style="min-width:120px;">
+              <button type="button" class="custom-select-trigger"><span class="custom-select-value">Frontend</span></button>
+              <div class="custom-select-dropdown">
+                <div class="custom-select-option depth-0 selected">Frontend</div>
+                <div class="custom-select-option depth-1">React</div>
+                <div class="custom-select-option depth-1">Next.js</div>
+                <div class="custom-select-option depth-0">Backend</div>
+                <div class="custom-select-option depth-1">Node.js</div>
+                <div class="custom-select-option depth-0">DevOps</div>
+                <div class="custom-select-option depth-0">TypeScript</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 태그 -->
+          <div class="flex items-center gap-2">
+            <label class="text-ui-xs" style="color:var(--text3);white-space:nowrap;">태그</label>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="tag-chip">React<button onclick="this.parentElement.remove()" aria-label="태그 삭제"><iconify-icon icon="solar:close-circle-linear" width="12"></iconify-icon></button></span>
+              <span class="tag-chip">RSC<button onclick="this.parentElement.remove()" aria-label="태그 삭제"><iconify-icon icon="solar:close-circle-linear" width="12"></iconify-icon></button></span>
+              <input type="text" class="tag-input" placeholder="태그 추가...">
+            </div>
+          </div>
+
+          <!-- 썸네일 -->
+          <div class="flex items-center gap-2">
+            <label class="text-ui-xs" style="color:var(--text3);white-space:nowrap;">썸네일</label>
+            <button class="btn-secondary" style="padding:4px 10px;font-size:12px;">
+              <iconify-icon icon="solar:gallery-wide-linear" width="14"></iconify-icon>
+              에셋 갤러리에서 선택
+            </button>
+            <img src="https://picsum.photos/seed/rsc-guide/96/72" alt="썸네일 미리보기" width="48" height="36" style="border-radius:6px;object-fit:cover;">
+          </div>
+
+          <!-- 상태 -->
+          <div class="flex items-center gap-2">
+            <label class="text-ui-xs" style="color:var(--text3);white-space:nowrap;">상태</label>
+            <div class="flex gap-1">
+              <button class="status-btn active-draft" onclick="selectStatus(this,'draft')">작성중</button>
+              <button class="status-btn" onclick="selectStatus(this,'published')">발행</button>
+            </div>
+          </div>
+
+          <!-- 공개 -->
+          <div class="flex items-center gap-2">
+            <label class="text-ui-xs" style="color:var(--text3);white-space:nowrap;">공개</label>
+            <div class="toggle-switch active" aria-label="공개 전환"><span class="toggle-knob"></span></div>
+          </div>
+
+          <!-- 댓글 상태 -->
+          <div class="flex items-center gap-2">
+            <label class="text-ui-xs" style="color:var(--text3);white-space:nowrap;">댓글 상태</label>
+            <div class="custom-select" style="min-width:80px;">
+              <button type="button" class="custom-select-trigger"><span class="custom-select-value">열림</span></button>
+              <div class="custom-select-dropdown">
+                <div class="custom-select-option selected">열림</div>
+                <div class="custom-select-option">잠김</div>
+                <div class="custom-select-option">비활성</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editor Split -->
+        <div id="editor-split-all" class="editor-split flex-1">
+
+          <!-- Left Panel (Editor) -->
+          <div class="editor-panel flex flex-col flex-1" style="min-width:0;">
+            <!-- Toolbar: 15 buttons (F-22 spec) -->
+            <div class="flex items-center gap-1 px-3 py-2 flex-wrap" style="border-bottom:1px solid var(--border4);background:var(--background2);">
+              <!-- 텍스트 서식: Bold, Italic, Strikethrough -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-weight:700;font-size:14px;" title="볼드 (Ctrl+B)">B</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-style:italic;font-size:14px;" title="이탤릭 (Ctrl+I)">I</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;text-decoration:line-through;font-size:14px;" title="취소선">S</button>
+              <div class="toolbar-divider"></div>
+              <!-- 제목: H1, H2, H3 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 1">H1</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 2">H2</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 3">H3</button>
+              <div class="toolbar-divider"></div>
+              <!-- 삽입: 링크, 이미지 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="링크 (Ctrl+K)"><iconify-icon icon="solar:link-minimalistic-2-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="이미지 삽입"><iconify-icon icon="solar:gallery-minimalistic-linear" width="16"></iconify-icon></button>
+              <div class="toolbar-divider"></div>
+              <!-- 코드: 인라인 코드, 코드 블록 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="인라인 코드"><iconify-icon icon="solar:code-square-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;position:relative;" title="코드 블록">
+                <iconify-icon icon="solar:code-square-linear" width="16"></iconify-icon>
+                <span style="position:absolute;bottom:2px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--primary1);"></span>
+              </button>
+              <div class="toolbar-divider"></div>
+              <!-- 블록: 인용, 순서 목록, 비순서 목록 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="인용문"><iconify-icon icon="solar:quote-down-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="순서 목록 (1.)"><iconify-icon icon="solar:list-1-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="비순서 목록 (-)"><iconify-icon icon="solar:list-linear" width="16"></iconify-icon></button>
+              <div class="toolbar-divider"></div>
+              <!-- 구조: 구분선, 테이블 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="구분선 (──)"><iconify-icon icon="solar:minus-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="테이블 (표)"><iconify-icon icon="solar:widget-linear" width="16"></iconify-icon></button>
+            </div>
+            <!-- Pending upload indicator -->
+            <div class="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style="border-bottom:1px solid var(--border4);background:var(--background2);font-size:12px;color:var(--text3);">
+              <span>&#x1F4CE; 업로드 대기: 3개</span>
+            </div>
+            <!-- Editor Content -->
+            <div class="flex flex-1" style="background:var(--code-surface);overflow:auto;">
+              <div class="line-numbers shrink-0">
+                <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div>
+                <div>6</div><div>7</div><div>8</div><div>9</div><div>10</div>
+                <div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+                <div>16</div><div>17</div><div>18</div><div>19</div><div>20</div>
+                <div>21</div><div>22</div><div>23</div><div>24</div><div>25</div>
+                <div>26</div><div>27</div><div>28</div><div>29</div><div>30</div>
+              </div>
+              <textarea class="editor-textarea" spellcheck="false">## React Server Components의 핵심 개념
+
+RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄일 수 있습니다.
+
+### 서버 컴포넌트 vs 클라이언트 컴포넌트
+
+서버 컴포넌트는 `'use server'` 지시어가 필요하지 않습니다. Next.js App Router에서는 기본적으로 모든 컴포넌트가 서버 컴포넌트입니다.
+
+```tsx
+// 서버 컴포넌트 (기본)
+async function PostList() {
+  const posts = await db.posts.findMany();
+  return <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>;
+}
+```
+
+> 서버 컴포넌트에서는 `useState`, `useEffect` 같은 클라이언트 훅을 사용할 수 없습니다.
+
+### 주요 장점
+
+- **번들 크기 감소**: 서버에서만 실행되는 코드는 클라이언트로 전송되지 않습니다
+- **직접 데이터 접근**: API 레이어 없이 DB에 직접 접근 가능
+- **자동 코드 분할**: 각 서버 컴포넌트가 자동으로 분할됩니다</textarea>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="split-divider hidden md:flex items-center shrink-0" style="width:5px;background:var(--border3);cursor:col-resize;position:relative;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:24px;border-radius:2px;background:var(--border2);"></div>
+          </div>
+
+          <!-- Right Panel (Preview) -->
+          <div class="preview-panel flex flex-col flex-1" style="min-width:0;">
+            <div class="flex items-center px-4 py-2" style="border-bottom:1px solid var(--border4);background:var(--background2);">
+              <span class="text-ui-sm" style="color:var(--text3);">미리보기</span>
+            </div>
+            <div class="preview-content flex-1 overflow-auto px-6 py-4" style="background:var(--background1);">
+              <h2>React Server Components의 핵심 개념</h2>
+              <p>RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄일 수 있습니다.</p>
+              <h3>서버 컴포넌트 vs 클라이언트 컴포넌트</h3>
+              <p>서버 컴포넌트는 <code>'use server'</code> 지시어가 필요하지 않습니다. Next.js App Router에서는 기본적으로 모든 컴포넌트가 서버 컴포넌트입니다.</p>
+              <div class="code-block">
+                <code><span class="syntax-comment">// 서버 컴포넌트 (기본)</span>
+<span class="syntax-keyword">async function</span> <span class="syntax-function">PostList</span>() {
+  <span class="syntax-keyword">const</span> <span class="syntax-variable">posts</span> = <span class="syntax-keyword">await</span> db.posts.<span class="syntax-function">findMany</span>();
+  <span class="syntax-keyword">return</span> <span class="syntax-tag">&lt;ul&gt;</span>{posts.<span class="syntax-function">map</span>(p <span class="syntax-keyword">=&gt;</span> <span class="syntax-tag">&lt;li</span> <span class="syntax-attr">key</span>={p.id}<span class="syntax-tag">&gt;</span>{p.title}<span class="syntax-tag">&lt;/li&gt;</span>)}<span class="syntax-tag">&lt;/ul&gt;</span>;
+}</code>
+              </div>
+              <blockquote><p>서버 컴포넌트에서는 <code>useState</code>, <code>useEffect</code> 같은 클라이언트 훅을 사용할 수 없습니다.</p></blockquote>
+              <h3>주요 장점</h3>
+              <ul>
+                <li><strong>번들 크기 감소</strong>: 서버에서만 실행되는 코드는 클라이언트로 전송되지 않습니다</li>
+                <li><strong>직접 데이터 접근</strong>: API 레이어 없이 DB에 직접 접근 가능</li>
+                <li><strong>자동 코드 분할</strong>: 각 서버 컴포넌트가 자동으로 분할됩니다</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /tab-all -->
+
+      <!-- ═══ Tab: 정보 ═══ -->
+      <div id="tab-info" class="tab-content">
+
+        <!-- Title Input -->
+        <div class="px-6 pt-4 pb-3 flex-shrink-0" style="border-bottom:1px solid var(--border4);">
+          <input type="text" class="title-input" placeholder="제목을 입력하세요" value="React Server Components 완벽 가이드">
+        </div>
+
+        <div class="meta-form-area">
+
+          <!-- Left: Meta Fields -->
+          <div class="meta-form-fields">
+
+            <!-- 카테고리 -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">카테고리</label>
+              <div class="custom-select w-full">
+                <button type="button" class="custom-select-trigger"><span class="custom-select-value">Frontend</span></button>
+                <div class="custom-select-dropdown">
+                  <div class="custom-select-option depth-0 selected">Frontend</div>
+                  <div class="custom-select-option depth-1">React</div>
+                  <div class="custom-select-option depth-1">Next.js</div>
+                  <div class="custom-select-option depth-0">Backend</div>
+                  <div class="custom-select-option depth-1">Node.js</div>
+                  <div class="custom-select-option depth-0">DevOps</div>
+                  <div class="custom-select-option depth-0">TypeScript</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 태그 -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">태그</label>
+              <div class="flex items-center gap-1.5 flex-wrap" style="padding:6px 10px;border:1px solid var(--border3);border-radius:8px;background:var(--background2);min-height:38px;">
+                <span class="tag-chip">React<button onclick="this.parentElement.remove()" aria-label="태그 삭제"><iconify-icon icon="solar:close-circle-linear" width="12"></iconify-icon></button></span>
+                <span class="tag-chip">RSC<button onclick="this.parentElement.remove()" aria-label="태그 삭제"><iconify-icon icon="solar:close-circle-linear" width="12"></iconify-icon></button></span>
+                <span class="tag-chip">Next.js<button onclick="this.parentElement.remove()" aria-label="태그 삭제"><iconify-icon icon="solar:close-circle-linear" width="12"></iconify-icon></button></span>
+                <input type="text" class="tag-input" placeholder="태그 추가..." style="min-width:80px;flex:1;">
+              </div>
+            </div>
+
+            <!-- 공개 설정 -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">공개 설정</label>
+              <div class="flex flex-col gap-3">
+                <div class="meta-form-toggle-row">
+                  <div class="toggle-switch active" aria-label="공개 전환"><span class="toggle-knob"></span></div>
+                  <span class="meta-form-toggle-label">공개</span>
+                  <span class="text-ui-xs" style="color:var(--text4);">— 발행된 글을 공개합니다</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 댓글 상태 -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">댓글 상태</label>
+              <div class="custom-select w-full">
+                <button type="button" class="custom-select-trigger"><span class="custom-select-value">열림</span></button>
+                <div class="custom-select-dropdown">
+                  <div class="custom-select-option selected">열림</div>
+                  <div class="custom-select-option">잠김</div>
+                  <div class="custom-select-option">비활성</div>
+                </div>
+              </div>
+              <div class="text-ui-xs" style="color:var(--text4);margin-top:4px;">열림: 댓글 작성 가능 / 잠김: 기존 댓글만 표시 / 비활성: 댓글 영역 숨김</div>
+            </div>
+
+            <!-- 썸네일 -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">썸네일</label>
+              <div class="flex items-start gap-3">
+                <img src="https://picsum.photos/seed/rsc-guide/240/180" alt="썸네일 미리보기" width="120" height="90" style="border-radius:8px;object-fit:cover;flex-shrink:0;">
+                <div class="flex flex-col gap-2">
+                  <button class="btn-secondary" style="padding:5px 12px;font-size:12px;">
+                    <iconify-icon icon="solar:gallery-wide-linear" width="14"></iconify-icon>
+                    에셋 갤러리에서 선택
+                  </button>
+                  <button class="btn-secondary" style="padding:5px 12px;font-size:12px;">
+                    <iconify-icon icon="solar:link-minimalistic-2-linear" width="14"></iconify-icon>
+                    URL 입력
+                  </button>
+                  <button class="btn-secondary" style="padding:5px 12px;font-size:12px;">
+                    <iconify-icon icon="solar:clipboard-linear" width="14"></iconify-icon>
+                    클립보드
+                  </button>
+                  <button class="btn-ghost" style="padding:5px 12px;font-size:12px;color:var(--negative1);">삭제</button>
+                </div>
+              </div>
+              <div class="text-ui-xs" style="color:var(--text4);margin-top:4px;">드래그 앤 드롭으로도 업로드 가능</div>
+            </div>
+
+            <!-- 요약 (summary 200자) -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">요약 (summary)</label>
+              <textarea class="meta-form-field" rows="3" maxlength="200" placeholder="글 목록에 표시될 요약문을 입력하세요">RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄이고 직접 데이터베이스에 접근할 수 있습니다.</textarea>
+              <div class="meta-form-char">68 / 200자</div>
+            </div>
+
+            <!-- 설명 (description 300자, SEO) -->
+            <div class="meta-form-row">
+              <label class="meta-form-label">설명 (description) <span style="color:var(--text4);font-weight:400;">— SEO 메타 설명</span></label>
+              <textarea class="meta-form-field" rows="4" maxlength="300" placeholder="검색엔진에 표시될 설명을 입력하세요">React Server Components(RSC)의 핵심 개념과 서버 컴포넌트, 클라이언트 컴포넌트의 차이점을 알아보고, Next.js App Router에서의 실전 활용 방법을 상세히 설명합니다.</textarea>
+              <div class="meta-form-char">91 / 300자</div>
+            </div>
+
+            <!-- PostListItem 미리보기 -->
+            <div style="border-top:1px solid var(--border4);padding-top:20px;margin-top:4px;">
+              <div class="preview-section-label">글 목록 아이템 미리보기</div>
+              <div class="post-list-item-row">
+                <div class="plr-thumb-wrap">
+                  <img src="https://picsum.photos/seed/rsc-guide/176/132" alt="썸네일">
+                </div>
+                <div class="plr-body">
+                  <div class="plr-top">
+                    <span class="plr-cat">Frontend</span>
+                    <span class="plr-date">2026. 3. 25.</span>
+                  </div>
+                  <div class="plr-title">React Server Components 완벽 가이드</div>
+                  <div class="plr-summary">RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄이고 직접 데이터베이스에 접근할 수 있습니다.</div>
+                  <div class="plr-metrics">
+                    <span class="flex items-center gap-1"><iconify-icon icon="solar:eye-linear" width="12"></iconify-icon>1,234</span>
+                    <span class="flex items-center gap-1"><iconify-icon icon="solar:chat-round-dots-linear" width="12"></iconify-icon>8</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /meta-form-fields -->
+
+          <!-- Right: PostListItem Preview -->
+          <div class="post-preview-panel">
+            <div class="post-preview-label">글 목록 미리보기</div>
+            <div class="post-list-item-card">
+              <div class="pli-thumb">
+                <img src="https://picsum.photos/seed/rsc-guide/400/250" alt="썸네일">
+              </div>
+              <div class="pli-body">
+                <div class="pli-cat">Frontend</div>
+                <div class="pli-title">React Server Components 완벽 가이드</div>
+                <div class="pli-date">2026. 3. 25.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /tab-info -->
+
+      <!-- ═══ Tab: 에디터 + 프리뷰 ═══ -->
+      <div id="tab-editor-split" class="tab-content">
+
+        <!-- Editor Split -->
+        <div class="editor-split flex-1">
+
+          <!-- Left Panel (Editor) -->
+          <div class="editor-panel flex flex-col flex-1" style="min-width:0;">
+            <!-- Toolbar: 15 buttons (F-22 spec) -->
+            <div class="flex items-center gap-1 px-3 py-2 flex-wrap" style="border-bottom:1px solid var(--border4);background:var(--background2);">
+              <!-- 텍스트 서식: Bold, Italic, Strikethrough -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-weight:700;font-size:14px;" title="볼드 (Ctrl+B)">B</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-style:italic;font-size:14px;" title="이탤릭 (Ctrl+I)">I</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;text-decoration:line-through;font-size:14px;" title="취소선">S</button>
+              <div class="toolbar-divider"></div>
+              <!-- 제목: H1, H2, H3 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 1">H1</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 2">H2</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 3">H3</button>
+              <div class="toolbar-divider"></div>
+              <!-- 삽입: 링크, 이미지 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="링크 (Ctrl+K)"><iconify-icon icon="solar:link-minimalistic-2-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="이미지 삽입"><iconify-icon icon="solar:gallery-minimalistic-linear" width="16"></iconify-icon></button>
+              <div class="toolbar-divider"></div>
+              <!-- 코드: 인라인 코드, 코드 블록 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="인라인 코드"><iconify-icon icon="solar:code-square-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;position:relative;" title="코드 블록">
+                <iconify-icon icon="solar:code-square-linear" width="16"></iconify-icon>
+                <span style="position:absolute;bottom:2px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--primary1);"></span>
+              </button>
+              <div class="toolbar-divider"></div>
+              <!-- 블록: 인용, 순서 목록, 비순서 목록 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="인용문"><iconify-icon icon="solar:quote-down-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="순서 목록 (1.)"><iconify-icon icon="solar:list-1-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="비순서 목록 (-)"><iconify-icon icon="solar:list-linear" width="16"></iconify-icon></button>
+              <div class="toolbar-divider"></div>
+              <!-- 구조: 구분선, 테이블 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="구분선 (──)"><iconify-icon icon="solar:minus-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="테이블 (표)"><iconify-icon icon="solar:widget-linear" width="16"></iconify-icon></button>
+            </div>
+            <!-- Pending upload indicator -->
+            <div class="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style="border-bottom:1px solid var(--border4);background:var(--background2);font-size:12px;color:var(--text3);">
+              <span>&#x1F4CE; 업로드 대기: 3개</span>
+            </div>
+            <!-- Editor Content -->
+            <div class="flex flex-1" style="background:var(--code-surface);overflow:auto;">
+              <div class="line-numbers shrink-0">
+                <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div>
+                <div>6</div><div>7</div><div>8</div><div>9</div><div>10</div>
+                <div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+                <div>16</div><div>17</div><div>18</div><div>19</div><div>20</div>
+                <div>21</div><div>22</div><div>23</div><div>24</div><div>25</div>
+                <div>26</div><div>27</div><div>28</div><div>29</div><div>30</div>
+              </div>
+              <textarea class="editor-textarea" spellcheck="false">## React Server Components의 핵심 개념
+
+RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄일 수 있습니다.
+
+### 서버 컴포넌트 vs 클라이언트 컴포넌트
+
+서버 컴포넌트는 `'use server'` 지시어가 필요하지 않습니다. Next.js App Router에서는 기본적으로 모든 컴포넌트가 서버 컴포넌트입니다.
+
+```tsx
+// 서버 컴포넌트 (기본)
+async function PostList() {
+  const posts = await db.posts.findMany();
+  return <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>;
+}
+```
+
+> 서버 컴포넌트에서는 `useState`, `useEffect` 같은 클라이언트 훅을 사용할 수 없습니다.
+
+### 주요 장점
+
+- **번들 크기 감소**: 서버에서만 실행되는 코드는 클라이언트로 전송되지 않습니다
+- **직접 데이터 접근**: API 레이어 없이 DB에 직접 접근 가능
+- **자동 코드 분할**: 각 서버 컴포넌트가 자동으로 분할됩니다</textarea>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="split-divider hidden md:flex items-center shrink-0" style="width:5px;background:var(--border3);cursor:col-resize;position:relative;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:24px;border-radius:2px;background:var(--border2);"></div>
+          </div>
+
+          <!-- Right Panel (Preview) -->
+          <div class="preview-panel flex flex-col flex-1" style="min-width:0;">
+            <div class="flex items-center px-4 py-2" style="border-bottom:1px solid var(--border4);background:var(--background2);">
+              <span class="text-ui-sm" style="color:var(--text3);">미리보기</span>
+            </div>
+            <div class="preview-content flex-1 overflow-auto px-6 py-4" style="background:var(--background1);">
+              <h2>React Server Components의 핵심 개념</h2>
+              <p>RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄일 수 있습니다.</p>
+              <h3>서버 컴포넌트 vs 클라이언트 컴포넌트</h3>
+              <p>서버 컴포넌트는 <code>'use server'</code> 지시어가 필요하지 않습니다. Next.js App Router에서는 기본적으로 모든 컴포넌트가 서버 컴포넌트입니다.</p>
+              <div class="code-block">
+                <code><span class="syntax-comment">// 서버 컴포넌트 (기본)</span>
+<span class="syntax-keyword">async function</span> <span class="syntax-function">PostList</span>() {
+  <span class="syntax-keyword">const</span> <span class="syntax-variable">posts</span> = <span class="syntax-keyword">await</span> db.posts.<span class="syntax-function">findMany</span>();
+  <span class="syntax-keyword">return</span> <span class="syntax-tag">&lt;ul&gt;</span>{posts.<span class="syntax-function">map</span>(p <span class="syntax-keyword">=&gt;</span> <span class="syntax-tag">&lt;li</span> <span class="syntax-attr">key</span>={p.id}<span class="syntax-tag">&gt;</span>{p.title}<span class="syntax-tag">&lt;/li&gt;</span>)}<span class="syntax-tag">&lt;/ul&gt;</span>;
+}</code>
+              </div>
+              <blockquote><p>서버 컴포넌트에서는 <code>useState</code>, <code>useEffect</code> 같은 클라이언트 훅을 사용할 수 없습니다.</p></blockquote>
+              <h3>주요 장점</h3>
+              <ul>
+                <li><strong>번들 크기 감소</strong>: 서버에서만 실행되는 코드는 클라이언트로 전송되지 않습니다</li>
+                <li><strong>직접 데이터 접근</strong>: API 레이어 없이 DB에 직접 접근 가능</li>
+                <li><strong>자동 코드 분할</strong>: 각 서버 컴포넌트가 자동으로 분할됩니다</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /tab-editor-split -->
+
+      <!-- ═══ Tab: 에디터 ═══ -->
+      <div id="tab-editor-only" class="tab-content">
+
+        <!-- Editor Full Width -->
+        <div class="editor-split flex-1">
+          <div class="editor-panel flex flex-col flex-1" style="min-width:0;">
+            <!-- Toolbar: 15 buttons (F-22 spec) -->
+            <div class="flex items-center gap-1 px-3 py-2 flex-shrink-0 flex-wrap" style="border-bottom:1px solid var(--border4);background:var(--background2);">
+              <!-- 텍스트 서식: Bold, Italic, Strikethrough -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-weight:700;font-size:14px;" title="볼드 (Ctrl+B)">B</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-style:italic;font-size:14px;" title="이탤릭 (Ctrl+I)">I</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;text-decoration:line-through;font-size:14px;" title="취소선">S</button>
+              <div class="toolbar-divider"></div>
+              <!-- 제목: H1, H2, H3 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 1">H1</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 2">H2</button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;font-size:12px;font-weight:700;" title="제목 3">H3</button>
+              <div class="toolbar-divider"></div>
+              <!-- 삽입: 링크, 이미지 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="링크 (Ctrl+K)"><iconify-icon icon="solar:link-minimalistic-2-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="이미지 삽입"><iconify-icon icon="solar:gallery-minimalistic-linear" width="16"></iconify-icon></button>
+              <div class="toolbar-divider"></div>
+              <!-- 코드: 인라인 코드, 코드 블록 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="인라인 코드"><iconify-icon icon="solar:code-square-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;position:relative;" title="코드 블록">
+                <iconify-icon icon="solar:code-square-linear" width="16"></iconify-icon>
+                <span style="position:absolute;bottom:2px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--primary1);"></span>
+              </button>
+              <div class="toolbar-divider"></div>
+              <!-- 블록: 인용, 순서 목록, 비순서 목록 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="인용문"><iconify-icon icon="solar:quote-down-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="순서 목록 (1.)"><iconify-icon icon="solar:list-1-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="비순서 목록 (-)"><iconify-icon icon="solar:list-linear" width="16"></iconify-icon></button>
+              <div class="toolbar-divider"></div>
+              <!-- 구조: 구분선, 테이블 -->
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="구분선 (──)"><iconify-icon icon="solar:minus-linear" width="16"></iconify-icon></button>
+              <button class="btn-ghost" style="width:32px;height:32px;padding:0;" title="테이블 (표)"><iconify-icon icon="solar:widget-linear" width="16"></iconify-icon></button>
+            </div>
+            <!-- Pending upload indicator -->
+            <div class="flex items-center gap-2 px-3 py-1.5 flex-shrink-0" style="border-bottom:1px solid var(--border4);background:var(--background2);font-size:12px;color:var(--text3);">
+              <span>&#x1F4CE; 업로드 대기: 3개</span>
+            </div>
+            <!-- Editor Content -->
+            <div class="flex flex-1" style="background:var(--code-surface);overflow:auto;">
+              <div class="line-numbers shrink-0">
+                <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div>
+                <div>6</div><div>7</div><div>8</div><div>9</div><div>10</div>
+                <div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+                <div>16</div><div>17</div><div>18</div><div>19</div><div>20</div>
+                <div>21</div><div>22</div><div>23</div><div>24</div><div>25</div>
+                <div>26</div><div>27</div><div>28</div><div>29</div><div>30</div>
+              </div>
+              <textarea class="editor-textarea" spellcheck="false">## React Server Components의 핵심 개념
+
+RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄일 수 있습니다.
+
+### 서버 컴포넌트 vs 클라이언트 컴포넌트
+
+서버 컴포넌트는 `'use server'` 지시어가 필요하지 않습니다. Next.js App Router에서는 기본적으로 모든 컴포넌트가 서버 컴포넌트입니다.
+
+```tsx
+// 서버 컴포넌트 (기본)
+async function PostList() {
+  const posts = await db.posts.findMany();
+  return <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>;
+}
+```
+
+> 서버 컴포넌트에서는 `useState`, `useEffect` 같은 클라이언트 훅을 사용할 수 없습니다.
+
+### 주요 장점
+
+- **번들 크기 감소**: 서버에서만 실행되는 코드는 클라이언트로 전송되지 않습니다
+- **직접 데이터 접근**: API 레이어 없이 DB에 직접 접근 가능
+- **자동 코드 분할**: 각 서버 컴포넌트가 자동으로 분할됩니다</textarea>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /tab-editor-only -->
+
+      <!-- ═══ Bottom Action Bar (F-23) ═══ -->
+      <div class="bottom-action-bar">
+        <button class="btn-secondary">
+          <iconify-icon icon="solar:archive-linear" width="16"></iconify-icon>
+          보관
+        </button>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <iconify-icon icon="solar:check-circle-linear" width="14" style="color:var(--positive1);"></iconify-icon>
+            <span class="text-ui-xs" style="color:var(--text4);">자동 저장됨 15:32</span>
+          </div>
+          <button class="btn-secondary">저장 (초안)</button>
+          <button class="btn-primary">
+            <iconify-icon icon="solar:upload-linear" width="16"></iconify-icon>
+            발행
+          </button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══ Preview Full Modal (F-22) ═══ -->
+  <div id="previewFullModal" class="preview-full-modal">
+    <div class="preview-full-modal-header">
+      <span class="text-ui-sm" style="font-weight:600;color:var(--text1);">React Server Components 완벽 가이드</span>
+      <button class="btn-ghost" style="width:32px;height:32px;padding:0;" onclick="closePreviewModal()" aria-label="닫기">
+        <iconify-icon icon="solar:close-linear" width="18"></iconify-icon>
+      </button>
+    </div>
+    <div class="preview-full-modal-body preview-content">
+      <h2>React Server Components의 핵심 개념</h2>
+      <p>RSC는 서버에서만 실행되는 React 컴포넌트입니다. 클라이언트 번들에 포함되지 않으므로 번들 크기를 줄일 수 있습니다.</p>
+      <h3>서버 컴포넌트 vs 클라이언트 컴포넌트</h3>
+      <p>서버 컴포넌트는 <code>'use server'</code> 지시어가 필요하지 않습니다. Next.js App Router에서는 기본적으로 모든 컴포넌트가 서버 컴포넌트입니다.</p>
+      <div class="code-block">
+        <code><span class="syntax-comment">// 서버 컴포넌트 (기본)</span>
+<span class="syntax-keyword">async function</span> <span class="syntax-function">PostList</span>() {
+  <span class="syntax-keyword">const</span> <span class="syntax-variable">posts</span> = <span class="syntax-keyword">await</span> db.posts.<span class="syntax-function">findMany</span>();
+  <span class="syntax-keyword">return</span> <span class="syntax-tag">&lt;ul&gt;</span>{posts.<span class="syntax-function">map</span>(p <span class="syntax-keyword">=&gt;</span> <span class="syntax-tag">&lt;li</span> <span class="syntax-attr">key</span>={p.id}<span class="syntax-tag">&gt;</span>{p.title}<span class="syntax-tag">&lt;/li&gt;</span>)}<span class="syntax-tag">&lt;/ul&gt;</span>;
+}</code>
+      </div>
+      <blockquote><p>서버 컴포넌트에서는 <code>useState</code>, <code>useEffect</code> 같은 클라이언트 훅을 사용할 수 없습니다.</p></blockquote>
+      <h3>주요 장점</h3>
+      <ul>
+        <li><strong>번들 크기 감소</strong>: 서버에서만 실행되는 코드는 클라이언트로 전송되지 않습니다</li>
+        <li><strong>직접 데이터 접근</strong>: API 레이어 없이 DB에 직접 접근 가능</li>
+        <li><strong>자동 코드 분할</strong>: 각 서버 컴포넌트가 자동으로 분할됩니다</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    function getPreferredTheme(){
+      const stored=localStorage.getItem('theme');
+      if(stored) return stored;
+      return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    function applyTheme(theme){
+      document.body.setAttribute('data-theme',theme);
+      localStorage.setItem('theme',theme);
+      document.getElementById('sunIcon').style.display=theme==='dark'?'none':'';
+      document.getElementById('moonIcon').style.display=theme==='dark'?'':'none';
+    }
+    function toggleTheme(){
+      applyTheme((document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+    }
+    applyTheme(getPreferredTheme());
+
+    // ─── Sidebar ───
+    function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+    function openMobileSidebar(){
+      document.getElementById('sidebar').classList.add('mobile-open');
+      document.getElementById('sidebarOverlay').classList.remove('hidden');
+      document.body.style.overflow='hidden';
+    }
+    function closeMobileSidebar(){
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+      document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){
+        if(document.getElementById('previewFullModal').classList.contains('open'))closePreviewModal();
+        else if(document.getElementById('sidebar').classList.contains('mobile-open'))closeMobileSidebar();
+      }
+    });
+
+    // ─── Active Nav ───
+    document.querySelectorAll('.admin-nav-item[data-page]').forEach(el=>{
+      if(el.dataset.page==='editor') el.classList.add('active');
+    });
+
+    // ─── Staggered Reveal ───
+    const revealObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}
+      });
+    },{threshold:0.08,rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('.reveal-stagger').forEach((el,i)=>{
+      el.style.animationDelay=`${i*80}ms`;
+      revealObserver.observe(el);
+    });
+
+    // ─── Pagination (demo) ───
+    document.querySelectorAll('.page-btn:not(:disabled)').forEach(btn=>{
+      btn.addEventListener('click',function(){
+        if(this.classList.contains('active'))return;
+        document.querySelectorAll('.page-btn.active').forEach(a=>{
+          a.classList.remove('active');a.style.background='transparent';a.style.color='var(--text2)';a.style.fontWeight='500';
+        });
+        this.classList.add('active');this.style.background='var(--primary1)';this.style.color='var(--background1)';this.style.fontWeight='700';
+      });
+    });
+
+    // ─── Modal ───
+    function openModal(id){document.getElementById(id).classList.add('open');}
+    function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+    // ─── Toggle Switch ───
+    document.querySelectorAll('.toggle-switch').forEach(el=>{
+      el.addEventListener('click',()=>el.classList.toggle('active'));
+    });
+
+    // ─── Status Buttons ───
+    function selectStatus(btn, status) {
+      // Clear all status buttons
+      btn.parentElement.querySelectorAll('.status-btn').forEach(b => {
+        b.classList.remove('active-draft', 'active-published');
+      });
+      // Activate selected
+      if (status === 'draft') {
+        btn.classList.add('active-draft');
+      } else if (status === 'published') {
+        btn.classList.add('active-published');
+      }
+    }
+
+    // ─── Page Tab Switch (F-23) ───
+    function switchPageTab(tab) {
+      const labels = {all:'전체', info:'정보', 'editor-split':'에디터 + 프리뷰', 'editor-only':'에디터'};
+      document.querySelectorAll('.page-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.trim() === labels[tab]);
+      });
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.toggle('active', el.id === 'tab-' + tab);
+      });
+    }
+
+    // ─── Preview Full Modal (F-22) ───
+    function openPreviewModal() {
+      document.getElementById('previewFullModal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closePreviewModal() {
+      document.getElementById('previewFullModal').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // ─── Tag Input ───
+    document.querySelectorAll('.tag-input').forEach(function(input) {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && this.value.trim()) {
+          e.preventDefault();
+          const chip = document.createElement('span');
+          chip.className = 'tag-chip';
+          chip.innerHTML = this.value.trim() +
+            ' <button onclick="this.parentElement.remove()" aria-label="태그 삭제">' +
+            '<iconify-icon icon="solar:close-circle-linear" width="12"></iconify-icon>' +
+            '</button>';
+          this.parentElement.insertBefore(chip, this);
+          this.value = '';
+        }
+      });
+    });
+
+    // ─── Editor Line Number Sync ───
+    const textarea = document.querySelector('.editor-textarea');
+    const lineNumbers = document.querySelector('.line-numbers');
+
+    function updateLineNumbers() {
+      const lines = textarea.value.split('\n').length;
+      const current = lineNumbers.children.length;
+      if (lines > current) {
+        for (let i = current + 1; i <= lines; i++) {
+          const div = document.createElement('div');
+          div.textContent = i;
+          lineNumbers.appendChild(div);
+        }
+      } else if (lines < current) {
+        while (lineNumbers.children.length > lines) {
+          lineNumbers.removeChild(lineNumbers.lastChild);
+        }
+      }
+    }
+
+    textarea.addEventListener('input', updateLineNumbers);
+    textarea.addEventListener('scroll', function() {
+      lineNumbers.style.transform = 'translateY(-' + this.scrollTop + 'px)';
+    });
+
+    // Initialize line numbers
+    updateLineNumbers();
+  </script>
+  <script>
+  /* Custom Select */
+  (function(){
+    function init(){
+      document.querySelectorAll('.custom-select').forEach(function(sel){
+        var trigger=sel.querySelector('.custom-select-trigger');
+        var valueEl=sel.querySelector('.custom-select-value');
+        var opts=sel.querySelectorAll('.custom-select-option');
+        trigger.addEventListener('click',function(e){
+          e.stopPropagation();
+          document.querySelectorAll('.custom-select.open').forEach(function(s){if(s!==sel)s.classList.remove('open');});
+          sel.classList.toggle('open');
+        });
+        opts.forEach(function(opt){
+          opt.addEventListener('click',function(){
+            if(valueEl)valueEl.textContent=opt.textContent;
+            opts.forEach(function(o){o.classList.remove('selected');});
+            opt.classList.add('selected');
+            sel.classList.remove('open');
+          });
+        });
+      });
+      document.addEventListener('click',function(){
+        document.querySelectorAll('.custom-select.open').forEach(function(s){s.classList.remove('open');});
+      });
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
+    else{init();}
+  })();
+  </script>
+</body>
+</html>

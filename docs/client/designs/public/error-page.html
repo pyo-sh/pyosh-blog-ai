@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog - 에러 페이지</title>
+  <meta name="description" content="에러 페이지 와이어프레임 (F-12)">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+                  fontFamily: {
+          sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        },
+                  colors: {
+          bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+          tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+          bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+          primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+          secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+          info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+          positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+          negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+          grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+          yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+          'code-surface': 'var(--code-surface)',
+        },
+        },
+      },
+    }
+  </script>
+  <style>
+        /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+/* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes errCodeIn{from{opacity:0;transform:translateY(2.5rem) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Nav ═══ */
+    .nav-glass{background:rgba(249,249,250,.80);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border-bottom:1px solid rgba(219,221,224,.50);box-shadow:0 1px 0 rgba(255,255,255,.05)}
+    body[data-theme="dark"] .nav-glass{background:rgba(19,20,21,0.85);border-bottom-color:rgba(62,66,69,.50);box-shadow:0 1px 0 rgba(0,0,0,.15)}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .nav-glass{background:rgba(19,20,21,0.85);border-bottom-color:rgba(62,66,69,.50);box-shadow:0 1px 0 rgba(0,0,0,.15)}}
+    .theme-toggle{transition:transform .4s cubic-bezier(.16,1,.3,1)}
+    .theme-toggle:hover{transform:rotate(30deg) scale(1.1)}
+
+    /* ═══ 2-Column Layout ═══ */
+    .layout-wrapper{display:flex;gap:0}
+    .sidebar-desktop{display:none;width:240px;flex-shrink:0}
+    .main-content{flex:1;min-width:0}
+    @media(min-width:1080px){
+      .layout-wrapper{gap:16px}
+      .sidebar-desktop{display:block}
+      .hamburger-btn{display:none !important}
+    }
+
+    /* ═══ Sidebar ═══ */
+    .sidebar-inner{position:sticky;top:70px}
+    .sidebar-section{padding:16px 0;border-bottom:1px solid var(--border4)}
+    .sidebar-section:last-child{border-bottom:none}
+    .sidebar-section-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text4);margin-bottom:10px}
+    .sidebar-tab{padding:4px 12px;border-radius:6px;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text3);background:transparent}
+    .sidebar-tab.active{background:rgba(138,111,224,.12);color:var(--primary1);font-weight:600}
+    .sidebar-tab:hover:not(.active){color:var(--text2)}
+    .sidebar-post{display:block;padding:6px 0;transition:color .2s;cursor:pointer}
+    .sidebar-post:hover .sidebar-post-title{color:var(--primary1)}
+    .sidebar-post-title{font-size:.813rem;font-weight:500;color:var(--text2);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s}
+    .sidebar-post-date{font-size:.688rem;color:var(--text4);margin-top:2px}
+    .cat-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;cursor:pointer;transition:color .2s;font-size:.813rem;color:var(--text2)}
+    .cat-item:hover{color:var(--primary1)}
+    .cat-count{font-size:.688rem;color:var(--text4);font-weight:400}
+    .cat-children{padding-left:14px;overflow:hidden;max-height:0;transition:max-height .3s cubic-bezier(.16,1,.3,1)}
+    .cat-children.open{max-height:500px}
+    .cat-toggle{transition:transform .25s cubic-bezier(.16,1,.3,1);color:var(--text4);flex-shrink:0}
+    .cat-toggle.open{transform:rotate(90deg)}
+    .sidebar-tag{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:500;transition:all .2s;cursor:pointer;border:1px solid var(--border3);color:var(--text3)}
+    .sidebar-tag:hover{border-color:var(--primary1);color:var(--primary1);background:rgba(138,111,224,.06)}
+    .view-counter{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.5rem;font-weight:700;color:var(--text1);letter-spacing:-.02em}
+
+    /* ═══ Mobile Slide-In ═══ */
+    .mobile-overlay{position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s}
+    .mobile-overlay.open{opacity:1;pointer-events:auto}
+    .mobile-sidebar{position:fixed;top:0;right:0;bottom:0;z-index:46;width:min(320px,85vw);background:var(--background1);transform:translateX(100%);transition:transform .35s cubic-bezier(.16,1,.3,1);overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.1);padding:0 20px 32px}
+    .mobile-sidebar.open{transform:translateX(0)}
+    .mobile-sidebar-header{display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:2;background:var(--background1)}
+    .mobile-sidebar-close{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:background .2s}
+    .mobile-sidebar-close:hover{background:var(--background3)}
+
+    /* ═══ Error Page ═══ */
+    /* small badge chip: HTTP code label */
+    .err-code-badge{
+      display:inline-flex;align-items:center;gap:5px;
+      padding:3px 10px;border-radius:6px;
+      font-family:'Outfit',monospace;font-size:.813rem;font-weight:700;letter-spacing:.03em;
+      background:var(--background3);border:1px solid var(--border3);
+    }
+    /* icon ring */
+    .err-icon-ring{
+      width:48px;height:48px;border-radius:12px;
+      border:1px solid var(--border3);background:var(--background1);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .err-icon-ring-amber{
+      border-color:rgba(255,190,61,.28);
+      background:var(--background2);
+    }
+    .err-icon-ring-negative{
+      border-color:rgba(239,68,68,.28);
+      background:var(--background2);
+    }
+
+    .err-eyebrow{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--text4)}
+    .err-title{font-size:1.5rem;font-weight:700;letter-spacing:-.025em;line-height:1.2;color:var(--text1);word-break:keep-all}
+    @media(min-width:640px){.err-title{font-size:1.75rem}}
+    .err-desc{font-size:.9375rem;line-height:1.7;color:var(--text3);word-break:keep-all;max-width:38ch}
+
+    .err-btn-primary{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:10px;font-size:.875rem;font-weight:600;background:var(--primary1);color:var(--background1);transition:all .2s cubic-bezier(.16,1,.3,1);cursor:pointer;text-decoration:none;border:none}
+    .err-btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .err-btn-primary:active{transform:translateY(0)}
+    .err-btn-ghost{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:10px;font-size:.875rem;font-weight:600;background:transparent;color:var(--text2);border:1px solid var(--border3);transition:all .2s cubic-bezier(.16,1,.3,1);cursor:pointer;text-decoration:none}
+    .err-btn-ghost:hover{border-color:var(--border2);color:var(--text1);background:var(--background2)}
+
+    /* related posts row */
+    .err-related-card{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:12px;border:1px solid var(--border4);background:var(--background1);transition:all .2s cubic-bezier(.16,1,.3,1);text-decoration:none}
+    .err-related-card:hover{border-color:var(--border3);background:var(--background2);transform:translateY(-1px)}
+    .err-related-tag{font-size:.688rem;font-weight:600;color:var(--primary1);text-transform:uppercase;letter-spacing:.06em}
+    .err-related-title{font-size:.813rem;font-weight:500;color:var(--text2);line-height:1.45;word-break:keep-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;transition:color .2s}
+    .err-related-card:hover .err-related-title{color:var(--text1)}
+
+    /* ═══ Demo Switcher ═══ */
+    .demo-tab{padding:5px 14px;border-radius:8px;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text3);border:1px solid transparent;background:transparent;white-space:nowrap}
+    .demo-tab.active{background:var(--background2);color:var(--text1);border-color:var(--border3);font-weight:600}
+    .demo-tab:hover:not(.active){color:var(--text2);background:var(--background2)}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+  
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    .text-h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    .text-h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    .text-h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    .text-h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    .text-h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-display-xl{font-size:4.4rem;line-height:5.469rem;font-weight:900}
+    .text-display-lg{font-size:4rem;line-height:5rem;font-weight:900}
+    .text-display-md{font-size:3.6rem;line-height:4.5rem;font-weight:900}
+    .text-display-base{font-size:3.2rem;line-height:4.031rem;font-weight:900}
+    .text-display-sm{font-size:2.8rem;line-height:3.469rem;font-weight:900}
+    .text-display-xs{font-size:2.4rem;line-height:3rem;font-weight:900}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Navigation ═══ -->
+  <nav class="nav-glass fixed top-0 left-0 right-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14">
+        <a href="/" class="flex items-center gap-2" aria-label="pyosh blog 홈">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+          <span class="text-body-sm font-bold tracking-tight" style="color:var(--text1)">pyosh blog</span>
+        </a>
+        <div class="flex items-center gap-1">
+          <button class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="검색">
+            <iconify-icon icon="solar:magnifer-linear" width="18"></iconify-icon>
+          </button>
+          <button id="themeToggle" class="theme-toggle w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="테마 전환">
+            <iconify-icon icon="solar:sun-2-linear" width="18" class="sun-icon"></iconify-icon>
+            <iconify-icon icon="solar:moon-linear" width="18" class="moon-icon" style="display:none"></iconify-icon>
+          </button>
+          <button id="hamburgerBtn" class="hamburger-btn w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="메뉴 열기">
+            <iconify-icon icon="solar:hamburger-menu-linear" width="20"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="h-14"></div>
+
+  <!-- ═══ 2-Column Layout ═══ -->
+  <div class="layout-wrapper max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- ─── Desktop Sidebar ─── -->
+    <aside class="sidebar-desktop" aria-label="사이드바">
+      <div class="sidebar-inner pr-8 pt-8 pb-16">
+
+        <!-- Section 1: 최근글 / 인기글 -->
+        <div class="sidebar-section" style="padding-top:0">
+          <div class="flex items-center gap-1 mb-3">
+            <button class="sidebar-tab active" data-tab="recent" onclick="switchTab('recent')">최근글</button>
+            <button class="sidebar-tab" data-tab="popular" onclick="switchTab('popular')">인기글</button>
+          </div>
+          <div id="recentList">
+            <a href="/posts/nextjs-app-router-caching" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">2026. 3. 17.</div></a>
+            <a href="/posts/css-container-queries" class="sidebar-post"><div class="sidebar-post-title">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</div><div class="sidebar-post-date">2026. 3. 14.</div></a>
+            <a href="/posts/zustand-vs-jotai" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">2026. 3. 12.</div></a>
+            <a href="/posts/node-stream-backpressure" class="sidebar-post"><div class="sidebar-post-title">Node.js Stream 백프레셔를 이해하면 보이는 것들</div><div class="sidebar-post-date">2026. 3. 10.</div></a>
+            <a href="/posts/vitest-mock-patterns" class="sidebar-post"><div class="sidebar-post-title">Vitest 모킹 패턴 8가지</div><div class="sidebar-post-date">2026. 3. 8.</div></a>
+          </div>
+          <div id="popularList" style="display:none">
+            <a href="/posts/react-server-components" class="sidebar-post"><div class="sidebar-post-title">React Server Components 실전 가이드</div><div class="sidebar-post-date">조회 3,847</div></a>
+            <a href="/posts/zustand-vs-jotai" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">조회 2,341</div></a>
+            <a href="/posts/typescript-5-pattern" class="sidebar-post"><div class="sidebar-post-title">TypeScript 5.x 패턴 매칭 완전 정복</div><div class="sidebar-post-date">조회 2,156</div></a>
+            <a href="/posts/docker-multi-stage" class="sidebar-post"><div class="sidebar-post-title">Docker 멀티스테이지 빌드로 이미지 87% 감량</div><div class="sidebar-post-date">조회 2,089</div></a>
+            <a href="/posts/nextjs-app-router-caching" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">조회 1,923</div></a>
+          </div>
+        </div>
+
+        <!-- Section 2: 분류 -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title flex items-center gap-1.5">
+            <iconify-icon icon="solar:folder-2-linear" width="13"></iconify-icon>
+            분류 전체보기 (47)
+          </div>
+          <div>
+            <div>
+              <div class="cat-item" onclick="toggleCategory(this)">
+                <span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Frontend</span>
+                <span class="cat-count">23</span>
+              </div>
+              <div class="cat-children">
+                <a href="/categories/react" class="cat-item" style="padding-left:4px"><span>React</span><span class="cat-count">12</span></a>
+                <a href="/categories/nextjs" class="cat-item" style="padding-left:4px"><span>Next.js</span><span class="cat-count">6</span></a>
+                <a href="/categories/css" class="cat-item" style="padding-left:4px"><span>CSS</span><span class="cat-count">5</span></a>
+              </div>
+            </div>
+            <div>
+              <div class="cat-item" onclick="toggleCategory(this)">
+                <span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Backend</span>
+                <span class="cat-count">14</span>
+              </div>
+              <div class="cat-children">
+                <a href="/categories/nodejs" class="cat-item" style="padding-left:4px"><span>Node.js</span><span class="cat-count">8</span></a>
+                <a href="/categories/database" class="cat-item" style="padding-left:4px"><span>Database</span><span class="cat-count">6</span></a>
+              </div>
+            </div>
+            <a href="/categories/devops" class="cat-item"><span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">DevOps</span><span class="cat-count">6</span></a>
+            <a href="/categories/typescript" class="cat-item"><span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">TypeScript</span><span class="cat-count">4</span></a>
+          </div>
+        </div>
+
+        <!-- Section 3: 태그 -->
+        <div class="sidebar-section">
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="sidebar-section-title flex items-center gap-1.5" style="margin-bottom:0">
+              <iconify-icon icon="solar:tag-linear" width="13"></iconify-icon>
+              태그
+            </div>
+            <a href="/tags" class="text-ui-xs font-semibold hover:underline underline-offset-4 flex items-center gap-0.5" style="color:var(--primary1)">
+              전체보기 <iconify-icon icon="solar:alt-arrow-right-linear" width="10"></iconify-icon>
+            </a>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <a href="/tags/javascript" class="sidebar-tag">#JavaScript</a>
+            <a href="/tags/react" class="sidebar-tag">#React</a>
+            <a href="/tags/typescript" class="sidebar-tag">#TypeScript</a>
+            <a href="/tags/nextjs" class="sidebar-tag">#Next.js</a>
+            <a href="/tags/css" class="sidebar-tag">#CSS</a>
+            <a href="/tags/nodejs" class="sidebar-tag">#Node.js</a>
+            <a href="/tags/testing" class="sidebar-tag">#Testing</a>
+            <a href="/tags/docker" class="sidebar-tag">#Docker</a>
+          </div>
+        </div>
+
+        <!-- Section 4: 블로그 조회수 -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-title flex items-center gap-1.5">
+            <iconify-icon icon="solar:eye-linear" width="13"></iconify-icon>
+            블로그 조회수
+          </div>
+          <div class="view-counter">128,347</div>
+          <div class="text-ui-xs mt-0.5" style="color:var(--text4)">Total Visitors</div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ─── Main Content ─── -->
+    <main class="main-content pt-8 pb-20">
+
+      <!-- Demo Switcher -->
+      <div class="mb-8 reveal" style="animation-delay:60ms">
+        <div class="flex items-center gap-1">
+          <button class="demo-tab active" data-view="404" onclick="switchView('404')">404 Not Found</button>
+          <button class="demo-tab" data-view="500" onclick="switchView('500')">500 서버 오류</button>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════
+           View: 404
+           ═══════════════════════════════════════ -->
+      <div id="view-404">
+
+        <!-- Error hero area -->
+        <div class="mb-10">
+          <div class="flex flex-col items-start gap-6 py-10 sm:py-14">
+
+            <!-- icon + badge chip row -->
+            <div class="flex items-center gap-3 reveal" style="animation-delay:100ms">
+              <div class="err-icon-ring">
+                <iconify-icon icon="solar:ghost-linear" width="22" style="color:var(--primary1)"></iconify-icon>
+              </div>
+              <div class="flex flex-col gap-1">
+                <div class="err-code-badge">
+                  <span style="color:var(--text4)">HTTP</span>
+                  <span style="color:var(--text2)">404</span>
+                </div>
+                <span class="err-eyebrow" style="letter-spacing:.12em;padding-left:1px">Not Found</span>
+              </div>
+            </div>
+
+            <!-- title + desc -->
+            <div class="flex flex-col gap-3 reveal" style="animation-delay:160ms">
+              <h1 class="err-title">페이지를 찾을 수 없어요</h1>
+              <p class="err-desc">요청하신 페이지가 존재하지 않거나 이동되었습니다.<br>주소를 다시 확인하거나 홈으로 돌아가 탐색해 보세요.</p>
+            </div>
+
+            <!-- action buttons -->
+            <div class="flex flex-wrap items-center gap-2.5 reveal" style="animation-delay:220ms">
+              <a href="/" class="err-btn-primary">
+                <iconify-icon icon="solar:home-2-linear" width="16"></iconify-icon>
+                홈으로 가기
+              </a>
+              <button class="err-btn-ghost" onclick="history.back()">
+                <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+                이전 페이지로
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 연관 글 추천 섹션 (404에서만 노출) ── -->
+        <section class="reveal" style="animation-delay:280ms">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-body-sm font-semibold" style="color:var(--text2)">이런 글은 어떠세요?</span>
+            <div class="flex-1 h-px" style="background:var(--border4)"></div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 reveal-stagger">
+            <a href="/posts/nextjs-app-router-caching" class="err-related-card">
+              <span class="err-related-tag">Frontend · Next.js</span>
+              <span class="err-related-title">Next.js App Router 캐싱 전략 A to Z</span>
+              <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 17.</span>
+            </a>
+            <a href="/posts/react-server-components" class="err-related-card">
+              <span class="err-related-tag">Frontend · React</span>
+              <span class="err-related-title">React Server Components 실전 가이드</span>
+              <span class="text-ui-xs" style="color:var(--text4)">조회 3,847</span>
+            </a>
+            <a href="/posts/typescript-5-pattern" class="err-related-card">
+              <span class="err-related-tag">TypeScript</span>
+              <span class="err-related-title">TypeScript 5.x 패턴 매칭 완전 정복</span>
+              <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 5.</span>
+            </a>
+            <a href="/posts/zustand-vs-jotai" class="err-related-card">
+              <span class="err-related-tag">Frontend · 상태 관리</span>
+              <span class="err-related-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</span>
+              <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 12.</span>
+            </a>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ═══════════════════════════════════════
+           View: 500
+           ═══════════════════════════════════════ -->
+      <div id="view-500" style="display:none">
+
+        <!-- Error hero area -->
+        <div class="mb-10">
+          <div class="flex flex-col items-start gap-6 py-10 sm:py-14">
+
+            <!-- icon + badge chip row -->
+            <div class="flex items-center gap-3 reveal" style="animation-delay:100ms">
+              <div class="err-icon-ring err-icon-ring-negative">
+                <iconify-icon icon="solar:bolt-linear" width="22" style="color:var(--negative1)"></iconify-icon>
+              </div>
+              <div class="flex flex-col gap-1">
+                <div class="err-code-badge">
+                  <span style="color:var(--text4)">HTTP</span>
+                  <span style="color:var(--text2)">500</span>
+                </div>
+                <span class="err-eyebrow" style="letter-spacing:.12em;padding-left:1px">Server Error</span>
+              </div>
+            </div>
+
+            <!-- title + desc -->
+            <div class="flex flex-col gap-3 reveal" style="animation-delay:160ms">
+              <h1 class="err-title">서버에서 오류가 발생했어요</h1>
+              <p class="err-desc">요청을 처리하는 중 예상치 못한 오류가 발생했습니다.<br>잠시 후 다시 시도하거나, 문제가 지속되면 관리자에게 문의해 주세요.</p>
+            </div>
+
+            <!-- action buttons -->
+            <div class="flex flex-wrap items-center gap-2.5 reveal" style="animation-delay:220ms">
+              <button class="err-btn-primary" onclick="location.reload()">
+                <iconify-icon icon="solar:restart-linear" width="16"></iconify-icon>
+                다시 시도
+              </button>
+              <a href="/" class="err-btn-ghost">
+                <iconify-icon icon="solar:home-2-linear" width="16"></iconify-icon>
+                홈으로 가기
+              </a>
+            </div>
+
+            <!-- 500 only: status / request ID chip row -->
+            <div class="flex flex-wrap gap-2 reveal" style="animation-delay:280ms">
+              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-ui-xs font-mono" style="background:rgba(239,68,68,.10);color:var(--negative1);border:1px solid rgba(239,68,68,.25)">
+                <span style="width:6px;height:6px;border-radius:50%;background:var(--negative1);display:inline-block;animation:pulse500 1.4s ease-in-out infinite"></span>
+                Internal Server Error
+              </div>
+              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-ui-xs font-mono" style="background:var(--background3);color:var(--text4);border:1px solid var(--border4)">
+                Request ID: <span style="color:var(--text3)">7f4e2a1b-c8d0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 500: 상태 안내 박스 ── -->
+        <section class="reveal" style="animation-delay:300ms">
+          <div class="rounded-xl border px-6 py-5 flex gap-4" style="background:var(--background3);border-color:var(--border3)">
+            <iconify-icon icon="solar:info-circle-linear" width="20" style="color:var(--negative1);margin-top:1px;flex-shrink:0"></iconify-icon>
+            <div class="flex flex-col gap-1">
+              <p class="text-body-sm font-semibold break-keep" style="color:var(--text2)">현재 서버 상태를 확인하고 있습니다</p>
+              <p class="text-ui-xs leading-relaxed break-keep" style="color:var(--text4)">
+                일시적인 오류일 수 있습니다. 1-2분 후 페이지를 새로고침하거나 홈으로 이동해 다른 글을 탐색해 보세요.<br>
+                문제가 반복된다면 오른쪽 아래 <strong style="color:var(--text3)">문의하기</strong> 버튼을 통해 알려주세요.
+              </p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══ Mobile Overlay & Sidebar ═══ -->
+  <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileSidebar()"></div>
+  <div class="mobile-sidebar" id="mobileSidebar" aria-label="모바일 사이드바">
+    <div class="mobile-sidebar-header">
+      <span class="text-body-sm font-bold" style="color:var(--text2)">탐색</span>
+      <button class="mobile-sidebar-close" onclick="closeMobileSidebar()" aria-label="닫기">
+        <iconify-icon icon="solar:close-circle-linear" width="20"></iconify-icon>
+      </button>
+    </div>
+    <!-- 최근글 -->
+    <div class="sidebar-section" style="padding-top:0">
+      <div class="sidebar-section-title flex items-center gap-1.5">
+        <iconify-icon icon="solar:documents-linear" width="13"></iconify-icon>
+        최근글
+      </div>
+      <a href="/posts/nextjs-app-router-caching" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">2026. 3. 17.</div></a>
+      <a href="/posts/css-container-queries" class="sidebar-post"><div class="sidebar-post-title">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</div><div class="sidebar-post-date">2026. 3. 14.</div></a>
+      <a href="/posts/zustand-vs-jotai" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">2026. 3. 12.</div></a>
+    </div>
+    <!-- 태그 -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title flex items-center gap-1.5">
+        <iconify-icon icon="solar:tag-linear" width="13"></iconify-icon>
+        태그
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <a href="/tags/javascript" class="sidebar-tag">#JavaScript</a>
+        <a href="/tags/react" class="sidebar-tag">#React</a>
+        <a href="/tags/typescript" class="sidebar-tag">#TypeScript</a>
+        <a href="/tags/nextjs" class="sidebar-tag">#Next.js</a>
+        <a href="/tags/css" class="sidebar-tag">#CSS</a>
+        <a href="/tags/nodejs" class="sidebar-tag">#Node.js</a>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes pulse500{0%,100%{opacity:1}50%{opacity:.4}}
+  </style>
+
+  <script>
+    /* ─── Theme ─── */
+    const themeToggle = document.getElementById('themeToggle');
+    const sunIcon = document.querySelector('.sun-icon');
+    const moonIcon = document.querySelector('.moon-icon');
+    function applyTheme(theme) {
+      document.body.setAttribute('data-theme', theme);
+      if (theme === 'dark') { sunIcon.style.display = ''; moonIcon.style.display = 'none'; }
+      else { sunIcon.style.display = 'none'; moonIcon.style.display = ''; }
+    }
+    (function() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+      applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+    })();
+    themeToggle.addEventListener('click', () => {
+      const next = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      localStorage.setItem('theme', next);
+    });
+
+    /* ─── Sidebar: recent/popular tab ─── */
+    function switchTab(name) {
+      document.getElementById('recentList').style.display = name === 'recent' ? '' : 'none';
+      document.getElementById('popularList').style.display = name === 'popular' ? '' : 'none';
+      document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    }
+
+    /* ─── Sidebar: category toggle ─── */
+    function toggleCategory(el) {
+      const children = el.nextElementSibling;
+      const toggle = el.querySelector('.cat-toggle');
+      children.classList.toggle('open');
+      toggle.classList.toggle('open');
+    }
+
+    /* ─── Mobile Sidebar ─── */
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    hamburgerBtn.addEventListener('click', () => {
+      mobileOverlay.classList.add('open');
+      mobileSidebar.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    });
+    function closeMobileSidebar() {
+      mobileOverlay.classList.remove('open');
+      mobileSidebar.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    /* ─── Demo Switcher ─── */
+    function switchView(name) {
+      ['404','500'].forEach(id => {
+        const el = document.getElementById('view-' + id);
+        el.style.display = (id === name) ? '' : 'none';
+        if (id === name) {
+          // re-trigger .reveal animations
+          el.querySelectorAll('.reveal').forEach(r => {
+            r.style.animation = 'none';
+            r.offsetHeight;
+            r.style.animation = '';
+          });
+          // re-observe reveal-stagger
+          setTimeout(() => {
+            el.querySelectorAll('.reveal-stagger').forEach(r => {
+              r.classList.remove('visible');
+              staggerObserver.observe(r);
+            });
+          }, 50);
+        }
+      });
+      document.querySelectorAll('.demo-tab').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+    }
+
+    /* ─── IntersectionObserver for stagger ─── */
+    const staggerObserver = new IntersectionObserver((entries) => {
+      let delay = 0;
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          setTimeout(() => {
+            e.target.style.animationDelay = delay + 'ms';
+            e.target.classList.add('visible');
+          }, delay);
+          delay += 80;
+          staggerObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.05 });
+
+    document.querySelectorAll('.reveal-stagger').forEach(el => staggerObserver.observe(el));
+
+    /* ─── Sidebar Scroll Sync (JS-controlled sticky) ─── */
+    let lastScrollY = window.scrollY;
+    let sidebarTop = 70;
+    const sidebarInner = document.querySelector('.sidebar-inner');
+
+    function onScroll() {
+      if (!sidebarInner) return;
+      const sidebarH = sidebarInner.getBoundingClientRect().height;
+      const viewportH = window.innerHeight;
+      const delta = window.scrollY - lastScrollY;
+      if (sidebarH <= viewportH - 70) {
+        sidebarTop = 70;
+      } else {
+        sidebarTop = Math.min(70, Math.max(viewportH - sidebarH, sidebarTop - delta));
+      }
+      sidebarInner.style.top = sidebarTop + 'px';
+      lastScrollY = window.scrollY;
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+  </script>
+</body>
+</html>

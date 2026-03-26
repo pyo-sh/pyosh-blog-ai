@@ -6,6 +6,11 @@
 
 - `docs/client/specs/search.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/search.html` - 검색 페이지 전체
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 헤더 검색 입력

@@ -6,6 +6,12 @@
 
 - `docs/client/specs/admin-category-crud.md`
 
+## 와이어프레임
+
+- `docs/client/designs/admin/admin-category.html` - 카테고리 관리 페이지 (생성/수정/삭제 모달)
+- Admin 공통 셸: `docs/client/designs/admin/_admin-shell.html`
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 생성 모달

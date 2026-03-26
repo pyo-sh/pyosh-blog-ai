@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog Admin - 글 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+            tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+            bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+            primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+            secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+            info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+            positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+            negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+            grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+            yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+            'code-surface': 'var(--code-surface)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ═══ Admin Sidebar ═══ */
+    .admin-sidebar{
+      position:fixed;left:0;top:0;bottom:0;z-index:30;
+      width:240px;display:flex;flex-direction:column;
+      background:var(--background2);border-right:1px solid var(--border3);
+      transition:width .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-sidebar.collapsed{width:64px;}
+    .admin-sidebar.collapsed .nav-label,
+    .admin-sidebar.collapsed .sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap;}
+    .admin-sidebar.collapsed .admin-nav-item{justify-content:center;padding:8px 0;}
+    .admin-sidebar.collapsed .sidebar-logo-area .admin-badge{display:none;}
+    .admin-sidebar.collapsed~#sidebarOverlay~#contentWrapper{margin-left:64px!important;}
+
+    .admin-nav-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 12px;border-radius:8px;
+      font-size:14px;color:var(--text2);text-decoration:none;
+      transition:all .15s ease;
+    }
+    .admin-nav-item:hover{background:var(--background3);}
+    .admin-nav-item.active{
+      background:rgba(138,111,224,0.10);
+      color:var(--primary1);font-weight:500;
+    }
+    .nav-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+    .admin-nav-item iconify-icon{display:flex;flex-shrink:0;align-items:center;}
+    iconify-icon{display:inline-block;vertical-align:middle;}
+
+    .admin-content{
+      margin-left:240px;
+      transition:margin-left .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-topbar{
+      position:sticky;top:0;z-index:10;
+      display:flex;align-items:center;height:56px;padding:0 24px;gap:16px;
+      background:rgba(249,249,250,0.80);
+      backdrop-filter:blur(16px) saturate(1.4);
+      -webkit-backdrop-filter:blur(16px) saturate(1.4);
+      border-bottom:1px solid var(--border4);
+    }
+    body[data-theme="dark"] .admin-topbar{background:rgba(19,20,21,0.85);}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .admin-topbar{background:rgba(19,20,21,0.85);}}
+
+    @media(max-width:767px){
+      .admin-sidebar{transform:translateX(-100%);width:240px!important;}
+      .admin-sidebar.mobile-open{transform:translateX(0);}
+      .admin-content{margin-left:0!important;}
+    }
+
+    /* ═══ Admin Components ═══ */
+
+    /* Form */
+    .admin-input{
+      width:100%;padding:8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-input:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+    .admin-input::placeholder{color:var(--text4);}
+
+    .admin-select{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;
+    }
+    .admin-select:focus{border-color:var(--primary1);}
+
+    /* ═══ Custom Select ═══ */
+    .custom-select{position:relative;display:inline-flex;}
+    .custom-select.w-full{display:flex;width:100%;}
+    .custom-select-trigger{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C%2Fsvg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;display:block;text-align:left;white-space:nowrap;
+    }
+    .custom-select.w-full .custom-select-trigger{width:100%;}
+    .custom-select.open .custom-select-trigger,.custom-select-trigger:focus{border-color:var(--primary1);}
+    .custom-select-dropdown{
+      position:absolute;top:calc(100% + 4px);left:0;min-width:100%;
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);
+      z-index:200;display:none;overflow:hidden;
+    }
+    .custom-select.open .custom-select-dropdown{display:block;}
+    .custom-select-option{padding:8px 12px;font-size:14px;cursor:pointer;color:var(--text1);transition:background .15s;}
+    .custom-select-option:hover{background:var(--background2);}
+    .custom-select-option.selected{color:var(--primary1);font-weight:500;}
+
+
+    .admin-textarea{
+      width:100%;padding:10px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;resize:vertical;min-height:80px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-textarea:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+
+    .admin-checkbox{
+      width:16px;height:16px;border-radius:4px;cursor:pointer;
+      accent-color:var(--primary1);
+    }
+
+    /* Buttons */
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--primary1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-primary:hover{opacity:.9;}.btn-primary:active{transform:scale(.97);}
+
+    .btn-secondary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:transparent;color:var(--text2);border:1px solid var(--border3);cursor:pointer;
+      transition:background .2s,transform .15s;
+    }
+    .btn-secondary:hover{background:var(--background3);}.btn-secondary:active{transform:scale(.97);}
+
+    .btn-danger{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--negative1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-danger:hover{opacity:.9;}
+
+    .btn-ghost{
+      display:inline-flex;align-items:center;justify-content:center;gap:4px;
+      padding:6px 10px;border-radius:6px;font-size:13px;
+      background:transparent;color:var(--text3);border:none;cursor:pointer;
+      transition:background .15s,color .15s;
+    }
+    .btn-ghost:hover{background:var(--background3);color:var(--text2);}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;}
+    .badge-published{background:rgba(13,169,107,0.12);color:var(--positive1);}
+    .badge-draft{background:rgba(144,153,161,0.12);color:var(--grey3);}
+    .badge-archived{background:rgba(255,190,61,0.12);color:var(--yellow1);}
+    .badge-deleted{background:rgba(226,18,35,0.12);color:var(--negative1);}
+    .badge-private{background:rgba(107,73,181,0.12);color:var(--secondary1);}
+    .badge-public{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .badge-category{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .badge-comment-open{background:rgba(13,169,107,0.12);color:var(--positive1);}
+    .badge-comment-locked{background:rgba(255,190,61,0.12);color:var(--yellow1);}
+    .badge-comment-disabled{background:rgba(144,153,161,0.12);color:var(--grey3);}
+
+    /* Table */
+    .admin-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+    .admin-table th{
+      padding:10px 12px;text-align:left;font-weight:600;font-size:12px;
+      color:var(--text3);background:var(--background2);
+      border-bottom:1px solid var(--border3);white-space:nowrap;
+    }
+    .admin-table td{
+      padding:12px;color:var(--text2);
+      border-bottom:1px solid var(--border4);vertical-align:middle;
+    }
+    .admin-table tbody tr{transition:background .15s;}
+    .admin-table tbody tr:hover{background:var(--background2);}
+
+    /* Sortable column headers */
+    .sortable-header{
+      cursor:pointer;user-select:none;
+      display:inline-flex;align-items:center;gap:4px;
+      transition:color .15s;
+    }
+    .sortable-header:hover{color:var(--text1);}
+    .sort-indicator{
+      font-size:11px;color:var(--text4);transition:color .15s;
+    }
+    .sortable-header:hover .sort-indicator{color:var(--text2);}
+    .sortable-header.sort-asc .sort-indicator,
+    .sortable-header.sort-desc .sort-indicator{color:var(--primary1);}
+
+    /* Pin toggle */
+    .pin-toggle{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:28px;height:28px;border-radius:6px;border:none;
+      background:transparent;cursor:pointer;font-size:16px;
+      transition:background .15s,transform .15s;color:var(--text4);
+    }
+    .pin-toggle:hover{background:var(--background3);transform:scale(1.1);}
+    .pin-toggle.pinned{color:var(--primary1);}
+
+    /* Inline toggle switch (small variant for table) */
+    .toggle-switch-inline{
+      position:relative;width:36px;height:20px;
+      background:var(--border3);border-radius:10px;cursor:pointer;
+      transition:background .2s;flex-shrink:0;
+    }
+    .toggle-switch-inline.active{background:var(--primary1);}
+    .toggle-switch-inline .toggle-knob-inline{
+      position:absolute;top:2px;left:2px;width:16px;height:16px;
+      border-radius:8px;background:#ffffff;
+      transition:transform .2s cubic-bezier(.16,1,.3,.1);
+    }
+    .toggle-switch-inline.active .toggle-knob-inline{transform:translateX(16px);}
+    .toggle-switch-inline .toggle-label{
+      position:absolute;right:-32px;top:50%;transform:translateY(-50%);
+      font-size:11px;white-space:nowrap;color:var(--text3);
+    }
+    .toggle-switch-inline.active .toggle-label{color:var(--primary1);}
+
+    /* Card */
+    .admin-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;transition:border-color .2s;
+    }
+    .admin-card:hover{border-color:var(--border3);}
+
+    /* Stat Card */
+    .stat-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:8px;
+      transition:border-color .2s,transform .2s;
+    }
+    .stat-card:hover{border-color:var(--border3);transform:translateY(-2px);}
+    .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+    .stat-value{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.75rem;font-weight:700;color:var(--text1);letter-spacing:-.02em;line-height:1;}
+    .stat-label{font-size:13px;color:var(--text3);}
+
+    /* Pagination */
+    .page-btn{
+      width:36px;height:36px;border-radius:8px;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:500;color:var(--text2);
+      background:transparent;border:none;cursor:pointer;
+      transition:all .25s cubic-bezier(.16,1,.3,1);
+    }
+    .page-btn:hover:not(:disabled):not(.active){transform:scale(1.08);background:var(--background3);}
+    .page-btn:active:not(:disabled){transform:scale(.95);}
+    .page-btn.active{background:var(--primary1);color:#fff;font-weight:700;}
+    .page-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:50;
+      background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .modal-overlay.open{display:flex;}
+    .modal-content{
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:16px;padding:24px;width:100%;
+      max-height:90vh;overflow-y:auto;
+      animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);
+    }
+
+    /* Toggle Switch */
+    .toggle-switch{
+      position:relative;width:44px;height:24px;
+      background:var(--border3);border-radius:12px;cursor:pointer;
+      transition:background .2s;
+    }
+    .toggle-switch.active{background:var(--primary1);}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#ffffff;transition:transform .2s cubic-bezier(.16,1,.3,.1);}.toggle-switch-sm .toggle-knob{width:16px;height:16px;border-radius:8px;}.toggle-switch.active .toggle-knob{transform:translateX(20px);}.toggle-switch-sm.active .toggle-knob{transform:translateX(16px);}
+
+
+    /* Dropzone */
+    .dropzone{
+      border:2px dashed var(--border3);border-radius:12px;
+      padding:40px 24px;text-align:center;
+      transition:border-color .2s,background .2s;cursor:pointer;
+    }
+    .dropzone:hover,.dropzone.dragover{
+      border-color:var(--primary1);
+      background:rgba(138,111,224,0.04);
+    }
+
+    /* Tab */
+    .admin-tab{
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      color:var(--text3);background:transparent;border:none;cursor:pointer;
+      transition:all .2s;
+    }
+    .admin-tab:hover{color:var(--text2);}
+    .admin-tab.active{background:rgba(138,111,224,0.10);color:var(--primary1);}
+
+    /* ═══ Page-Specific Styles ═══ */
+    .search-input-wrapper{position:relative;}
+    .search-input-wrapper .admin-input{padding-left:36px;}
+    .search-input-wrapper iconify-icon{
+      position:absolute;left:10px;top:50%;transform:translateY(-50%);
+      color:var(--text4);pointer-events:none;
+    }
+
+    /* Bulk action bar (above table) */
+    .bulk-action-bar{
+      display:none;align-items:center;gap:12px;flex-wrap:wrap;
+      padding:10px 16px;margin-bottom:8px;
+      background:var(--background2);border:1px solid var(--border3);
+      border-radius:10px;
+      animation:fadeInUp .25s cubic-bezier(.16,1,.3,1);
+    }
+    .bulk-action-bar.visible{display:flex;}
+    .bulk-action-bar .bulk-select-label{
+      font-size:13px;font-weight:500;color:var(--text2);
+      display:flex;align-items:center;gap:6px;white-space:nowrap;
+    }
+    .bulk-action-bar .bulk-divider{
+      width:1px;height:20px;background:var(--border3);flex-shrink:0;
+    }
+    .bulk-action-bar .btn-sm{
+      display:inline-flex;align-items:center;justify-content:center;gap:4px;
+      padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;
+      border:1px solid var(--border3);background:transparent;color:var(--text2);
+      cursor:pointer;transition:background .15s;
+    }
+    .bulk-action-bar .btn-sm:hover{background:var(--background3);}
+    .bulk-action-bar .btn-sm.btn-sm-primary{
+      background:var(--primary1);color:#fff;border-color:var(--primary1);
+    }
+    .bulk-action-bar .btn-sm.btn-sm-primary:hover{opacity:.9;}
+    .bulk-action-bar .btn-sm.btn-sm-danger{
+      background:var(--negative1);color:#fff;border-color:var(--negative1);
+    }
+    .bulk-action-bar .btn-sm.btn-sm-danger:hover{opacity:.9;}
+    .bulk-action-bar .bulk-dropdown{
+      padding:5px 28px 5px 10px;border-radius:6px;font-size:12px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 8px center;
+    }
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Admin Sidebar ═══ -->
+  <aside id="sidebar" class="admin-sidebar" aria-label="관리자 메뉴">
+    <div class="sidebar-logo-area flex items-center h-14 px-4 gap-2 shrink-0" style="border-bottom:1px solid var(--border4);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7 shrink-0" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+      <span class="admin-badge sidebar-text text-xs font-medium px-1.5 py-0.5 rounded" style="background:rgba(138,111,224,0.12); color:var(--primary1);">Admin</span>
+      <button onclick="toggleSidebar()" class="ml-auto flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="사이드바 접기"
+        onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+        <iconify-icon icon="solar:sidebar-minimalistic-linear" width="18" style="display:flex"></iconify-icon>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+      <a href="admin-dashboard.html" class="admin-nav-item" data-page="dashboard">
+        <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
+        <span class="nav-label">대시보드</span>
+      </a>
+      <a href="admin-post-list.html" class="admin-nav-item" data-page="posts">
+        <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+        <span class="nav-label">글</span>
+      </a>
+      <a href="admin-post-editor.html" class="admin-nav-item" data-page="editor">
+        <iconify-icon icon="solar:pen-new-round-linear" width="20"></iconify-icon>
+        <span class="nav-label">글 작성</span>
+      </a>
+      <a href="admin-category.html" class="admin-nav-item" data-page="categories">
+        <iconify-icon icon="solar:folder-open-linear" width="20"></iconify-icon>
+        <span class="nav-label">카테고리</span>
+      </a>
+      <a href="admin-comment.html" class="admin-nav-item" data-page="comments">
+        <iconify-icon icon="solar:chat-round-dots-linear" width="20"></iconify-icon>
+        <span class="nav-label">댓글</span>
+      </a>
+      <a href="admin-guestbook.html" class="admin-nav-item" data-page="guestbook">
+        <iconify-icon icon="solar:notebook-linear" width="20"></iconify-icon>
+        <span class="nav-label">방명록</span>
+      </a>
+      <a href="admin-asset.html" class="admin-nav-item" data-page="assets">
+        <iconify-icon icon="solar:gallery-wide-linear" width="20"></iconify-icon>
+        <span class="nav-label">에셋</span>
+      </a>
+    </nav>
+    <div class="px-3 pb-4 shrink-0">
+      <a href="../public/home-page.html" class="admin-nav-item" style="color:var(--text3);">
+        <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+        <span class="nav-label">블로그로 돌아가기</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Mobile Overlay -->
+  <div id="sidebarOverlay" class="fixed inset-0 z-20 hidden" style="background:rgba(0,0,0,.4);backdrop-filter:blur(2px);" onclick="closeMobileSidebar()"></div>
+
+  <!-- ═══ Content Wrapper ═══ -->
+  <div id="contentWrapper" class="admin-content">
+    <!-- Top Bar -->
+    <header class="admin-topbar">
+      <button onclick="openMobileSidebar()" class="p-1.5 rounded-lg md:hidden transition-colors" style="color:var(--text2);" aria-label="메뉴">
+        <iconify-icon icon="solar:hamburger-menu-linear" width="22" style="display:flex"></iconify-icon>
+      </button>
+      <h1 class="text-lg font-bold break-keep" style="color:var(--text1);">글 관리</h1>
+            <div class="ml-auto flex items-center gap-1">
+        <span class="text-sm hidden sm:inline" style="color:var(--text3);">관리자</span>
+        <button onclick="toggleTheme()" class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="테마 전환"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:sun-2-linear" width="18" id="sunIcon" style="display:flex"></iconify-icon>
+          <iconify-icon icon="solar:moon-linear" width="18" id="moonIcon" style="display:none"></iconify-icon>
+        </button>
+        <button class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="로그아웃"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:logout-2-linear" width="18" style="display:flex"></iconify-icon>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-6" style="min-height:calc(100dvh - 56px);">
+
+      <!-- ═══ Top Action Bar ═══ -->
+      <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+        <div class="flex items-center gap-1">
+          <button class="admin-tab active">게시글</button>
+          <button class="admin-tab" onclick="this.classList.add('active');this.previousElementSibling.classList.remove('active')">휴지통</button>
+        </div>
+        <a href="admin-post-editor.html" class="btn-primary">
+          새 글 작성
+        </a>
+      </div>
+
+      <!-- ═══ Filter Bar ═══ -->
+      <div class="flex flex-wrap gap-3 mb-4 items-center">
+        <div class="custom-select">
+          <button type="button" class="custom-select-trigger"><span class="custom-select-value">전체 상태</span></button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected">전체 상태</div>
+            <div class="custom-select-option">작성</div>
+            <div class="custom-select-option">발행</div>
+            <div class="custom-select-option">보관</div>
+          </div>
+        </div>
+        <div class="custom-select">
+          <button type="button" class="custom-select-trigger"><span class="custom-select-value">전체 공개범위</span></button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected">전체 공개범위</div>
+            <div class="custom-select-option">공개</div>
+            <div class="custom-select-option">비공개</div>
+          </div>
+        </div>
+        <div class="custom-select">
+          <button type="button" class="custom-select-trigger"><span class="custom-select-value">전체 카테고리</span></button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected">전체 카테고리</div>
+            <div class="custom-select-option">Frontend</div>
+            <div class="custom-select-option">Backend</div>
+            <div class="custom-select-option">DevOps</div>
+            <div class="custom-select-option">TypeScript</div>
+          </div>
+        </div>
+        <div class="search-input-wrapper max-w-xs">
+          <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
+          <input type="text" class="admin-input" placeholder="제목으로 검색...">
+        </div>
+      </div>
+
+      <!-- ═══ Bulk Action Bar ═══ -->
+      <div id="bulkActionBar" class="bulk-action-bar">
+        <div class="bulk-select-label">
+          <input type="checkbox" class="admin-checkbox" id="bulkSelectAll" checked>
+          <span>전체</span>
+          <span style="color:var(--primary1);font-weight:600;" id="selectedCount">선택됨 3개</span>
+        </div>
+        <div class="bulk-divider"></div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <select class="bulk-dropdown" aria-label="카테고리 변경">
+            <option value="">카테고리</option>
+            <option>Frontend</option>
+            <option>Backend</option>
+            <option>DevOps</option>
+            <option>TypeScript</option>
+          </select>
+          <select class="bulk-dropdown" aria-label="댓글 상태 변경">
+            <option value="">댓글 상태</option>
+            <option>열림</option>
+            <option>잠김</option>
+            <option>닫힘</option>
+          </select>
+          <button class="btn-sm" aria-label="초기화" title="초기화">
+            <iconify-icon icon="solar:refresh-linear" width="14"></iconify-icon>
+          </button>
+          <button class="btn-sm btn-sm-primary">적용</button>
+          <button class="btn-sm btn-sm-danger">삭제</button>
+        </div>
+      </div>
+
+      <!-- ═══ Posts Table ═══ -->
+      <div class="overflow-x-auto rounded-xl border" style="border-color:var(--border4);">
+        <table class="admin-table" aria-label="글 목록">
+          <thead>
+            <tr>
+              <th class="w-10"><input type="checkbox" class="admin-checkbox" id="selectAll"></th>
+              <th class="w-10">
+                <iconify-icon icon="solar:pin-bold" width="14" style="color:var(--text4);"></iconify-icon>
+              </th>
+              <th>제목</th>
+              <th>상태</th>
+              <th>
+                <span class="sortable-header" data-sort="views" onclick="toggleSort(this)">
+                  조회수<span class="sort-indicator">↕</span>
+                </span>
+              </th>
+              <th>
+                <span class="sortable-header" data-sort="comments" onclick="toggleSort(this)">
+                  댓글<span class="sort-indicator">↕</span>
+                </span>
+              </th>
+              <th>댓글 상태</th>
+              <th>
+                <span class="sortable-header" data-sort="published" onclick="toggleSort(this)">
+                  발행일<span class="sort-indicator">↕</span>
+                </span>
+              </th>
+              <th>
+                <span class="sortable-header" data-sort="modified" onclick="toggleSort(this)">
+                  수정일<span class="sort-indicator">↕</span>
+                </span>
+              </th>
+              <th>공개</th>
+              <th></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Row 1 - pinned, published, public, open -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle pinned" aria-label="고정 해제" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-bold" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post1/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">React Server Components 실전 가이드</span>
+                      <span class="badge badge-category shrink-0">React</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">서버 컴포넌트의 동작 원리와 클라이언트 컴포넌트와의 차이를 실제 예제로 알아봅니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  3,847
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  12
+                </span>
+              </td>
+              <td><span class="badge badge-comment-open">열림</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.15</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.17</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 2 - pinned, published, public, locked -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle pinned" aria-label="고정 해제" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-bold" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post2/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">Next.js App Router 캐싱 전략 A to Z</span>
+                      <span class="badge badge-category shrink-0">Next.js</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">App Router의 4가지 캐시 레이어를 분석하고 실전 최적화 전략을 정리합니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  1,923
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  8
+                </span>
+              </td>
+              <td><span class="badge badge-comment-locked">잠김</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.12</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.14</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 3 - unpinned, published, public, open -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post3/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</span>
+                      <span class="badge badge-category shrink-0">CSS</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">미디어 쿼리 대신 컨테이너 쿼리로 진정한 컴포넌트 반응형을 구현하는 방법.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  1,456
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  5
+                </span>
+              </td>
+              <td><span class="badge badge-comment-open">열림</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.10</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.12</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 4 - unpinned, published, public, open -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post4/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">Zustand와 Jotai, 어떤 상태 관리가 맞을까</span>
+                      <span class="badge badge-category shrink-0">React</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">두 라이브러리의 설계 철학과 실전 사용 사례를 비교 분석합니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  2,341
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  15
+                </span>
+              </td>
+              <td><span class="badge badge-comment-open">열림</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.08</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.10</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 5 - unpinned, published, private, disabled -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post5/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">Node.js Stream 백프레셔를 이해하면 보이는 것들</span>
+                      <span class="badge badge-category shrink-0">Node.js</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">스트림의 백프레셔 메커니즘과 메모리 효율적인 데이터 처리 패턴을 소개합니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  892
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  3
+                </span>
+              </td>
+              <td><span class="badge badge-comment-disabled">닫힘</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.06</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.08</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline" onclick="this.classList.toggle('active')" role="switch" aria-checked="false" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--text4);">비공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 6 - unpinned, draft, public, open -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post6/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">Vitest 모킹 패턴 8가지</span>
+                      <span class="badge badge-category shrink-0">Testing</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">Vitest에서 자주 사용하는 모킹 패턴 8가지를 예제와 함께 정리합니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-draft">작성</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  0
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  0
+                </span>
+              </td>
+              <td><span class="badge badge-comment-open">열림</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">-</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.06</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 7 - unpinned, published, public, open -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post7/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">TypeScript 5.x 패턴 매칭 완전 정복</span>
+                      <span class="badge badge-category shrink-0">TypeScript</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">TypeScript 5.x에서 패턴 매칭을 활용한 타입 안전 코드 작성법을 다룹니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  2,156
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  7
+                </span>
+              </td>
+              <td><span class="badge badge-comment-open">열림</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.02</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.04</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 8 - unpinned, published, public, locked -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post8/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">Docker 멀티스테이지 빌드로 이미지 크기를 87% 줄인 이야기</span>
+                      <span class="badge badge-category shrink-0">DevOps</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">멀티스테이지 빌드와 Alpine 베이스로 이미지 사이즈를 극적으로 줄인 과정을 공유합니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-published">발행</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  2,089
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  11
+                </span>
+              </td>
+              <td><span class="badge badge-comment-locked">잠김</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.02.28</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.03.01</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 9 - unpinned, archived, public, disabled -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post9/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">PostgreSQL 인덱스 튜닝 실무 노트</span>
+                      <span class="badge badge-category shrink-0">Database</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">실무에서 자주 만나는 PostgreSQL 인덱스 튜닝 시나리오와 해결법을 정리합니다.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-archived">보관</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  1,234
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  4
+                </span>
+              </td>
+              <td><span class="badge badge-comment-disabled">닫힘</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.02.20</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.02.25</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+            <!-- Row 10 - unpinned, draft, public, open -->
+            <tr class="reveal-stagger" onclick="location.href='admin-post-editor.html'" style="cursor:pointer;">
+              <td><input type="checkbox" class="admin-checkbox row-checkbox" onclick="event.stopPropagation()"></td>
+              <td>
+                <button class="pin-toggle" aria-label="고정" onclick="event.stopPropagation();this.classList.toggle('pinned')">
+                  <iconify-icon icon="solar:pin-linear" width="16"></iconify-icon>
+                </button>
+              </td>
+              <td>
+                <div class="flex items-center gap-3" style="max-width:320px;">
+                  <img src="https://picsum.photos/seed/post10/40/30" alt="" class="w-[40px] h-[30px] rounded object-cover shrink-0">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium" style="color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">GitHub Actions 워크플로우 최적화 팁</span>
+                      <span class="badge badge-category shrink-0">DevOps</span>
+                    </div>
+                    <p class="text-ui-xs line-clamp-1 mt-0.5" style="color:var(--text4);">캐싱, 매트릭스 전략, 재사용 워크플로우 등으로 CI/CD 속도를 높이는 팁.</p>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-draft">작성</span></td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                  0
+                </span>
+              </td>
+              <td>
+                <span class="text-ui-sm flex items-center gap-1" style="color:var(--text3);">
+                  <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+                  0
+                </span>
+              </td>
+              <td><span class="badge badge-comment-open">열림</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">-</span></td>
+              <td><span class="text-ui-sm" style="color:var(--text4);">2026.02.20</span></td>
+              <td>
+                <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                  <div class="toggle-switch-inline active" onclick="this.classList.toggle('active')" role="switch" aria-checked="true" aria-label="공개 토글">
+                    <div class="toggle-knob-inline"></div>
+                  </div>
+                  <span class="text-ui-xs" style="color:var(--primary1);">공개</span>
+                </div>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="미리보기" onclick="event.stopPropagation();location.href='admin-post-preview.html'"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+              </td>
+              <td>
+                <button class="btn-ghost" aria-label="삭제" style="color:var(--negative1);" onclick="event.stopPropagation()"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══ Pagination ═══ -->
+      <div class="flex justify-center mt-6 gap-1">
+        <button class="page-btn" disabled aria-label="첫 페이지">
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon>
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="16" style="margin-left:-10px;"></iconify-icon>
+        </button>
+        <button class="page-btn" disabled aria-label="이전 페이지">
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon>
+        </button>
+        <button class="page-btn active">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
+        <button class="page-btn" disabled style="cursor:default;opacity:1;">...</button>
+        <button class="page-btn">5</button>
+        <button class="page-btn" aria-label="다음 페이지">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+        </button>
+        <button class="page-btn" aria-label="마지막 페이지">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="16" style="margin-left:-10px;"></iconify-icon>
+        </button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    function getPreferredTheme(){
+      const stored=localStorage.getItem('theme');
+      if(stored) return stored;
+      return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    function applyTheme(theme){
+      document.body.setAttribute('data-theme',theme);
+      localStorage.setItem('theme',theme);
+      document.getElementById('sunIcon').style.display=theme==='dark'?'none':'';
+      document.getElementById('moonIcon').style.display=theme==='dark'?'':'none';
+    }
+    function toggleTheme(){
+      applyTheme((document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+    }
+    applyTheme(getPreferredTheme());
+
+    // ─── Sidebar ───
+    function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+    function openMobileSidebar(){
+      document.getElementById('sidebar').classList.add('mobile-open');
+      document.getElementById('sidebarOverlay').classList.remove('hidden');
+      document.body.style.overflow='hidden';
+    }
+    function closeMobileSidebar(){
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+      document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'&&document.getElementById('sidebar').classList.contains('mobile-open'))closeMobileSidebar();
+    });
+
+    // ─── Active Nav ───
+    document.querySelectorAll('.admin-nav-item[data-page]').forEach(el=>{
+      if(el.dataset.page==='posts') el.classList.add('active');
+    });
+
+    // ─── Staggered Reveal ───
+    const revealObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}
+      });
+    },{threshold:0.08,rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('.reveal-stagger').forEach((el,i)=>{
+      el.style.animationDelay=`${i*80}ms`;
+      revealObserver.observe(el);
+    });
+
+    // ─── Pagination (demo) ───
+    document.querySelectorAll('.page-btn:not(:disabled)').forEach(btn=>{
+      btn.addEventListener('click',function(){
+        if(this.classList.contains('active'))return;
+        document.querySelectorAll('.page-btn.active').forEach(a=>{
+          a.classList.remove('active');a.style.background='transparent';a.style.color='var(--text2)';a.style.fontWeight='500';
+        });
+        this.classList.add('active');this.style.background='var(--primary1)';this.style.color='var(--background1)';this.style.fontWeight='700';
+      });
+    });
+
+    // ─── Modal ───
+    function openModal(id){document.getElementById(id).classList.add('open');}
+    function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+    // ─── Toggle Switch ───
+    document.querySelectorAll('.toggle-switch').forEach(el=>{
+      el.addEventListener('click',()=>el.classList.toggle('active'));
+    });
+
+    // ─── Inline Toggle Switch (visibility) ───
+    document.querySelectorAll('.toggle-switch-inline').forEach(el=>{
+      el.addEventListener('click',function(){
+        const label=this.nextElementSibling;
+        if(this.classList.contains('active')){
+          if(label){label.textContent='비공개';label.style.color='var(--text4)';}
+        }else{
+          if(label){label.textContent='공개';label.style.color='var(--primary1)';}
+        }
+      });
+    });
+
+    // ─── Sortable Column Headers ───
+    function toggleSort(el){
+      var states=['','sort-desc','sort-asc'];
+      var indicators={'':{text:'↕'},'sort-desc':{text:'▼'},'sort-asc':{text:'▲'}};
+      // Clear other sort headers
+      document.querySelectorAll('.sortable-header').forEach(function(h){
+        if(h!==el){
+          h.classList.remove('sort-asc','sort-desc');
+          h.querySelector('.sort-indicator').textContent='↕';
+        }
+      });
+      var current='';
+      if(el.classList.contains('sort-desc'))current='sort-desc';
+      if(el.classList.contains('sort-asc'))current='sort-asc';
+      var idx=states.indexOf(current);
+      var next=states[(idx+1)%states.length];
+      el.classList.remove('sort-asc','sort-desc');
+      if(next)el.classList.add(next);
+      el.querySelector('.sort-indicator').textContent=indicators[next].text;
+    }
+
+    // ─── Checkbox / Bulk Actions ───
+    const selectAllCheckbox=document.getElementById('selectAll');
+    const bulkSelectAll=document.getElementById('bulkSelectAll');
+    const rowCheckboxes=document.querySelectorAll('.row-checkbox');
+    const bulkActionBar=document.getElementById('bulkActionBar');
+    const selectedCountEl=document.getElementById('selectedCount');
+
+    function updateBulkBar(){
+      const checked=document.querySelectorAll('.row-checkbox:checked');
+      if(checked.length>0){
+        bulkActionBar.classList.add('visible');
+        selectedCountEl.textContent='선택됨 '+checked.length+'개';
+      }else{
+        bulkActionBar.classList.remove('visible');
+      }
+      const total=rowCheckboxes.length;
+      selectAllCheckbox.checked=checked.length===total&&total>0;
+      selectAllCheckbox.indeterminate=checked.length>0&&checked.length<total;
+      if(bulkSelectAll){
+        bulkSelectAll.checked=checked.length===total&&total>0;
+        bulkSelectAll.indeterminate=checked.length>0&&checked.length<total;
+      }
+    }
+
+    selectAllCheckbox.addEventListener('change',function(){
+      rowCheckboxes.forEach(cb=>{cb.checked=this.checked;});
+      updateBulkBar();
+    });
+
+    if(bulkSelectAll){
+      bulkSelectAll.addEventListener('change',function(){
+        rowCheckboxes.forEach(cb=>{cb.checked=this.checked;});
+        selectAllCheckbox.checked=this.checked;
+        updateBulkBar();
+      });
+    }
+
+    rowCheckboxes.forEach(cb=>{
+      cb.addEventListener('change',updateBulkBar);
+    });
+  </script>
+  <script>
+  /* Custom Select */
+  (function(){
+    function init(){
+      document.querySelectorAll('.custom-select').forEach(function(sel){
+        var trigger=sel.querySelector('.custom-select-trigger');
+        var valueEl=sel.querySelector('.custom-select-value');
+        var opts=sel.querySelectorAll('.custom-select-option');
+        trigger.addEventListener('click',function(e){
+          e.stopPropagation();
+          document.querySelectorAll('.custom-select.open').forEach(function(s){if(s!==sel)s.classList.remove('open');});
+          sel.classList.toggle('open');
+        });
+        opts.forEach(function(opt){
+          opt.addEventListener('click',function(){
+            if(valueEl)valueEl.textContent=opt.textContent;
+            opts.forEach(function(o){o.classList.remove('selected');});
+            opt.classList.add('selected');
+            sel.classList.remove('open');
+          });
+        });
+      });
+      document.addEventListener('click',function(){
+        document.querySelectorAll('.custom-select.open').forEach(function(s){s.classList.remove('open');});
+      });
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
+    else{init();}
+  })();
+  </script>
+</body>
+</html>

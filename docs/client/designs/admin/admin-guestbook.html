@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog Admin - 방명록 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+            tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+            bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+            primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+            secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+            info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+            positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+            negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+            grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+            yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+            'code-surface': 'var(--code-surface)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ═══ Admin Sidebar ═══ */
+    .admin-sidebar{
+      position:fixed;left:0;top:0;bottom:0;z-index:30;
+      width:240px;display:flex;flex-direction:column;
+      background:var(--background2);border-right:1px solid var(--border3);
+      transition:width .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-sidebar.collapsed{width:64px;}
+    .admin-sidebar.collapsed .nav-label,
+    .admin-sidebar.collapsed .sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap;}
+    .admin-sidebar.collapsed .admin-nav-item{justify-content:center;padding:8px 0;}
+    .admin-sidebar.collapsed .sidebar-logo-area .admin-badge{display:none;}
+    .admin-sidebar.collapsed~#sidebarOverlay~#contentWrapper{margin-left:64px!important;}
+
+    .admin-nav-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 12px;border-radius:8px;
+      font-size:14px;color:var(--text2);text-decoration:none;
+      transition:all .15s ease;
+    }
+    .admin-nav-item:hover{background:var(--background3);}
+    .admin-nav-item.active{
+      background:rgba(138,111,224,0.10);
+      color:var(--primary1);font-weight:500;
+    }
+    .nav-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+    .admin-nav-item iconify-icon{display:flex;flex-shrink:0;align-items:center;}
+
+    .admin-content{
+      margin-left:240px;
+      transition:margin-left .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-topbar{
+      position:sticky;top:0;z-index:10;
+      display:flex;align-items:center;height:56px;padding:0 24px;gap:16px;
+      background:rgba(249,249,250,0.80);
+      backdrop-filter:blur(16px) saturate(1.4);
+      -webkit-backdrop-filter:blur(16px) saturate(1.4);
+      border-bottom:1px solid var(--border4);
+    }
+    body[data-theme="dark"] .admin-topbar{background:rgba(19,20,21,0.85);}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .admin-topbar{background:rgba(19,20,21,0.85);}}
+
+    @media(max-width:767px){
+      .admin-sidebar{transform:translateX(-100%);width:240px!important;}
+      .admin-sidebar.mobile-open{transform:translateX(0);}
+      .admin-content{margin-left:0!important;}
+    }
+
+    /* ═══ Admin Components ═══ */
+
+    /* Form */
+    .admin-input{
+      width:100%;padding:8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-input:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+    .admin-input::placeholder{color:var(--text4);}
+
+    .admin-select{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;
+    }
+    .admin-select:focus{border-color:var(--primary1);}
+
+    /* ═══ Custom Select ═══ */
+    .custom-select{position:relative;display:inline-flex;}
+    .custom-select.w-full{display:flex;width:100%;}
+    .custom-select-trigger{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C%2Fsvg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;display:block;text-align:left;white-space:nowrap;
+    }
+    .custom-select.w-full .custom-select-trigger{width:100%;}
+    .custom-select.open .custom-select-trigger,.custom-select-trigger:focus{border-color:var(--primary1);}
+    .custom-select-dropdown{
+      position:absolute;top:calc(100% + 4px);left:0;min-width:100%;
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);
+      z-index:200;display:none;overflow:hidden;
+    }
+    .custom-select.open .custom-select-dropdown{display:block;}
+    .custom-select-option{padding:8px 12px;font-size:14px;cursor:pointer;color:var(--text1);transition:background .15s;}
+    .custom-select-option:hover{background:var(--background2);}
+    .custom-select-option.selected{color:var(--primary1);font-weight:500;}
+
+
+    .admin-textarea{
+      width:100%;padding:10px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;resize:vertical;min-height:80px;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-textarea:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+
+    .admin-checkbox{
+      width:16px;height:16px;border-radius:4px;cursor:pointer;
+      accent-color:var(--primary1);
+    }
+
+    /* Icons */
+    iconify-icon{display:inline-block;vertical-align:middle;}
+
+    /* Buttons */
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap;
+      background:var(--primary1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-primary:hover{opacity:.9;}.btn-primary:active{transform:scale(.97);}
+
+    .btn-secondary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap;
+      background:transparent;color:var(--text2);border:1px solid var(--border3);cursor:pointer;
+      transition:background .2s,transform .15s;
+    }
+    .btn-secondary:hover{background:var(--background3);}.btn-secondary:active{transform:scale(.97);}
+
+    .btn-danger{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap;
+      background:var(--negative1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-danger:hover{opacity:.9;}
+
+    .btn-ghost{
+      display:inline-flex;align-items:center;justify-content:center;gap:4px;
+      padding:6px 10px;border-radius:6px;font-size:13px;
+      background:transparent;color:var(--text3);border:none;cursor:pointer;
+      transition:background .15s,color .15s;
+    }
+    .btn-ghost:hover{background:var(--background3);color:var(--text2);}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;}
+    .badge-published{background:rgba(13,169,107,0.12);color:var(--positive1);}
+    .badge-draft{background:rgba(144,153,161,0.12);color:var(--grey3);}
+    .badge-archived{background:rgba(255,190,61,0.12);color:var(--yellow1);}
+    .badge-deleted{background:rgba(226,18,35,0.12);color:var(--negative1);}
+    .badge-private{background:rgba(107,73,181,0.12);color:var(--secondary1);}
+    .badge-public{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .badge-category{background:rgba(138,111,224,0.12);color:var(--primary1);}
+
+    /* Table */
+    .admin-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+    .admin-table th{
+      padding:10px 12px;text-align:left;font-weight:600;font-size:12px;
+      color:var(--text3);background:var(--background2);
+      border-bottom:1px solid var(--border3);white-space:nowrap;
+    }
+    .admin-table td{
+      padding:12px;color:var(--text2);
+      border-bottom:1px solid var(--border4);vertical-align:middle;
+    }
+    .admin-table tbody tr{transition:background .15s;}
+    .admin-table tbody tr:hover{background:var(--background2);}
+
+    /* Card */
+    .admin-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;transition:border-color .2s;
+    }
+    .admin-card:hover{border-color:var(--border3);}
+
+    /* Stat Card */
+    .stat-card{
+      background:var(--background2);border:1px solid var(--border4);
+      border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:8px;
+      transition:border-color .2s,transform .2s;
+    }
+    .stat-card:hover{border-color:var(--border3);transform:translateY(-2px);}
+    .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+    .stat-value{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.75rem;font-weight:700;color:var(--text1);letter-spacing:-.02em;line-height:1;}
+    .stat-label{font-size:13px;color:var(--text3);}
+
+    /* Pagination */
+    .page-btn{
+      width:36px;height:36px;border-radius:8px;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:13px;font-weight:500;color:var(--text2);
+      background:transparent;border:none;cursor:pointer;
+      transition:all .25s cubic-bezier(.16,1,.3,1);
+    }
+    .page-btn:hover:not(:disabled):not(.active){transform:scale(1.08);background:var(--background3);}
+    .page-btn:active:not(:disabled){transform:scale(.95);}
+    .page-btn.active{background:var(--primary1);color:#fff;font-weight:700;}
+    .page-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:50;
+      background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .modal-overlay.open{display:flex;}
+    .modal-content{
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:16px;padding:24px;width:100%;
+      max-height:90vh;overflow-y:auto;
+      animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);
+    }
+    @media(max-width:640px){
+      #modalActions{flex-wrap:wrap;}
+      #modalActions .btn-primary,
+      #modalActions .btn-secondary,
+      #modalActions .btn-danger{flex:1 1 calc(50% - 4px);min-width:0;}
+    }
+
+    /* Toggle Switch */
+    .toggle-switch{
+      position:relative;width:44px;height:24px;
+      background:var(--border3);border-radius:12px;cursor:pointer;
+      transition:background .2s;
+    }
+    .toggle-switch.active{background:var(--primary1);}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#ffffff;transition:transform .2s cubic-bezier(.16,1,.3,.1);}.toggle-switch-sm .toggle-knob{width:16px;height:16px;border-radius:8px;}.toggle-switch.active .toggle-knob{transform:translateX(20px);}.toggle-switch-sm.active .toggle-knob{transform:translateX(16px);}
+    
+    
+
+    /* Dropzone */
+    .dropzone{
+      border:2px dashed var(--border3);border-radius:12px;
+      padding:40px 24px;text-align:center;
+      transition:border-color .2s,background .2s;cursor:pointer;
+    }
+    .dropzone:hover,.dropzone.dragover{
+      border-color:var(--primary1);
+      background:rgba(138,111,224,0.04);
+    }
+
+    /* Tab */
+    .admin-tab{
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      color:var(--text3);background:transparent;border:none;cursor:pointer;
+      transition:all .2s;
+    }
+    .admin-tab:hover{color:var(--text2);}
+    .admin-tab.active{background:rgba(138,111,224,0.10);color:var(--primary1);}
+
+    /* ═══ Page-Specific Styles ═══ */
+    .bulk-action-bar{
+      position:fixed;bottom:0;left:240px;right:0;z-index:20;
+      display:none;align-items:center;gap:12px;
+      padding:12px 24px;
+      background:rgba(241,242,243,0.95);
+      backdrop-filter:blur(12px);
+      border-top:1px solid var(--border3);
+      animation:fadeInUp .25s cubic-bezier(.16,1,.3,1);
+    }
+    .bulk-action-bar.visible{display:flex;}
+    .admin-sidebar.collapsed~#sidebarOverlay~#contentWrapper~.bulk-action-bar{left:64px;}
+    @media(max-width:767px){
+      .bulk-action-bar{left:0!important;}
+    }
+
+    .search-input-wrapper{position:relative;}
+    .search-input-wrapper .admin-input{padding-left:36px;}
+    .search-input-wrapper iconify-icon{
+      position:absolute;left:10px;top:50%;transform:translateY(-50%);
+      color:var(--text4);pointer-events:none;
+    }
+
+    .admin-radio{
+      width:16px;height:16px;cursor:pointer;
+      accent-color:var(--primary1);
+    }
+
+    .row-deleted{opacity:.5;}
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Admin Sidebar ═══ -->
+  <aside id="sidebar" class="admin-sidebar" aria-label="관리자 메뉴">
+    <div class="sidebar-logo-area flex items-center h-14 px-4 gap-2 shrink-0" style="border-bottom:1px solid var(--border4);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7 shrink-0" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+      <span class="admin-badge sidebar-text text-xs font-medium px-1.5 py-0.5 rounded" style="background:rgba(138,111,224,0.12); color:var(--primary1);">Admin</span>
+      <button onclick="toggleSidebar()" class="ml-auto flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="사이드바 접기"
+        onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+        <iconify-icon icon="solar:sidebar-minimalistic-linear" width="18" style="display:flex"></iconify-icon>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+      <a href="admin-dashboard.html" class="admin-nav-item" data-page="dashboard">
+        <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
+        <span class="nav-label">대시보드</span>
+      </a>
+      <a href="admin-post-list.html" class="admin-nav-item" data-page="posts">
+        <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+        <span class="nav-label">글</span>
+      </a>
+      <a href="admin-post-editor.html" class="admin-nav-item" data-page="editor">
+        <iconify-icon icon="solar:pen-new-round-linear" width="20"></iconify-icon>
+        <span class="nav-label">글 작성</span>
+      </a>
+      <a href="admin-category.html" class="admin-nav-item" data-page="categories">
+        <iconify-icon icon="solar:folder-open-linear" width="20"></iconify-icon>
+        <span class="nav-label">카테고리</span>
+      </a>
+      <a href="admin-comment.html" class="admin-nav-item" data-page="comments">
+        <iconify-icon icon="solar:chat-round-dots-linear" width="20"></iconify-icon>
+        <span class="nav-label">댓글</span>
+      </a>
+      <a href="admin-guestbook.html" class="admin-nav-item" data-page="guestbook">
+        <iconify-icon icon="solar:notebook-linear" width="20"></iconify-icon>
+        <span class="nav-label">방명록</span>
+      </a>
+      <a href="admin-asset.html" class="admin-nav-item" data-page="assets">
+        <iconify-icon icon="solar:gallery-wide-linear" width="20"></iconify-icon>
+        <span class="nav-label">에셋</span>
+      </a>
+    </nav>
+    <div class="px-3 pb-4 shrink-0">
+      <a href="../public/home-page.html" class="admin-nav-item" style="color:var(--text3);">
+        <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+        <span class="nav-label">블로그로 돌아가기</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Mobile Overlay -->
+  <div id="sidebarOverlay" class="fixed inset-0 z-20 hidden" style="background:rgba(0,0,0,.4);backdrop-filter:blur(2px);" onclick="closeMobileSidebar()"></div>
+
+  <!-- ═══ Content Wrapper ═══ -->
+  <div id="contentWrapper" class="admin-content">
+    <!-- Top Bar -->
+    <header class="admin-topbar">
+      <button onclick="openMobileSidebar()" class="p-1.5 rounded-lg md:hidden transition-colors" style="color:var(--text2);" aria-label="메뉴">
+        <iconify-icon icon="solar:hamburger-menu-linear" width="22" style="display:flex"></iconify-icon>
+      </button>
+      <h1 class="text-lg font-bold break-keep" style="color:var(--text1);">방명록 관리</h1>
+            <div class="ml-auto flex items-center gap-1">
+        <span class="text-sm hidden sm:inline" style="color:var(--text3);">관리자</span>
+        <button onclick="toggleTheme()" class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="테마 전환"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:sun-2-linear" width="18" id="sunIcon" style="display:flex"></iconify-icon>
+          <iconify-icon icon="solar:moon-linear" width="18" id="moonIcon" style="display:none"></iconify-icon>
+        </button>
+        <button class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="로그아웃"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:logout-2-linear" width="18" style="display:flex"></iconify-icon>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-6" style="min-height:calc(100dvh - 56px);">
+
+      <!-- ═══ Top Section: Stats + Feature Toggle ═══ -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <span class="text-ui-sm" style="color:var(--text2);">전체 34개</span>
+        <div class="flex items-center gap-3">
+          <span class="text-ui-sm" style="color:var(--text2);">방명록 기능</span>
+          <div class="toggle-switch active" id="guestbookToggle" aria-label="방명록 기능 토글"><span class="toggle-knob"></span></div>
+          <span class="text-ui-xs" style="color:var(--text4);">비활성화하면 방명록 페이지가 숨겨집니다</span>
+        </div>
+      </div>
+
+      <!-- ═══ Filter Bar ═══ -->
+      <div class="flex flex-row gap-3 mb-4 flex-wrap">
+        <div class="custom-select">
+          <button type="button" class="custom-select-trigger"><span class="custom-select-value">전체</span></button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected">전체</div>
+            <div class="custom-select-option">정상</div>
+            <div class="custom-select-option">숨김</div>
+            <div class="custom-select-option">삭제됨</div>
+          </div>
+        </div>
+        <div class="custom-select">
+          <button type="button" class="custom-select-trigger"><span class="custom-select-value">작성자 타입</span></button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected">전체</div>
+            <div class="custom-select-option">OAuth</div>
+            <div class="custom-select-option">게스트</div>
+          </div>
+        </div>
+        <div class="custom-select">
+          <button type="button" class="custom-select-trigger"><span class="custom-select-value">전체 기간</span></button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected">전체 기간</div>
+            <div class="custom-select-option">최근 7일</div>
+            <div class="custom-select-option">최근 30일</div>
+            <div class="custom-select-option">최근 90일</div>
+          </div>
+        </div>
+        <div class="search-input-wrapper max-w-xs flex-1" style="min-width:200px;">
+          <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
+          <input type="text" class="admin-input" placeholder="작성자 또는 내용 검색...">
+        </div>
+      </div>
+
+      <!-- ═══ Guestbook Table ═══ -->
+      <div class="overflow-x-auto rounded-xl" style="border:1px solid var(--border4);">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th class="w-10"><input type="checkbox" class="admin-checkbox" id="selectAll"></th>
+              <th>작성자</th>
+              <th>내용</th>
+              <th class="w-10 text-center"><iconify-icon icon="solar:lock-linear" width="14" style="display:inline-flex;vertical-align:middle;"></iconify-icon></th>
+              <th>상태</th>
+              <th>작성일</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Row 1 -->
+            <tr>
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">이서연</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">블로그 잘 보고 있습니다! 특히 React 관련 글들이 실무에 큰 도움이 되고 있어요.</span>
+              </td>
+              <td class="text-center"></td>
+              <td><span class="badge badge-published">정상</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.20</span></td>
+              <td>
+                <!-- 정상: 숨기기 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(0)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" aria-label="숨기기" title="숨기기"><iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 2 -->
+            <tr>
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">정우진</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">안녕하세요, 혹시 Next.js 관련 강의도 계획이 있으신가요? 블로그 글이 너무 좋아서...</span>
+              </td>
+              <td class="text-center"><iconify-icon icon="solar:lock-bold" width="14" style="color:var(--text4);"></iconify-icon></td>
+              <td><span class="badge badge-published">정상</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.18</span></td>
+              <td>
+                <!-- 정상: 숨기기 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(1)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" aria-label="숨기기" title="숨기기"><iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 3 -->
+            <tr>
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">오지민</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">개발 블로그 중에 이렇게 깔끔한 건 처음이에요. 디자인도 내용도 최고입니다.</span>
+              </td>
+              <td class="text-center"></td>
+              <td><span class="badge badge-published">정상</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.15</span></td>
+              <td>
+                <!-- 정상: 숨기기 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(2)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" aria-label="숨기기" title="숨기기"><iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 4 -->
+            <tr>
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">김태현</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">TypeScript 시리즈 정말 유용합니다. 다음 주제도 기대하고 있을게요!</span>
+              </td>
+              <td class="text-center"></td>
+              <td><span class="badge badge-published">정상</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.12</span></td>
+              <td>
+                <!-- 정상: 숨기기 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(3)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" aria-label="숨기기" title="숨기기"><iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 5 -->
+            <tr>
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">박하은</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">CSS 관련 글 잘 봤습니다. Container Queries 설명이 정말 명쾌했어요.</span>
+              </td>
+              <td class="text-center"><iconify-icon icon="solar:lock-bold" width="14" style="color:var(--text4);"></iconify-icon></td>
+              <td><span class="badge badge-published">정상</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.10</span></td>
+              <td>
+                <!-- 정상: 숨기기 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(4)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" aria-label="숨기기" title="숨기기"><iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 6 (hidden/숨김) -->
+            <tr style="opacity:.65;">
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">송민규</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">스팸 광고 내용</span>
+              </td>
+              <td class="text-center"></td>
+              <td><span class="badge badge-archived">숨김</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.08</span></td>
+              <td>
+                <!-- 숨김: 복원 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(5)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--positive1);" aria-label="복원" title="복원"><iconify-icon icon="solar:restart-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 7 -->
+            <tr>
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">최은비</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">블로그 구독 기능 있으면 좋겠어요! RSS로 구독하고 있긴 한데 이메일 알림이...</span>
+              </td>
+              <td class="text-center"></td>
+              <td><span class="badge badge-published">정상</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.05</span></td>
+              <td>
+                <!-- 정상: 숨기기 / 소프트 삭제 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(6)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" aria-label="숨기기" title="숨기기"><iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" onclick="openDeleteModal()" aria-label="소프트 삭제" title="소프트 삭제"><iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 8 (deleted/삭제됨) -->
+            <tr class="row-deleted">
+              <td class="w-10"><input type="checkbox" class="admin-checkbox row-checkbox"></td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="28" height="28">
+                  <span class="text-ui-sm font-medium" style="color:var(--text1);">한승우</span>
+                </div>
+              </td>
+              <td>
+                <span class="text-ui-sm line-clamp-1 break-keep" style="color:var(--text2);max-width:28rem;display:block;">삭제된 방명록</span>
+              </td>
+              <td class="text-center"></td>
+              <td><span class="badge badge-deleted">삭제됨</span></td>
+              <td><span class="text-ui-xs" style="color:var(--text4);">2026.03.01</span></td>
+              <td>
+                <!-- 삭제됨: 복원 / 영구 삭제 -->
+                <div class="flex gap-1">
+                  <button class="btn-ghost" onclick="openGuestbookDetail(7)" aria-label="보기"><iconify-icon icon="solar:eye-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--positive1);" aria-label="복원" title="복원"><iconify-icon icon="solar:restart-linear" width="16"></iconify-icon></button>
+                  <button class="btn-ghost" style="color:var(--negative1);" onclick="openDeleteModal()" aria-label="영구 삭제" title="영구 삭제"><iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon></button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══ Pagination ═══ -->
+      <div class="flex justify-center items-center gap-1 mt-6">
+        <button class="page-btn" disabled aria-label="이전">
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon>
+        </button>
+        <button class="page-btn active">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
+        <button class="page-btn">4</button>
+        <button class="page-btn" aria-label="다음">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+        </button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══ Bulk Action Bar ═══ -->
+  <div id="bulkActionBar" class="bulk-action-bar">
+    <span class="text-ui-sm font-medium" style="color:var(--text1);"><span id="selectedCount">0</span>개 선택됨</span>
+    <div class="flex gap-2 ml-auto">
+      <button class="btn-secondary">
+        <iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon>
+        숨기기
+      </button>
+      <button class="btn-secondary">
+        <iconify-icon icon="solar:restart-linear" width="16"></iconify-icon>
+        복원
+      </button>
+      <button class="btn-secondary">
+        <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+        소프트 삭제
+      </button>
+      <button class="btn-danger">
+        <iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon>
+        영구 삭제
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ Guestbook Detail Modal ═══ -->
+  <div id="guestbookModal" class="modal-overlay open">
+    <div class="modal-content" style="max-width:560px;">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold" style="color:var(--text1);">방명록 상세</h3>
+        <button onclick="closeModal('guestbookModal')" class="btn-ghost" aria-label="닫기">
+          <iconify-icon icon="solar:close-circle-linear" width="20"></iconify-icon>
+        </button>
+      </div>
+      <!-- Author Info -->
+      <div class="flex items-center gap-3 mb-4">
+        <img id="modalAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="" class="rounded-full" width="40" height="40">
+        <div class="flex flex-col">
+          <span id="modalName" class="text-ui-sm font-medium" style="color:var(--text1);">이서연</span>
+          <div class="flex items-center gap-2">
+            <span id="modalEmail" class="text-ui-xs" style="color:var(--text3);">seoyeon@example.com</span>
+            <span class="text-ui-xs" style="color:var(--text4);">|</span>
+            <span id="modalDate" class="text-ui-xs" style="color:var(--text4);">2026.03.20</span>
+          </div>
+        </div>
+      </div>
+      <!-- Divider -->
+      <div class="mb-4" style="border-bottom:1px solid var(--border4);"></div>
+      <!-- Full Message -->
+      <p id="modalMessage" class="text-body-sm break-keep leading-relaxed mb-6" style="color:var(--text2);">
+        블로그 잘 보고 있습니다! 특히 React 관련 글들이 실무에 큰 도움이 되고 있어요. 최근 올려주신 Server Components 글 덕분에 프로젝트에 바로 적용해 볼 수 있었습니다. 앞으로도 좋은 글 부탁드립니다.
+      </p>
+      <!-- Status + Demo Switcher -->
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-ui-xs" style="color:var(--text3);">상태:</span>
+        <span id="modalStatusBadge" class="badge badge-published">정상</span>
+        <!-- Demo: click to cycle through states -->
+        <button id="modalStatusCycleBtn" onclick="cycleModalStatus()" class="btn-ghost text-ui-xs" title="데모: 상태 전환">
+          <iconify-icon icon="solar:refresh-linear" width="14"></iconify-icon>
+          <span class="text-ui-xs">상태 전환 (데모)</span>
+        </button>
+      </div>
+      <!-- Actions: buttons change based on status -->
+      <!-- 정상: [숨기기] [소프트 삭제] [영구 삭제] -->
+      <!-- 숨김: [복원] [소프트 삭제] [영구 삭제] -->
+      <!-- 삭제됨: [복원] [영구 삭제] -->
+      <div id="modalActions" class="flex gap-2 justify-end items-center">
+        <!-- 정상 state (default) -->
+        <button class="btn-secondary gb-btn gb-active">
+          <iconify-icon icon="solar:eye-closed-linear" width="16"></iconify-icon>
+          숨기기
+        </button>
+        <button class="btn-secondary gb-btn gb-active" onclick="closeModal('guestbookModal');openModal('deleteActionModal');">
+          <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+          소프트 삭제
+        </button>
+        <button class="btn-danger gb-btn gb-active" onclick="closeModal('guestbookModal');openModal('deleteActionModal');">
+          <iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon>
+          영구 삭제
+        </button>
+        <!-- 숨김 state -->
+        <button class="btn-secondary gb-btn gb-hidden" style="display:none;color:var(--positive1);border-color:var(--positive1);">
+          <iconify-icon icon="solar:restart-linear" width="16"></iconify-icon>
+          복원
+        </button>
+        <button class="btn-secondary gb-btn gb-hidden" style="display:none;" onclick="closeModal('guestbookModal');openModal('deleteActionModal');">
+          <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="16"></iconify-icon>
+          소프트 삭제
+        </button>
+        <button class="btn-danger gb-btn gb-hidden" style="display:none;" onclick="closeModal('guestbookModal');openModal('deleteActionModal');">
+          <iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon>
+          영구 삭제
+        </button>
+        <!-- 삭제됨 state -->
+        <button class="btn-secondary gb-btn gb-deleted" style="display:none;color:var(--positive1);border-color:var(--positive1);">
+          <iconify-icon icon="solar:restart-linear" width="16"></iconify-icon>
+          복원
+        </button>
+        <button class="btn-danger gb-btn gb-deleted" style="display:none;" onclick="closeModal('guestbookModal');openModal('deleteActionModal');">
+          <iconify-icon icon="solar:trash-bin-trash-linear" width="16"></iconify-icon>
+          영구 삭제
+        </button>
+        <!-- always -->
+        <button class="btn-secondary" onclick="closeModal('guestbookModal')">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Delete Action Modal ═══ -->
+  <div id="deleteActionModal" class="modal-overlay">
+    <div class="modal-content max-w-sm">
+      <h3 class="text-lg font-bold mb-5" style="color:var(--text1);">방명록 처리</h3>
+      <p class="text-ui-sm mb-4" style="color:var(--text2);">처리 방식을 선택하세요.</p>
+      <div class="flex flex-col gap-3 mb-6">
+        <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style="border:1px solid var(--border3);"
+          onmouseover="this.style.background='var(--background2)'" onmouseout="this.style.background=''">
+          <input type="radio" name="deleteType" class="admin-radio" value="hide" checked>
+          <div class="flex flex-col">
+            <span class="text-ui-sm font-medium" style="color:var(--text1);">숨기기</span>
+            <span class="text-ui-xs" style="color:var(--text4);">방명록이 숨김 처리됩니다.</span>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style="border:1px solid var(--border3);"
+          onmouseover="this.style.background='var(--background2)'" onmouseout="this.style.background=''">
+          <input type="radio" name="deleteType" class="admin-radio" value="soft">
+          <div class="flex flex-col">
+            <span class="text-ui-sm font-medium" style="color:var(--text1);">소프트 삭제</span>
+            <span class="text-ui-xs" style="color:var(--text4);">방명록이 '삭제된 방명록입니다'로 표시됩니다.</span>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style="border:1px solid var(--border3);"
+          onmouseover="this.style.background='var(--background2)'" onmouseout="this.style.background=''">
+          <input type="radio" name="deleteType" class="admin-radio" value="permanent">
+          <div class="flex flex-col">
+            <span class="text-ui-sm font-medium" style="color:var(--text1);">영구 삭제</span>
+            <span class="text-ui-xs" style="color:var(--text4);">방명록이 완전히 삭제됩니다. 되돌릴 수 없습니다.</span>
+          </div>
+        </label>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button class="btn-secondary" onclick="closeModal('deleteActionModal')">취소</button>
+        <button class="btn-danger" onclick="closeModal('deleteActionModal')">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    function getPreferredTheme(){
+      const stored=localStorage.getItem('theme');
+      if(stored) return stored;
+      return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    function applyTheme(theme){
+      document.body.setAttribute('data-theme',theme);
+      localStorage.setItem('theme',theme);
+      document.getElementById('sunIcon').style.display=theme==='dark'?'none':'';
+      document.getElementById('moonIcon').style.display=theme==='dark'?'':'none';
+    }
+    function toggleTheme(){
+      applyTheme((document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+    }
+    applyTheme(getPreferredTheme());
+
+    // ─── Sidebar ───
+    function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+    function openMobileSidebar(){
+      document.getElementById('sidebar').classList.add('mobile-open');
+      document.getElementById('sidebarOverlay').classList.remove('hidden');
+      document.body.style.overflow='hidden';
+    }
+    function closeMobileSidebar(){
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+      document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'&&document.getElementById('sidebar').classList.contains('mobile-open'))closeMobileSidebar();
+    });
+
+    // ─── Active Nav ───
+    document.querySelectorAll('.admin-nav-item[data-page]').forEach(el=>{
+      if(el.dataset.page==='guestbook') el.classList.add('active');
+    });
+
+    // ─── Staggered Reveal ───
+    const revealObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}
+      });
+    },{threshold:0.08,rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('.reveal-stagger').forEach((el,i)=>{
+      el.style.animationDelay=`${i*80}ms`;
+      revealObserver.observe(el);
+    });
+
+    // ─── Pagination (demo) ───
+    document.querySelectorAll('.page-btn:not(:disabled)').forEach(btn=>{
+      btn.addEventListener('click',function(){
+        if(this.classList.contains('active'))return;
+        document.querySelectorAll('.page-btn.active').forEach(a=>{
+          a.classList.remove('active');a.style.background='transparent';a.style.color='var(--text2)';a.style.fontWeight='500';
+        });
+        this.classList.add('active');this.style.background='var(--primary1)';this.style.color='var(--background1)';this.style.fontWeight='700';
+      });
+    });
+
+    // ─── Modal ───
+    function openModal(id){document.getElementById(id).classList.add('open');}
+    function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+    // ─── Toggle Switch ───
+    document.querySelectorAll('.toggle-switch').forEach(el=>{
+      el.addEventListener('click',()=>el.classList.toggle('active'));
+    });
+
+    // ─── Guestbook Detail Data ───
+    const guestbookData=[
+      {name:'이서연',email:'seoyeon@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.20',status:'active',
+       message:'블로그 잘 보고 있습니다! 특히 React 관련 글들이 실무에 큰 도움이 되고 있어요. 최근 올려주신 Server Components 글 덕분에 프로젝트에 바로 적용해 볼 수 있었습니다. 앞으로도 좋은 글 부탁드립니다.'},
+      {name:'정우진',email:'woojin@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.18',status:'active',
+       message:'안녕하세요, 혹시 Next.js 관련 강의도 계획이 있으신가요? 블로그 글이 너무 좋아서 강의 형태로 나오면 바로 수강하고 싶네요. App Router 관련 내용이 특히 도움이 됩니다.'},
+      {name:'오지민',email:'jimin@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.15',status:'active',
+       message:'개발 블로그 중에 이렇게 깔끔한 건 처음이에요. 디자인도 내용도 최고입니다. 깔끔한 코드 예시와 실무 적용 팁이 정말 유용합니다.'},
+      {name:'김태현',email:'taehyun@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.12',status:'active',
+       message:'TypeScript 시리즈 정말 유용합니다. 다음 주제도 기대하고 있을게요! 특히 제네릭 패턴 정리가 업무에 바로 적용 가능했습니다.'},
+      {name:'박하은',email:'haeun@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.10',status:'active',
+       message:'CSS 관련 글 잘 봤습니다. Container Queries 설명이 정말 명쾌했어요. 실무에서 바로 써볼 수 있을 만큼 예시가 잘 되어 있어서 좋았습니다.'},
+      {name:'송민규',email:'mingyu@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.08',status:'hidden',
+       message:'스팸 광고 내용'},
+      {name:'최은비',email:'eunbi@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.05',status:'active',
+       message:'블로그 구독 기능 있으면 좋겠어요! RSS로 구독하고 있긴 한데 이메일 알림이 있으면 새 글을 놓치지 않을 수 있을 것 같아요. 항상 좋은 글 감사합니다.'},
+      {name:'한승우',email:'seungwoo@example.com',avatar:'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E',date:'2026.03.01',status:'deleted',
+       message:'삭제된 방명록'},
+    ];
+
+    // Status labels and badge classes
+    const statusMap={
+      active:{label:'정상',badgeClass:'badge-published'},
+      hidden:{label:'숨김',badgeClass:'badge-archived'},
+      deleted:{label:'삭제됨',badgeClass:'badge-deleted'},
+    };
+    let currentModalStatus='active';
+
+    function updateModalActions(status){
+      currentModalStatus=status;
+      const info=statusMap[status]||statusMap.active;
+      const badgeEl=document.getElementById('modalStatusBadge');
+      badgeEl.textContent=info.label;
+      badgeEl.className='badge '+info.badgeClass;
+      ['active','hidden','deleted'].forEach(function(s){
+        document.querySelectorAll('.gb-'+s).forEach(function(b){
+          b.style.display=(s===status)?'':'none';
+        });
+      });
+    }
+
+    function cycleModalStatus(){
+      const order=['active','hidden','deleted'];
+      const idx=order.indexOf(currentModalStatus);
+      updateModalActions(order[(idx+1)%order.length]);
+    }
+
+    function openGuestbookDetail(idx){
+      const d=guestbookData[idx];
+      if(!d)return;
+      document.getElementById('modalAvatar').src=d.avatar;
+      document.getElementById('modalName').textContent=d.name;
+      document.getElementById('modalEmail').textContent=d.email;
+      document.getElementById('modalDate').textContent=d.date;
+      document.getElementById('modalMessage').textContent=d.message;
+      updateModalActions(d.status||'active');
+      openModal('guestbookModal');
+    }
+
+    function openDeleteModal(){
+      openModal('deleteActionModal');
+    }
+
+    // ─── Checkbox / Bulk Actions ───
+    const selectAllEl=document.getElementById('selectAll');
+    const rowCheckboxes=document.querySelectorAll('.row-checkbox');
+    const bulkBar=document.getElementById('bulkActionBar');
+    const selectedCountEl=document.getElementById('selectedCount');
+
+    function updateBulkBar(){
+      const checked=document.querySelectorAll('.row-checkbox:checked').length;
+      selectedCountEl.textContent=checked;
+      if(checked>0){
+        bulkBar.classList.add('visible');
+      }else{
+        bulkBar.classList.remove('visible');
+      }
+    }
+
+    selectAllEl.addEventListener('change',function(){
+      rowCheckboxes.forEach(cb=>{cb.checked=this.checked;});
+      updateBulkBar();
+    });
+
+    rowCheckboxes.forEach(cb=>{
+      cb.addEventListener('change',function(){
+        const allChecked=[...rowCheckboxes].every(c=>c.checked);
+        const someChecked=[...rowCheckboxes].some(c=>c.checked);
+        selectAllEl.checked=allChecked;
+        selectAllEl.indeterminate=someChecked&&!allChecked;
+        updateBulkBar();
+      });
+    });
+
+    // ─── Close modals on overlay click ───
+    document.querySelectorAll('.modal-overlay').forEach(overlay=>{
+      overlay.addEventListener('click',function(e){
+        if(e.target===this) this.classList.remove('open');
+      });
+    });
+
+    // ─── Escape to close modals ───
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){
+        document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+      }
+    });
+  </script>
+  <script>
+  /* Custom Select */
+  (function(){
+    function init(){
+      document.querySelectorAll('.custom-select').forEach(function(sel){
+        var trigger=sel.querySelector('.custom-select-trigger');
+        var valueEl=sel.querySelector('.custom-select-value');
+        var opts=sel.querySelectorAll('.custom-select-option');
+        trigger.addEventListener('click',function(e){
+          e.stopPropagation();
+          document.querySelectorAll('.custom-select.open').forEach(function(s){if(s!==sel)s.classList.remove('open');});
+          sel.classList.toggle('open');
+        });
+        opts.forEach(function(opt){
+          opt.addEventListener('click',function(){
+            if(valueEl)valueEl.textContent=opt.textContent;
+            opts.forEach(function(o){o.classList.remove('selected');});
+            opt.classList.add('selected');
+            sel.classList.remove('open');
+          });
+        });
+      });
+      document.addEventListener('click',function(){
+        document.querySelectorAll('.custom-select.open').forEach(function(s){s.classList.remove('open');});
+      });
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
+    else{init();}
+  })();
+  </script>
+</body>
+</html>

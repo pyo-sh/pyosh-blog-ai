@@ -6,6 +6,12 @@
 
 - `docs/client/specs/loading-empty-states.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/loading-empty-states.html` - 로딩 스켈레톤 상태
+- `docs/client/designs/public/loading-empty-states-empty.html` - 빈 상태 UI
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 로딩 상태 분류

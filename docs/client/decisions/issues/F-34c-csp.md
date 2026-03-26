@@ -6,6 +6,10 @@
 
 - `docs/specs/deploy-security.md` (섹션 5.4 CSP)
 
+## 와이어프레임
+
+해당 없음 (비시각적 기능).
+
 ## 상세 설계
 
 ### Nonce 기반 CSP

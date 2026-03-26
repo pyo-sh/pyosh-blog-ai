@@ -6,6 +6,11 @@
 
 - `docs/client/specs/home-post-list.md`
 
+## 와이어프레임
+
+- `docs/client/designs/public/home-page.html` - 홈 페이지 전체 레이아웃, 글 목록, 페이지네이션
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
 ## 상세 설계
 
 ### 5.1 사용자 흐름

@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog Admin - 글 미리보기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+            tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+            bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+            primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+            secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+            info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+            positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+            negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+            grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+            yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+            'code-surface': 'var(--code-surface)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ═══ Admin Sidebar ═══ */
+    .admin-sidebar{
+      position:fixed;left:0;top:0;bottom:0;z-index:30;
+      width:240px;display:flex;flex-direction:column;
+      background:var(--background2);border-right:1px solid var(--border3);
+      transition:width .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-sidebar.collapsed{width:64px;}
+    .admin-sidebar.collapsed .nav-label,
+    .admin-sidebar.collapsed .sidebar-text{opacity:0;width:0;overflow:hidden;white-space:nowrap;}
+    .admin-sidebar.collapsed .admin-nav-item{justify-content:center;padding:8px 0;}
+    .admin-sidebar.collapsed .sidebar-logo-area .admin-badge{display:none;}
+    .admin-sidebar.collapsed~#sidebarOverlay~#contentWrapper{margin-left:64px!important;}
+
+    .admin-nav-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 12px;border-radius:8px;
+      font-size:14px;color:var(--text2);text-decoration:none;
+      transition:all .15s ease;
+    }
+    .admin-nav-item:hover{background:var(--background3);}
+    .admin-nav-item.active{
+      background:rgba(138,111,224,0.10);
+      color:var(--primary1);font-weight:500;
+    }
+    .nav-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+    .admin-nav-item iconify-icon{display:flex;flex-shrink:0;align-items:center;}
+    iconify-icon{display:inline-block;vertical-align:middle;}
+
+    .admin-content{
+      margin-left:240px;
+      transition:margin-left .3s cubic-bezier(.16,1,.3,1);
+    }
+    .admin-topbar{
+      position:sticky;top:0;z-index:10;
+      display:flex;align-items:center;height:56px;padding:0 24px;gap:16px;
+      background:rgba(249,249,250,0.80);
+      backdrop-filter:blur(16px) saturate(1.4);
+      -webkit-backdrop-filter:blur(16px) saturate(1.4);
+      border-bottom:1px solid var(--border4);
+    }
+    body[data-theme="dark"] .admin-topbar{background:rgba(19,20,21,0.85);}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .admin-topbar{background:rgba(19,20,21,0.85);}}
+
+    @media(max-width:767px){
+      .admin-sidebar{transform:translateX(-100%);width:240px!important;}
+      .admin-sidebar.mobile-open{transform:translateX(0);}
+      .admin-content{margin-left:0!important;}
+    }
+
+    /* ═══ Admin Components ═══ */
+
+    /* Buttons */
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--primary1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-primary:hover{opacity:.9;}.btn-primary:active{transform:scale(.97);}
+
+    .btn-secondary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:transparent;color:var(--text2);border:1px solid var(--border3);cursor:pointer;
+      transition:background .2s,transform .15s;
+    }
+    .btn-secondary:hover{background:var(--background3);}.btn-secondary:active{transform:scale(.97);}
+
+    .btn-danger{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--negative1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-danger:hover{opacity:.9;}
+
+    .btn-ghost{
+      display:inline-flex;align-items:center;justify-content:center;gap:4px;
+      padding:6px 10px;border-radius:6px;font-size:13px;
+      background:transparent;color:var(--text3);border:none;cursor:pointer;
+      transition:background .15s,color .15s;
+    }
+    .btn-ghost:hover{background:var(--background3);color:var(--text2);}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;}
+    .badge-published{background:rgba(13,169,107,0.12);color:var(--positive1);}
+    .badge-draft{background:rgba(144,153,161,0.12);color:var(--grey3);}
+    .badge-archived{background:rgba(255,190,61,0.12);color:var(--yellow1);}
+    .badge-deleted{background:rgba(226,18,35,0.12);color:var(--negative1);}
+    .badge-private{background:rgba(107,73,181,0.12);color:var(--secondary1);}
+    .badge-public{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .badge-category{background:rgba(138,111,224,0.12);color:var(--primary1);}
+
+    /* Toggle Switch */
+    .toggle-switch{
+      position:relative;width:44px;height:24px;
+      background:var(--border3);border-radius:12px;cursor:pointer;
+      transition:background .2s;
+    }
+    .toggle-switch.active{background:var(--primary1);}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#ffffff;transition:transform .2s cubic-bezier(.16,1,.3,.1);}.toggle-switch.active .toggle-knob{transform:translateX(20px);}
+
+    /* Inline toggle switch */
+    .toggle-switch-inline{
+      position:relative;width:36px;height:20px;
+      background:var(--border3);border-radius:10px;cursor:pointer;
+      transition:background .2s;flex-shrink:0;
+    }
+    .toggle-switch-inline.active{background:var(--primary1);}
+    .toggle-switch-inline .toggle-knob-inline{
+      position:absolute;top:2px;left:2px;width:16px;height:16px;
+      border-radius:8px;background:#ffffff;
+      transition:transform .2s cubic-bezier(.16,1,.3,.1);
+    }
+    .toggle-switch-inline.active .toggle-knob-inline{transform:translateX(16px);}
+    .toggle-switch-inline .toggle-label{
+      position:absolute;right:-32px;top:50%;transform:translateY(-50%);
+      font-size:11px;white-space:nowrap;color:var(--text3);
+    }
+    .toggle-switch-inline.active .toggle-label{color:var(--primary1);}
+
+    /* Pin toggle */
+    .pin-toggle{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:28px;height:28px;border-radius:6px;border:none;
+      background:transparent;cursor:pointer;font-size:16px;
+      transition:background .15s,transform .15s;color:var(--text4);
+    }
+    .pin-toggle:hover{background:var(--background3);transform:scale(1.1);}
+    .pin-toggle.pinned{color:var(--primary1);}
+
+    /* Custom Select */
+    .custom-select{position:relative;display:inline-flex;}
+    .custom-select-trigger{
+      padding:8px 32px 8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23838c95' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C%2Fsvg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      transition:border-color .2s;display:block;text-align:left;white-space:nowrap;
+    }
+    .custom-select.open .custom-select-trigger{border-color:var(--primary1);}
+    .custom-select-dropdown{
+      position:absolute;top:calc(100% + 4px);left:0;min-width:100%;
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);
+      z-index:200;display:none;overflow:hidden;
+    }
+    .custom-select.open .custom-select-dropdown{display:block;}
+    .custom-select-option{padding:8px 12px;font-size:14px;cursor:pointer;color:var(--text1);transition:background .15s;}
+    .custom-select-option:hover{background:var(--background2);}
+    .custom-select-option.selected{color:var(--primary1);font-weight:500;}
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:50;
+      background:rgba(0,0,0,.5);backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .modal-overlay.open{display:flex;}
+    .modal-content{
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:16px;padding:24px;width:100%;max-width:420px;
+      max-height:90vh;overflow-y:auto;
+      animation:fadeInUp .3s cubic-bezier(.16,1,.3,1);
+    }
+
+    /* ═══ Control Bar ═══ */
+    .preview-control-bar{
+      display:flex;align-items:center;gap:12px;padding:12px 24px;
+      border-bottom:1px solid var(--border4);
+      background:var(--background1);
+      flex-wrap:wrap;
+    }
+    .preview-control-bar .control-back{
+      display:inline-flex;align-items:center;gap:4px;
+      font-size:14px;font-weight:500;color:var(--text3);
+      text-decoration:none;transition:color .2s;
+    }
+    .preview-control-bar .control-back:hover{color:var(--text1);}
+    .preview-control-bar .control-spacer{flex:1;}
+    .preview-control-bar .control-actions{
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    }
+    .control-actions .toggle-group{
+      display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text3);
+    }
+    .control-actions .toggle-group.active-label{color:var(--primary1);}
+    .control-actions .status-dropdown{position:relative;display:inline-flex;}
+    .control-actions .status-badge-btn{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500;
+      cursor:pointer;border:none;transition:opacity .2s;
+    }
+
+    /* ═══ Post Detail Styles (from public post-detail) ═══ */
+    .post-thumbnail{width:100%;aspect-ratio:16/9;border-radius:1.5rem;overflow:hidden;background:var(--background3)}
+    .post-thumbnail img{width:100%;height:100%;object-fit:cover}
+
+    .post-meta-badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:6px;font-size:.75rem;font-weight:600;background:rgba(138,111,224,.12);color:var(--primary1)}
+
+    .post-tag{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:500;border:1px solid var(--border3);color:var(--text3);transition:all .2s;text-decoration:none}
+    .post-tag:hover{border-color:var(--primary1);color:var(--primary1);background:rgba(138,111,224,.06)}
+
+    /* ═══ Markdown Content ═══ */
+    .markdown-content{font-size:.938rem;line-height:1.8;color:var(--text2);word-break:keep-all;overflow-wrap:break-word}
+    .markdown-content h1{font-size:1.5rem;font-weight:800;color:var(--text1);margin:2.5rem 0 1rem;line-height:1.3}
+    .markdown-content h2{font-size:1.25rem;font-weight:700;color:var(--text1);margin:2rem 0 .75rem;line-height:1.35;padding-bottom:.5rem;border-bottom:1px solid var(--border4)}
+    .markdown-content h3{font-size:1.1rem;font-weight:600;color:var(--text1);margin:1.5rem 0 .5rem;line-height:1.4}
+    .markdown-content p{margin:0 0 1.25rem}
+    .markdown-content a{color:var(--primary1);text-decoration:underline;text-underline-offset:3px}
+    .markdown-content a:hover{color:var(--primary2)}
+    .markdown-content strong{font-weight:700;color:var(--text1)}
+    .markdown-content em{font-style:italic}
+    .markdown-content del{text-decoration:line-through;color:var(--text4)}
+    .markdown-content ul,.markdown-content ol{margin:0 0 1.25rem;padding-left:1.5rem}
+    .markdown-content li{margin-bottom:.35rem}
+    .markdown-content li::marker{color:var(--text4)}
+    .markdown-content blockquote{margin:0 0 1.25rem;padding:.75rem 1rem;border-left:3px solid var(--primary1);background:rgba(138,111,224,.04);border-radius:0 .5rem .5rem 0;color:var(--text3);font-size:.875rem}
+    .markdown-content hr{border:none;height:1px;background:var(--border4);margin:2rem 0}
+    .markdown-content img{max-width:100%;border-radius:.75rem;margin:1rem 0}
+
+    /* Code Block */
+    .code-block{position:relative;margin:0 0 1.25rem;border-radius:.75rem;overflow:hidden;background:#0d1117;border:1px solid var(--border3)}
+    .code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06)}
+    .code-lang{font-size:.688rem;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em}
+    .code-copy{font-size:.688rem;font-weight:500;color:rgba(255,255,255,.35);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:3px 10px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px}
+    .code-copy:hover{color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.25)}
+    .code-block pre{margin:0;padding:16px;overflow-x:auto;font-size:.813rem;line-height:1.6}
+    .code-block code{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;color:#e6edf3}
+
+    /* Inline code */
+    .markdown-content code:not(.code-block code){font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.813rem;padding:2px 6px;border-radius:4px;background:var(--background3);color:var(--primary1);font-weight:500;display:inline-block;vertical-align:baseline}
+
+    /* Table */
+    .markdown-content .table-wrapper{overflow-x:auto;margin:0 0 1.25rem;border-radius:.75rem;border:1px solid var(--border3)}
+    .markdown-content table{width:100%;border-collapse:collapse;font-size:.875rem}
+    .markdown-content th{background:var(--background3);font-weight:600;text-align:left;padding:.5rem .75rem;color:var(--text1);white-space:nowrap}
+    .markdown-content td{padding:.5rem .75rem;border-top:1px solid var(--border4);color:var(--text2)}
+
+    /* Checkbox */
+    .markdown-content .task-item{list-style:none;position:relative;padding-left:4px}
+    .markdown-content .task-item input[type="checkbox"]{appearance:none;width:16px;height:16px;border:2px solid var(--border3);border-radius:4px;vertical-align:middle;margin-right:8px;position:relative;top:-1px;cursor:default}
+    .markdown-content .task-item input[type="checkbox"]:checked{background:var(--primary1);border-color:var(--primary1)}
+    .markdown-content .task-item input[type="checkbox"]:checked::after{content:'';position:absolute;left:4px;top:1px;width:5px;height:9px;border:solid var(--background1);border-width:0 2px 2px 0;transform:rotate(45deg)}
+
+    /* ═══ Related Posts ═══ */
+    .related-section-title{font-size:.875rem;font-weight:700;color:var(--text1);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .related-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .related-scroll::-webkit-scrollbar{display:none}
+    .related-card{flex-shrink:0;width:180px;scroll-snap-align:start;border-radius:.75rem;overflow:hidden;border:1px solid var(--border3);background:var(--background2);transition:all .3s cubic-bezier(.16,1,.3,1);cursor:pointer;text-decoration:none;display:block}
+    .related-card:hover{border-color:var(--primary1);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+    .related-thumb{width:100%;aspect-ratio:16/10;overflow:hidden;background:var(--background3)}
+    .related-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.16,1,.3,1)}
+    .related-card:hover .related-thumb img{transform:scale(1.05)}
+    .related-info{padding:10px 12px}
+    .related-info-title{font-size:.75rem;font-weight:600;color:var(--text1);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all}
+
+    /* ═══ Author Box ═══ */
+    .author-box{
+      display:flex;align-items:center;gap:16px;padding:20px;
+      border-radius:1rem;border:1px solid var(--border3);
+      background:var(--background2);margin-top:2rem;
+    }
+    .author-avatar{
+      width:56px;height:56px;border-radius:50%;overflow:hidden;flex-shrink:0;
+      background:var(--background3);
+    }
+    .author-avatar img{width:100%;height:100%;object-fit:cover}
+    .author-name{font-size:.938rem;font-weight:700;color:var(--text1)}
+    .author-bio{font-size:.813rem;color:var(--text3);line-height:1.5;margin-top:2px}
+
+    /* ═══ Page-Specific: Preview Content Wrapper ═══ */
+    .preview-content-wrapper{
+      max-width:760px;
+      margin:0 auto;
+      padding:32px 0 64px;
+    }
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Admin Sidebar ═══ -->
+  <aside id="sidebar" class="admin-sidebar" aria-label="관리자 메뉴">
+    <div class="sidebar-logo-area flex items-center h-14 px-4 gap-2 shrink-0" style="border-bottom:1px solid var(--border4);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7 shrink-0" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+      <span class="admin-badge sidebar-text text-xs font-medium px-1.5 py-0.5 rounded" style="background:rgba(138,111,224,0.12); color:var(--primary1);">Admin</span>
+      <button onclick="toggleSidebar()" class="ml-auto flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="사이드바 접기"
+        onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+        <iconify-icon icon="solar:sidebar-minimalistic-linear" width="18" style="display:flex"></iconify-icon>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+      <a href="admin-dashboard.html" class="admin-nav-item" data-page="dashboard">
+        <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
+        <span class="nav-label">대시보드</span>
+      </a>
+      <a href="admin-post-list.html" class="admin-nav-item active" data-page="posts">
+        <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+        <span class="nav-label">글</span>
+      </a>
+      <a href="admin-post-editor.html" class="admin-nav-item" data-page="editor">
+        <iconify-icon icon="solar:pen-new-round-linear" width="20"></iconify-icon>
+        <span class="nav-label">글 작성</span>
+      </a>
+      <a href="admin-category.html" class="admin-nav-item" data-page="categories">
+        <iconify-icon icon="solar:folder-open-linear" width="20"></iconify-icon>
+        <span class="nav-label">카테고리</span>
+      </a>
+      <a href="admin-comment.html" class="admin-nav-item" data-page="comments">
+        <iconify-icon icon="solar:chat-round-dots-linear" width="20"></iconify-icon>
+        <span class="nav-label">댓글</span>
+      </a>
+      <a href="admin-guestbook.html" class="admin-nav-item" data-page="guestbook">
+        <iconify-icon icon="solar:notebook-linear" width="20"></iconify-icon>
+        <span class="nav-label">방명록</span>
+      </a>
+      <a href="admin-asset.html" class="admin-nav-item" data-page="assets">
+        <iconify-icon icon="solar:gallery-wide-linear" width="20"></iconify-icon>
+        <span class="nav-label">에셋</span>
+      </a>
+    </nav>
+    <div class="px-3 pb-4 shrink-0">
+      <a href="../public/home-page.html" class="admin-nav-item" style="color:var(--text3);">
+        <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+        <span class="nav-label">블로그로 돌아가기</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Mobile Overlay -->
+  <div id="sidebarOverlay" class="fixed inset-0 z-20 hidden" style="background:rgba(0,0,0,.4);backdrop-filter:blur(2px);" onclick="closeMobileSidebar()"></div>
+
+  <!-- ═══ Content Wrapper ═══ -->
+  <div id="contentWrapper" class="admin-content">
+    <!-- Top Bar -->
+    <header class="admin-topbar">
+      <button onclick="openMobileSidebar()" class="p-1.5 rounded-lg md:hidden transition-colors" style="color:var(--text2);" aria-label="메뉴">
+        <iconify-icon icon="solar:hamburger-menu-linear" width="22" style="display:flex"></iconify-icon>
+      </button>
+      <h1 class="text-lg font-bold break-keep" style="color:var(--text1);">글 미리보기</h1>
+      <div class="ml-auto flex items-center gap-1">
+        <span class="text-sm hidden sm:inline" style="color:var(--text3);">관리자</span>
+        <button onclick="toggleTheme()" class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="테마 전환"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:sun-2-linear" width="18" id="sunIcon" style="display:flex"></iconify-icon>
+          <iconify-icon icon="solar:moon-linear" width="18" id="moonIcon" style="display:none"></iconify-icon>
+        </button>
+        <button class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors" style="color:var(--text3);" aria-label="로그아웃"
+          onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+          <iconify-icon icon="solar:logout-2-linear" width="18" style="display:flex"></iconify-icon>
+        </button>
+      </div>
+    </header>
+
+    <!-- ═══ Control Bar ═══ -->
+    <div class="preview-control-bar">
+      <a href="admin-post-list.html" class="control-back">
+        <iconify-icon icon="solar:arrow-left-linear" width="16"></iconify-icon>
+        목록
+      </a>
+      <div class="control-spacer"></div>
+      <div class="control-actions">
+        <!-- 수정 -->
+        <a href="admin-post-editor.html" class="btn-secondary" style="padding:6px 14px;font-size:13px;">
+          <iconify-icon icon="solar:pen-linear" width="15"></iconify-icon>
+          수정
+        </a>
+
+        <!-- 공개/비공개 toggle -->
+        <div class="toggle-group active-label">
+          <span class="text-ui-xs">공개</span>
+          <div class="toggle-switch-inline active" onclick="toggleVisibility(this)">
+            <div class="toggle-knob-inline"></div>
+          </div>
+        </div>
+
+        <!-- 고정 toggle -->
+        <button class="pin-toggle pinned" onclick="this.classList.toggle('pinned')" title="고정/고정해제">
+          <iconify-icon icon="solar:pin-bold" width="16"></iconify-icon>
+        </button>
+
+        <!-- 상태 dropdown -->
+        <div class="status-dropdown custom-select">
+          <button type="button" class="custom-select-trigger status-badge-btn badge-published" style="padding:4px 28px 4px 10px;font-size:12px;font-weight:500;border:none;">
+            <span class="custom-select-value">발행</span>
+          </button>
+          <div class="custom-select-dropdown">
+            <div class="custom-select-option selected" onclick="setStatus(this,'published')">발행</div>
+            <div class="custom-select-option" onclick="setStatus(this,'draft')">작성</div>
+            <div class="custom-select-option" onclick="setStatus(this,'archived')">보관</div>
+          </div>
+        </div>
+
+        <!-- 삭제 -->
+        <button class="btn-danger" style="padding:6px 14px;font-size:13px;" onclick="openModal('deleteModal')">
+          <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="15"></iconify-icon>
+          삭제
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══ Main Content ═══ -->
+    <main style="min-height:calc(100dvh - 56px - 52px);">
+      <div class="preview-content-wrapper px-6">
+
+        <!-- ═══ Post Article (from post-detail.html) ═══ -->
+        <article class="reveal" style="animation-delay:100ms">
+
+          <!-- Thumbnail -->
+          <div class="post-thumbnail mb-6">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="React Server Components 아키텍처 다이어그램" loading="lazy" decoding="async">
+          </div>
+
+          <!-- Meta -->
+          <div class="flex items-center gap-3 mb-3">
+            <a href="/categories/react" class="post-meta-badge">React</a>
+            <span class="text-ui-xs" style="color:var(--text4)">2026. 3. 18.</span>
+            <span class="flex items-center gap-1 text-ui-xs" style="color:var(--text4)">
+              <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>3,847
+            </span>
+          </div>
+
+          <!-- Title -->
+          <h1 class="text-body-lg md:text-h1 font-bold tracking-tight leading-snug break-keep mb-4" style="color:var(--text1)">
+            React Server Components 실전 가이드 - 서버와 클라이언트의 경계를 설계하는 방법
+          </h1>
+
+          <!-- Tags -->
+          <div class="flex flex-wrap gap-1.5 mb-8">
+            <a href="/tags/react" class="post-tag">#React</a>
+            <a href="/tags/rsc" class="post-tag">#RSC</a>
+            <a href="/tags/nextjs" class="post-tag">#Next.js</a>
+            <a href="/tags/architecture" class="post-tag">#Architecture</a>
+            <a href="/tags/performance" class="post-tag">#Performance</a>
+          </div>
+
+          <!-- ═══ Markdown Body ═══ -->
+          <div class="markdown-content">
+
+            <h1 id="소개">소개</h1>
+            <p>React Server Components(RSC)가 Next.js App Router에 정식 도입되면서, 프론트엔드 아키텍처의 패러다임이 바뀌고 있습니다. 하지만 "서버 컴포넌트는 서버에서 실행되고, 클라이언트 컴포넌트는 브라우저에서 실행된다"는 단순한 이해만으로는 실전에서 마주치는 수많은 설계 결정을 내리기 어렵습니다.</p>
+
+            <p>이 글에서는 RSC를 <strong>실제 프로덕션 환경</strong>에서 활용할 때 필요한 판단 기준과 설계 패턴을 정리합니다.</p>
+
+            <blockquote>
+              이 글은 Next.js 15 App Router 기준으로 작성되었습니다. Pages Router에서는 적용 방식이 다를 수 있습니다.
+            </blockquote>
+
+            <h1 id="rsc란-무엇인가">RSC란 무엇인가</h1>
+            <p>React Server Components는 <code>서버에서만 실행</code>되는 React 컴포넌트입니다. 번들에 포함되지 않으며, 서버에서 렌더링된 결과만 클라이언트로 전달됩니다.</p>
+
+            <h2 id="서버와-클라이언트의-경계">서버와 클라이언트의 경계</h2>
+            <p>가장 중요한 설계 결정은 <em>어디에서 서버와 클라이언트의 경계를 나눌 것인가</em>입니다. 이 경계는 <code>"use client"</code> 지시어로 명시합니다.</p>
+
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">typescript</span>
+                <button class="code-copy" onclick="copyCode(this)">
+                  <iconify-icon icon="solar:copy-linear" width="12"></iconify-icon>
+                  복사
+                </button>
+              </div>
+              <pre><code><span style="color:#ff7b72">// 서버 컴포넌트 (기본값)</span>
+<span style="color:#ff7b72">async function</span> <span style="color:#d2a8ff">PostPage</span>({ params }: Props) {
+  <span style="color:#ff7b72">const</span> post = <span style="color:#ff7b72">await</span> <span style="color:#79c0ff">fetchPost</span>(params.slug);
+
+  <span style="color:#ff7b72">return</span> (
+    <span style="color:#79c0ff">&lt;article&gt;</span>
+      <span style="color:#79c0ff">&lt;h1&gt;</span>{post.title}<span style="color:#79c0ff">&lt;/h1&gt;</span>
+      <span style="color:#79c0ff">&lt;PostContent</span> html={post.html} <span style="color:#79c0ff">/&gt;</span>
+      <span style="color:#79c0ff">&lt;LikeButton</span> postId={post.id} <span style="color:#79c0ff">/&gt;</span>  {<span style="color:#8b949e">/* 클라이언트 */</span>}
+    <span style="color:#79c0ff">&lt;/article&gt;</span>
+  );
+}</code></pre>
+            </div>
+
+            <h2 id="데이터-페칭-패턴">데이터 페칭 패턴</h2>
+            <p>서버 컴포넌트에서는 <code>async/await</code>를 직접 사용하여 데이터를 가져올 수 있습니다. <del>기존의 <code>getServerSideProps</code>나 <code>useEffect</code> 패턴은 더 이상 필요하지 않습니다.</del></p>
+
+            <h3 id="직렬-vs-병렬-페칭">직렬 vs 병렬 페칭</h3>
+            <p>여러 데이터 소스를 가져올 때는 직렬/병렬 여부를 신중하게 선택해야 합니다.</p>
+
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">typescript</span>
+                <button class="code-copy" onclick="copyCode(this)">
+                  <iconify-icon icon="solar:copy-linear" width="12"></iconify-icon>
+                  복사
+                </button>
+              </div>
+              <pre><code><span style="color:#8b949e">// 병렬 페칭 (권장)</span>
+<span style="color:#ff7b72">const</span> [post, comments, related] = <span style="color:#ff7b72">await</span> Promise.<span style="color:#d2a8ff">all</span>([
+  <span style="color:#79c0ff">fetchPost</span>(slug),
+  <span style="color:#79c0ff">fetchComments</span>(postId),
+  <span style="color:#79c0ff">fetchRelated</span>(postId),
+]);</code></pre>
+            </div>
+
+            <h3 id="워터폴-방지">워터폴 방지</h3>
+            <p>부모 컴포넌트의 데이터 페칭이 완료된 후에야 자식 컴포넌트의 페칭이 시작되는 <strong>워터폴 패턴</strong>을 피해야 합니다. <code>Suspense</code>와 병렬 페칭을 조합하면 이를 해결할 수 있습니다.</p>
+
+            <!-- GFM Table -->
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>패턴</th>
+                    <th>장점</th>
+                    <th>단점</th>
+                    <th>적합한 상황</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>직렬 페칭</td>
+                    <td>단순함</td>
+                    <td>느림 (워터폴)</td>
+                    <td>의존 데이터</td>
+                  </tr>
+                  <tr>
+                    <td><code>Promise.all</code></td>
+                    <td>빠름</td>
+                    <td>전체 실패 가능</td>
+                    <td>독립 데이터</td>
+                  </tr>
+                  <tr>
+                    <td><code>Promise.allSettled</code></td>
+                    <td>부분 성공 가능</td>
+                    <td>에러 처리 복잡</td>
+                    <td>선택적 데이터</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h1 id="컴포넌트-트리-설계">컴포넌트 트리 설계</h1>
+            <p>RSC의 핵심은 컴포넌트 트리에서 서버/클라이언트 경계를 어떻게 나눌지 결정하는 것입니다. 다음 원칙을 따르면 대부분의 상황에서 올바른 판단을 내릴 수 있습니다:</p>
+
+            <ul>
+              <li>서버 컴포넌트를 <strong>가능한 한 높이</strong> 배치한다</li>
+              <li><code>"use client"</code> 경계를 <strong>가능한 한 낮게</strong> 내린다</li>
+              <li>상태와 이벤트가 필요한 <strong>최소 단위</strong>만 클라이언트로 분리한다</li>
+              <li>데이터 페칭은 서버 컴포넌트에서, 렌더링 로직은 props로 전달한다</li>
+            </ul>
+
+            <!-- GFM Checkbox -->
+            <h2 id="실전-리팩토링-사례">실전 리팩토링 사례</h2>
+            <p>기존 Pages Router 프로젝트를 App Router로 마이그레이션하면서 적용한 체크리스트입니다:</p>
+            <ul style="list-style:none;padding-left:0">
+              <li class="task-item"><input type="checkbox" checked disabled> <code>getServerSideProps</code>를 서버 컴포넌트 async 함수로 전환</li>
+              <li class="task-item"><input type="checkbox" checked disabled> <code>useEffect</code> 데이터 페칭을 서버 컴포넌트로 이동</li>
+              <li class="task-item"><input type="checkbox" checked disabled> 전역 상태(Zustand)를 필요한 컴포넌트에만 적용</li>
+              <li class="task-item"><input type="checkbox" disabled> 라우트 핸들러 API 정리 (진행 중)</li>
+            </ul>
+
+            <h2 id="성능-측정">성능 측정</h2>
+            <p>RSC 도입 전후의 성능 변화를 측정한 결과입니다. JavaScript 번들 크기가 34% 감소했고, LCP(Largest Contentful Paint)가 평균 1.2초에서 0.7초로 개선되었습니다.</p>
+
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="RSC 도입 전후 성능 비교 차트" loading="lazy" decoding="async">
+
+            <h1 id="주의사항">주의사항</h1>
+            <p>RSC를 도입할 때 주의해야 할 점들을 정리합니다:</p>
+
+            <ol>
+              <li>서버 컴포넌트에서 브라우저 API(<code>window</code>, <code>document</code>)를 사용할 수 없습니다</li>
+              <li>서버 컴포넌트에서 클라이언트 컴포넌트로 전달하는 props는 <strong>직렬화 가능</strong>해야 합니다 (함수, Date 등 불가)</li>
+              <li>Third-party 라이브러리 호환성을 반드시 확인해야 합니다</li>
+            </ol>
+
+            <h1 id="결론">결론</h1>
+            <p>React Server Components는 단순히 "서버에서 렌더링한다"는 것 이상의 의미를 가집니다. 컴포넌트 트리의 각 노드가 어디에서 실행되어야 하는지를 <strong>의도적으로 설계</strong>하는 새로운 사고 방식입니다.</p>
+
+            <p>핵심은 서버/클라이언트 경계를 최대한 낮게 내리고, 데이터는 서버에서, 인터랙션은 클라이언트에서 처리하는 것입니다. 이 원칙만 지키면 번들 크기 감소와 성능 향상을 자연스럽게 얻을 수 있습니다.</p>
+
+            <hr>
+
+            <p>관련 글: <a href="#">Next.js App Router 캐싱 전략 A to Z</a></p>
+          </div>
+
+        </article>
+
+        <!-- ═══ Tags (bottom repeat) ═══ -->
+        <div class="flex flex-wrap gap-1.5 mt-8 mb-6">
+          <a href="/tags/react" class="post-tag">#React</a>
+          <a href="/tags/rsc" class="post-tag">#RSC</a>
+          <a href="/tags/nextjs" class="post-tag">#Next.js</a>
+          <a href="/tags/architecture" class="post-tag">#Architecture</a>
+          <a href="/tags/performance" class="post-tag">#Performance</a>
+        </div>
+
+        <!-- ═══ Author Box ═══ -->
+        <div class="author-box reveal" style="animation-delay:150ms">
+          <div class="author-avatar">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='80' rx='30' ry='22' fill='%2394a3b8'/%3E%3C/svg%3E" alt="pyosh" loading="lazy" decoding="async">
+          </div>
+          <div>
+            <div class="author-name">pyosh</div>
+            <div class="author-bio">프론트엔드 개발자. React, TypeScript, 그리고 좋은 코드에 대해 고민합니다.</div>
+          </div>
+        </div>
+
+        <!-- ═══ Related Posts ═══ -->
+        <section class="mt-10 reveal" style="animation-delay:200ms" aria-label="관련 글">
+          <div class="related-section-title">
+            <iconify-icon icon="solar:document-text-linear" width="16" style="color:var(--text3)"></iconify-icon>
+            관련 글
+          </div>
+          <div class="related-scroll">
+            <a href="#" class="related-card">
+              <div class="related-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="TypeScript 코드 스니펫" loading="lazy" decoding="async">
+              </div>
+              <div class="related-info">
+                <div class="related-info-title">TypeScript 5.x 패턴 매칭 완전 정복</div>
+              </div>
+            </a>
+            <a href="#" class="related-card">
+              <div class="related-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="Next.js 캐시 레이어 다이어그램" loading="lazy" decoding="async">
+              </div>
+              <div class="related-info">
+                <div class="related-info-title">Next.js App Router 캐싱 전략 A to Z</div>
+              </div>
+            </a>
+            <a href="#" class="related-card">
+              <div class="related-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="상태 관리 비교 차트" loading="lazy" decoding="async">
+              </div>
+              <div class="related-info">
+                <div class="related-info-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div>
+              </div>
+            </a>
+            <a href="#" class="related-card">
+              <div class="related-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="CSS Container Queries 비교" loading="lazy" decoding="async">
+              </div>
+              <div class="related-info">
+                <div class="related-info-title">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</div>
+              </div>
+            </a>
+            <a href="#" class="related-card">
+              <div class="related-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'%3E%3Crect width='4' height='3' fill='%23f1f5f9'/%3E%3C/svg%3E" alt="Vitest 테스트 코드" loading="lazy" decoding="async">
+              </div>
+              <div class="related-info">
+                <div class="related-info-title">Vitest 모킹 패턴 8가지</div>
+              </div>
+            </a>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══ Delete Confirmation Modal ═══ -->
+  <div id="deleteModal" class="modal-overlay" onclick="if(event.target===this)closeModal('deleteModal')">
+    <div class="modal-content">
+      <h3 style="font-size:1rem;font-weight:700;color:var(--text1);margin-bottom:12px;">글 삭제</h3>
+      <p style="font-size:.875rem;color:var(--text2);line-height:1.6;margin-bottom:20px;">
+        "React Server Components 실전 가이드 - 서버와 클라이언트의 경계를 설계하는 방법"을 삭제하시겠습니까?
+      </p>
+      <div style="font-size:.813rem;color:var(--yellow1);display:flex;align-items:flex-start;gap:6px;padding:10px 12px;border-radius:8px;background:rgba(255,190,61,.08);margin-bottom:20px;">
+        <iconify-icon icon="solar:danger-triangle-linear" width="16" style="flex-shrink:0;margin-top:1px;"></iconify-icon>
+        삭제된 글은 휴지통으로 이동됩니다.
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button class="btn-secondary" onclick="closeModal('deleteModal')">취소</button>
+        <button class="btn-danger" onclick="closeModal('deleteModal')">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    function getPreferredTheme(){
+      const stored=localStorage.getItem('theme');
+      if(stored) return stored;
+      return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    function applyTheme(theme){
+      document.body.setAttribute('data-theme',theme);
+      localStorage.setItem('theme',theme);
+      document.getElementById('sunIcon').style.display=theme==='dark'?'none':'';
+      document.getElementById('moonIcon').style.display=theme==='dark'?'':'none';
+    }
+    function toggleTheme(){
+      applyTheme((document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+    }
+    applyTheme(getPreferredTheme());
+
+    // ─── Sidebar ───
+    function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
+    function openMobileSidebar(){
+      document.getElementById('sidebar').classList.add('mobile-open');
+      document.getElementById('sidebarOverlay').classList.remove('hidden');
+      document.body.style.overflow='hidden';
+    }
+    function closeMobileSidebar(){
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+      document.body.style.overflow='';
+    }
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'&&document.getElementById('sidebar').classList.contains('mobile-open'))closeMobileSidebar();
+    });
+
+    // ─── Staggered Reveal ───
+    const revealObserver=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}
+      });
+    },{threshold:0.08,rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('.reveal-stagger').forEach((el,i)=>{
+      el.style.animationDelay=`${i*80}ms`;
+      revealObserver.observe(el);
+    });
+
+    // ─── Modal ───
+    function openModal(id){document.getElementById(id).classList.add('open');}
+    function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+    // ─── Toggle Visibility ───
+    function toggleVisibility(el){
+      el.classList.toggle('active');
+      const label=el.closest('.toggle-group');
+      const span=label.querySelector('span');
+      if(el.classList.contains('active')){
+        span.textContent='공개';
+        label.classList.add('active-label');
+      }else{
+        span.textContent='비공개';
+        label.classList.remove('active-label');
+      }
+    }
+
+    // ─── Status Dropdown ───
+    function setStatus(option,status){
+      const dropdown=option.closest('.custom-select');
+      const trigger=dropdown.querySelector('.custom-select-trigger');
+      const valueEl=trigger.querySelector('.custom-select-value');
+      // Remove all badge classes
+      trigger.className=trigger.className.replace(/badge-\w+/g,'').trim();
+      // Add new badge class
+      const classMap={published:'badge-published',draft:'badge-draft',archived:'badge-archived'};
+      trigger.classList.add(classMap[status]);
+      valueEl.textContent=option.textContent;
+      // Update selected state
+      dropdown.querySelectorAll('.custom-select-option').forEach(o=>o.classList.remove('selected'));
+      option.classList.add('selected');
+      dropdown.classList.remove('open');
+    }
+
+    // ─── Custom Select ───
+    document.querySelectorAll('.custom-select').forEach(select=>{
+      const trigger=select.querySelector('.custom-select-trigger');
+      trigger.addEventListener('click',e=>{
+        e.stopPropagation();
+        document.querySelectorAll('.custom-select.open').forEach(s=>{if(s!==select)s.classList.remove('open');});
+        select.classList.toggle('open');
+      });
+    });
+    document.addEventListener('click',()=>{
+      document.querySelectorAll('.custom-select.open').forEach(s=>s.classList.remove('open'));
+    });
+
+    // ─── Code Copy ───
+    function copyCode(btn){
+      const code=btn.closest('.code-block').querySelector('code');
+      navigator.clipboard.writeText(code.textContent).then(()=>{
+        const orig=btn.innerHTML;
+        btn.innerHTML='<iconify-icon icon="solar:check-circle-linear" width="12"></iconify-icon> 복사됨';
+        setTimeout(()=>{btn.innerHTML=orig;},1500);
+      });
+    }
+  </script>
+</body>
+</html>
