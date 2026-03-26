@@ -1,5 +1,24 @@
 # Server Progress - 2026-03-26
 
+## Issue #39 - Production security settings (PR #57)
+
+**Status**: Merged
+
+### What was done
+
+Implemented production security hardening across five plugin files and one route file.
+
+- `session.ts`: added `httpOnly: true`, `path: '/'`, `sameSite: 'lax'` (uniform across environments; `strict` avoided because OAuth provider redirects would drop the cookie on a cross-site navigation), `secure` bound to `NODE_ENV === 'production'`
+- `cors.ts`: added explicit `methods`, `allowedHeaders` (including `X-CSRF-Token`), and `maxAge` (7200 in production, 0 in development)
+- `helmet.ts`: set `contentSecurityPolicy: false` - CSP responsibility delegated to Next.js client; removed unused `NodeEnv` import
+- `swagger.ts`: early return when `NODE_ENV === 'production'` so `/docs` is not registered in production
+- `app.ts`: consolidated all `/api/admin/*` routes into a single sub-plugin with an `onRequest` hook that calls `csrfProtection` for any method not in `{GET, HEAD, OPTIONS, TRACE}`; sub-prefixes within the admin plugin mirror the original `/api/admin` structure
+- `asset.route.ts`: added `onRequest: fastify.csrfProtection` to `POST /api/assets/upload`
+
+### Review notes
+
+Round 2 raised a critical issue: `sameSite: 'strict'` breaks OAuth callbacks because browsers withhold strict-samesite cookies on cross-site redirects from OAuth providers. Fixed by using `'lax'` uniformly. Round 1 raised that the CSRF hook should use a safe-methods set (`GET, HEAD, OPTIONS, TRACE`) rather than only excluding `GET`.
+
 ## Issue #38 - User API (PR #58)
 
 **Status**: Merged
