@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-27 | Issue #42 Stats API: POST /api/stats/view (postId 선택적, KST 날짜, CSRF, rate limit), GET /api/stats/popular, GET /api/stats/total-views, GET /api/admin/stats/dashboard (postsByStatus), postId=0 센티넬 전략(MySQL NULL unique bug), NOT NULL 마이그레이션, 13개 통합 테스트 + PR #59 머지 | ✅   |
 | 2026-03-27 | Issue #43 SEO endpoints: sitemap.xml + rss.xml integration tests (14 tests); implementation was already on main + PR #60 머지 | ✅   |
 | 2026-03-26 | Issue #39 Production security: httpOnly/sameSite-lax/secure cookies, CORS methods+headers+maxAge, admin CSRF sub-plugin (safe-methods set), Swagger prod disable, Helmet CSP false + PR #57 머지 | ✅   |
 | 2026-03-26 | Issue #38 User API: GET/PUT/DELETE /api/user/me with requireAuth; soft delete + session destroy; deleted-user masking in comments/guestbook + PR #58 머지 | ✅   |
@@ -62,6 +63,7 @@
 - [progress.2026-02-16.md](./progress/progress.2026-02-16.md) - Stats + SEO(Sitemap/RSS) 구현 및 task/findings 반영
 - [progress.2026-02-19.md](./progress/progress.2026-02-19.md) - Task 03 테스트 인프라 설정
 - [progress.2026-02-20.md](./progress/progress.2026-02-20.md) - Task 06/07 및 Task 08 이후 lint fix 작업
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - Issue #42 Stats API 4개 엔드포인트 구현 + postId=0 센티넬 전략 + PR #59 머지
 - [progress.2026-02-22.md](./progress/progress.2026-02-22.md) - E1 관리자 setup 제거, E6 /api/user 구현, E2 thumbnailUrl 전환, E4 Tag API 제거, E3 categories slug 제거
 
 ## 📊 최종 성과
