@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-26 | Issue #32 Logging and error management: prod multistream(stdout+error.log), req body 마스킹, test disableRequestLogging, discriminated union 타입 + PR #50 머지 | ✅   |
 | 2026-03-26 | Issue #31 Auth system: OAuth 전략/라우트 env 조건부 등록, `optionalAuth` null 명시, `user` 타입 확장 + PR #51 머지 | ✅   |
 | 2026-03-26 | Issue #29 DB schema + migrations: `post_tb` 5개 컬럼 추가(summary, description, commentStatus, isPinned, contentModifiedAt) + migration 0004 + PR #49 머지 | ✅   |
 | 2026-03-26 | Issue #28 Env Zod validation: `Object.freeze()` 추가, `constants/env.ts` 삭제, `.env.example` 갱신 + PR #48 머지 | ✅   |

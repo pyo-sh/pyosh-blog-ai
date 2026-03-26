@@ -1,5 +1,36 @@
 # Server Progress - 2026-03-26
 
+## Issue #32 - Logging and error management (PR #50)
+
+**Status**: Merged
+
+### What was done
+
+Implemented Pino logging configuration per environment, sensitive data masking for request body, and production multistream output.
+
+- Added `pino ^10.3.0` as a direct dependency (was previously only available as a transitive dep via fastify)
+- `src/plugins/logger.ts`:
+  - `buildFastifyLoggerConfig()` - env-aware Fastify constructor config: returns `loggerInstance` in prod, `logger` options in dev/test
+  - `buildProdLoggerInstance()` - creates pino logger with multistream: stdout (info+) + `logs/error.log` (error only via `LOG_FILE` env var or `process.cwd()/logs/error.log`); `mkdirSync` creates the logs dir before `pino.destination()`; `process.once('exit')` flush handler to avoid async buffer loss
+  - `REQ_SERIALIZER` - custom req serializer that explicitly excludes request body (protects password, guestPassword, guestEmail fields)
+  - `REDACT_PATHS` - shared constant for header masking (authorization, cookie, set-cookie) used by both dev/prod options
+  - `FastifyLoggerConfig` discriminated union type - ensures `logger | loggerInstance` is always present, catches future regressions at compile time
+  - `disableRequestLogging: true` added for test env
+  - `buildLoggerOptions()` unexported (internal detail, `buildFastifyLoggerConfig` is the public API)
+- `src/app.ts`: spread `buildFastifyLoggerConfig()` into Fastify constructor
+
+Existing implementations that were already correct (no changes needed):
+- Global error handler: 500 errors log stack trace + request context, response body is "An unexpected error occurred"
+- `HttpError` classification (400/401/403/404/409/413/429/500)
+- Health endpoints (`/health`, `/api/health/live`, `/api/health/ready`)
+- `logs/` directory in `.gitignore`
+
+### Review outcome
+
+Round 1: 1 critical, 2 warning, 1 suggestion. Critical: `logs/` dir not created - ENOENT crash at prod startup. Warning 1: relative log path fragile in containers. Warning 2: async pino.destination buffer loss on crash. All fixed.
+
+Round 2: 0 critical, 0 warning, 2 suggestion. Suggestion 1: `process.once` instead of `process.on`. Suggestion 2: discriminated union return type. Both applied and merged without re-review.
+
 ## Issue #29 - DB schema + migrations (PR #49)
 
 **Status**: Merged
