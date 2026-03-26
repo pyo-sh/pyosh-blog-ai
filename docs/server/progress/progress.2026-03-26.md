@@ -1,5 +1,25 @@
 # Server Progress - 2026-03-26
 
+## Issue #36 - Tags API (PR #55)
+
+**Status**: Merged
+
+### What was done
+
+`GET /api/tags` was already fully implemented on `main` from PR #18 (issue #14). All 5 acceptance criteria were already met:
+
+- Route handler in `src/routes/tags/tag.route.ts`
+- `TagService.getPublicTagsWithCount()` in `src/routes/tags/tag.service.ts` - filters by `status=published`, `visibility=public`, `deletedAt IS NULL` via innerJoin; excludes tags with postCount=0 implicitly
+- Zod schemas in `src/routes/tags/tag.schema.ts`
+- Route registered at `/api/tags` in `src/app.ts`
+- 2 integration tests in `test/routes/tags.test.ts`
+
+Added one missing test case: empty database returns `{ tags: [] }`.
+
+### Review outcome
+
+Clean (0 critical, 0 warning, 0 suggestion). Approved and auto-merged.
+
 ## Issue #37 - Posts public API (PR #54)
 
 **Status**: Merged
