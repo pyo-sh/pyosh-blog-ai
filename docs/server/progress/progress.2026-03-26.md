@@ -1,5 +1,32 @@
 # Server Progress - 2026-03-26
 
+## Issue #38 - User API (PR #58)
+
+**Status**: Merged
+
+### What was done
+
+Implemented OAuth user profile management endpoints under `/api/user/me`, all protected by the `requireAuth` preHandler hook. The implementation was already on `main` from earlier migration work; this PR formalised it through the pipeline and fixed lint issues.
+
+**Files:**
+- `src/routes/user/user.route.ts` - GET/PUT/DELETE `/me` handlers with `requireAuth`; PUT body uses `fastify-type-provider-zod`-validated `request.body` directly (no redundant re-parse); 404 added to all response schemas for OpenAPI completeness
+- `src/routes/user/user.service.ts` - `UserService`: `getMyProfile`, `updateMyProfile` (partial update, supports `avatarUrl: null`), `deleteMyAccount` (soft delete: sets `deletedAt`), `isActive` (internal util)
+- `src/routes/user/user.schema.ts` - `UpdateMyProfileBodySchema` (displayName 1-100, avatarUrl URL or null, both optional), `UserProfileResponseSchema` (excludes providerUserId and deletedAt)
+- `test/routes/user.test.ts` - Integration tests: GET/PUT/DELETE happy paths, 401 on unauthenticated, avatarUrl null removal, empty body no-op, session destroyed after DELETE, deleted-user comment/guestbook masking
+
+Deleted-user data retention: `comment.service.ts` and `guestbook.service.ts` already masked deleted OAuth accounts as "탈퇴한 사용자" (author id and avatarUrl omitted).
+
+### Key design decisions
+
+- Soft delete only: `deletedAt` is set; no rows are removed. Comments and guestbook entries are preserved and displayed with author "탈퇴한 사용자"
+- Session destroyed synchronously after soft delete via `request.session.destroy()` - same request, no async gap
+- `UserProfileResponseSchema` explicitly excludes `providerUserId` and `deletedAt` to avoid leaking sensitive/internal fields
+- PUT handler skips the Drizzle UPDATE entirely when `updateData` is empty (no-op path returns existing row immediately)
+
+### Review outcome
+
+1 round. 0 critical, 0 warning, 2 suggestions. Suggestions applied (removed redundant `UpdateMyProfileBodySchema.parse(request.body)` in PUT handler; added 404 to GET/PUT/DELETE response schemas). Merged without re-review.
+
 ## Issue #33 - Assets API (PR #56)
 
 **Status**: Merged

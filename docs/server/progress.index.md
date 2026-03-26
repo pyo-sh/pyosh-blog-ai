@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-26 | Issue #38 User API: GET/PUT/DELETE /api/user/me with requireAuth; soft delete + session destroy; deleted-user masking in comments/guestbook + PR #58 머지 | ✅   |
 | 2026-03-26 | Issue #33 Assets API: upload (multipart), list, get, delete, bulk delete; FileStorageService (stream buffering pattern, FST_REQ_FILE_TOO_LARGE handling, image-size) + PR #56 머지 | ✅   |
 | 2026-03-26 | Issue #34 Categories API: GET tree with post counts, POST, PATCH /tree (batch + cycle detection), PATCH /:id, DELETE (action=move/trash), nullable categoryId migration + PR #52 머지 | ✅   |
 | 2026-03-26 | Issue #36 Tags API: GET /api/tags already implemented on main; added empty-state test + PR #55 머지 | ✅   |
