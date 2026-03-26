@@ -1,5 +1,29 @@
 # Server Progress - 2026-03-26
 
+## Issue #29 - DB schema + migrations (PR #49)
+
+**Status**: Merged
+
+### What was done
+
+Completed the Drizzle ORM schema definition for all active tables and brought `post_tb` in line with the spec.
+
+- 11 tables defined in `src/db/schema/`: `admin_tb`, `oauth_account_tb`, `session_tb`, `asset_tb`, `category_tb`, `tag_tb`, `post_tb`, `post_tag_tb`, `comment_tb`, `guestbook_entry_tb`, `stats_daily_tb`
+- `user_tb` and `image_tb` were created in migration 0000 and dropped in migration 0001 - intentionally absent from the Drizzle schema code
+- Added 5 missing `post_tb` columns: `summary varchar(200)`, `description varchar(300)`, `comment_status enum('open','locked','disabled')`, `is_pinned boolean`, `content_modified_at timestamp`
+- Created `drizzle/0004_post_tb_extend.sql` with ALTER TABLE statements for all 5 columns
+- Updated `drizzle/meta/_journal.json` and created `drizzle/meta/0004_snapshot.json`
+- Updated Zod schemas: `CreatePostBodySchema`, `UpdatePostBodySchema`, `PostDetailSchema`
+- Updated `CreatePostInput` and `UpdatePostInput` service interfaces
+- Added `contentModifiedAt` auto-tracking in `updatePost` - set to `new Date()` when `contentMd` is changed
+- Applied `.min(1)` validation to `summary`/`description` in both create and update schemas
+
+### Review outcome
+
+Round 1: 0 critical, 1 warning, 1 suggestion. Warning: `contentModifiedAt` had no write path. Applied automatic tracking on `contentMd` change. Added `.min(1)` to create-side `summary`/`description`.
+
+Round 2: 0 critical, 0 warning, 1 suggestion. Suggestion: `UpdatePostBodySchema` missing `.min(1)` for `summary`/`description`. Applied and merged without re-review.
+
 ## Issue #30 - App bootstrap + health check (PR #47)
 
 **Status**: Merged
