@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog - 방명록</title>
+  <meta name="description" content="방명록 페이지 와이어프레임 (F-09)">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+                  fontFamily: {
+          sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        },
+                  colors: {
+          bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+          tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+          bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+          primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+          secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+          info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+          positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+          negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+          grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+          yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+          'code-surface': 'var(--code-surface)',
+        },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+    .reveal-stagger{opacity:0}
+    .reveal-stagger.visible{animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Nav ═══ */
+    .nav-glass{background:rgba(249,249,250,.80);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border-bottom:1px solid rgba(219,221,224,.50);box-shadow:0 1px 0 rgba(255,255,255,.05)}
+    body[data-theme="dark"] .nav-glass{background:rgba(19,20,21,0.85);border-bottom-color:rgba(62,66,69,.50);box-shadow:0 1px 0 rgba(0,0,0,.15)}
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]) .nav-glass{background:rgba(19,20,21,0.85);border-bottom-color:rgba(62,66,69,.50);box-shadow:0 1px 0 rgba(0,0,0,.15)}}
+    .theme-toggle{transition:transform .4s cubic-bezier(.16,1,.3,1)}
+    .theme-toggle:hover{transform:rotate(30deg) scale(1.1)}
+
+    /* ═══ Layout ═══ */
+    .layout-wrapper{display:flex;gap:0}
+    .sidebar-desktop{display:none;width:240px;flex-shrink:0}
+    .main-content{flex:1;min-width:0}
+    @media(min-width:1080px){.layout-wrapper{gap:16px}.sidebar-desktop{display:block}.hamburger-btn{display:none !important}}
+
+    /* ═══ Sidebar ═══ */
+    .sidebar-inner{position:sticky;top:70px}
+    .sidebar-section{padding:16px 0;border-bottom:1px solid var(--border4)}
+    .sidebar-section:last-child{border-bottom:none}
+    .sidebar-section-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text4);margin-bottom:10px}
+    .sidebar-tab{padding:4px 12px;border-radius:6px;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text3);background:transparent}
+    .sidebar-tab.active{background:rgba(138,111,224,.12);color:var(--primary1);font-weight:600}
+    .sidebar-tab:hover:not(.active){color:var(--text2)}
+    .sidebar-post{display:block;padding:6px 0}
+    .sidebar-post:hover .sidebar-post-title{color:var(--primary1)}
+    .sidebar-post-title{font-size:.813rem;font-weight:500;color:var(--text2);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s}
+    .sidebar-post-date{font-size:.688rem;color:var(--text4);margin-top:2px}
+    .cat-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;cursor:pointer;transition:color .2s;font-size:.813rem;color:var(--text2)}
+    .cat-item:hover{color:var(--primary1)}
+    .cat-count{font-size:.688rem;color:var(--text4)}
+    .cat-children{padding-left:14px;overflow:hidden;max-height:0;transition:max-height .3s cubic-bezier(.16,1,.3,1)}
+    .cat-children.open{max-height:500px}
+    .cat-toggle{transition:transform .25s cubic-bezier(.16,1,.3,1);color:var(--text4);flex-shrink:0}
+    .cat-toggle.open{transform:rotate(90deg)}
+    .sidebar-tag{display:inline-flex;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:500;transition:all .2s;cursor:pointer;border:1px solid var(--border3);color:var(--text3)}
+    .sidebar-tag:hover{border-color:var(--primary1);color:var(--primary1);background:rgba(138,111,224,.06)}
+    .view-counter{font-family:'Outfit','Gothic A1',sans-serif;font-size:1.5rem;font-weight:700;color:var(--text1);letter-spacing:-.02em}
+
+    /* ═══ Mobile Sidebar ═══ */
+    .mobile-overlay{position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s}
+    .mobile-overlay.open{opacity:1;pointer-events:auto}
+    .mobile-sidebar{position:fixed;top:0;right:0;bottom:0;z-index:46;width:min(320px,85vw);background:var(--background1);transform:translateX(100%);transition:transform .35s cubic-bezier(.16,1,.3,1);overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.1);padding:0 20px 32px}
+    .mobile-sidebar.open{transform:translateX(0)}
+    .mobile-sidebar-header{display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:2;background:var(--background1)}
+    .mobile-sidebar-close{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:background .2s}
+    .mobile-sidebar-close:hover{background:var(--background3)}
+
+    /* ═══ Demo Switcher ═══ */
+    .demo-tab{padding:5px 14px;border-radius:8px;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text3);border:1px solid transparent;background:transparent;white-space:nowrap}
+    .demo-tab.active{background:var(--background2);color:var(--text1);border-color:var(--border3);font-weight:600}
+    .demo-tab:hover:not(.active){color:var(--text2);background:var(--background2)}
+
+    /* ═══ Guestbook Form ═══ */
+    .form-input{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border3);background:var(--background1);color:var(--text1);font-size:.875rem;outline:none;transition:border-color .2s,box-shadow .2s;font-family:'Gothic A1',sans-serif}
+    .form-input::placeholder{color:var(--text4)}
+    .form-input:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,.12)}
+    .form-textarea{resize:vertical;min-height:96px;line-height:1.6}
+    .form-submit{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;background:var(--primary1);color:var(--background1);border:none}
+    .form-submit:hover{background:var(--secondary1);transform:translateY(-1px)}
+    .form-submit:active{transform:translateY(0)}
+    .form-label{display:block;font-size:.75rem;font-weight:600;color:var(--text3);margin-bottom:5px;letter-spacing:.02em}
+    .secret-check{display:flex;align-items:center;gap:7px;font-size:.813rem;color:var(--text3);cursor:pointer;user-select:none}
+    .secret-check input[type="checkbox"]{width:15px;height:15px;accent-color:var(--primary1);cursor:pointer;flex-shrink:0}
+
+    /* ═══ Guestbook Entry ═══ */
+    .entry-item{padding:20px 0;border-bottom:1px solid var(--border4)}
+    .entry-item:last-child{border-bottom:none}
+    .entry-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.813rem;font-weight:700;flex-shrink:0}
+    .entry-delete-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:7px;font-size:.75rem;font-weight:500;color:var(--text4);background:transparent;border:none;cursor:pointer;transition:all .2s}
+    .entry-delete-btn:hover{color:var(--negative1);background:rgba(226,18,35,.08)}
+    .entry-secret-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:.688rem;font-weight:600;background:rgba(138,111,224,.10);color:var(--primary1)}
+    .entry-secret-body{display:flex;align-items:center;gap:6px;padding:12px 14px;border-radius:10px;background:var(--background2);font-size:.875rem;color:var(--text4);font-style:italic}
+    .entry-deleted-body{display:flex;align-items:center;gap:6px;font-size:.875rem;color:var(--text4);font-style:italic}
+    .oauth-chip{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:5px;font-size:.688rem;font-weight:600;background:rgba(141,158,255,.10);color:var(--info1);margin-left:4px}
+
+    /* ═══ Pagination ═══ */
+    .page-btn{transition:all .25s cubic-bezier(.16,1,.3,1)}
+    .page-btn:hover:not(:disabled):not(.active){transform:scale(1.08)}
+    .page-btn:active:not(:disabled){transform:scale(.95)}
+
+    /* ═══ Modal ═══ */
+    .modal-overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .25s}
+    .modal-overlay.open{opacity:1;pointer-events:auto}
+    .modal-box{background:var(--background1);border-radius:1.25rem;padding:28px 28px 24px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2);transform:translateY(8px) scale(.97);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+    .modal-overlay.open .modal-box{transform:translateY(0) scale(1)}
+    .modal-btn{padding:9px 20px;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;border:none}
+    .modal-btn-cancel{background:var(--background3);color:var(--text2)}
+    .modal-btn-cancel:hover{background:var(--background4)}
+    .modal-btn-delete{background:var(--negative2);color:var(--background1)}
+    .modal-btn-delete:hover{background:var(--negative1)}
+
+    /* ═══ Empty State ═══ */
+    .empty-state-box{border-radius:2rem;border:2px dashed var(--border3);background:var(--background2);padding:4rem 2rem;text-align:center}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+  
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    .text-h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    .text-h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    .text-h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    .text-h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    .text-h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-display-xl{font-size:4.4rem;line-height:5.469rem;font-weight:900}
+    .text-display-lg{font-size:4rem;line-height:5rem;font-weight:900}
+    .text-display-md{font-size:3.6rem;line-height:4.5rem;font-weight:900}
+    .text-display-base{font-size:3.2rem;line-height:4.031rem;font-weight:900}
+    .text-display-sm{font-size:2.8rem;line-height:3.469rem;font-weight:900}
+    .text-display-xs{font-size:2.4rem;line-height:3rem;font-weight:900}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+  </style>
+</head>
+<body class="min-h-[100dvh] antialiased">
+
+  <!-- ═══ Navigation ═══ -->
+  <nav class="nav-glass fixed top-0 left-0 right-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14">
+        <a href="/" class="flex items-center gap-2" aria-label="pyosh blog 홈">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-7 h-7" style="fill:var(--primary1)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+          <span class="text-body-sm font-bold tracking-tight" style="color:var(--text1)">pyosh blog</span>
+        </a>
+        <div class="flex items-center gap-1">
+          <button class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="검색">
+            <iconify-icon icon="solar:magnifer-linear" width="18"></iconify-icon>
+          </button>
+          <button id="themeToggle" class="theme-toggle w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="테마 전환">
+            <iconify-icon icon="solar:sun-2-linear" width="18" class="sun-icon"></iconify-icon>
+            <iconify-icon icon="solar:moon-linear" width="18" class="moon-icon" style="display:none"></iconify-icon>
+          </button>
+          <button id="hamburgerBtn" class="hamburger-btn w-9 h-9 rounded-lg flex items-center justify-center hover:bg-bg-3 transition-colors" style="color:var(--text3)" aria-label="메뉴 열기">
+            <iconify-icon icon="solar:hamburger-menu-linear" width="20"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="h-14"></div>
+
+  <!-- ═══ 2-Column Layout ═══ -->
+  <div class="layout-wrapper max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    <!-- ─── Desktop Sidebar ─── -->
+    <aside class="sidebar-desktop" aria-label="사이드바">
+      <div class="sidebar-inner pr-8 pt-8 pb-16">
+        <div class="sidebar-section" style="padding-top:0">
+          <div class="flex items-center gap-1 mb-3">
+            <button class="sidebar-tab active" data-tab="recent" onclick="switchTab('recent')">최근글</button>
+            <button class="sidebar-tab" data-tab="popular" onclick="switchTab('popular')">인기글</button>
+          </div>
+          <div id="recentList">
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">2026. 3. 17.</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Container Queries로 진짜 컴포넌트 기반 반응형 만들기</div><div class="sidebar-post-date">2026. 3. 14.</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">2026. 3. 12.</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Node.js Stream 백프레셔를 이해하면 보이는 것들</div><div class="sidebar-post-date">2026. 3. 10.</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Vitest 모킹 패턴 8가지</div><div class="sidebar-post-date">2026. 3. 8.</div></a>
+          </div>
+          <div id="popularList" style="display:none">
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">React Server Components 실전 가이드</div><div class="sidebar-post-date">조회 3,847</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">조회 2,341</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">TypeScript 5.x 패턴 매칭 완전 정복</div><div class="sidebar-post-date">조회 2,156</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Docker 멀티스테이지 빌드로 이미지 87% 감량</div><div class="sidebar-post-date">조회 2,089</div></a>
+            <a href="#" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">조회 1,923</div></a>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title flex items-center gap-1.5"><iconify-icon icon="solar:folder-2-linear" width="13"></iconify-icon>분류 전체보기 (47)</div>
+          <div>
+            <div>
+              <div class="cat-item" onclick="toggleCategory(this)"><span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Frontend</span><span class="cat-count">23</span></div>
+              <div class="cat-children"><a href="#" class="cat-item" style="padding-left:4px"><span>React</span><span class="cat-count">12</span></a><a href="#" class="cat-item" style="padding-left:4px"><span>Next.js</span><span class="cat-count">6</span></a></div>
+            </div>
+            <div>
+              <div class="cat-item" onclick="toggleCategory(this)"><span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Backend</span><span class="cat-count">14</span></div>
+              <div class="cat-children"><a href="#" class="cat-item" style="padding-left:4px"><span>Node.js</span><span class="cat-count">8</span></a></div>
+            </div>
+            <a href="#" class="cat-item"><span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">DevOps</span><span class="cat-count">6</span></a>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="sidebar-section-title flex items-center gap-1.5" style="margin-bottom:0"><iconify-icon icon="solar:tag-linear" width="13"></iconify-icon>태그</div>
+            <a href="/tags" class="text-ui-xs font-medium hover:underline underline-offset-4 flex items-center gap-0.5" style="color:var(--primary1)">전체보기 <iconify-icon icon="solar:alt-arrow-right-linear" width="10"></iconify-icon></a>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <a href="#" class="sidebar-tag">#React</a><a href="#" class="sidebar-tag">#Next.js</a><a href="#" class="sidebar-tag">#TypeScript</a><a href="#" class="sidebar-tag">#CSS</a><a href="#" class="sidebar-tag">#Node.js</a><a href="#" class="sidebar-tag">#Docker</a><a href="#" class="sidebar-tag">#Testing</a><a href="#" class="sidebar-tag">#PostgreSQL</a>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title flex items-center gap-1.5"><iconify-icon icon="solar:eye-linear" width="13"></iconify-icon>블로그 조회수</div>
+          <div class="view-counter">128,347</div>
+          <div class="text-ui-xs mt-0.5" style="color:var(--text4)">Total Visitors</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ─── Main Content ─── -->
+    <main class="main-content pt-8 pb-16">
+
+      <!-- Demo Switcher -->
+      <div class="mb-7 reveal" style="animation-delay:80ms">
+        <div class="flex items-center gap-1 flex-wrap">
+          <button class="demo-tab active" data-view="guest" onclick="switchView('guest')">게스트 (비로그인)</button>
+          <button class="demo-tab" data-view="oauth" onclick="switchView('oauth')">OAuth (로그인)</button>
+          <span class="mx-1 text-ui-xs" style="color:var(--border3)">|</span>
+          <button class="demo-tab" data-view="empty" onclick="switchView('empty')">빈 상태</button>
+        </div>
+      </div>
+
+      <!-- ─── 공통: 페이지 헤더 ─── -->
+      <header class="mb-6 reveal" style="animation-delay:120ms">
+        <div class="flex items-baseline justify-between gap-4 flex-wrap">
+          <h1 class="text-body-lg sm:text-h1 font-bold tracking-tight break-keep" style="color:var(--text1)">방명록</h1>
+          <span class="text-body-sm" style="color:var(--text4)" id="guestbook-count">총 42개 방명록</span>
+        </div>
+        <div class="mt-4 h-px" style="background:var(--border4)"></div>
+      </header>
+
+      <!-- ─── View: 게스트 (비로그인) ─── -->
+      <div id="view-guest">
+
+        <!-- 작성 폼 - 게스트 -->
+        <section class="mb-8 reveal" aria-label="방명록 작성" style="animation-delay:160ms">
+          <div class="rounded-2xl border p-5 sm:p-6" style="border-color:var(--border3);background:var(--background2)">
+            <!-- 3열 그리드: 이름 / 이메일 / 비밀번호 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <div>
+                <label class="form-label">이름 <span style="color:var(--negative1)">*</span></label>
+                <input type="text" class="form-input" placeholder="이름을 입력하세요" autocomplete="name">
+              </div>
+              <div>
+                <label class="form-label">이메일</label>
+                <input type="email" class="form-input" placeholder="이메일 (선택)" autocomplete="email">
+              </div>
+              <div>
+                <label class="form-label">비밀번호 <span style="color:var(--negative1)">*</span></label>
+                <input type="password" class="form-input" placeholder="삭제 시 필요합니다">
+              </div>
+            </div>
+            <!-- 본문 -->
+            <div class="mb-3">
+              <label class="form-label">내용 <span style="color:var(--negative1)">*</span></label>
+              <textarea class="form-input form-textarea" placeholder="방명록을 남겨주세요 (최대 2,000자)"></textarea>
+            </div>
+            <!-- 하단: 비밀글 + 작성 버튼 -->
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <label class="secret-check">
+                <input type="checkbox">
+                <iconify-icon icon="solar:lock-linear" width="14" style="color:var(--text4)"></iconify-icon>
+                비밀글
+              </label>
+              <button class="form-submit">
+                <iconify-icon icon="solar:pen-linear" width="15"></iconify-icon>
+                작성하기
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 방명록 목록 -->
+        <section aria-label="방명록 목록">
+          <div>
+
+            <!-- 항목 1: OAuth 사용자, 본인 (삭제 버튼 있음) -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:rgba(138,111,224,.15);color:var(--primary1)">P</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-body-sm" style="color:var(--text1)">pyosh</span>
+                      <span class="oauth-chip"><iconify-icon icon="solar:user-check-linear" width="10"></iconify-icon>OAuth</span>
+                      <span class="text-ui-xs" style="color:var(--text4)">방금 전</span>
+                    </div>
+                    <button class="entry-delete-btn" onclick="openModal('oauth-modal')" aria-label="방명록 삭제">
+                      <iconify-icon icon="solar:trash-bin-2-linear" width="13"></iconify-icon>
+                      삭제
+                    </button>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">블로그 잘 보고 있습니다! 항상 유익한 글 감사해요. 특히 Next.js 관련 글들이 실무에 많이 도움이 됐어요. 앞으로도 좋은 글 많이 부탁드려요.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 항목 2: 게스트, 일반 -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text3)">김</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="font-semibold text-body-sm" style="color:var(--text1)">김개발</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">3분 전</span>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">TypeScript 패턴 매칭 글 정말 잘 읽었습니다. 실무에서 바로 적용해봤는데 코드가 훨씬 깔끔해졌어요!</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 항목 3: 비밀글, 본인 (내용 보임) -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:rgba(138,111,224,.15);color:var(--primary1)">이</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-body-sm" style="color:var(--text1)">이진화</span>
+                      <span class="oauth-chip"><iconify-icon icon="solar:user-check-linear" width="10"></iconify-icon>OAuth</span>
+                      <span class="entry-secret-badge"><iconify-icon icon="solar:lock-bold" width="10"></iconify-icon>비밀글</span>
+                      <span class="text-ui-xs" style="color:var(--text4)">1시간 전</span>
+                    </div>
+                    <button class="entry-delete-btn" onclick="openModal('oauth-modal')" aria-label="방명록 삭제">
+                      <iconify-icon icon="solar:trash-bin-2-linear" width="13"></iconify-icon>
+                      삭제
+                    </button>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">안녕하세요, 기술 자문 건으로 연락드려도 될까요? 이메일 주소 공유해 주실 수 있으신가요?</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 항목 4: 비밀글, 타인 (내용 숨김) -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text3)">박</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="font-semibold text-body-sm" style="color:var(--text1)">박테스터</span>
+                    <span class="entry-secret-badge"><iconify-icon icon="solar:lock-bold" width="10"></iconify-icon>비밀글</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">2시간 전</span>
+                  </div>
+                  <div class="entry-secret-body">
+                    <iconify-icon icon="solar:lock-linear" width="14"></iconify-icon>
+                    비밀 방명록입니다.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 항목 5: 삭제된 항목 -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text4)">
+                  <iconify-icon icon="solar:user-linear" width="16"></iconify-icon>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="text-ui-xs font-medium" style="color:var(--text4)">알 수 없음</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">3시간 전</span>
+                  </div>
+                  <div class="entry-deleted-body">
+                    <iconify-icon icon="solar:trash-bin-2-linear" width="14"></iconify-icon>
+                    삭제된 방명록입니다.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 항목 6: 일반 OAuth -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:rgba(65,214,155,.15);color:var(--positive2)">최</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="font-semibold text-body-sm" style="color:var(--text1)">최프론트</span>
+                    <span class="oauth-chip"><iconify-icon icon="solar:user-check-linear" width="10"></iconify-icon>OAuth</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">1일 전</span>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">Docker 멀티스테이지 빌드 글 보고 바로 적용해봤는데 정말 효과가 있었어요. 이미지 크기가 절반 이하로 줄었습니다. 감사합니다!</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 항목 7: 탈퇴한 사용자 -->
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text4)">
+                  <iconify-icon icon="solar:user-linear" width="16"></iconify-icon>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="text-body-sm font-medium" style="color:var(--text4)">탈퇴한 사용자</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">3일 전</span>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">좋은 블로그 감사합니다.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Pagination -->
+        <nav class="mt-8 flex items-center justify-center gap-1 reveal" aria-label="페이지 탐색" style="animation-delay:200ms">
+          <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm disabled:opacity-30 disabled:cursor-not-allowed" style="color:var(--text3);background:transparent" disabled>
+            <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon><iconify-icon icon="solar:alt-arrow-left-linear" width="16" style="margin-left:-8px"></iconify-icon>
+          </button>
+          <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm disabled:opacity-30 disabled:cursor-not-allowed" style="color:var(--text3);background:transparent" disabled>
+            <iconify-icon icon="solar:alt-arrow-left-linear" width="16"></iconify-icon>
+          </button>
+          <button class="page-btn active w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-bold" style="background:var(--primary1);color:var(--background1)" aria-current="page">1</button>
+          <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)">2</button>
+          <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm font-medium hover:bg-bg-3" style="color:var(--text2)">3</button>
+          <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm hover:bg-bg-3" style="color:var(--text3)">
+            <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon>
+          </button>
+          <button class="page-btn w-9 h-9 rounded-lg flex items-center justify-center text-body-sm hover:bg-bg-3" style="color:var(--text3)">
+            <iconify-icon icon="solar:alt-arrow-right-linear" width="16"></iconify-icon><iconify-icon icon="solar:alt-arrow-right-linear" width="16" style="margin-left:-8px"></iconify-icon>
+          </button>
+        </nav>
+
+      </div>
+
+      <!-- ─── View: OAuth (로그인) ─── -->
+      <div id="view-oauth" style="display:none">
+
+        <!-- 작성 폼 - OAuth -->
+        <section class="mb-8 reveal" aria-label="방명록 작성" style="animation-delay:160ms">
+          <div class="rounded-2xl border p-5 sm:p-6" style="border-color:var(--border3);background:var(--background2)">
+            <!-- 로그인 사용자 정보 표시 -->
+            <div class="flex items-center gap-2.5 mb-4 pb-4" style="border-bottom:1px solid var(--border4)">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-body-sm flex-shrink-0" style="background:rgba(138,111,224,.15);color:var(--primary1)">P</div>
+              <div>
+                <p class="text-body-sm font-semibold" style="color:var(--text1)">pyosh</p>
+                <p class="text-ui-xs" style="color:var(--text4)">로그인 중 · OAuth</p>
+              </div>
+            </div>
+            <!-- 본문만 -->
+            <div class="mb-3">
+              <label class="form-label">내용 <span style="color:var(--negative1)">*</span></label>
+              <textarea class="form-input form-textarea" placeholder="방명록을 남겨주세요 (최대 2,000자)"></textarea>
+            </div>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <label class="secret-check">
+                <input type="checkbox">
+                <iconify-icon icon="solar:lock-linear" width="14" style="color:var(--text4)"></iconify-icon>
+                비밀글
+              </label>
+              <button class="form-submit">
+                <iconify-icon icon="solar:pen-linear" width="15"></iconify-icon>
+                작성하기
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 같은 목록 (동일한 항목들, 삭제 버튼 표시 방식만 동일) -->
+        <section aria-label="방명록 목록">
+          <div>
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:rgba(138,111,224,.15);color:var(--primary1)">P</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-body-sm" style="color:var(--text1)">pyosh</span>
+                      <span class="oauth-chip"><iconify-icon icon="solar:user-check-linear" width="10"></iconify-icon>OAuth</span>
+                      <span class="text-ui-xs" style="color:var(--text4)">방금 전</span>
+                    </div>
+                    <button class="entry-delete-btn" onclick="openModal('oauth-modal')">
+                      <iconify-icon icon="solar:trash-bin-2-linear" width="13"></iconify-icon>삭제
+                    </button>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">블로그 잘 보고 있습니다! 항상 유익한 글 감사해요. 특히 Next.js 관련 글들이 실무에 많이 도움이 됐어요.</p>
+                </div>
+              </div>
+            </div>
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text3)">김</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="font-semibold text-body-sm" style="color:var(--text1)">김개발</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">3분 전</span>
+                  </div>
+                  <p class="text-body-sm leading-relaxed break-keep" style="color:var(--text2)">TypeScript 패턴 매칭 글 정말 잘 읽었습니다!</p>
+                </div>
+              </div>
+            </div>
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text3)">박</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    <span class="font-semibold text-body-sm" style="color:var(--text1)">박테스터</span>
+                    <span class="entry-secret-badge"><iconify-icon icon="solar:lock-bold" width="10"></iconify-icon>비밀글</span>
+                    <span class="text-ui-xs" style="color:var(--text4)">2시간 전</span>
+                  </div>
+                  <div class="entry-secret-body"><iconify-icon icon="solar:lock-linear" width="14"></iconify-icon>비밀 방명록입니다.</div>
+                </div>
+              </div>
+            </div>
+            <div class="entry-item reveal-stagger">
+              <div class="flex items-start gap-3">
+                <div class="entry-avatar" style="background:var(--background3);color:var(--text4)"><iconify-icon icon="solar:user-linear" width="16"></iconify-icon></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2"><span class="text-ui-xs font-medium" style="color:var(--text4)">알 수 없음</span><span class="text-ui-xs" style="color:var(--text4)">3시간 전</span></div>
+                  <div class="entry-deleted-body"><iconify-icon icon="solar:trash-bin-2-linear" width="14"></iconify-icon>삭제된 방명록입니다.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 게스트 삭제 모달 데모 -->
+        <div class="mt-8 pt-6 reveal" style="border-top:1px solid var(--border4);animation-delay:220ms">
+          <p class="text-ui-xs font-medium mb-3" style="color:var(--text4)">삭제 모달 데모</p>
+          <div class="flex gap-2 flex-wrap">
+            <button class="text-ui-xs px-3 py-2 rounded-lg border font-medium transition-colors hover:bg-bg-3" style="border-color:var(--border3);color:var(--text3)" onclick="openModal('guest-modal')">
+              <iconify-icon icon="solar:trash-bin-2-linear" width="12" class="mr-1"></iconify-icon>
+              게스트 삭제 모달
+            </button>
+            <button class="text-ui-xs px-3 py-2 rounded-lg border font-medium transition-colors hover:bg-bg-3" style="border-color:var(--border3);color:var(--text3)" onclick="openModal('oauth-modal')">
+              <iconify-icon icon="solar:trash-bin-2-linear" width="12" class="mr-1"></iconify-icon>
+              OAuth 삭제 모달
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ─── View: 빈 상태 ─── -->
+      <div id="view-empty" style="display:none">
+        <div class="empty-state-box reveal" style="animation-delay:160ms">
+          <div class="flex justify-center mb-4">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:var(--background3)">
+              <iconify-icon icon="solar:chat-square-linear" width="28" style="color:var(--text4)"></iconify-icon>
+            </div>
+          </div>
+          <p class="text-base font-medium break-keep mb-1" style="color:var(--text2)">아직 방명록이 없습니다.</p>
+          <p class="text-body-sm" style="color:var(--text4)">첫 번째 방명록을 남겨보세요!</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ═══ Delete Modal: 게스트 (비밀번호 입력) ═══ -->
+  <div id="guest-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
+    <div class="modal-box">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(226,18,35,.10)">
+          <iconify-icon icon="solar:trash-bin-2-bold-duotone" width="20" style="color:var(--negative1)"></iconify-icon>
+        </div>
+        <div>
+          <h2 id="guest-modal-title" class="text-base font-bold" style="color:var(--text1)">방명록 삭제</h2>
+          <p class="text-ui-xs mt-0.5" style="color:var(--text4)">작성 시 입력한 비밀번호를 확인합니다.</p>
+        </div>
+      </div>
+      <div class="mb-5">
+        <label class="form-label mb-1.5">비밀번호</label>
+        <input type="password" class="form-input" placeholder="비밀번호를 입력하세요" autofocus>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button class="modal-btn modal-btn-cancel" onclick="closeModal('guest-modal')">취소</button>
+        <button class="modal-btn modal-btn-delete">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Delete Modal: OAuth (확인) ═══ -->
+  <div id="oauth-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="oauth-modal-title">
+    <div class="modal-box">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(226,18,35,.10)">
+          <iconify-icon icon="solar:trash-bin-2-bold-duotone" width="20" style="color:var(--negative1)"></iconify-icon>
+        </div>
+        <div>
+          <h2 id="oauth-modal-title" class="text-base font-bold" style="color:var(--text1)">방명록 삭제</h2>
+          <p class="text-ui-xs mt-0.5" style="color:var(--text4)">이 방명록을 삭제하시겠습니까?</p>
+        </div>
+      </div>
+      <p class="text-body-sm mb-5 break-keep" style="color:var(--text3)">삭제된 방명록은 복구할 수 없으며, <br>"삭제된 방명록입니다."로 표시됩니다.</p>
+      <div class="flex gap-2 justify-end">
+        <button class="modal-btn modal-btn-cancel" onclick="closeModal('oauth-modal')">취소</button>
+        <button class="modal-btn modal-btn-delete">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Mobile Overlay + Sidebar ═══ -->
+  <div id="mobileOverlay" class="mobile-overlay" aria-hidden="true"></div>
+  <aside id="mobileSidebar" class="mobile-sidebar" role="dialog" aria-label="사이드바 메뉴" aria-modal="true">
+    <div class="mobile-sidebar-header">
+      <span class="text-body-sm font-bold" style="color:var(--text1)">메뉴</span>
+      <button id="mobileSidebarClose" class="mobile-sidebar-close" aria-label="메뉴 닫기">
+        <iconify-icon icon="solar:close-circle-linear" width="20"></iconify-icon>
+      </button>
+    </div>
+    <div class="sidebar-section" style="padding-top:0">
+      <div class="flex items-center gap-1 mb-3">
+        <button class="sidebar-tab active" data-tab="m-recent" onclick="switchMobileTab('m-recent')">최근글</button>
+        <button class="sidebar-tab" data-tab="m-popular" onclick="switchMobileTab('m-popular')">인기글</button>
+      </div>
+      <div id="m-recentList">
+        <a href="#" class="sidebar-post"><div class="sidebar-post-title">Next.js App Router 캐싱 전략 A to Z</div><div class="sidebar-post-date">2026. 3. 17.</div></a>
+        <a href="#" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">2026. 3. 12.</div></a>
+        <a href="#" class="sidebar-post"><div class="sidebar-post-title">Vitest 모킹 패턴 8가지</div><div class="sidebar-post-date">2026. 3. 8.</div></a>
+      </div>
+      <div id="m-popularList" style="display:none">
+        <a href="#" class="sidebar-post"><div class="sidebar-post-title">React Server Components 실전 가이드</div><div class="sidebar-post-date">조회 3,847</div></a>
+        <a href="#" class="sidebar-post"><div class="sidebar-post-title">Zustand와 Jotai, 어떤 상태 관리가 맞을까</div><div class="sidebar-post-date">조회 2,341</div></a>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title flex items-center gap-1.5"><iconify-icon icon="solar:folder-2-linear" width="13"></iconify-icon>분류 전체보기 (47)</div>
+      <div>
+        <div>
+          <div class="cat-item" onclick="toggleCategory(this)"><span class="flex items-center gap-1.5 font-medium"><iconify-icon icon="solar:alt-arrow-right-linear" width="12" class="cat-toggle"></iconify-icon>Frontend</span><span class="cat-count">23</span></div>
+          <div class="cat-children"><a href="#" class="cat-item" style="padding-left:4px"><span>React</span><span class="cat-count">12</span></a></div>
+        </div>
+        <a href="#" class="cat-item"><span class="flex items-center gap-1.5 font-medium" style="padding-left:16px">DevOps</span><span class="cat-count">6</span></a>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="flex items-center justify-between mb-2.5">
+        <div class="sidebar-section-title flex items-center gap-1.5" style="margin-bottom:0"><iconify-icon icon="solar:tag-linear" width="13"></iconify-icon>태그</div>
+        <a href="/tags" class="text-ui-xs font-medium hover:underline underline-offset-4 flex items-center gap-0.5" style="color:var(--primary1)">전체보기 <iconify-icon icon="solar:alt-arrow-right-linear" width="12"></iconify-icon></a>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <a href="#" class="sidebar-tag">#React</a><a href="#" class="sidebar-tag">#TypeScript</a><a href="#" class="sidebar-tag">#Next.js</a><a href="#" class="sidebar-tag">#Docker</a>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title flex items-center gap-1.5"><iconify-icon icon="solar:eye-linear" width="13"></iconify-icon>블로그 조회수</div>
+      <div class="view-counter">128,347</div>
+      <div class="text-ui-xs mt-0.5" style="color:var(--text4)">Total Visitors</div>
+    </div>
+  </aside>
+
+  <!-- ═══ Footer ═══ -->
+  <footer style="border-top:1px solid var(--border4);background:var(--background2)">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="w-5 h-5" style="fill:var(--text4)"><g><path d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/><path d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/><path d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/></g></svg>
+          <span class="text-ui-xs" style="color:var(--text4)">&copy; 2026 pyosh. All rights reserved.</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="/guestbook" class="text-ui-xs hover:underline underline-offset-4" style="color:var(--primary1);font-weight:600">방명록</a>
+          <a href="https://github.com/pyo-sh" class="text-ui-xs hover:underline underline-offset-4 flex items-center gap-1" style="color:var(--text3)"><iconify-icon icon="solar:link-minimalistic-2-linear" width="12"></iconify-icon>GitHub</a>
+          <a href="mailto:pyo@pyosh.dev" class="text-ui-xs hover:underline underline-offset-4 flex items-center gap-1" style="color:var(--text3)"><iconify-icon icon="solar:letter-linear" width="12"></iconify-icon>Email</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme ───
+    const themeToggle = document.getElementById('themeToggle');
+    const sunIcon = themeToggle.querySelector('.sun-icon');
+    const moonIcon = themeToggle.querySelector('.moon-icon');
+    function applyTheme(t) {
+      document.body.setAttribute('data-theme', t);
+      localStorage.setItem('theme', t);
+      sunIcon.style.display = t === 'dark' ? 'none' : '';
+      moonIcon.style.display = t === 'dark' ? '' : 'none';
+    }
+    applyTheme(localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'));
+    themeToggle.addEventListener('click', () => applyTheme(document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+
+    // ─── Demo Switcher ───
+    const VIEWS = ['guest', 'oauth', 'empty'];
+    function switchView(view) {
+      VIEWS.forEach(v => { document.getElementById('view-' + v).style.display = v === view ? '' : 'none'; });
+      document.querySelectorAll('.demo-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+      document.getElementById('guestbook-count').textContent = view === 'empty' ? '총 0개 방명록' : '총 42개 방명록';
+      const el = document.getElementById('view-' + view);
+      el.querySelectorAll('.reveal').forEach(r => { r.style.animation='none'; r.offsetHeight; r.style.animation=''; });
+      el.querySelectorAll('.reveal-stagger').forEach((r, i) => {
+        r.style.opacity='0'; r.classList.remove('visible'); r.style.animationDelay=`${i*80}ms`;
+        setTimeout(() => revealObserver.observe(r), 50);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ─── Reveal ───
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObserver.unobserve(e.target); } });
+    }, { threshold: 0.05, rootMargin: '0px 0px -30px 0px' });
+    document.querySelectorAll('.reveal-stagger').forEach((el, i) => { el.style.animationDelay = `${i * 80}ms`; revealObserver.observe(el); });
+
+    // ─── Modals ───
+    function openModal(id) {
+      document.getElementById(id).classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
+    });
+
+    // ─── Sidebar Tabs ───
+    function switchTab(tab) {
+      document.querySelectorAll('.sidebar-desktop .sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.getElementById('recentList').style.display = tab === 'recent' ? '' : 'none';
+      document.getElementById('popularList').style.display = tab === 'popular' ? '' : 'none';
+    }
+    function switchMobileTab(tab) {
+      document.querySelectorAll('.mobile-sidebar .sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.getElementById('m-recentList').style.display = tab === 'm-recent' ? '' : 'none';
+      document.getElementById('m-popularList').style.display = tab === 'm-popular' ? '' : 'none';
+    }
+
+    // ─── Category Toggle ───
+    function toggleCategory(el) {
+      const c = el.nextElementSibling;
+      const t = el.querySelector('.cat-toggle');
+      if (c && c.classList.contains('cat-children')) { c.classList.toggle('open'); t && t.classList.toggle('open'); }
+    }
+
+    // ─── Mobile Sidebar ───
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileSidebarClose = document.getElementById('mobileSidebarClose');
+    function openMobileSidebar() { mobileOverlay.classList.add('open'); mobileSidebar.classList.add('open'); document.body.style.overflow='hidden'; mobileSidebarClose.focus(); }
+    function closeMobileSidebar() { mobileOverlay.classList.remove('open'); mobileSidebar.classList.remove('open'); document.body.style.overflow=''; hamburgerBtn.focus(); }
+    hamburgerBtn.addEventListener('click', openMobileSidebar);
+    mobileSidebarClose.addEventListener('click', closeMobileSidebar);
+    mobileOverlay.addEventListener('click', closeMobileSidebar);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && mobileSidebar.classList.contains('open')) closeMobileSidebar(); });
+    matchMedia('(min-width:1080px)').addEventListener('change', e => { if (e.matches && mobileSidebar.classList.contains('open')) closeMobileSidebar(); });
+    mobileSidebar.querySelectorAll('a').forEach(l => l.addEventListener('click', closeMobileSidebar));
+
+    // ─── Sidebar Scroll Sync ───
+    const sidebarInner = document.querySelector('.sidebar-inner');
+    let lastScrollY = window.scrollY, sidebarTop = 70;
+    window.addEventListener('scroll', () => {
+      if (!sidebarInner) return;
+      const delta = window.scrollY - lastScrollY; lastScrollY = window.scrollY;
+      const sH = sidebarInner.offsetHeight, vH = window.innerHeight;
+      if (sH <= vH - 70) { sidebarTop = 70; }
+      else if (delta > 0) { sidebarTop = Math.max(vH - sH, sidebarTop - delta); }
+      else { sidebarTop = Math.min(70, sidebarTop - delta); }
+      sidebarInner.style.top = sidebarTop + 'px';
+    }, { passive: true });
+  </script>
+
+</body>
+</html>

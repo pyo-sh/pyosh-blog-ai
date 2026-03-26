@@ -1,0 +1,155 @@
+# [F-01] 홈 - 글 목록
+
+> 블로그 홈 페이지. 최신순으로 발행된 글 목록을 리스트형으로 표시하고, 고정 글 기능을 제공한다.
+
+## SPEC 참조
+
+- `docs/client/specs/home-post-list.md`
+
+## 와이어프레임
+
+- `docs/client/designs/public/home-page.html` - 홈 페이지 전체 레이아웃, 글 목록, 페이지네이션
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
+## 상세 설계
+
+### 5.1 사용자 흐름
+
+1. 방문자가 `/` 접속
+2. 최신순 글 목록 + 고정 글 표시
+3. 페이지 번호 클릭 - URL 변경, reload 없이 글 목록 교체
+4. 글 클릭 - `/posts/{slug}` 이동
+
+### 5.2 UI 구성
+
+#### 레이아웃
+
+```
+[PIN] 고정 글 1 (리스트 아이템)
+[PIN] 고정 글 2 (리스트 아이템)
+──────────────────────────────
+일반 글 리스트 아이템 1
+일반 글 리스트 아이템 2
+...
+일반 글 리스트 아이템 10
+
+[<<] [<]  1 2 3 ... 18 19 20  [>] [>>]
+```
+
+#### 리스트 아이템 표시 항목
+
+| 항목 | 설명 |
+|---|---|
+| 썸네일 | md breakpoint 이상에서 표시. 미등록 시 미표시 |
+| 카테고리명 | 배지 형태 |
+| 날짜 | `publishedAt` 표시. `contentModifiedAt`이 있으면 "수정: {날짜}"도 함께 표시 |
+| 제목 | 최대 2줄, 초과 시 ellipsis |
+| 요약 | 서버 저장 `summary` 필드, CSS `line-clamp`으로 ellipsis 처리 |
+| 조회수 | 아이콘 + 숫자 |
+| 댓글 수 | 아이콘 + 숫자 |
+| ~~태그 목록~~ | 삭제 |
+
+#### 고정 글
+
+- 목록 최상단에 표시
+- 핀(pin) 아이콘으로 고정 글임을 나타냄
+- 일반 글과 동일한 리스트 아이템 형태, 핀 아이콘만 추가
+- 고정 글은 페이지네이션과 무관하게 항상 1페이지 상단에 표시
+
+#### 페이지네이션
+
+```
+[<<] [<]  1 2 3 ... 18 19 20  [>] [>>]
+ -5장  -1장                    +1장  +5장
+```
+
+- 현재 페이지 기준 앞뒤 +-3 페이지 + 처음/끝 페이지 표시, 중간 생략(...)
+- 현재 페이지 하이라이트
+- `<<` / `>>`: 5페이지 이동
+- `<` / `>`: 1페이지 이동
+- 범위 초과 시 해당 버튼 비활성화
+- 총 페이지가 1 이하이면 페이지네이션 미표시
+
+### 5.3 데이터 흐름
+
+```
+Server Component (SSR)
+  └─ fetchPosts({ page }) → initialData
+       └─ Client Component
+            └─ useQuery({ queryKey: ["posts", page], initialData })
+            └─ 페이지 변경 시 router.push → queryKey 변경 → refetch (reload 없음)
+```
+
+- SSR `initialData` + TanStack Query 패턴
+- URL 쿼리 파라미터로 상태 관리: `?page=N`
+- `router.push`로 URL 변경, 브라우저 히스토리 유지 (뒤로가기 지원)
+
+### 5.4 컴포넌트 구조 (FSD)
+
+| 계층 | 컴포넌트 | 역할 |
+|---|---|---|
+| `app` | `page.tsx` | SSR 데이터 페칭, 초기 데이터 전달 |
+| `widgets` | `HomePage` | 전체 레이아웃 조합 |
+| `features` | `PostList` | 글 목록 + 페이지네이션 |
+| `features` | `PostListItem` | 리스트 아이템 (기존 PostCard 대체) |
+| `entities` | `post/api.ts` | `fetchPosts()` |
+| `shared` | `Pagination` | 페이지네이션 UI |
+
+## API 연동
+
+### GET /api/posts
+
+기존 엔드포인트 활용. 변경사항:
+
+| 항목 | 현재 | 변경 |
+|---|---|---|
+| 응답 필드 | `contentMd` 포함 | `summary` 필드 추가, 목록 응답에서 `contentMd` 제외 |
+| 응답 필드 | 없음 | `totalPageviews` 추가 |
+| 응답 필드 | 없음 | `commentCount` 추가 |
+| 응답 필드 | 없음 | `isPinned` 추가 |
+| 응답 필드 | 없음 | `contentModifiedAt` 추가 |
+
+### 서버 변경 필요사항
+
+| 항목 | 설명 |
+|---|---|
+| DB 스키마 | `posts` 테이블에 `summary` 컬럼 추가 (VARCHAR 200, nullable) |
+| DB 스키마 | `posts` 테이블에 `is_pinned` 컬럼 추가 (BOOLEAN, default false) |
+| DB 스키마 | `posts` 테이블에 `content_modified_at` 컬럼 추가 (TIMESTAMP, nullable) |
+| 글 발행 로직 | `summary`가 비어있으면 `contentMd`에서 plain text 200자 자동 추출 |
+| 글 목록 응답 | `totalPageviews`, `commentCount` 집계하여 응답에 포함 |
+| 글 목록 정렬 | 고정 글이 최상단, 이후 `published_at` 내림차순 |
+| Admin API | 고정/해제 토글 엔드포인트 또는 글 수정 시 `isPinned` 필드 |
+| Admin API | `summary` 필드 작성/수정 가능 |
+
+## 수용 기준
+
+- [ ] `/` 접속 시 최신순 글 목록이 리스트형으로 표시된다
+- [ ] 리스트 아이템에 카테고리, 날짜(발행일 + 수정일), 제목, 요약, 조회수, 댓글 수가 표시된다
+- [ ] `contentModifiedAt`이 있는 글은 "수정: {날짜}"가 추가로 표시된다
+- [ ] 요약은 서버 `summary` 필드를 사용하며, CSS `line-clamp`으로 ellipsis 처리된다
+- [ ] 썸네일은 md breakpoint 이상에서만 표시된다
+- [ ] 고정 글이 목록 최상단에 핀 아이콘과 함께 표시된다
+- [ ] 페이지네이션: `[<<-5] [<-1] 번호 [+1>] [+5>>]` 형태, 중간 생략(...) 패턴
+- [ ] 페이지 전환 시 URL이 `?page=N`으로 변경된다 (reload 없음)
+- [ ] 브라우저 뒤로가기 시 이전 페이지 상태가 복원된다
+- [ ] 범위 초과 페이지 접근 시 404
+- [ ] 글이 없을 때 빈 상태 메시지 표시
+- [ ] 페이지 전환 시 스켈레톤 로딩 표시
+- [ ] 접근성: 키보드로 페이지네이션 조작 가능 (A-01 참조)
+- [ ] Storybook story 작성 (F-38 참조)
+
+## 에지 케이스
+
+| 케이스 | 처리 |
+|---|---|
+| 글이 0개 | 빈 상태 메시지 표시, 페이지네이션 미표시 |
+| 고정 글만 있고 일반 글 0개 | 고정 글만 표시, 페이지네이션 미표시 |
+| 페이지 파라미터가 음수/문자열 | 404 |
+| summary가 null이고 발행된 글 | 서버에서 발행 시 자동 생성하므로 발생하지 않음 |
+| 요약이 짧아서 ellipsis 불필요 | CSS `line-clamp`이 자연스럽게 처리 |
+
+## 의존성
+
+- Blocked by: 없음 (기반 기능)
+- Blocks: F-02, F-03, F-05, F-06, F-11, F-39

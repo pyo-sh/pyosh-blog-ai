@@ -1,0 +1,134 @@
+# [F-12] 에러 페이지
+
+> 에러 페이지 시스템. 404, 500 등 에러 상황에서 사용자에게 적절한 피드백과 복구 동선을 제공한다.
+
+## SPEC 참조
+
+- `docs/client/specs/error-pages.md`
+
+## 와이어프레임
+
+- `docs/client/designs/public/error-page.html` - 에러 페이지 (404, 글로벌 에러)
+- 공통 디자인 시스템: `docs/client/designs/DESIGN_SYSTEM.md`
+
+## 상세 설계
+
+### 사용자 흐름
+
+**Public 404:**
+
+1. 존재하지 않는 URL 접근
+2. 404 페이지 표시 - "홈으로 돌아가기" 링크
+
+**Public 500:**
+
+1. 서버 에러 발생
+2. 에러 페이지 표시 - "다시 시도" 버튼
+
+**Admin 404:**
+
+1. `/manage/posts/999` 등 존재하지 않는 리소스 접근
+2. Admin 레이아웃(사이드바) 유지한 채 404 표시
+
+**Admin 500:**
+
+1. Admin 영역에서 서버 에러 발생
+2. Admin 레이아웃(사이드바) 유지한 채 에러 페이지 표시
+
+**Admin 403:**
+
+1. 권한 없는 요청 (세션 만료 등)
+2. Toast "접근 권한이 없습니다" 표시 + `/manage/login` 리다이렉트
+
+**Global error (앱 초기화 실패):**
+
+1. 루트 레이아웃 렌더링 실패
+2. 전체 HTML 구조로 에러 페이지 표시
+
+### UI 구성
+
+#### Public 에러 페이지
+
+- 404: primary 배지, "페이지를 찾을 수 없습니다" 메시지, "홈으로 돌아가기" 링크
+- 500: negative 배지, "문제가 발생했습니다" 메시지, "다시 시도" 버튼
+
+#### Admin 에러 페이지
+
+- `manage/layout.tsx` 내부에서 렌더링되어 사이드바가 유지됨
+- 404: "관리 홈으로 돌아가기" 링크 (`/manage`)
+- 500: "다시 시도" 버튼
+
+#### 색상
+
+- 404: `primary-1` (파랑) 배지
+- 500: `negative-1` (빨강) 배지
+- 다크모드: 자동 적용 (별도 처리 불필요)
+
+### 데이터 흐름
+
+```
+에러 바운더리 계층:
+
+global-error.tsx (앱 초기화 실패 - 전체 HTML 구조)
+  └─ app/error.tsx (Public 500)
+  └─ app/not-found.tsx (Public 404)
+  └─ app/manage/error.tsx (Admin 500 - 사이드바 유지)
+  └─ app/manage/not-found.tsx (Admin 404 - 사이드바 유지)
+
+403 처리:
+  API 응답 403 → Toast("접근 권한이 없습니다") → /manage/login 리다이렉트
+  미인증 직접 접근 → Middleware → /manage/login 리다이렉트 (F-19에서 처리)
+```
+
+- `global-error.tsx`는 루트 레이아웃 밖에서 동작하므로 자체 `<html>`, `<body>` 포함
+- 나머지 에러 파일은 상위 레이아웃을 상속
+- 403 처리는 API 클라이언트 공통 인터셉터에서 수행
+
+### 컴포넌트 구조 (FSD)
+
+| 계층 | 컴포넌트 | 역할 |
+|---|---|---|
+| `app` | `error.tsx` | 루트 에러 바운더리 (Public 500) |
+| `app` | `global-error.tsx` | 앱 초기화 실패 |
+| `app` | `not-found.tsx` | Public 404 |
+| `app` | `manage/error.tsx` | Admin 에러 바운더리 (사이드바 유지) |
+| `app` | `manage/not-found.tsx` | Admin 404 (사이드바 유지) |
+| `shared` | `ErrorContent` | 에러 메시지 + 동작 버튼 공통 컴포넌트 |
+
+- `ErrorContent`는 배지 색상, 메시지, 동작 버튼을 props로 받아 렌더링
+- Public/Admin 에러 파일 모두 `ErrorContent`를 재사용
+
+## API 연동
+
+없음. 에러 페이지는 클라이언트 전용.
+
+403 응답 처리는 API 클라이언트(fetch wrapper) 공통 인터셉터에서 수행:
+- 응답 상태 403 감지 → Toast 표시 → `/manage/login` 리다이렉트
+
+## 수용 기준
+
+- [ ] 존재하지 않는 URL 접근 시 404 페이지가 표시된다
+- [ ] Public 404: primary 배지, "홈으로 돌아가기" 링크
+- [ ] Public 500: negative 배지, "다시 시도" 버튼
+- [ ] Admin 404: 사이드바가 유지된 채 404 메시지 표시, "관리 홈으로 돌아가기" 링크
+- [ ] Admin 500: 사이드바가 유지된 채 에러 메시지 표시, "다시 시도" 버튼
+- [ ] Admin 403 응답 시 Toast 메시지 + `/manage/login` 리다이렉트
+- [ ] `global-error.tsx`: 앱 초기화 실패 시 전체 HTML 구조로 에러 표시
+- [ ] `ErrorContent` 공통 컴포넌트로 중복 없이 구현
+- [ ] 다크모드 자동 적용
+- [ ] 접근성: 에러 메시지에 적절한 ARIA role, 동작 버튼 키보드 접근 가능 (A-01 참조)
+
+## 에지 케이스
+
+| 케이스 | 처리 |
+|---|---|
+| Admin 영역에서 404 발생 | `manage/not-found.tsx` - 사이드바 유지 |
+| Admin 영역에서 500 발생 | `manage/error.tsx` - 사이드바 유지 |
+| `global-error.tsx` 렌더링 실패 | 브라우저 기본 에러 페이지 (대응 불가) |
+| 에러 페이지에서 "다시 시도" 재실패 | 동일 에러 페이지 유지 |
+| F-14 미구현 시 403 처리 | 인라인 alert 후 리다이렉트로 대체 |
+
+## 의존성
+
+- Blocked by: 없음
+- Blocks: F-35c

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyosh blog Admin - 로그인</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
+  <script src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Gothic A1', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            bg:         { 1: 'var(--background1)', 2: 'var(--background2)', 3: 'var(--background3)', 4: 'var(--background4)' },
+            tx:         { 1: 'var(--text1)',        2: 'var(--text2)',       3: 'var(--text3)',       4: 'var(--text4)'       },
+            bd:         { 1: 'var(--border1)',      2: 'var(--border2)',     3: 'var(--border3)',     4: 'var(--border4)'     },
+            primary:    { 1: 'var(--primary1)',     2: 'var(--primary2)'    },
+            secondary:  { 1: 'var(--secondary1)',   2: 'var(--secondary2)'  },
+            info:      { 1: 'var(--info1)',    2: 'var(--info2)'   },
+            warning:   { 1: 'var(--warning1)',   2: 'var(--warning2)'  },
+            positive:   { 1: 'var(--positive1)',    2: 'var(--positive2)'   },
+            negative:   { 1: 'var(--negative1)',    2: 'var(--negative2)'   },
+            grey:       { 1: 'var(--grey1)',        2: 'var(--grey2)',       3: 'var(--grey3)',       4: 'var(--grey4)'       },
+            yellow:     { 1: 'var(--yellow1)',      2: 'var(--yellow2)'     },
+            'code-surface': 'var(--code-surface)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* ═══ Color Tokens ═══ */
+    :root {
+      --dark-background1:#131415;--dark-background2:#1d1e20;--dark-background3:#26282a;--dark-background4:#303335;
+      --dark-text1:#e9eaeb;--dark-text2:#c4c6c9;--dark-text3:#a8adb1;--dark-text4:#919799;
+      --dark-border1:#a6abb0;--dark-border2:#a1a5aa;--dark-border3:#54595d;--dark-border4:#3e4245;
+      --dark-primary1:#a591e8;--dark-primary2:#c7bbf0;--dark-secondary1:#8c72c5;--dark-secondary2:#b9aadc;
+      --dark-info1:#a5b2ff;--dark-info2:#c7d0ff;
+      --dark-warning1:#f0a030;--dark-warning2:#3d2e18;
+      --dark-positive1:#10c67d;--dark-positive2:#78e2b8;--dark-negative1:#f15966;--dark-negative2:#feccd0;
+      --dark-grey1:#484c50;--dark-grey2:#797f85;--dark-grey3:#aeb2b6;--dark-grey4:#dee0e1;
+      --dark-yellow1:#ffbb32;--dark-yellow2:#ffd470;
+      --light-background1:#f9f9fa;--light-background2:#f1f2f3;--light-background3:#e6e8e9;--light-background4:#dbdde0;
+      --light-text1:#232629;--light-text2:#4b5158;--light-text3:#6b7780;--light-text4:#a3aab1;
+      --light-border1:#33383c;--light-border2:#a6adb3;--light-border3:#dbdde0;--light-border4:#eaebed;
+      --light-primary1:#8a6fe0;--light-primary2:#b09ee9;--light-secondary1:#6b49b5;--light-secondary2:#9983cc;
+      --light-info1:#8d9eff;--light-info2:#b0bcff;
+      --light-warning1:#c67a0a;--light-warning2:#fef3e0;
+      --light-positive1:#078556;--light-positive2:#41d69b;--light-negative1:#e21223;--light-negative2:#f15966;
+      --light-grey1:#f1f2f3;--light-grey2:#c7ccd0;--light-grey3:#9099a1;--light-grey4:#596068;
+      --light-yellow1:#f2a116;--light-yellow2:#ffbe3d;
+      --code-surface:#0d1117;
+    }
+    body{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+      color:var(--text1);background-color:var(--background1);transition:color .25s,background-color .4s;
+    }
+    @media(prefers-color-scheme:dark){body:not([data-theme="light"]){
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }}
+    body[data-theme="dark"]{
+      --background1:var(--dark-background1);--background2:var(--dark-background2);--background3:var(--dark-background3);--background4:var(--dark-background4);
+      --text1:var(--dark-text1);--text2:var(--dark-text2);--text3:var(--dark-text3);--text4:var(--dark-text4);
+      --border1:var(--dark-border1);--border2:var(--dark-border2);--border3:var(--dark-border3);--border4:var(--dark-border4);
+      --primary1:var(--dark-primary1);--primary2:var(--dark-primary2);--secondary1:var(--dark-secondary1);--secondary2:var(--dark-secondary2);
+      --info1:var(--dark-info1);--info2:var(--dark-info2);
+      --warning1:var(--dark-warning1);--warning2:var(--dark-warning2);
+      --positive1:var(--dark-positive1);--positive2:var(--dark-positive2);--negative1:var(--dark-negative1);--negative2:var(--dark-negative2);
+      --grey1:var(--dark-grey1);--grey2:var(--dark-grey2);--grey3:var(--dark-grey3);--grey4:var(--dark-grey4);
+      --yellow1:var(--dark-yellow1);--yellow2:var(--dark-yellow2);
+    }
+    body[data-theme="light"]{
+      --background1:var(--light-background1);--background2:var(--light-background2);--background3:var(--light-background3);--background4:var(--light-background4);
+      --text1:var(--light-text1);--text2:var(--light-text2);--text3:var(--light-text3);--text4:var(--light-text4);
+      --border1:var(--light-border1);--border2:var(--light-border2);--border3:var(--light-border3);--border4:var(--light-border4);
+      --primary1:var(--light-primary1);--primary2:var(--light-primary2);--secondary1:var(--light-secondary1);--secondary2:var(--light-secondary2);
+      --info1:var(--light-info1);--info2:var(--light-info2);
+      --warning1:var(--light-warning1);--warning2:var(--light-warning2);
+      --positive1:var(--light-positive1);--positive2:var(--light-positive2);--negative1:var(--light-negative1);--negative2:var(--light-negative2);
+      --grey1:var(--light-grey1);--grey2:var(--light-grey2);--grey3:var(--light-grey3);--grey4:var(--light-grey4);
+      --yellow1:var(--light-yellow1);--yellow2:var(--light-yellow2);
+    }
+
+    /* ═══ Noise Overlay ═══ */
+    body::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat:repeat;background-size:256px 256px;}
+
+    /* ═══ Animations ═══ */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(1.5rem)}to{opacity:1;transform:translateY(0)}}
+    .reveal{opacity:0;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1) forwards}
+
+    /* ═══ Typography ═══ */
+    h1{font-size:1.875rem;line-height:2.375rem;font-weight:700}
+    h2{font-size:1.625rem;line-height:2.063rem;font-weight:700}
+    h3{font-size:1.375rem;line-height:1.75rem;font-weight:700}
+    h4{font-size:1.25rem;line-height:1.625rem;font-weight:700}
+    h5{font-size:1.063rem;line-height:1.375rem;font-weight:700}
+    h6{font-size:0.938rem;line-height:1.25rem;font-weight:700}
+    .text-body-xl{font-size:1.688rem;line-height:2.125rem;font-weight:400}
+    .text-body-lg{font-size:1.5rem;line-height:1.938rem;font-weight:400}
+    .text-body-md{font-size:1.313rem;line-height:1.688rem;font-weight:400}
+    .text-body-base{font-size:1.125rem;line-height:1.5rem;font-weight:400}
+    .text-body-sm{font-size:0.875rem;line-height:1.188rem;font-weight:400}
+    .text-body-xs{font-size:0.688rem;line-height:1rem;font-weight:400}
+    .text-ui-base{font-size:1rem;line-height:1.5rem;font-weight:400}
+    .text-ui-sm{font-size:0.813rem;line-height:1.125rem;font-weight:400}
+    .text-ui-xs{font-size:0.75rem;line-height:1rem;font-weight:400}
+
+    /* ═══ Scrollbar ═══ */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:var(--background2)}
+    ::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+    /* ═══ Utility ═══ */
+    .break-keep{word-break:keep-all;overflow-wrap:break-word}
+    .line-clamp-1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ═══ Form ═══ */
+    .admin-input{
+      width:100%;padding:8px 12px;border-radius:8px;font-size:14px;
+      background:var(--background1);border:1px solid var(--border3);
+      color:var(--text1);outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    .admin-input:focus{border-color:var(--primary1);box-shadow:0 0 0 3px rgba(138,111,224,0.12);}
+    .admin-input::placeholder{color:var(--text4);}
+
+    /* ═══ Icons ═══ */
+    iconify-icon{display:inline-block;vertical-align:middle;}
+
+    /* ═══ Buttons ═══ */
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500;
+      background:var(--primary1);color:#fff;border:none;cursor:pointer;
+      transition:opacity .2s,transform .15s;
+    }
+    .btn-primary:hover{opacity:.9;}.btn-primary:active{transform:scale(.97);}
+
+    /* ═══ Login Card ═══ */
+    .login-card{
+      max-width:24rem;width:100%;margin-left:auto;margin-right:auto;padding:2rem;
+      background:var(--background1);border:1px solid var(--border3);
+      border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,.08);
+    }
+    @media(max-width:639px){
+      .login-card{
+        box-shadow:none;background:var(--background1);border-color:var(--border4);
+      }
+    }
+    .pw-wrapper{position:relative;}
+    .pw-wrapper .admin-input{padding-right:2.5rem;}
+    .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+      display:flex;align-items:center;justify-content:center;
+      width:28px;height:28px;border-radius:6px;border:none;background:transparent;
+      cursor:pointer;color:var(--text3);transition:background .15s,color .15s;}
+    .pw-toggle:hover{background:var(--background3);color:var(--text2);}
+  </style>
+</head>
+<body class="min-h-[100dvh] flex items-center justify-center antialiased" style="background:var(--background3);">
+
+  <div class="login-card reveal relative" role="main">
+    <!-- Theme Toggle - top right of main content -->
+    <button onclick="toggleTheme()" class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-lg transition-colors" style="color:var(--text3);" aria-label="테마 전환"
+      onmouseover="this.style.background='var(--background3)'" onmouseout="this.style.background=''">
+      <iconify-icon icon="solar:sun-2-linear" width="20" id="sunIcon"></iconify-icon>
+      <iconify-icon icon="solar:moon-linear" width="20" id="moonIcon" style="display:none"></iconify-icon>
+    </button>
+
+    <!-- Logo Area -->
+    <div class="flex flex-col items-center">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="48" height="48" aria-hidden="true">
+        <g>
+          <path fill="var(--primary1)" d="M128,26.25C71.81,26.25,26.25,71.8,26.25,128c0,32.76,15.49,61.9,39.53,80.51c14.84-24.7,29.68-49.4,44.53-74.1c-18.12-15.67-30.87-37.86-40.59-60.59c-1.79-4.18,2.26-13.74,6.37-16.22c3.5-2.11,5.62,3.36,7.56,7.59c8.92,19.45,19.83,40.08,35.26,54.47l31.97-54.8c1.8-3.09,4.75-4.55,7.69-4.24c1.69,0.12,3.21,0.55,4.92,1.65c14.53,9.41,25.4,24.78,29.28,42.43c3.51,15.99,2.05,34.39-11.95,44.16c-13.72,9.57-32.44,6.65-46.86,0.48c-2.94-1.26-5.76-2.66-8.49-4.21c-0.01,0.01-33.12,55.64-43.75,73.49c13.89,7.11,29.62,11.12,46.3,11.12c56.19,0,101.75-45.56,101.75-101.75C229.75,71.8,184.19,26.25,128,26.25z M185.65,191.94c-2.42,9.22-11.36,14.6-20.61,13.68c-9.71-0.97-17.06-8.57-15.87-18.61c1.07-9.06,8.7-17.66,18.2-17.66c0.86,0,1.78-0.08,3.28,0c1.13,0.19,1.13,0.19,2.4,0.64C181.44,173.01,188.84,179.76,185.65,191.94z"/>
+          <path fill="var(--primary1)" d="M169.85,181.57c-0.32-0.11-0.78-0.07-1.29-0.15c-0.62-0.06-0.62-0.06-1.2-0.06c-3.19-0.04-5.81,3.65-6.28,6.62c-0.59,3.76,2.06,5.59,5.49,5.78C173.89,194.16,177.57,184.34,169.85,181.57z"/>
+          <path fill="var(--primary1)" d="M172.67,134.12c6.04-4.71,6.21-13.25,5.33-20.48c-1.49-12.13-7.33-23.29-15.9-31.31l-28.18,48.3c5.07,2.77,10.54,4.9,16.47,6.22C157.57,138.45,166.42,138.99,172.67,134.12z"/>
+        </g>
+      </svg>
+      <span class="mt-2 text-sm font-semibold" style="color:var(--primary1);">Admin</span>
+    </div>
+
+    <!-- Form -->
+    <form class="mt-6 flex flex-col gap-4" onsubmit="return false;" aria-label="관리자 로그인 양식">
+      <!-- 사용자 이름 -->
+      <div>
+        <label for="username" class="text-ui-sm font-medium block mb-1.5" style="color:var(--text2);">사용자 이름</label>
+        <input
+          id="username"
+          type="text"
+          class="admin-input"
+          placeholder="사용자 이름을 입력하세요"
+          autocomplete="username"
+          aria-label="사용자 이름"
+          required
+        >
+      </div>
+
+      <!-- 비밀번호 -->
+      <div>
+        <label for="password" class="text-ui-sm font-medium block mb-1.5" style="color:var(--text2);">비밀번호</label>
+        <div class="pw-wrapper">
+          <input
+            id="password"
+            type="password"
+            class="admin-input"
+            placeholder="비밀번호를 입력하세요"
+            autocomplete="current-password"
+            aria-label="비밀번호"
+            required
+          >
+          <button type="button" class="pw-toggle" onclick="togglePassword()" aria-label="비밀번호 표시/숨기기">
+            <iconify-icon icon="solar:eye-linear" width="18" id="eyeOpen" style="display:flex"></iconify-icon>
+            <iconify-icon icon="solar:eye-closed-linear" width="18" id="eyeClosed" style="display:none"></iconify-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- 로그인 버튼 (로딩 상태 데모 포함) -->
+      <button type="submit" class="btn-primary w-full mt-2 py-2.5" aria-label="로그인" id="loginBtn">로그인</button>
+    </form>
+    <style>
+      .btn-login-loading{pointer-events:none;opacity:.7;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+      @keyframes login-spin{to{transform:rotate(360deg)}}
+      .login-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:login-spin .6s linear infinite;display:inline-block;}
+    </style>
+    <script>
+      document.getElementById('loginBtn')?.addEventListener('click',function(e){
+        e.preventDefault();var b=this;b.classList.add('btn-login-loading');b.disabled=true;
+        b.innerHTML='<span class="login-spinner"></span> 로그인 중...';
+        setTimeout(function(){b.classList.remove('btn-login-loading');b.disabled=false;b.textContent='로그인';},2000);
+      });
+    </script>
+
+  </div>
+
+  <!-- ═══ Scripts ═══ -->
+  <script>
+    // ─── Theme Toggle ───
+    function getPreferredTheme(){
+      const stored=localStorage.getItem('theme');
+      if(stored) return stored;
+      return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    function applyTheme(theme){
+      document.body.setAttribute('data-theme',theme);
+      localStorage.setItem('theme',theme);
+      document.getElementById('sunIcon').style.display=theme==='dark'?'none':'';
+      document.getElementById('moonIcon').style.display=theme==='dark'?'':'none';
+    }
+    function toggleTheme(){
+      applyTheme((document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+    }
+    applyTheme(getPreferredTheme());
+
+    // ─── Password Toggle ───
+    function togglePassword(){
+      const input=document.getElementById('password');
+      const isShowing=input.type==='text';
+      input.type=isShowing?'password':'text';
+      document.getElementById('eyeOpen').style.display=isShowing?'':'none';
+      document.getElementById('eyeClosed').style.display=isShowing?'none':'';
+    }
+  </script>
+</body>
+</html>
