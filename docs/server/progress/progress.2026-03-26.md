@@ -1,5 +1,37 @@
 # Server Progress - 2026-03-26
 
+## Issue #33 - Assets API (PR #56)
+
+**Status**: Merged
+
+### What was done
+
+Implemented the full Assets API (5 endpoints) with local file storage, image dimension extraction, and multipart upload support.
+
+**New files:**
+- `src/services/file-storage.service.ts` - `FileStorageService`: `bufferFile()` static helper (streams multipart file to Buffer inline, catches `FST_REQ_FILE_TOO_LARGE`), `saveFile(buffered)` (MIME type + size validation, UUID filename, date-based dir `uploads/YYYY/MM/`, `image-size` sync extraction for width/height), `deleteFile()` (idempotent ENOENT-tolerant), `getFilePath()` (path traversal guard via `..` check), `ensureUploadDir()`
+- `src/routes/assets/asset.schema.ts` - Zod schemas: `assetResponseSchema`, `assetListItemSchema`, `uploadAssetsResponseSchema`, `assetListQuerySchema`, `assetIdParamSchema`, `bulkDeleteAssetsBodySchema` (`ids` array min 1 max 100), `errorResponseSchema`
+- `src/routes/assets/asset.service.ts` - `AssetService`: `uploadAsset(buffered)`, `uploadAssets(buffered[])`, `getAssetById(id)`, `getAssetList(query)` with pagination, `deleteAsset(id)` (DB + file), `deleteAssets(ids)` (single transaction DB delete + `Promise.all` best-effort file cleanup)
+- `src/routes/assets/asset.route.ts` - 5 routes registered with proper ordering; multipart files buffered in-loop via `FileStorageService.bufferFile()` before service call
+- `test/routes/assets.test.ts` - 16 integration tests covering all endpoints
+
+**Modified files:**
+- `src/errors/http-error.ts` - added `payloadTooLarge()` static factory
+- `package.json` / `pnpm-lock.yaml` - added `image-size ^2.0.2`
+- `test/helpers/seed.ts` - added `seedAsset()` helper
+
+### Key design decisions
+
+- Multipart stream must be consumed inside the `for await` loop - deferring `toBuffer()` to the service caused the stream to hang. `FileStorageService.bufferFile()` is the designated consume-and-buffer point
+- `@fastify/multipart` v9 throws `FST_REQ_FILE_TOO_LARGE` (FastifyError) when file exceeds `limits.fileSize`; caught in `bufferFile()` and re-thrown as `HttpError.payloadTooLarge(413)`
+- `deleteAssets` uses `Promise.all` (not `allSettled`) with an inner try/catch - the inner catch swallows every error, so the two are not redundant at the behavior level but `allSettled` added no value
+- `ids` array capped at 100 to prevent unbounded `WHERE id IN (...)` clauses; larger batches require server-side loops
+- `image-size` v2 has no async Buffer API - sync call is the only option; acceptable at 10 MB limit
+
+### Review outcome
+
+2 rounds. Round 1: 0 critical, 1 warning, 1 suggestion. Warning: `bulkDeleteAssetsBodySchema` had no upper bound on `ids` - added `.max(100)`. Round 2: 0 critical, 0 warning, 2 suggestions. Both suggestions were no-change items (imageSize has no async Buffer API; allSettled refactored to Promise.all). Merged without re-review.
+
 ## Issue #34 - Categories API (PR #52)
 
 **Status**: Merged
