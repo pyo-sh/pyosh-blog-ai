@@ -46,3 +46,35 @@ Server Component (SSR) → fetchPosts({ page }) → initialData
 사이드바 통합(AC 2건)은 F-39 이슈 #185에서 처리. PR은 `Closes` 대신 `Refs #168`로 변경하여 이슈가 F-39 완료 시까지 열린 상태를 유지.
 
 **리뷰 라운드:** 2회 (Critical 1건 - PR body Closes→Refs 수정)
+
+### #170 [F-09] 방명록 (PR #213 머지)
+
+방명록 페이지(F-09)를 구현했다. 게스트/OAuth 사용자 작성·삭제, 비밀글, flat 구조, 상대 시간 표시를 완성했다.
+
+**주요 변경 사항:**
+
+- `entities/guestbook/model.ts` - `BaseCreateGuestbookBody`에서 `parentId` 제거 (방명록 flat 구조 명시)
+- `features/guestbook-form/ui/guestbook-page-content.tsx` - 여러 기능 완성:
+  - `formatRelativeTime` - "3분 전", "1시간 전", "2일 전" 형태의 상대 시간 표시 (30일 초과 시 절대 날짜 폴백); 음수 diffMs 가드 추가
+  - flat 구조 렌더링 - replies 재귀 제거, `appendGuestbookEntry`·`markGuestbookDeleted` 단순화
+  - 작성 후 스크롤 이동 - `newEntryRef` + `scrollIntoView({ behavior: "smooth" })`
+  - OAuth 배지 표시 - OAuth 사용자 항목에 배지 추가
+  - 비밀글 body 마스킹 - `isSecret && !body` 조건으로 "비밀 방명록입니다." 표시
+  - 헤더에 "총 N개 방명록" 카운트 표시
+
+**데이터 흐름:**
+```
+GuestbookPage (Server Component, SSR)
+  └─ fetchMeServer() → guest/oauth 구분
+  └─ fetchGuestbook(page) → flat 목록
+       └─ GuestbookPageContent (Client)
+            ├─ CommentForm variant="guestbook" → POST /api/guestbook → 목록 prepend + scroll
+            └─ Modal → DELETE /api/guestbook/:id → soft delete 마스킹
+```
+
+**미완료 DoD:**
+- F-13 EmptyState 컴포넌트 (별도 이슈)
+- F-38 Storybook story (별도 이슈)
+- A-01 모달 포커스 트랩 (별도 이슈)
+
+**리뷰 라운드:** 1회 (Suggestion 2건 수정 - 클락 스큐 가드, 중복 의존성 제거)
