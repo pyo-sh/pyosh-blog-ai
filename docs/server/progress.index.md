@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-26 | Issue #37 Posts public API: GET /api/posts/slugs, PostListItem/PostDetail schemas (totalPageviews, commentCount, ancestors), filter param, batch enrichment + PR #54 머지 | ✅   |
 | 2026-03-26 | Issue #35 Guestbook + settings API: 8 guestbook endpoints + 2 settings endpoints, DELETE/PATCH HTTP semantics split, status-guard filters, soft_delete idempotency + PR #53 머지 | ✅   |
 | 2026-03-26 | Issue #32 Logging and error management: prod multistream(stdout+error.log), req body 마스킹, test disableRequestLogging, discriminated union 타입 + PR #50 머지 | ✅   |
 | 2026-03-26 | Issue #31 Auth system: OAuth 전략/라우트 env 조건부 등록, `optionalAuth` null 명시, `user` 타입 확장 + PR #51 머지 | ✅   |

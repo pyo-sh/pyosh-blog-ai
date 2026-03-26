@@ -1,5 +1,56 @@
 # Server Progress - 2026-03-26
 
+## Issue #37 - Posts public API (PR #54)
+
+**Status**: Merged
+
+### What was done
+
+Implemented the 3 public post endpoints, `PostDetail`/`PostListItem` response schemas with aggregates and category ancestors, and the `filter` search parameter.
+
+**New endpoint:**
+- `GET /api/posts/slugs` - returns `{ slugs: [{slug, updatedAt}] }` for published+public posts (sitemap use); capped at 50,000 rows with TODO for cursor pagination
+
+**Schema changes (`post.schema.ts`):**
+- `PostListItemSchema` - new schema for list responses: all `PostDetail` fields except `contentMd`, category without `ancestors`
+- `PostDetailSchema` - extended with `totalPageviews: number`, `commentCount: number`, `category.ancestors: [{name, slug}]`
+- `PostDetailCategorySchema` - `PostCategorySchema` + `ancestors` array (PostDetail only)
+- `PostSlugsResponseSchema` - `{ slugs: [{slug, updatedAt}] }`
+- `PostListResponseSchema` - updated to use `PostListItemSchema` (was `PostDetailSchema`)
+- `PostListQuerySchema` - added `filter` enum: `title_content | title | content | tag | category | comment` (default `title_content`)
+
+**Service changes (`post.service.ts`):**
+- `enrichPostListItems(posts)` - batch method: 4 parallel queries (category IN, tags JOIN IN, stats SUM GROUP BY, comments COUNT GROUP BY) for N posts; replaces N×4 per-post calls
+- `enrichPostWithDetails(post)` - single-post enrichment with stats, commentCount, category.ancestors; explicit null guard for missing category
+- `fetchCategoryAncestors(categoryId, db)` - walks parentId chain with per-level queries; cycle-safe via `visited` Set; depth-capped at `MAX_DEPTH=10`
+- `getPostSlugs()` - returns published+public slugs ordered by updatedAt desc, limited to 50,000
+- `getPostList()` filter support - `title`/`content`/`title_content` use LIKE conditions; `tag` fetches matching tag IDs then post IDs; `category` fetches matching category IDs; `comment` fetches post IDs from comment body matches; else branch falls back to `title_content` when `filter` is undefined (direct service callers)
+- `getPostByIdInternal()` - updated to include stats, commentCount, ancestors; explicit null guard for category
+
+**Route changes (`post.route.ts`):**
+- `GET /api/posts/slugs` registered before `GET /api/posts/:slug` to avoid route conflict
+
+**Tests added (`test/routes/posts.test.ts`):**
+- `GET /api/posts/slugs` - returns only published+public slugs; empty result when none
+- `filter=tag` - match by tag name, empty result path
+- `filter=category` - match by category name, empty result path
+- `filter=comment` - match by comment body, empty result path
+- `filter=title` / `filter=content` - field-scoped search
+- `category.ancestors` - nested category returns parent in ancestors array
+- `totalPageviews`/`commentCount` fields present in list response
+
+### Key design decisions
+
+- List endpoint uses 4 fixed queries regardless of page size (`enrichPostListItems`), not N×4 per post
+- `PostListItem` excludes `contentMd` from list responses; `PostDetail` (single post) includes it
+- `category.ancestors` only in `PostDetail`; list items use flat `PostCategorySchema` (no ancestors) for efficiency
+- `fetchCategoryAncestors` avoids full-table scan by walking parentId chain individually; MAX_DEPTH=10 bounds worst-case depth traversal
+- `filter` default enforced at Zod schema level; service has else fallback for direct callers
+
+### Review outcome
+
+5 rounds. Round 1: N+1 amplified to 4N (critical) - fixed with batch `enrichPostListItems`. Cycle guard missing (warning) - fixed with visited Set. Full category table scan (warning) - fixed with per-level parent chain walk. Round 2: MAX_DEPTH guard, tests for tag/category/comment filter modes, TODO for unbounded slugs. Round 3: else fallback for undefined filter, `.limit(50000)` on slugs. Round 4: null guard for category in single-post paths. Round 5: `HttpError.notFound` consistency in list batch path.
+
 ## Issue #35 - Guestbook + settings API (PR #53)
 
 **Status**: Merged
