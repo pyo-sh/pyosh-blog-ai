@@ -1,5 +1,35 @@
 # Server Progress - 2026-03-27
 
+## Issue #45 Admin comment API - test coverage (PR #64)
+
+**관련 이슈:** #45 [S-05b] Comments admin API
+**PR:** pyo-sh/pyosh-blog-be#64 (merged)
+
+### 작업 내용
+
+5개 admin comment 엔드포인트는 #40(PR #61)에서 이미 구현됨. 이 PR은 spec에 명시된 `authorType` 필터와 `order` 파라미터 테스트가 누락되어 있어 추가.
+
+**구현 범위 (기존 #40에서 완성):** `GET /api/admin/comments`, `GET /api/admin/comments/:id/thread`, `PUT /api/admin/comments/:id/restore`, `DELETE /api/admin/comments/:id`, `DELETE /api/admin/comments/bulk`
+
+#### 추가된 테스트
+
+| 항목 | 내용 |
+|---|---|
+| `authorType=guest` 필터 | guest 댓글만 반환, author.type 확인 |
+| `authorType=oauth` 필터 | OAuth 댓글만 반환 |
+| `order=asc/desc` 정렬 | desc 첫 번째 = asc 마지막 ID 검증 |
+
+#### seedComment 헬퍼 추가
+
+`test/helpers/seed.ts`에 `seedComment(postId, overrides?)` 추가. `createdAt` 오버라이드를 지원하여 `order` 정렬 테스트에서 distinct timestamp를 보장함 (MySQL TIMESTAMP 1초 정밀도 우회, `setTimeout` 불필요).
+
+### 변경 파일
+
+- `test/helpers/seed.ts` - `seedComment` 헬퍼 추가
+- `test/routes/comments.test.ts` - authorType/order 테스트 추가, 페이지네이션 메타 어설션 확장 (24 → 27 tests)
+
+---
+
 ## Issue #41 Posts admin CRUD — tests + pagination meta fix (PR #62)
 
 **관련 이슈:** #41 [S-04b] Posts admin CRUD
