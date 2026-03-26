@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-26 | Issue #30 App bootstrap + health check: `GET /api/health` memory 필드 누락 수정 + PR #47 머지 | ✅   |
 | 2026-02-28 | Issue #10 로깅 체계화: PR #22 리뷰 2라운드 반영 + squash merge (routeOptions.url 보안, pino err 키 일관성) | ✅   |
 | 2026-02-27 | Issue #10 로깅 체계화: buildLoggerOptions(env 레벨/redact), loggerPlugin, 에러 핸들러 컨텍스트 강화, uncaughtException/unhandledRejection 처리 | ✅   |
 | 2026-02-25 | Issue #15 GET /api/assets 에셋 목록 엔드포인트 추가 + dev-pipeline 스킬 CLI 옵션 수정 | ✅   |
@@ -33,6 +34,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-26.md](./progress/progress.2026-03-26.md) - Issue #30 app bootstrap: /api/health memory 필드 추가 + PR #47 머지
 - [progress.2026-02-28.md](./progress/progress.2026-02-28.md) - Issue #10 PR #22 리뷰 반영 + squash merge 완료
 - [progress.2026-02-27.md](./progress/progress.2026-02-27.md) - Issue #10 로깅 체계화: pino logger 최적화 + 에러 컨텍스트 로깅 + uncaught 예외 처리
 - [progress.2026-02-25.md](./progress/progress.2026-02-25.md) - Issue #13 GET /api/admin/posts 쿼리 파라미터 문서화 및 구현
