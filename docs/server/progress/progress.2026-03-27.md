@@ -1,5 +1,46 @@
 # Server Progress - 2026-03-27
 
+## Issue #44 Posts admin lifecycle (PR #63)
+
+**관련 이슈:** #44 [S-04c] Posts admin lifecycle
+**PR:** pyo-sh/pyosh-blog-be#63 (merged)
+
+### 작업 내용
+
+Admin 게시글 생명주기 엔드포인트 구현 및 기존 hard delete 버그 수정.
+
+**구현 범위:** `PATCH /api/admin/posts/bulk`, `DELETE /api/admin/posts/:id` (soft), `PUT /api/admin/posts/:id/restore`, `DELETE /api/admin/posts/:id/hard`
+
+#### 신규 구현: `PATCH /api/admin/posts/bulk`
+
+| 항목 | 내용 |
+|---|---|
+| 스키마 | `BulkPostActionBodySchema` - dual refine: `update` 시 필드 필수 / non-update 시 필드 거부 |
+| 서비스 | `bulkUpdatePosts` - 단일 트랜잭션, ID 중복 제거, `categoryId` 존재 확인 |
+| 지원 액션 | `update` (categoryId/commentStatus), `soft_delete`, `restore`, `hard_delete` |
+
+#### 버그 수정: `hardDeletePost` 연쇄 삭제 미완성
+
+기존 구현에서 댓글(`comment_tb`), 조회수(`stats_daily_tb`), 고아 태그(`tag_tb`) 삭제가 누락되어 있었음.
+
+```
+수정 전: post_tag_tb + post_tb 삭제만 수행
+수정 후: comment_tb → stats_daily_tb → post_tag_tb → post_tb → 고아 tag_tb 순서로 삭제
+```
+
+#### `cleanOrphanTags` 헬퍼 추출
+
+`hardDeletePost`와 `bulkUpdatePosts` 양쪽에서 동일한 orphan-tag 정리 로직이 사용됨 - `cleanOrphanTags(tx, tagIds)` private 메서드로 추출해 중복 제거.
+
+### 변경 파일
+
+- `src/routes/posts/post.schema.ts` - `BulkPostActionBodySchema` 추가 (`.max(100)`, dual refine)
+- `src/routes/posts/post.service.ts` - `hardDeletePost` cascade 수정, `bulkUpdatePosts` + `cleanOrphanTags` 추가
+- `src/routes/posts/post.route.ts` - `PATCH /bulk` 라우트 추가 (/:id 앞 등록)
+- `test/routes/posts.test.ts` - 통합 테스트 16건 추가 (47 → 63 tests)
+
+---
+
 ## Issue #45 Admin comment API - test coverage (PR #64)
 
 **관련 이슈:** #45 [S-05b] Comments admin API

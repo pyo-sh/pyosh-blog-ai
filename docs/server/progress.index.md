@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-27 | Issue #44 Posts admin lifecycle: PATCH /bulk 신규, hardDeletePost cascade 수정 (댓글/통계/고아태그), cleanOrphanTags 헬퍼 추출, 통합 테스트 16건 추가 + PR #63 머지 | ✅   |
 | 2026-03-27 | Issue #45 Admin comment API: authorType/order 필터 테스트 추가, seedComment 헬퍼(createdAt 오버라이드) 추가 + PR #64 머지 | ✅   |
 | 2026-03-27 | Issue #40 Comments public API: GET pagination(루트 기준), POST/DELETE CSRF, Admin thread/restore/hard-delete/bulk + status guard + N+1 제거 + PR #61 머지 | ✅   |
 | 2026-03-27 | Issue #41 Posts admin CRUD: 통합 테스트 16건 추가 (GET list/detail, POST, PATCH), buildPaginatedResponse 파라미터 순서 버그 수정 + PR #62 머지 | ✅   |
