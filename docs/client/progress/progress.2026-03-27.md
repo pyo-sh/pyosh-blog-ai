@@ -325,4 +325,19 @@ Footer에 저작권 문구를 추가하고, GitHub 링크를 프로필 URL로 �
 
 **리뷰 라운드:** 2회
 - Round 1: Warning 1건 (`usePathname` 클라이언트 컴포넌트 → route group 레이아웃으로 교체), Suggestion 1건 (`URLS.githubProfile` 중복 제거)
+
+---
+
+### #184 [F-32] Favicon / Web Manifest (PR #227 머지)
+
+SVG favicon 추가, Web App Manifest를 W3C 권장 형식(`.webmanifest`)으로 변경, 브라우저 테마 색상을 다크/라이트 분리 적용.
+
+**주요 변경 사항:**
+
+- `public/favicon.svg` - NEW: 로고 아이콘 패스 추출. `<style>` 블록에 `prefers-color-scheme` 미디어 쿼리 포함 (라이트: `#232629`, 다크: `#e9eaeb`)
+- `public/manifest.webmanifest` - NEW: `manifest.json` 대체. `favicon.ico` type `image/png` → `image/x-icon` 수정, `theme_color` `#8D72E1` → `#8a6fe0`, `background_color` `#FFFFFF` → `#f9f9fa`, SVG 아이콘 항목 추가
+- `public/manifest.json` - 삭제
+- `src/app/layout.tsx` - SVG favicon을 icons 배열 최상단에 추가, manifest 경로 `/manifest.json` → `/manifest.webmanifest`, `themeColor` 단일 값(`#6200EE`) → 라이트(`#8a6fe0`) / 다크(`#131415`) 분리, `msapplication-TileColor` / `msapplication-TileImage` 메타데이터 제거, `Viewport` 타입 명시
+
+**리뷰 라운드:** 1회 (clean - 지적 없음)
 - Round 2: Clean pass

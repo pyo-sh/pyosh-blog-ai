@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #184 Favicon / Web Manifest (F-32) - SVG favicon 추가(다크/라이트), manifest.webmanifest 전환, theme-color 분리, msapplication 제거 PR #227 머지 | ✅   |
 | 2026-03-27 | #174 CSP 미들웨어 (F-34c) - nonce 기반 CSP-Report-Only 헤더, strict-dynamic, object-src none, matcher 확장 PR #225 머지 | ✅   |
 | 2026-03-27 | #180 Storybook 환경 구성 (F-38) - Storybook 10 + MSW 2, QueryClient useState factory, tsconfig.storybook.json, 스토리 22개 PR #226 머지 | ✅   |
 | 2026-03-27 | #179 Footer 콘텐츠 - 저작권 문구 추가, GitHub 프로필 URL 수정, (public) route group으로 Admin 페이지 숨김 PR #224 머지 | ✅   |
