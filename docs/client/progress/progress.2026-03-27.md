@@ -90,3 +90,26 @@ GuestbookPage (Server Component, SSR)
 - 5개 페이지에 배치: `posts/[slug]`, `tags`, `tags/[slug]`, `search`, `guestbook`
 
 **리뷰 라운드:** 2회 (Warning 1건 - 하드 리로드 시 초기 상태 미동기화 수정, Suggestion 1건 - PR description breakpoint 오기재 수정)
+
+### #173 [F-12] 에러 페이지 (PR #215 머지)
+
+에러 페이지 시스템(F-12)을 구현했다. `ErrorContent` 공통 컴포넌트를 도입하고, Public/Admin 에러 경계에 일관되게 적용했다.
+
+**주요 변경 사항:**
+
+- `shared/ui/libs/error-content.tsx` - NEW: badge(`primary` | `negative`), title, description, action(`link` | `button`)을 props로 받는 에러 카드 컴포넌트. h1 heading 계층 구조로 접근성 확보.
+- `shared/ui/libs/index.tsx` - `ErrorContent` export 추가
+- `app/not-found.tsx` - `ErrorContent` 사용으로 리팩터링 (Public 404, primary 배지, "홈으로 돌아가기" 링크)
+- `app/error.tsx` - `ErrorContent` 사용으로 리팩터링 (Public 500, negative 배지, "다시 시도" 버튼)
+- `app/global-error.tsx` - `ErrorContent` 사용으로 리팩터링 + `@app-layer/style/index.css` import 추가 (루트 레이아웃 밖 렌더링이므로 필요)
+- `app/dashboard/not-found.tsx` - NEW: Admin 404, `dashboard/layout.tsx`가 사이드바를 유지하므로 `<div>` 래퍼만 사용, "관리 홈으로 돌아가기" 링크 (`/dashboard`)
+- `app/dashboard/error.tsx` - NEW: Admin 500, 사이드바 유지, "다시 시도" 버튼
+- `shared/api/client.ts` - `clientFetch`에 403 인터셉터 추가: `/dashboard` 경로에서만 `/dashboard/login?reason=forbidden`으로 리다이렉트 (공개 페이지 영향 없음)
+
+**주요 결정:**
+
+- `ErrorContent`의 최대 너비를 `max-w-[32rem]`으로 통일 (기존 Not Found는 `max-w-[36rem]` 사용) - 500/404 일관성 확보
+- 403 인터셉터는 `window.location.pathname.startsWith("/dashboard")` 조건으로 공유 레이어에서 경로 분기 처리 - 공개 API 호출이 403을 받아도 대시보드 로그인으로 리다이렉트되지 않음
+- `role="alert"`는 정적 에러 페이지에 부적합 - h1 heading 계층 구조로 대체
+
+**리뷰 라운드:** 3회 (Round 1: Warning 1건 - window.alert 제거/리다이렉트로 교체, Suggestion 1건 - 중복 aria-live 제거. Round 2: Critical 1건 - 403 인터셉터 공유 레이어 경로 분기, Warning 1건 - role=alert 제거)
