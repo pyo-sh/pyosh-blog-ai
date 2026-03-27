@@ -249,3 +249,25 @@ CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인�
 - `.env.local.example` - 두 변수의 용도와 폴백 동작을 설명하는 인라인 주석 추가
 
 **리뷰 라운드:** 0회 (Clean pass)
+
+---
+
+### #179 [F-36] Footer 콘텐츠 (PR #224 머지)
+
+Footer에 저작권 문구를 추가하고, GitHub 링크를 프로필 URL로 수정했으며, Admin 페이지에서 Footer를 숨겼다.
+
+**주요 변경 사항:**
+
+- `src/widgets/footer/index.tsx` - Logo 제거; `© {year} pyo-sh` 저작권 문구 추가(`new Date().getFullYear()`); GitHub 링크 표시 텍스트를 전체 URL에서 "pyo-sh"로 변경; 소셜 링크에 `aria-label` 추가; `nav aria-label="소셜 링크"` 랜드마크 추가; 상하 패딩 `py-8`(32px), 소셜 링크 간격 `gap-2`(8px), 저작권 상단 여백 `mt-4`(16px)
+- `src/shared/constant/url.ts` - `URLS.github` 값을 레포 URL(`pyosh_blog`)에서 프로필 URL(`https://github.com/pyo-sh`)로 변경; 동일해진 `URLS.githubProfile` 제거
+- `src/app/(public)/layout.tsx` - NEW: 공개 라우트 전용 레이아웃. Footer를 이 레이아웃에 배치
+- `src/app-layer/provider/index.tsx` - Footer import/렌더링 제거 (route group 레이아웃으로 이전)
+- 공개 페이지 라우트 7개 (`page.tsx`, `categories/`, `guestbook/`, `popular/`, `posts/`, `search/`, `tags/`) → `app/(public)/`로 이전
+
+**주요 결정:**
+
+- Footer 숨김 방식으로 `usePathname()` 대신 Next.js App Router route group `(public)` 패턴 채택. `usePathname` 방식은 Footer를 클라이언트 컴포넌트로 만들어 불필요한 hydration을 유발하므로, route group 레이아웃 분리로 Footer를 Server Component로 유지.
+
+**리뷰 라운드:** 2회
+- Round 1: Warning 1건 (`usePathname` 클라이언트 컴포넌트 → route group 레이아웃으로 교체), Suggestion 1건 (`URLS.githubProfile` 중복 제거)
+- Round 2: Clean pass
