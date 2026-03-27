@@ -341,3 +341,23 @@ SVG favicon 추가, Web App Manifest를 W3C 권장 형식(`.webmanifest`)으로 
 
 **리뷰 라운드:** 1회 (clean - 지적 없음)
 - Round 2: Clean pass
+
+---
+
+### #182 [F-05] 태그별 글 목록 (PR #228 머지)
+
+태그 slug 기반 글 목록 페이지를 완성했다. 기존 구현에서 `PostCard` → `PostListItem` 전환, `Pagination` 사용 패턴을 F-01·F-03·F-05 전체에서 통일했다.
+
+**주요 변경 사항:**
+
+- `src/app/(public)/tags/[slug]/page.tsx` - `PostCard` → `PostListItem` (F-01과 동일), `Pagination`을 `posts.length` 조건 분기 밖으로 이동 (항상 렌더링, 표시 여부는 컴포넌트에 위임)
+- `src/app/(public)/categories/[slug]/page.tsx` - `PostCard` → `PostListItem` (태그 페이지와 일관성), `{meta.totalPages > 1 && <Pagination>}` 조건 제거 → 항상 렌더링
+- `src/features/post-list/ui/post-list.tsx` - `{meta && meta.totalPages > 1 && <Pagination>}` 조건 제거 → 항상 렌더링, empty 분기를 early return → ternary로 변경
+- `stories/app/tag-posts.stories.tsx` - TagPostsPreview 프레젠테이션 컴포넌트로 태그별 글 목록 레이아웃 Storybook story 추가 (Default / WithPagination / Empty / Mobile / DarkMode)
+- `stories/mocks/data/tags.ts` - Tag mock 데이터 추가
+
+**Pagination 패턴 통일 근거:** `Pagination` 컴포넌트 내부에 `if (totalPages <= 1) return null` 로직이 있으므로 호출 측에서 이중 조건 체크가 불필요하다.
+
+**리뷰 라운드:** 2회
+- Round 1: [WARNING] categories 페이지가 `PostCard`를 그대로 사용해 태그 페이지와 불일치 - `PostListItem`으로 전환
+- Round 2: Clean pass

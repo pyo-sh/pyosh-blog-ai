@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #182 태그별 글 목록 (F-05) - PostListItem 통일(tags+categories), Pagination 조건 제거(F-01·F-03·F-05), Storybook story PR #228 머지 | ✅   |
 | 2026-03-27 | #184 Favicon / Web Manifest (F-32) - SVG favicon 추가(다크/라이트), manifest.webmanifest 전환, theme-color 분리, msapplication 제거 PR #227 머지 | ✅   |
 | 2026-03-27 | #174 CSP 미들웨어 (F-34c) - nonce 기반 CSP-Report-Only 헤더, strict-dynamic, object-src none, matcher 확장 PR #225 머지 | ✅   |
 | 2026-03-27 | #180 Storybook 환경 구성 (F-38) - Storybook 10 + MSW 2, QueryClient useState factory, tsconfig.storybook.json, 스토리 22개 PR #226 머지 | ✅   |
@@ -50,7 +51,7 @@
 
 ## 🔗 상세 문서
 
-- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #182 태그별 글 목록 PR #228 머지, #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
 - [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지
