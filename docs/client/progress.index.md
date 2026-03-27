@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #193 댓글 관리 테이블 + 필터 + 상세 모달 (F-28a) - Admin 댓글 테이블/필터/상세 모달/스레드 뷰, 단건 삭제 복구, thread API 계약 정합화 PR #238 머지 | ✅   |
 | 2026-03-27 | #190 카테고리 트리 표시 (F-24a) - 재귀 렌더링, 접기/펼치기, 숨김 필터, 글 개수 표시 PR #236 머지 | ✅   |
 | 2026-03-27 | #191 에셋 업로드 (F-26) - XHR 진행률, 드래그 피드백, magic bytes 검증, Cache-Control PR #235 머지 | ✅   |
 | 2026-03-27 | #186 글 관리 테이블 + 필터 + 정렬 (F-21a) - PostTable/PostFilters/BulkActions 위젯, ConfirmDialog/ToggleSwitch 공유 컴포넌트, optimistic 토글, 3단계 정렬 PR #234 머지 | ✅   |
@@ -59,6 +60,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #193 댓글 관리 테이블 + 필터 + 상세 모달 PR #238 머지
 - [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #186 글 관리 테이블+필터+정렬 PR #234 머지, #185 Public 사이드바 레이아웃 PR #232 머지, #188 클라이언트 에러 수집 PR #230 머지, #182 태그별 글 목록 PR #228 머지, #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지

@@ -2,6 +2,44 @@
 
 ## 완료된 작업
 
+### #193 [F-28a] 댓글 관리 테이블 + 필터 + 상세 모달 (PR #238 머지)
+
+관리자 댓글 관리 페이지에 댓글 테이블, 상태/작성자/글/기간 필터, 상세 모달과 스레드 뷰를 구현하고 자동 리뷰 라운드에서 드러난 회귀·정합성 문제를 정리해 병합했다.
+
+**주요 변경 사항:**
+
+- `src/widgets/admin-comments/ui/admin-comments-page.tsx`
+  - 상태/작성자/글/기간 필터와 페이지네이션을 오케스트레이션
+  - 체크박스 기반 선택 상태를 ID 기준으로 유지하고 다른 페이지 선택 개수를 카운터에 반영
+  - 단건 삭제 mutation을 테이블 액션과 다시 연결하고 실패 메시지 표시
+  - 상세 모달 `onClose`를 `useCallback`으로 고정해 ESC 리스너 재등록을 방지
+- `src/widgets/admin-comments/ui/comment-table.tsx`
+  - 체크박스 열, 비밀 여부 아이콘 열, 글 제목 링크, 상태 배지, 단건 삭제 버튼 추가
+  - 헤더 체크박스로 현재 페이지 전체 선택/해제 지원
+  - `🔒` 아이콘 헤더에 `sr-only` 레이블을 추가해 스크린리더 접근성 보완
+- `src/widgets/admin-comments/ui/comment-detail-modal.tsx`
+  - 댓글 메타데이터, 부모 댓글 접기/펼치기, 관련 댓글 스레드 뷰 구현
+  - 스레드 로드 실패 시 상세 뷰를 유지하도록 수정
+  - 비동기 스레드 응답에 stale guard를 두고, 모달 내부에서 다른 댓글로 이동한 뒤에도 현재 댓글 기준으로 안전하게 다시 로드되도록 보완
+- `src/entities/comment/api.ts`
+  - `GET /api/admin/comments/:id/thread` 응답을 서버 계약 `{ parent, replies }`에 맞춰 파싱하고 모달에서 쓰는 flat 배열로 정규화
+
+**리뷰 수정 사항:**
+
+- 라운드 2: 테이블 단건 삭제 회귀를 복구하고 삭제 액션 상태/오류 표시를 페이지에 다시 연결
+- 라운드 3: 스레드 로드 실패 시 빈 스레드 화면으로 전환되던 동작과 늦은 응답이 다른 댓글 상태를 덮어쓰는 문제를 수정
+- 라운드 4: 이슈 명세를 재확인해 필터 변경 시 선택 유지가 맞음을 확인하고, 선택 상태 초기화 제거·thread API 응답 shape 정합성 수정·모달 내부 네비게이션 후 stale guard 동기화 적용
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm eslint src/entities/comment/api.ts src/widgets/admin-comments/ui/admin-comments-page.tsx src/widgets/admin-comments/ui/comment-detail-modal.tsx src/widgets/admin-comments/ui/comment-table.tsx`
+- `pnpm build`
+
+**메모:**
+
+- 전체 `pnpm lint`는 기존 저장소의 무관한 lint 오류(`src/entities/asset/api.ts`, `src/features/asset-uploader/ui/asset-uploader.tsx`, `src/features/asset-uploader/ui/upload-zone.tsx`) 때문에 이번 이슈 범위 밖에서 계속 실패한다.
+
 ### #190 [F-24a] 카테고리 트리 표시 (PR #236 머지)
 
 관리자 카테고리 관리 페이지의 `category-tree.tsx`를 전면 리팩토링하여 트리 렌더링, 접기/펼치기, 숨김 필터, 글 개수 표시를 구현했다.
