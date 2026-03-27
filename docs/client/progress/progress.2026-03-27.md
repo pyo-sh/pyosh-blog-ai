@@ -2,6 +2,34 @@
 
 ## 완료된 작업
 
+### #180 [F-38] Storybook 환경 구성 (PR #226 머지)
+
+Storybook 10 + MSW 2 + TanStack Query 기반 컴포넌트 개발·검토 환경을 구성했다. DB/서버 없이 모든 화면을 Storybook에서 확인할 수 있다.
+
+**주요 변경 사항:**
+
+- `.storybook/main.ts` - `@storybook/nextjs` 프레임워크, webpack alias 설정(`@app`, `@widgets` 등 FSD 경로), `@storybook/addon-themes`·`@storybook/addon-a11y` 애드온
+- `.storybook/preview.tsx` - `useState` factory 패턴으로 QueryClient 스토리당 격리, `onUnhandledRequest: "bypass"` MSW 초기화, 다크/라이트 모드 데코레이터, 모바일(375px)/데스크톱(1280px) 뷰포트
+- `tsconfig.storybook.json` - `moduleResolution: bundler`로 Storybook v10 패키지 타입 호환
+- `package.json` - `"storybook": "storybook dev -p 6006"` 스크립트 추가 (로컬 전용, build-storybook 미포함)
+- `public/mockServiceWorker.js` - MSW 서비스 워커 (`pnpm exec msw init public/`)
+- `stories/mocks/handlers.ts` - 공통 API 핸들러 (posts, categories, comments, guestbook, assets, stats, auth 7개 도메인)
+- `stories/mocks/data/` - 6개 도메인 목 데이터 (SVG data URL 기반 placeholder 이미지, 도메인별 정확한 pagination meta)
+- 스토리 파일 22개 - FSD 계층(App, Widgets/Admin, Features, Shared) 구조로 배치; Default/Empty/Error/DarkMode/Mobile 변형 포함
+
+**Storybook v10 주요 이슈 (findings.011 참조):**
+
+- `@storybook/addon-essentials`는 v10 코어에 통합 - 별도 설치 불필요
+- `moduleResolution: node`로는 v10 패키지 타입 해석 불가 - 전용 `tsconfig.storybook.json` 필요
+- `QueryClient` 싱글톤/직접 생성은 스토리 간 캐시 오염 - `useState` factory 패턴으로 해결
+
+**리뷰 라운드:** 3회
+- Round 1: Warning 2건 - QueryClient 싱글톤 캐시 공유 문제, `stories/` tsconfig 미포함
+- Round 2: Warning 2건 - QueryClient 직접 생성(re-render 시 캐시 초기화), `via.placeholder.com` 외부 URL 의존
+- Round 3: Suggestion 3건 - mockMeta 총계 불일치, PostList 스토리 제목 오해 소지 (적용), build-storybook 누락 (스펙상 제외)
+
+---
+
 ### #169 [F-13] 로딩/빈 상태 (PR #217 머지)
 
 `Skeleton`, `Spinner`, `EmptyState` 공유 컴포넌트를 `@shared/ui/libs`에 추가하고, 기존 7개 로컬 스켈레톤 정의와 인라인 빈 상태 패턴을 교체했다.

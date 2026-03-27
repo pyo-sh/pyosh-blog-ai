@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #180 Storybook 환경 구성 (F-38) - Storybook 10 + MSW 2, QueryClient useState factory, tsconfig.storybook.json, 스토리 22개 PR #226 머지 | ✅   |
 | 2026-03-27 | #179 Footer 콘텐츠 - 저작권 문구 추가, GitHub 프로필 URL 수정, (public) route group으로 Admin 페이지 숨김 PR #224 머지 | ✅   |
 | 2026-03-27 | #178 Client 환경 변수 설정 - serverFetch/clientFetch API URL 분리 (INTERNAL_API_URL/PUBLIC_API_URL), .env.local.example 주석 추가 PR #223 머지 | ✅   |
 | 2026-03-27 | #221 Design token 동기화 - theme.css/typography.css figma_tokens.json 동기화 (tertiary→info, quaternary 삭제, warning/overlay/special 추가, 색상 값 8개 수정, text-ui-* 추가) PR #222 머지 | ✅   |
