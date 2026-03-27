@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #191 에셋 업로드 (F-26) - XHR 진행률, 드래그 피드백, magic bytes 검증, Cache-Control PR #235 머지 | ✅   |
 | 2026-03-27 | #186 글 관리 테이블 + 필터 + 정렬 (F-21a) - PostTable/PostFilters/BulkActions 위젯, ConfirmDialog/ToggleSwitch 공유 컴포넌트, optimistic 토글, 3단계 정렬 PR #234 머지 | ✅   |
 | 2026-03-27 | #183 포스트 상세 마크다운 렌더링 개선 (F-06) - GFM, 코드 블록 복사/언어 헤더(CodeBlockEnhancer), 관련 글 섹션, SSR 코드 블록 시각 폴백 PR #229 머지 | ✅   |
 | 2026-03-27 | #187 관리자 대시보드 리팩터링 - dashboard-home 분리(StatsSection/PostStatusSection/RecentCommentsSection), formatNumber 공유 유틸, deleteError onMutate 클리어, totalPosts 활용 PR #233 머지 | ✅   |

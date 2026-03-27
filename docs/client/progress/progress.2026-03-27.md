@@ -528,3 +528,21 @@ GFM 지원, 코드 블록 복사/언어 레이블 헤더, 관련 글 섹션을 �
 **리뷰 라운드:** 3회
 - Round 1 (1 WARNING, 1 SUGGESTION): SSR 코드 블록 unstyled - `.markdown-content pre`에 배경/보더/반경 추가; `pre.parentNode?.insertBefore` 불완전 가드 - `if (!pre.parentNode) return`으로 교체
 - Round 2 (2 SUGGESTION): `fetchPosts limit: 6` 필터 후 4개 반환 가능 - `limit: 7`로 수정; `timers.splice(indexOf(-1))` 엣지 케이스 - `if (idx !== -1)` 가드 추가 (skipReview)
+
+---
+
+### #191 [F-26] 에셋 업로드 - XHR 진행률, 드래그 피드백, magic bytes (PR #235 머지)
+
+기존 에셋 업로드 구현에 세 가지 개선을 추가했다. fetch 기반 업로드를 XHR로 전환하여 진행률 이벤트를 수신하고, 드래그 앤 드롭 영역에 시각 피드백 상태를 추가했다. 서버에서는 magic bytes 검증과 Cache-Control 헤더를 추가하는 별도 server PR(pyo-sh/pyosh-blog-be#66)을 함께 제출했다.
+
+**주요 변경 사항:**
+
+- `src/entities/asset/api.ts` - `uploadAssets`를 XHR 기반으로 재작성. `onProgress` 콜백으로 업로드 진행률(0-100%) 수신. `xhr.upload.onprogress`, `xhr.onload`, `xhr.onerror` 핸들러로 오류 처리 포함
+- `src/features/asset-uploader/ui/upload-zone.tsx` - `uploadProgress: number | null` prop 추가 + 진행률 바 렌더링. `DropArea`에 `isDragging` 상태와 `dragCounterRef`(중첩 dragenter/dragleave 카운터) 추가 - 드래그 중 테두리 하이라이트(`border-primary-1`) + "놓으면 추가됩니다" 메시지. `role="button"`, `tabIndex`, `onKeyDown`으로 키보드 포커스 접근성 개선
+- `src/features/asset-uploader/ui/asset-uploader.tsx` - `uploadProgress` state 추가. `uploadAssets` 호출 시 `setUploadProgress` 콜백 전달. 성공/실패 시 `null`로 초기화
+
+**서버 병행 변경 (pyo-sh/pyosh-blog-be#66):**
+- `src/plugins/static.ts` - `maxAge: 30 * 24 * 60 * 60 * 1000`, `immutable: true` 추가 → `Cache-Control: public, max-age=2592000, immutable`
+- `src/services/file-storage.service.ts` - `MAGIC_BYTES` 맵 추가, `validateMagicBytes()` 함수로 MIME 위조 차단 (JPEG/PNG/GIF/WebP; SVG는 텍스트 기반이므로 제외)
+
+**리뷰 라운드:** 0회 (clean pass)
