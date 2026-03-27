@@ -395,3 +395,31 @@ SVG favicon 추가, Web App Manifest를 W3C 권장 형식(`.webmanifest`)으로 
 **리뷰 라운드:** 2회
 - Round 1: [WARNING] categories 페이지가 `PostCard`를 그대로 사용해 태그 페이지와 불일치 - `PostListItem`으로 전환
 - Round 2: Clean pass
+
+---
+
+### #188 [F-35c] 클라이언트 에러 수집 (PR #230 머지)
+
+React Error Boundary, API 에러 로깅, unhandledrejection 핸들러를 추가해 클라이언트 에러를 체계적으로 수집한다. v1은 콘솔 로깅 기반이다.
+
+**주요 변경 사항:**
+
+- `src/shared/ui/error-boundary.tsx` (신규)
+  - `ErrorBoundary` 클래스 컴포넌트 - `componentDidCatch`에서 `[React Error]` 구조화 로깅
+  - `retryKey` 카운터 - 재시도 시 children 강제 remount (`<React.Fragment key={retryKey}>`)
+  - `ErrorBoundaryWithReset` 래퍼 - `usePathname`으로 라우트 이동 시 자동 리셋 (retryKey도 0으로 초기화)
+  - 폴백 UI: `ErrorContent` 컴포넌트 재사용 (badge: "오류가 발생했습니다")
+- `src/shared/api/client.ts`
+  - `handleResponse`에 optional `context` 파라미터 추가 (`url`, `method`)
+  - 5xx 응답: `console.error("[API Error]", ...)` / 4xx 응답: `console.warn("[API Warning]", ...)`
+  - `clientFetch`에서 context 전달 (`serverFetch`는 클라이언트 전용 범위라 제외)
+- `src/app-layer/provider/index.tsx`
+  - `useEffect`로 `unhandledrejection` 이벤트 리스너 등록/정리
+- `src/app/layout.tsx`
+  - `ErrorBoundaryWithReset`으로 최상위 래핑
+
+**리뷰 라운드:** 4회
+- Round 1: 배지 레이블 "500 Server Error" → "오류가 발생했습니다" (클라이언트 에러에 HTTP 500 표기 오류), serverFetch 미로깅 의도 명시 주석 추가
+- Round 2: `retryKey` 카운터 추가로 reset 시 children 강제 remount
+- Round 3: `ErrorBoundaryWithReset` 래퍼 추가 (라우트 이동 시 자동 리셋), `getDerivedStateFromError`에 `_error` 파라미터 명시
+- Round 4: 4xx는 `console.warn` 분기, 라우트 변경 시 `retryKey`도 0으로 초기화
