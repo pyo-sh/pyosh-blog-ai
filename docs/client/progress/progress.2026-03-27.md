@@ -177,3 +177,20 @@ CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인�
 - `CategoryFormModal.errorMessage` prop은 항상 null이 되어 dead interface가 되므로 prop 자체를 제거
 
 **리뷰 라운드:** 2회 (Round 1: Warning 2건 - 잔여 inline 에러 상태 dead code 제거, Suggestion 1건 - `error.message` 빈 문자열 가드 추가. Round 2: Suggestion 1건 - CategoryFormModal dead errorMessage prop 제거)
+
+---
+
+### #175 [F-19] 관리자 로그인 (PR #219 머지)
+
+관리자 인증 시스템을 구현했다. 아이디/비밀번호 기반 로그인, `/manage/*` 경로 인증 가드, 사이드바 로그아웃 버튼을 완성했다.
+
+**주요 변경 사항:**
+
+- `src/middleware.ts` - 경로 `/dashboard/*` → `/manage/*` 이전. matcher, 상수, `redirectToDashboard` → `redirectToManage` 함수명 업데이트
+- `src/app/dashboard/` → `src/app/manage/` - 관리 페이지 라우팅 디렉터리 전체 이전 (15개 파일). 내부 하이퍼링크 `/dashboard/...` → `/manage/...` 일괄 변경
+- `src/entities/auth/model.ts` - `LoginCredentials.email` → `username`, `CurrentAdminUser.email` → `username`, `AdminUser.email` → `username`
+- `src/features/admin-login/ui/login-form.tsx` - 이메일 필드 → 아이디 필드 (`type="text"`, `autoComplete="username"`). 로그인 성공 후 `/manage`로 이동
+- `src/widgets/admin-sidebar/ui/admin-sidebar.tsx` - 메뉴 경로 전체 `/manage/*`로 업데이트. 상단 로그아웃 버튼 추가 (`useTransition`, `logout()` 호출, 실패 시 Toast)
+- `src/shared/api/client.ts` - 403 인터셉터 경로 조건 및 리다이렉트 대상 `/manage/login`으로 업데이트
+
+**리뷰 라운드:** 1회 (Suggestion 1건 - `DashboardPostEditPage` 함수명 미변경, 런타임 영향 없어 merge 결정)
