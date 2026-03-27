@@ -2,6 +2,30 @@
 
 ## 완료된 작업
 
+### #169 [F-13] 로딩/빈 상태 (PR #217 머지)
+
+`Skeleton`, `Spinner`, `EmptyState` 공유 컴포넌트를 `@shared/ui/libs`에 추가하고, 기존 7개 로컬 스켈레톤 정의와 인라인 빈 상태 패턴을 교체했다.
+
+**주요 변경 사항:**
+
+- `shared/ui/libs/skeleton.tsx` - NEW: `variant`(text/circle/rect), `width`, `height`, `repeat`, `className` props. 각 variant별 기본 크기 및 `animate-pulse bg-background-3`. `aria-busy="true"` wrapper로 접근성 확보.
+- `shared/ui/libs/spinner.tsx` - NEW: `size`(sm/md) prop. `aria-hidden="true"` SVG만 렌더링, `role="status"` 미포함 (버튼 내부 이중 공지 방지).
+- `shared/ui/libs/empty-state.tsx` - NEW: `variant`("default" | "page"), `icon`, `message`, `className` props. `default` - 관리자 스타일(`bg-background-1 px-6 py-12 text-sm`), `page` - 공개 페이지 스타일(`bg-background-2 p-8 md:p-10 text-body-md`).
+- `shared/ui/libs/index.tsx` - `EmptyState`, `Skeleton`, `Spinner` export 추가 (main 브랜치의 `ErrorContent`, `ScrollToTop`과 병합).
+- 로컬 스켈레톤 7개 제거: `TableSkeleton`(posts, guestbook-manager), `TreeSkeleton`(category-manager), `DashboardLoading`/`DashboardStatsSkeleton`(dashboard), `PostListItemSkeleton`(post-list), `app/loading.tsx` 인라인.
+- Spinner 적용: login-form, category-form-modal, category-manager, guestbook-form, guestbook-manager, comment-form, comment-list, post-form, asset-uploader, upload-zone의 제출/삭제 버튼.
+- EmptyState(variant="page") 적용: tags, tags/[slug], search, categories/[slug], popular, post-list, guestbook-form.
+
+**리뷰 라운드:** 4회
+- Round 1: `role="status"` 이중 공지 제거, circle variant 기본 너비(`2rem`) 추가
+- Round 2: EmptyState `className` prop 추가, category-form-modal typo 수정(`submitingLabel` → `submittingLabel`)
+- Round 3: EmptyState `variant` prop 도입, 공개 페이지 전용 스타일 분리
+- Round 4: `default` variant에 `text-sm` 누락 추가
+
+**병합 충돌:** main 브랜치의 `ScrollToTop`/`ErrorContent` 도입, `getErrorMessage` 추출(#171/#172/#173)과 충돌. `git merge origin/main`으로 8개 파일 충돌 수동 해소.
+
+---
+
 ### #167 [F-01] 홈 - 글 목록 (PR #211 머지)
 
 홈 페이지 글 목록 기능을 구현했다. 기존 카드형 `PostCard` 레이아웃을 리스트형으로 교체하고, 고정 글·페이지네이션 업그레이드·TanStack Query SSR 패턴을 적용했다.

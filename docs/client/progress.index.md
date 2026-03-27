@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #169 로딩/빈 상태 (F-13) - Skeleton/Spinner/EmptyState 공유 컴포넌트, 로컬 스켈레톤 7개 제거, 버튼 Spinner 피드백 PR #217 머지 | ✅   |
 | 2026-03-27 | #171 Toast 알림 (F-14) - sonner 도입, getErrorMessage 공유 유틸 추출, 7개 파일 Toast 마이그레이션 PR #216 머지 | ✅   |
 | 2026-03-27 | #177 다크 모드 (F-17) - transition-theme 완성, aria-label, cookie Secure/MaxAge PR #218 머지 | ✅   |
 | 2026-03-27 | #173 에러 페이지 (F-12) - ErrorContent 공통 컴포넌트, Public/Admin 에러 경계, 403 인터셉터 PR #215 머지 | ✅   |
@@ -41,7 +42,7 @@
 
 ## 🔗 상세 문서
 
-- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
 - [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지
