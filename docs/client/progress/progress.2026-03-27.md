@@ -126,3 +126,30 @@ CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인�
 - `role="alert"`는 정적 에러 페이지에 부적합 - h1 heading 계층 구조로 대체
 
 **리뷰 라운드:** 3회 (Round 1: Warning 1건 - window.alert 제거/리다이렉트로 교체, Suggestion 1건 - 중복 aria-live 제거. Round 2: Critical 1건 - 403 인터셉터 공유 레이어 경로 분기, Warning 1건 - role=alert 제거)
+
+### #171 [F-14] Toast 알림 (PR #216 머지)
+
+전역 Toast 알림 시스템(F-14)을 구현했다. `sonner`를 도입하고, 7개 파일에 분산된 `getErrorMessage` 유틸을 `@shared/lib`으로 추출했으며, 서버 요청 결과 피드백을 Toast로 전환했다.
+
+**주요 변경 사항:**
+
+- `shared/lib/get-error-message.ts` - NEW: `ApiResponseError` → `.message`, `Error && error.message` → `.message`, fallback 순서로 처리하는 공유 유틸. 기존 7개 파일의 중복 구현을 통합
+- `app-layer/provider/toast-provider.tsx` - NEW: `<Toaster position="top-right" duration={3000} visibleToasts={3} closeButton />`; `useTheme()`으로 `themeType`을 읽어 sonner `theme` prop에 연결 (`"default"` → `"system"` 매핑)
+- `app-layer/provider/index.tsx` - `ThemeProvider` 내부에 `<ToastProvider />` 추가
+- 7개 파일 마이그레이션:
+  - `features/post-editor/ui/post-form.tsx` - `onError: setSubmitError` → `toast.error`; 폼 검증 오류(카테고리·제목) 인라인 유지
+  - `features/asset-uploader/ui/asset-uploader.tsx` - `feedbackMessage`·`errorMessage` 상태 완전 제거; 업로드/삭제 성공 → `toast.success`, 에러 → `toast.error`, 클립보드 복사 → `toast.info`; 파일 검증 오류도 `toast.error`로 전환
+  - `features/comment-section/ui/comment-form.tsx` - catch block `setErrorMessage` → `toast.error`; "본문을 입력해 주세요" 인라인 유지
+  - `features/category-manager/ui/category-manager.tsx` - `actionError` 상태 완전 제거; mutation `onError` → `toast.error`; "하위 카테고리가 있는 항목은 삭제할 수 없습니다" → `toast.error`
+  - `features/category-manager/ui/category-form-modal.tsx` - dead `errorMessage` prop 제거
+  - `features/admin-login/ui/login-form.tsx` - catch block `setErrorMessage` → `toast.error`; `errorMessage` 상태 완전 제거
+  - `app/dashboard/posts/page.tsx` - `actionError` 상태 완전 제거; mutation `onError` → `toast.error`
+  - `features/guestbook-manager/ui/guestbook-manager.tsx` - `actionError` 상태 완전 제거; mutation `onError` → `toast.error`
+
+**주요 결정:**
+
+- 폼 검증 오류(카테고리·제목·본문 empty)는 인라인 유지; 서버 요청 결과만 Toast로 전환
+- `"default"` 테마는 sonner의 `"system"`으로 매핑하여 OS 다크 모드 자동 연동
+- `CategoryFormModal.errorMessage` prop은 항상 null이 되어 dead interface가 되므로 prop 자체를 제거
+
+**리뷰 라운드:** 2회 (Round 1: Warning 2건 - 잔여 inline 에러 상태 dead code 제거, Suggestion 1건 - `error.message` 빈 문자열 가드 추가. Round 2: Suggestion 1건 - CategoryFormModal dead errorMessage prop 제거)
