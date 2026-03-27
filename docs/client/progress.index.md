@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #181 검색 (F-11) - 6개 필터 드롭다운, highlightText 유틸, SearchResultItem (하이라이팅+댓글발췌), 헤더 SearchBar UX 개선, SEARCH_FILTERS const PR #231 머지 | ✅   |
 | 2026-03-27 | #182 태그별 글 목록 (F-05) - PostListItem 통일(tags+categories), Pagination 조건 제거(F-01·F-03·F-05), Storybook story PR #228 머지 | ✅   |
 | 2026-03-27 | #184 Favicon / Web Manifest (F-32) - SVG favicon 추가(다크/라이트), manifest.webmanifest 전환, theme-color 분리, msapplication 제거 PR #227 머지 | ✅   |
 | 2026-03-27 | #174 CSP 미들웨어 (F-34c) - nonce 기반 CSP-Report-Only 헤더, strict-dynamic, object-src none, matcher 확장 PR #225 머지 | ✅   |

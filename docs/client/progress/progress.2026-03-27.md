@@ -2,6 +2,40 @@
 
 ## 완료된 작업
 
+### #181 [F-11] 검색 - 필터/하이라이팅/댓글 발췌 (PR #231 머지)
+
+헤더 검색 바 UX 개선, 6개 필터 드롭다운, 검색어 하이라이팅, 댓글 검색 발췌 표시를 구현했다.
+
+**주요 변경 사항:**
+
+- `src/entities/post/model.ts`
+  - `SearchFilter` 타입 추가 (6개 값: title_content, title, content, tag, category, comment)
+  - `SEARCH_FILTERS` const 추가 - 페이지 validation과 타입을 단일 소스로 통일
+  - `MatchedComment` 인터페이스 추가 (`body`, `authorName`)
+  - `Post`에 `matchedComment?` 필드 추가 (댓글 필터 시 서버가 포함)
+  - `FetchPostsParams`에 `filter?` 필드 추가
+- `src/entities/post/api.ts` - `filter` 파라미터를 query string에 추가
+- `src/features/search/lib/highlight.tsx` - `highlightText()` 유틸 (split 홀수 인덱스 기반 `<mark>` 래핑)
+- `src/features/search/ui/search-filter.tsx` - `SearchFilterDropdown` 컴포넌트 (6개 옵션 `<select>`, 필터 변경 시 URL 업데이트)
+- `src/features/search/ui/search-result-item.tsx` - 하이라이팅 + 댓글 발췌가 포함된 리스트 아이템
+- `src/features/search/index.ts` - barrel export
+- `src/widgets/header/search-bar.tsx`
+  - Esc 키 닫기, 외부 클릭 닫기 추가
+  - `role="searchbox"` 제거 (input[type=search] 암시적 role)
+  - 반응형 크기: `min-w-[120px] md:min-w-[200px] max-w-[320px]`
+  - `/search` 페이지에서 열 때 현재 filter 값 유지
+- `src/app/(public)/search/page.tsx`
+  - `PostCard` - `SearchResultItem`으로 교체 (리스트 형식)
+  - `SearchFilterDropdown` 드롭다운 추가 (빈 상태 포함)
+  - `filter` 파라미터 읽기/전달 + Pagination queryParams에 포함
+  - 검색 헤더 형식 변경: `"keyword" 검색 결과 (N건)`
+
+**리뷰 라운드:** 2회
+- Round 1 (4개 제안): regex.test 대신 홀수 인덱스 검사 적용, SearchFilterDropdown으로 컴포넌트 이름 변경, authorName UI 렌더링 추가, role="searchbox" 제거
+- Round 2 (2개 제안): next/image 허용 호스트 주석 추가, SEARCH_FILTERS const 추출로 중복 제거
+
+---
+
 ### #174 [F-34c] CSP (Content Security Policy) (PR #225 머지)
 
 Next.js middleware에서 nonce 기반 CSP 헤더를 설정했다. 초기 배포는 `Content-Security-Policy-Report-Only`(phase 1)로 차단 없이 위반 로그만 수집하며, `script-src`에 `strict-dynamic`을 포함해 Next.js 하이드레이션 스크립트를 준비했다.
