@@ -2,6 +2,44 @@
 
 ## 완료된 작업
 
+### #197 목차 (TOC) (PR #244 머지)
+
+글 상세 페이지 사이드바 최상단에 TOC를 추가하고, 마크다운 heading anchor와 smooth scroll 동작을 연결한 뒤 자동 리뷰 경고 3건을 반영해 병합했다.
+
+**주요 변경 사항:**
+
+- `src/shared/lib/markdown.ts`
+  - `rehype-slug`를 렌더링 파이프라인에 추가하고, sanitize schema에서 `h1`~`h3`의 `id` 속성을 허용
+  - `extractHeadings()`와 `TocItem` 타입을 추가해 마크다운 본문에서 h1/h2/h3 heading 목록을 추출
+  - 렌더링된 heading과 TOC가 동일한 anchor를 사용하도록 `HEADING_ID_PREFIX`를 추출/렌더 양쪽에서 공유
+- `src/app/(public)/posts/[slug]/page.tsx`
+  - 서버에서 `post.contentMd`를 파싱해 TOC 데이터를 추출하고, 페이지 내 JSON payload로 직렬화
+- `src/features/toc/ui/toc-section.tsx`
+  - 데스크톱 기본 펼침 / 모바일 기본 접힘, 접기·펼치기 토글, smooth scroll, 모바일 클릭 시 접힘 처리를 포함한 TOC 섹션 추가
+  - hash 갱신 시 `window.history.state`를 보존해 Next.js App Router history metadata를 깨지 않도록 수정
+- `src/widgets/public-sidebar/ui/public-sidebar.tsx`
+  - 글 상세 페이지에서만 TOC를 사이드바 최상단에 조건부 렌더링
+  - post 페이지의 TOC payload를 읽어 headings가 없을 때는 섹션을 숨김
+- `stories/app/public-sidebar.stories.tsx`, `stories/features/toc-section.stories.tsx`
+  - PublicSidebar TOC 상태와 TOC 섹션 단독 Storybook 프리뷰 추가
+- `package.json`, `pnpm-lock.yaml`
+  - `rehype-slug`, `github-slugger`, `mdast-util-to-string` 의존성 추가
+
+**리뷰 수정 사항:**
+
+- `rehype-sanitize`와 TOC 추출 경로가 서로 다른 heading ID를 만들지 않도록 공통 prefix 상수로 정렬
+- TOC 클릭이 Next.js App Router의 `history.state`를 지우지 않도록 `replaceState` 호출을 수정
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- 전체 `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 항목 1건이 그대로 남아 있었고, 이번 이슈 범위 밖으로 유지했다.
+
 ### #194 인기 글 (7일/30일) (PR #243 머지)
 
 공개 사이드바의 "최근글 / 인기글" 탭에 7일/30일 인기 글 전환 UI를 추가하고, 기존 독립 `/popular` 페이지는 호환 리다이렉트만 남긴 채 사이드바 전용 흐름으로 전환했다.

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #197 목차 (TOC) (F-16) - 글 상세 사이드바 TOC, markdown heading anchor slug, Storybook story PR #244 머지 | ✅   |
 | 2026-03-28 | #198 조회수 기록 PR #241 머지 | ✅   |
 | 2026-03-28 | #194 인기 글 (7일/30일) (F-06) - 사이드바 인기글 7일/30일 토글, top 5 SSR 프리패치, `/popular` 호환 리다이렉트, Storybook story PR #243 머지 | ✅   |
 | 2026-03-28 | #195 카테고리별 글 목록 (F-03) - CategoryNav 제거, breadcrumb 헤더, category entity 유틸 추출, Storybook story PR #240 머지 | ✅   |
@@ -64,6 +65,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #197 목차 (TOC) PR #244 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #198 조회수 기록 PR #241 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #194 인기 글 (7일/30일) PR #243 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #195 카테고리별 글 목록 PR #240 머지
