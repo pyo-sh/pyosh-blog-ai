@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #174 CSP 미들웨어 (F-34c) - nonce 기반 CSP-Report-Only 헤더, strict-dynamic, object-src none, matcher 확장 PR #225 머지 | ✅   |
 | 2026-03-27 | #180 Storybook 환경 구성 (F-38) - Storybook 10 + MSW 2, QueryClient useState factory, tsconfig.storybook.json, 스토리 22개 PR #226 머지 | ✅   |
 | 2026-03-27 | #179 Footer 콘텐츠 - 저작권 문구 추가, GitHub 프로필 URL 수정, (public) route group으로 Admin 페이지 숨김 PR #224 머지 | ✅   |
 | 2026-03-27 | #178 Client 환경 변수 설정 - serverFetch/clientFetch API URL 분리 (INTERNAL_API_URL/PUBLIC_API_URL), .env.local.example 주석 추가 PR #223 머지 | ✅   |
@@ -48,7 +49,7 @@
 
 ## 🔗 상세 문서
 
-- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
 - [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지

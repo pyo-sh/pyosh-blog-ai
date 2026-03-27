@@ -2,6 +2,33 @@
 
 ## 완료된 작업
 
+### #174 [F-34c] CSP (Content Security Policy) (PR #225 머지)
+
+Next.js middleware에서 nonce 기반 CSP 헤더를 설정했다. 초기 배포는 `Content-Security-Policy-Report-Only`(phase 1)로 차단 없이 위반 로그만 수집하며, `script-src`에 `strict-dynamic`을 포함해 Next.js 하이드레이션 스크립트를 준비했다.
+
+**주요 변경 사항:**
+
+- `src/middleware.ts`
+  - `buildCspDirectives(nonce)` 헬퍼 - dev/prod 분기 (`img-src`에 dev만 `http:` 허용), `script-src 'nonce-{random}' 'strict-dynamic'`, `object-src 'none'`, `connect-src 'self' ${NEXT_PUBLIC_API_URL}` (apiUrl 미설정 시 조건부 생략), `style-src 'self' 'unsafe-inline'` (phase 2 전환 전 교체 필요, 코드 주석 명시)
+  - `nextWithCsp(request, nonce)` 헬퍼 - request headers에 `x-nonce` 설정 (App Router가 자동 적용), response headers에 `Content-Security-Policy-Report-Only` 설정
+  - nonce 생성: `Buffer.from(crypto.randomUUID()).toString("base64")`
+  - matcher 확장: `/manage/:path*` + `/((?!_next/static|_next/image|...)$).*)` 전체 페이지 라우트 커버
+  - `/manage` 경로 가드 조건 정밀화: `startsWith(MANAGE_HOME_PATH)` → `=== MANAGE_HOME_PATH || startsWith(\`${MANAGE_HOME_PATH}/\`)`
+
+**리뷰 라운드:** 5회 (round limit 도달, 사용자 결정으로 merge)
+- Round 1: `connect-src` apiUrl 미설정 시 trailing whitespace 조건부 생략으로 수정
+- Round 2: `'strict-dynamic'` 추가, `/manage` 경로 가드 정밀화
+- Round 3: `object-src 'none'` 추가
+- Round 4: `unsafe-inline` phase 2 prerequisite 주석 추가
+- Round 5: report endpoint (API 연동: 없음으로 out of scope) - merge
+
+**Phase 2 전환 전 필수 항목:**
+- `style-src 'unsafe-inline'` → nonce 기반 스타일로 교체
+- `report-uri /api/csp-report` 엔드포인트 구현 및 디렉티브 추가
+- `Content-Security-Policy-Report-Only` → `Content-Security-Policy` 전환
+
+---
+
 ### #180 [F-38] Storybook 환경 구성 (PR #226 머지)
 
 Storybook 10 + MSW 2 + TanStack Query 기반 컴포넌트 개발·검토 환경을 구성했다. DB/서버 없이 모든 화면을 Storybook에서 확인할 수 있다.
