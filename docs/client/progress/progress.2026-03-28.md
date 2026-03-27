@@ -2,6 +2,42 @@
 
 ## 완료된 작업
 
+### #196 댓글 표시 개선 (PR #242 머지)
+
+공개 글 상세의 댓글 섹션을 paginated comment API/meta 기준으로 재정비하고, 자동 리뷰 다라운드에서 나온 edge case를 끝까지 정리한 뒤 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/app/(public)/posts/[slug]/page.tsx`
+  - 댓글 초기 로드를 paginated 응답(`data` + `meta`) 기준으로 연결하고, `commentStatus`에 따라 disabled 상태를 SSR에서 반영
+  - 마지막 merge 단계에서 `origin/main`의 JSON-LD/TOC 변경과 충돌한 구간을 통합
+- `src/features/comment-section/ui/comment-list.tsx`
+  - 페이지네이션 UI, reply 펼침/접힘, locked/disabled 상태, secret comment 복원, root/reply delete fallback, hydration-safe secret reveal 로직 추가
+  - mutation 성공 후 refetch 실패 시 stale UI가 남지 않도록 로컬 fallback과 meta 보정을 정리
+  - 페이지 번호 버튼은 windowed pagination으로 축소해 긴 스레드에서도 DOM/UX 부담을 줄임
+- `src/features/comment-section/lib/guest-secret-store.ts`
+  - guest secret comment 복원을 위한 sessionStorage 저장 형식을 정리하고, 표시용 이름과 비교용 identity key를 분리
+- `src/entities/comment/*`, `stories/features/comment-section.stories.tsx`, `stories/mocks/*`
+  - paginated comment meta/client fetch 타입 정리와 story/mocks 업데이트
+
+**리뷰 수정 사항:**
+
+- 삭제된 루트/마지막 답글 삭제 시 페이지 underfill, totalCount drift, refresh 실패 stale UI 문제를 순차적으로 수정
+- `locked` 상태에서 삭제까지 막도록 read-only 의미를 맞춤
+- guest secret identity가 폼에 자동 주입돼 이전 사용자의 이름/이메일이 보이던 privacy 회귀를 제거
+- secret comment 복원을 렌더 시점 storage read에서 `useEffect` 기반 post-mount hydration으로 옮겨 hydration mismatch를 제거
+- 마지막 merge 단계에서 `origin/main`과 충돌한 `posts/[slug]/page.tsx`를 수동 병합
+
+**검증:**
+
+- `pnpm build`
+- `pnpm compile:types`
+- `pnpm lint`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+
 ### #200 글 메타데이터 편집 (PR #245 머지)
 
 관리자 글 작성/수정 화면의 메타데이터 입력을 확장하고, 공개 글 카드/상세 페이지가 새 필드를 실제로 소비하도록 연결한 뒤 자동 리뷰 여러 라운드와 `origin/main` 머지 충돌까지 정리해 병합했다.
