@@ -194,3 +194,26 @@ CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인�
 - `src/shared/api/client.ts` - 403 인터셉터 경로 조건 및 리다이렉트 대상 `/manage/login`으로 업데이트
 
 **리뷰 라운드:** 1회 (Suggestion 1건 - `DashboardPostEditPage` 함수명 미변경, 런타임 영향 없어 merge 결정)
+
+---
+
+## [F-18] 반응형 레이아웃 (#176)
+
+모바일 우선 반응형 레이아웃 시스템을 구현했다. Tailwind v4 커스텀 브레이크포인트(480px/1080px), 관리자 사이드바 모바일 오버레이, 페이지네이션 반응형, 공개 페이지 max-width 정규화를 완성했다.
+
+**주요 변경 사항:**
+
+- `src/app-layer/style/theme.css` - `@theme` 블록에 커스텀 브레이크포인트 추가 (`--breakpoint-sm: 30rem`, `--breakpoint-lg: 67.5rem`)
+- `src/app-layer/style/typography.css` - h1/h2 반응형 크기 (모바일 24px/20px, md+ 30px/26px), `.markdown-content` 테이블 overflow-x, 이미지 max-width
+- `src/widgets/admin-sidebar/ui/admin-sidebar.tsx` - 데스크톱 고정 사이드바 + 모바일 오버레이 (`role="dialog"`, `aria-modal`, focus trap, Escape 키, body scroll lock, resize/popstate 핸들러)
+- `src/app/manage/layout-shell.tsx` - 햄버거 버튼 (`aria-expanded`, 조건부 `aria-controls`), `didOpenRef` 패턴으로 사이드바 닫힘 시 포커스 반환
+- `src/shared/ui/libs/pagination.tsx` - `generatePageNumbers`에 `windowSize` 파라미터 추가. 모바일(±1)/데스크톱(±3) 이중 렌더링, `display: contents` 래퍼로 flex 레이아웃 유지
+- 공개 페이지 7개 - 컨테이너 `max-w-[67.5rem] px-4 md:px-6` 적용 (home, post detail, tags, search, popular, categories, guestbook)
+- `src/widgets/header/index.tsx` - 헤더 패딩 `px-6` → `px-4 md:px-6`
+- 관리자 그리드 3개 파일 - `xl:grid-cols-*` → `lg:grid-cols-*` (1080px 브레이크포인트 통일)
+
+**리뷰 라운드:** 4회
+- Round 1: Critical 4건 (focus trap 미구현, `xl:` → `lg:` 미변경, search 페이지 두 번째 return 누락, 헤더 패딩 누락)
+- Round 2: Critical 1건 (`<span className="md:hidden">` flex 레이아웃 깨짐 → `contents` 적용), Warning 2건 (search 두 번째 return, 햄버거 포커스 반환)
+- Round 3: Critical 1건 (포커스 반환이 마운트 시 실행 → `didOpenRef` 가드), Warning 1건 (`aria-controls` 누락)
+- Round 4: Suggestion 1건 (`aria-controls` 조건부 처리) - merge 결정
