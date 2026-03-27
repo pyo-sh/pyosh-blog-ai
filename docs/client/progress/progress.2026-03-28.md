@@ -2,6 +2,42 @@
 
 ## 완료된 작업
 
+### #194 인기 글 (7일/30일) (PR #243 머지)
+
+공개 사이드바의 "최근글 / 인기글" 탭에 7일/30일 인기 글 전환 UI를 추가하고, 기존 독립 `/popular` 페이지는 호환 리다이렉트만 남긴 채 사이드바 전용 흐름으로 전환했다.
+
+**주요 변경 사항:**
+
+- `src/features/popular-posts/ui/popular-post-list.tsx`
+  - 7일/30일 pill 토글, 상위 5개 인기 글 목록, 빈 상태/에러 상태, 실패한 기간 재시도 로직을 포함한 클라이언트 컴포넌트 추가
+  - 첫 SSR 로드 실패를 "빈 결과"로 캐시하지 않도록 분리해 기본 7일 뷰에서 재시도 가능하게 수정
+- `src/features/recent-popular-posts/ui/recent-popular-posts.tsx`
+  - 기존 최근글/인기글 탭 셸을 유지하면서 인기글 탭 본문을 `PopularPostList`로 위임
+- `src/entities/stat/api.ts`, `src/app/(public)/layout.tsx`
+  - `/api/stats/popular` 쿼리 생성 로직과 client fetch helper를 추가하고, 공개 레이아웃의 초기 인기 글 프리패치를 7일 상위 5개 기준으로 축소
+- `src/app/(public)/popular/page.tsx`
+  - 독립 페이지 UI는 제거하고, 기존 북마크/검색 유입을 깨지 않도록 홈(`/`)으로 리다이렉트하는 호환 라우트만 유지
+- `src/widgets/header/navigation.tsx`
+  - 헤더의 `/popular` 네비게이션 링크 제거
+- `stories/features/popular-post-list.stories.tsx`
+  - 기본/빈 상태/초기 로드 실패/다크 모드 Storybook 프리뷰 추가
+
+**리뷰 수정 사항:**
+
+- `/popular` 삭제가 404 회귀를 만들지 않도록 경량 리다이렉트 라우트를 복원
+- 초기 7일 fetch 실패를 빈 목록으로 취급하지 않도록 상태를 분리하고, 선택된 기간에서 직접 재시도할 수 있게 보완
+
+**검증:**
+
+- `pnpm exec tsc --noEmit`
+- `pnpm exec eslint src --ext .ts,.tsx`
+- `pnpm exec next build`
+
+**메모:**
+
+- `pnpm lint` 스크립트 자체는 이 환경에서 로컬 `.bin/tsc` shim 경로 문제로 바로 실행되지 않아 동등한 `pnpm exec` 명령으로 검증했다.
+- `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 warning 1건은 기존 경고로 남아 있었고, 이번 이슈 범위 밖으로 두고 병합했다.
+
 ### #195 카테고리별 글 목록 (PR #240 머지)
 
 카테고리 글 목록 페이지를 F-39 공개 사이드바 레이아웃에 맞춰 정리하고, breadcrumb 기반 헤더와 Storybook 프리뷰를 추가한 뒤 병합했다.

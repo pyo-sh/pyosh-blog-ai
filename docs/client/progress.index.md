@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #194 인기 글 (7일/30일) (F-06) - 사이드바 인기글 7일/30일 토글, top 5 SSR 프리패치, `/popular` 호환 리다이렉트, Storybook story PR #243 머지 | ✅   |
 | 2026-03-28 | #195 카테고리별 글 목록 (F-03) - CategoryNav 제거, breadcrumb 헤더, category entity 유틸 추출, Storybook story PR #240 머지 | ✅   |
 | 2026-03-28 | #189 CodeMirror 기반 마크다운 에디터 안정화 - controlled sync/undo/history 회귀, toolbar multi-line/inline formatting, label wiring, language bundle 축소 PR #237 머지 | ✅   |
 | 2026-03-27 | #193 댓글 관리 테이블 + 필터 + 상세 모달 (F-28a) - Admin 댓글 테이블/필터/상세 모달/스레드 뷰, 단건 삭제 복구, thread API 계약 정합화 PR #238 머지 | ✅   |
@@ -62,6 +63,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #194 인기 글 (7일/30일) PR #243 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #195 카테고리별 글 목록 PR #240 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #189 CodeMirror 기반 마크다운 에디터 안정화 PR #237 머지
 - [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #193 댓글 관리 테이블 + 필터 + 상세 모달 PR #238 머지
