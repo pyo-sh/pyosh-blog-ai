@@ -2,6 +2,19 @@
 
 ## 완료된 작업
 
+### #190 [F-24a] 카테고리 트리 표시 (PR #236 머지)
+
+관리자 카테고리 관리 페이지의 `category-tree.tsx`를 전면 리팩토링하여 트리 렌더링, 접기/펼치기, 숨김 필터, 글 개수 표시를 구현했다.
+
+**주요 변경 사항:**
+
+- `src/features/category-manager/ui/category-tree.tsx` (리팩토링) - 재귀 `CategoryTreeRow` 컴포넌트로 계층 렌더링, depth당 24px 인덴트, 기본 전체 접힘 상태, ToggleSwitch 기반 숨김 필터(isVisible=false 행 opacity-50 + "(숨김)" 텍스트), 발행 N / 전체 N 글 개수 표시, 전체 펼침/접힘 버튼
+
+**리뷰 수정 사항:**
+
+- `collectVisibleNonLeafIds`: showHidden 필터를 반영하여 전체 펼침 시 보이는 노드만 expandedIds에 추가 (기존 `collectNonLeafIds`는 숨김 여부 무시)
+- 토글 버튼에 `aria-expanded={hasVisibleChildren ? isExpanded : undefined}` 추가 (WAI-ARIA 트리 위젯 패턴 준수)
+
 ### #186 [F-21a] 글 관리 테이블 + 필터 + 정렬 (PR #234 머지)
 
 관리자 글 관리 페이지에 테이블 표시, 탭(활성/휴지통), 상태/공개여부/검색 필터, 컬럼 정렬을 구현했다. FSD 구조로 PostFilters, PostTable, BulkActions 위젯을 분리하고, ConfirmDialog와 ToggleSwitch 공유 컴포넌트를 추가했다.
