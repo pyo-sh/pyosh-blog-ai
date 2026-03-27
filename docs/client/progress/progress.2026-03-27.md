@@ -2,6 +2,34 @@
 
 ## 완료된 작업
 
+### #185 [F-39] Public 사이드바 레이아웃 (PR #232 머지)
+
+모든 Public 페이지에 2컬럼 레이아웃(사이드바 + 본문)을 적용했다. 데스크톱에서는 스마트-스티키 사이드바, 모바일에서는 햄버거 버튼 + 슬라이드-인 패널로 동작한다.
+
+**주요 변경 사항:**
+
+- `src/entities/stat/model.ts` - `TotalViewsStats` 인터페이스 추가
+- `src/entities/stat/api.ts` - `fetchTotalViews()` 추가
+- `src/entities/category/model.ts` - `publishedPostCount?`, `totalPostCount?` 필드 추가
+- `src/app-layer/style/animation.css` - `slide-in-right` 키프레임 + `--animate-slide-in-right` CSS 변수 추가
+- `src/shared/ui/libs/slide-in-panel.tsx` (신규) - 포커스 트랩, ESC 닫기, `role="dialog" aria-modal` 슬라이드-인 패널
+- `src/features/category-tree/ui/category-tree.tsx` (신규) - 재귀 카테고리 트리, `aria-expanded` 토글, depth 기반 들여쓰기
+- `src/features/recent-popular-posts/ui/recent-popular-posts.tsx` (신규) - 최신/인기 탭 전환, `role="tablist"`, `aria-selected`
+- `src/features/total-view-count/ui/total-view-count.tsx` (신규) - 총 조회수 표시 (`toLocaleString("ko-KR")`)
+- `src/widgets/public-sidebar/ui/public-sidebar.tsx` (신규)
+  - `PublicSidebarContent` - 사이드바 4개 섹션 렌더링
+  - `StickySidebarWrapper` - JS 스크롤 연동 sticky (사이드바 높이 > 뷰포트일 때 콘텐츠 따라 스크롤), `NAV_HEIGHT = 72`, `lastScrollY` = `window.scrollY`로 초기화
+- `src/widgets/header/index.tsx` - 내비게이션 제거, 햄버거 버튼 추가 (`lg:` 이상에서 숨김), `hamburgerRef` prop 추가
+- `src/app/(public)/layout-shell.tsx` (신규) - Client Component, 2컬럼 레이아웃, `PublicLayoutShell`, 리사이즈 시 자동 닫기(1080px), 닫힌 후 햄버거 버튼으로 포커스 반환
+- `src/app/(public)/layout.tsx` - async Server Component로 전환, `Promise.all`로 사이드바 데이터 SSR 페치, 모든 fetch에 `.catch()` graceful degradation
+- `stories/app/public-sidebar.stories.tsx` (신규) - Storybook story (Default/NoCategories/NoTags/Empty/DarkMode)
+
+**리뷰 라운드:** 2회
+- Round 1 ([WARNING] 1개, [SUGGESTION] 3개): `closeBtnRef` - 언마운트된 버튼 대신 햄버거 버튼으로 포커스 반환(findings-012), `NAV_HEIGHT` 70→72 수정, `fetchPosts/Categories/Tags`에 `.catch()` 추가
+- Round 2 ([SUGGESTION] 3개): `lastScrollY` 초기화 버그 수정(0→window.scrollY), 나머지 2개(포커스 트랩 재쿼리, 상수 추출)는 skip
+
+---
+
 ### #181 [F-11] 검색 - 필터/하이라이팅/댓글 발췌 (PR #231 머지)
 
 헤더 검색 바 UX 개선, 6개 필터 드롭다운, 검색어 하이라이팅, 댓글 검색 발췌 표시를 구현했다.

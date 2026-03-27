@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #185 Public 사이드바 레이아웃 (F-39) - 2컬럼 레이아웃, SlideInPanel, StickySidebarWrapper, 햄버거 포커스 반환(WCAG 2.4.3), SSR 페치 graceful degradation PR #232 머지 | ✅   |
 | 2026-03-27 | #188 클라이언트 에러 수집 (F-35c) - ErrorBoundary + 라우트 자동 리셋, API 에러 구조화 로깅(4xx warn/5xx error), unhandledrejection 핸들러 PR #230 머지 | ✅   |
 | 2026-03-27 | #181 검색 (F-11) - 6개 필터 드롭다운, highlightText 유틸, SearchResultItem (하이라이팅+댓글발췌), 헤더 SearchBar UX 개선, SEARCH_FILTERS const PR #231 머지 | ✅   |
 | 2026-03-27 | #182 태그별 글 목록 (F-05) - PostListItem 통일(tags+categories), Pagination 조건 제거(F-01·F-03·F-05), Storybook story PR #228 머지 | ✅   |
@@ -53,7 +54,7 @@
 
 ## 🔗 상세 문서
 
-- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #188 클라이언트 에러 수집 PR #230 머지, #182 태그별 글 목록 PR #228 머지, #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #185 Public 사이드바 레이아웃 PR #232 머지, #188 클라이언트 에러 수집 PR #230 머지, #182 태그별 글 목록 PR #228 머지, #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
 - [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지
