@@ -236,3 +236,16 @@ CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인�
   - `.text-ui-base`, `.text-ui-sm`, `.text-ui-xs` 유틸리티 클래스 추가 (figma_tokens.json `typography.scale.ui` 반영)
 
 **리뷰 라운드:** 0회 (Clean pass)
+
+---
+
+### #178 [F-33c] Client 환경 변수 설정 (PR #223 머지)
+
+`serverFetch()`와 `clientFetch()`의 API URL을 분리했다. 서버 사이드에서는 내부 네트워크 URL(`API_URL`)을 사용하고, 브라우저에서는 공개 URL(`NEXT_PUBLIC_API_URL`)을 사용한다. `API_URL` 미설정 시 `NEXT_PUBLIC_API_URL`로 폴백한다.
+
+**주요 변경 사항:**
+
+- `src/shared/api/client.ts` - `API_URL` 단일 상수를 `PUBLIC_API_URL`(`NEXT_PUBLIC_API_URL` 기반)과 `INTERNAL_API_URL`(`API_URL` 기반, 폴백: `PUBLIC_API_URL`)으로 분리. `serverFetch()`는 `INTERNAL_API_URL`, `clientFetch()`는 `PUBLIC_API_URL` 사용
+- `.env.local.example` - 두 변수의 용도와 폴백 동작을 설명하는 인라인 주석 추가
+
+**리뷰 라운드:** 0회 (Clean pass)
