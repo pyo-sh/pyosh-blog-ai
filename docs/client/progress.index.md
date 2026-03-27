@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #186 글 관리 테이블 + 필터 + 정렬 (F-21a) - PostTable/PostFilters/BulkActions 위젯, ConfirmDialog/ToggleSwitch 공유 컴포넌트, optimistic 토글, 3단계 정렬 PR #234 머지 | ✅   |
 | 2026-03-27 | #183 포스트 상세 마크다운 렌더링 개선 (F-06) - GFM, 코드 블록 복사/언어 헤더(CodeBlockEnhancer), 관련 글 섹션, SSR 코드 블록 시각 폴백 PR #229 머지 | ✅   |
 | 2026-03-27 | #187 관리자 대시보드 리팩터링 - dashboard-home 분리(StatsSection/PostStatusSection/RecentCommentsSection), formatNumber 공유 유틸, deleteError onMutate 클리어, totalPosts 활용 PR #233 머지 | ✅   |
 | 2026-03-27 | #185 Public 사이드바 레이아웃 (F-39) - 2컬럼 레이아웃, SlideInPanel, StickySidebarWrapper, 햄버거 포커스 반환(WCAG 2.4.3), SSR 페치 graceful degradation PR #232 머지 | ✅   |
@@ -56,7 +57,7 @@
 
 ## 🔗 상세 문서
 
-- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #185 Public 사이드바 레이아웃 PR #232 머지, #188 클라이언트 에러 수집 PR #230 머지, #182 태그별 글 목록 PR #228 머지, #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
+- [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - #186 글 관리 테이블+필터+정렬 PR #234 머지, #185 Public 사이드바 레이아웃 PR #232 머지, #188 클라이언트 에러 수집 PR #230 머지, #182 태그별 글 목록 PR #228 머지, #174 CSP 미들웨어 PR #225 머지, #179 Footer 콘텐츠 PR #224 머지, #178 Client 환경 변수 설정 PR #223 머지, #221 Design token 동기화 PR #222 머지, #175 관리자 로그인 /manage 경로 이전 PR #219 머지, #169 로딩/빈 상태 Skeleton/Spinner/EmptyState PR #217 머지, #168 태그 목록 PostListItem 배지 + TagCloud feature PR #212 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #63 SEO 메타데이터 + Open Graph PR #166 머지
 - [progress.2026-03-15.md](./progress/progress.2026-03-15.md) - #69 조회수 기록 hook + ViewCounter PR #164 머지
 - [progress.2026-03-14.md](./progress/progress.2026-03-14.md) - #48 공개 방명록 페이지 PR #165 머지

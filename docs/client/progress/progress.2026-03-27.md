@@ -2,6 +2,29 @@
 
 ## 완료된 작업
 
+### #186 [F-21a] 글 관리 테이블 + 필터 + 정렬 (PR #234 머지)
+
+관리자 글 관리 페이지에 테이블 표시, 탭(활성/휴지통), 상태/공개여부/검색 필터, 컬럼 정렬을 구현했다. FSD 구조로 PostFilters, PostTable, BulkActions 위젯을 분리하고, ConfirmDialog와 ToggleSwitch 공유 컴포넌트를 추가했다.
+
+**주요 변경 사항:**
+
+- `src/widgets/admin-post-list/ui/post-table.tsx` (신규) - 글 테이블 위젯. 활성 글 / 휴지통 탭별 컬럼 구성, 체크박스 선택, 고정 토글(optimistic), 공개여부 토글(optimistic rollback), 정렬 헤더(3단계: DESC -> ASC -> 기본), 인라인 삭제/복원/영구삭제
+- `src/widgets/admin-post-list/ui/post-filters.tsx` (신규) - 상태/공개여부 드롭다운 + 검색 입력. 필터 변경 시 page 초기화
+- `src/widgets/admin-post-list/ui/bulk-actions.tsx` (신규) - 벌크 액션 바. 카테고리 변경, 댓글 상태 변경, 일괄 삭제/복원/영구삭제. 확인 모달 표시 후 서버 벌크 API 호출
+- `src/shared/ui/confirm-dialog.tsx` (신규) - 확인 다이얼로그. focus trap, ESC 닫기, `aria-modal`
+- `src/shared/ui/toggle-switch.tsx` (신규) - 토글 스위치. `aria-checked`, 로딩 비활성화
+- `src/entities/post/model.ts` - `FetchAdminPostsParams`에 `sort`, `order`, `visibility`, `q` 필드 추가
+- `src/entities/post/api.ts` - Admin 글 목록 API에 필터/정렬 파라미터 전달, 벌크 API 함수 추가
+- `src/app/manage/posts/page.tsx` - 3개 위젯 조합으로 교체. 상태 소유권은 페이지에 유지
+- `src/app/manage/posts/[id]/preview/page.tsx` (신규) - 미리보기 페이지. PostContent 재사용
+
+**리뷰 라운드:** 6회 (round limit 도달, 사용자 결정으로 merge)
+- Round 1-4: handleSingleDelete/handleHardDeleteConfirm의 mutateAsync 미캐치 경고, SortField 타입 중복 등 반복 지적
+- Round 5 (1 WARNING, 1 SUGGESTION): mutateAsync unhandled promise rejection - try/catch 추가; SortField 독립 정의 - `NonNullable<FetchAdminPostsParams["sort"]>`로 도출
+- Round 6: 동일 지적 유지 - 사용자 승인으로 merge (이전 라운드에서 이미 수정 적용됨)
+
+---
+
 ### #187 관리자 대시보드 - 통계/글 상태/최근 댓글 (PR #233 머지)
 
 단일 252줄 `dashboard-home.tsx`를 3개의 집중된 서브 위젯으로 분리했다. 각 위젯은 독립적으로 로딩/에러/빈 상태를 처리하고, TanStack Query `["dashboard", "stats"]` 공유 키로 네트워크 요청을 중복 제거한다.
