@@ -217,3 +217,22 @@ CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인�
 - Round 2: Critical 1건 (`<span className="md:hidden">` flex 레이아웃 깨짐 → `contents` 적용), Warning 2건 (search 두 번째 return, 햄버거 포커스 반환)
 - Round 3: Critical 1건 (포커스 반환이 마운트 시 실행 → `didOpenRef` 가드), Warning 1건 (`aria-controls` 누락)
 - Round 4: Suggestion 1건 (`aria-controls` 조건부 처리) - merge 결정
+
+---
+
+### #221 Design token 동기화 (PR #222 머지)
+
+`docs/client/figma_tokens.json` (2026-03-26 업데이트) 기준으로 `theme.css`와 `typography.css`를 동기화했다.
+
+**주요 변경 사항:**
+
+- `src/app-layer/style/theme.css`
+  - `--dark/light-tertiary1/2` → `--dark/light-info1/2` 이름 변경
+  - `--dark/light-quaternary1/2` 삭제 (`@theme` 매핑 포함)
+  - `--dark/light-warning1/2`, `--dark/light-overlay1`, `--special-code-surface` 추가
+  - 색상 값 8개 수정: `light.text.3/4`, `light.border.4`, `light.positive.1`, `dark.text.3/4`, `dark.border.1/4`
+  - `@theme` 블록: `--color-info-1/2`, `--color-warning-1/2`, `--color-overlay-1`, `--color-special-code-surface` 추가; `quaternary` 매핑 제거
+- `src/app-layer/style/typography.css`
+  - `.text-ui-base`, `.text-ui-sm`, `.text-ui-xs` 유틸리티 클래스 추가 (figma_tokens.json `typography.scale.ui` 반영)
+
+**리뷰 라운드:** 0회 (Clean pass)
