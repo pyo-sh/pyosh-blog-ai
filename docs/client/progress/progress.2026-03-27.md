@@ -2,6 +2,27 @@
 
 ## 완료된 작업
 
+### #187 관리자 대시보드 - 통계/글 상태/최근 댓글 (PR #233 머지)
+
+단일 252줄 `dashboard-home.tsx`를 3개의 집중된 서브 위젯으로 분리했다. 각 위젯은 독립적으로 로딩/에러/빈 상태를 처리하고, TanStack Query `["dashboard", "stats"]` 공유 키로 네트워크 요청을 중복 제거한다.
+
+**주요 변경 사항:**
+
+- `src/entities/stat/model.ts` - `DashboardStats`에 `postsByStatus: { draft, published, archived }` 필드 추가
+- `src/shared/lib/format-number.ts` (신규) - `Intl.NumberFormat('ko-KR')` 싱글톤을 공유 유틸로 추출 (`formatNumber(value: number): string`)
+- `src/widgets/dashboard/ui/stats-section.tsx` (신규) - 오늘/7일/30일 페이지뷰 통계 카드 3개. `["dashboard", "stats"]` 쿼리 키 사용. `formatNumber` 직접 호출 (중간 wrapper 없음)
+- `src/widgets/dashboard/ui/post-status-section.tsx` (신규) - 전체/발행/임시저장/보관 글 수 카드 4개. 전체 카드는 수동 합산 대신 `data.totalPosts` 사용 (서버 추가 상태 대응). 각 카드는 `/manage/posts?status=...` 링크
+- `src/widgets/dashboard/ui/recent-comments-section.tsx` (신규) - 최신 댓글 목록 (페이지당 5개), 인라인 삭제. `deleteError` 인라인 표시, `onMutate`에서 초기화 (재시도 시 stale 오류 메시지 제거). SecretIcon `<svg>`에 `role="img"` 추가 (aria-label 스크린리더 호환)
+- `src/widgets/dashboard/ui/dashboard-home.tsx` - 3개 서브 위젯 조합으로 교체
+
+**리뷰 라운드:** 4회
+- Round 1 ([WARNING] 1, [SUGGESTION] 2): delete 오류 무음 처리 - `deleteError` 인라인 상태 추가; SecretIcon `role="img"` 누락; `STAT_CARDS.label` 미사용 필드 제거
+- Round 2 ([WARNING] 1): 전체 글 수 수동 합산 - `data.totalPosts` 사용으로 교체
+- Round 3 ([WARNING] 1, [SUGGESTION] 1): `deleteError` 재시도 시 stale 표시 - `onMutate` 클리어 추가; `numberFormatter` 중복 - `@shared/lib/format-number` 추출
+- Round 4 ([SUGGESTION] 2): 불필요한 `formatStatValue` wrapper 제거; `toLocaleString` 직접 호출을 `formatNumber`로 교체 - skipReview로 merge
+
+---
+
 ### #185 [F-39] Public 사이드바 레이아웃 (PR #232 머지)
 
 모든 Public 페이지에 2컬럼 레이아웃(사이드바 + 본문)을 적용했다. 데스크톱에서는 스마트-스티키 사이드바, 모바일에서는 햄버거 버튼 + 슬라이드-인 패널로 동작한다.

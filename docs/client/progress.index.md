@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-27 | #187 관리자 대시보드 리팩터링 - dashboard-home 분리(StatsSection/PostStatusSection/RecentCommentsSection), formatNumber 공유 유틸, deleteError onMutate 클리어, totalPosts 활용 PR #233 머지 | ✅   |
 | 2026-03-27 | #185 Public 사이드바 레이아웃 (F-39) - 2컬럼 레이아웃, SlideInPanel, StickySidebarWrapper, 햄버거 포커스 반환(WCAG 2.4.3), SSR 페치 graceful degradation PR #232 머지 | ✅   |
 | 2026-03-27 | #188 클라이언트 에러 수집 (F-35c) - ErrorBoundary + 라우트 자동 리셋, API 에러 구조화 로깅(4xx warn/5xx error), unhandledrejection 핸들러 PR #230 머지 | ✅   |
 | 2026-03-27 | #181 검색 (F-11) - 6개 필터 드롭다운, highlightText 유틸, SearchResultItem (하이라이팅+댓글발췌), 헤더 SearchBar UX 개선, SEARCH_FILTERS const PR #231 머지 | ✅   |
