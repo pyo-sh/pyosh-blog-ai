@@ -2,6 +2,47 @@
 
 ## 완료된 작업
 
+### #199 구조화 데이터 (JSON-LD) (PR #246 머지)
+
+홈, 글 상세, 카테고리, 태그 공개 페이지에 JSON-LD 구조화 데이터를 추가하고, 자동 리뷰에서 지적된 성능·FSD 계층·환경 변수 안전성 이슈를 반영한 뒤 병합했다.
+
+**주요 변경 사항:**
+
+- `src/shared/lib/structured-data.ts`
+  - `WebSite`, `SearchAction`, `BlogPosting`, `BreadcrumbList` 빌더와 공용 site URL helper를 추가
+  - 프로덕션에서 `NEXT_PUBLIC_SITE_URL`이 없으면 잘못된 `localhost` URL을 내보내지 않도록 fail-closed 처리
+- `src/shared/ui/json-ld.tsx`
+  - Server Component에서 안전하게 JSON-LD `<script>`를 렌더링하는 공용 컴포넌트 추가
+- `src/app/(public)/page.tsx`
+  - 홈 페이지에 `WebSite` + `SearchAction` 구조화 데이터 삽입
+- `src/app/(public)/posts/[slug]/page.tsx`
+  - 글 상세 페이지에 `BlogPosting` + `BreadcrumbList` 구조화 데이터 추가
+  - `post.category.ancestors`가 없을 때만 카테고리 트리를 병렬 fallback fetch해 breadcrumb 계층 계산
+  - `origin/main`의 TOC 변경과 충돌한 머지 구간을 정리해 TOC와 JSON-LD가 함께 동작하도록 통합
+- `src/app/(public)/categories/[slug]/page.tsx`, `src/app/(public)/tags/[slug]/page.tsx`
+  - 카테고리/태그 페이지 breadcrumb 구조화 데이터 삽입
+- `src/entities/post/model.ts`
+  - 글 상세 응답의 optional `category.ancestors` 타입 허용
+- `package.json`, `pnpm-lock.yaml`
+  - `origin/main`의 TOC 머지 과정에서 필요한 `github-slugger`, `mdast-util-to-string`, `rehype-slug` 의존성 동기화
+
+**리뷰 수정 사항:**
+
+- post detail route가 ancestor 데이터가 이미 있을 때도 `fetchCategories()`를 무조건 호출하지 않도록 수정
+- `shared` 계층이 `@entities/post`를 참조하지 않도록 structured-data 입력 타입을 shared 내부 최소 인터페이스로 분리
+- 잘못된 절대 URL을 발행하지 않도록 `getSiteUrl()`의 localhost fallback을 development 전용으로 제한
+- `origin/main`의 TOC 머지 충돌을 직접 해결하고, 누락된 markdown 관련 의존성을 설치해 빌드 회귀를 제거
+
+**검증:**
+
+- `pnpm lint`
+- `pnpm build`
+- `pnpm compile:types`
+
+**메모:**
+
+- 전체 `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 항목 1건이 그대로 남아 있었고, 이번 이슈 범위 밖으로 유지했다.
+
 ### #197 목차 (TOC) (PR #244 머지)
 
 글 상세 페이지 사이드바 최상단에 TOC를 추가하고, 마크다운 heading anchor와 smooth scroll 동작을 연결한 뒤 자동 리뷰 경고 3건을 반영해 병합했다.
