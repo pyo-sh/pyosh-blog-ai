@@ -472,3 +472,36 @@ React Error Boundary, API 에러 로깅, unhandledrejection 핸들러를 추가�
 - Round 2: `retryKey` 카운터 추가로 reset 시 children 강제 remount
 - Round 3: `ErrorBoundaryWithReset` 래퍼 추가 (라우트 이동 시 자동 리셋), `getDerivedStateFromError`에 `_error` 파라미터 명시
 - Round 4: 4xx는 `console.warn` 분기, 라우트 변경 시 `retryKey`도 0으로 초기화
+
+---
+
+### #183 [F-06] 포스트 상세 - 마크다운 렌더링 개선 (PR #229 머지)
+
+GFM 지원, 코드 블록 복사/언어 레이블 헤더, 관련 글 섹션을 구현했다.
+
+**주요 변경 사항:**
+
+- `src/app/(public)/posts/[slug]/page.tsx`
+  - `remark-gfm` 추가 (GFM 테이블/체크박스/취소선)
+  - `rehype-external-links` 추가 - 외부 링크에 `target="_blank" rel="noopener noreferrer"` 자동 적용. `rehypeSanitize` 전에 실행되도록 파이프라인 순서 확정
+  - `rehypeLazyImages` 커스텀 플러그인 추가 - `img` 요소에 `loading="lazy"` 주입; `rehypeSanitize` 전에 실행
+  - sanitize 스키마 확장: `input[type=checkbox]` 허용(체크박스), `del` 요소 허용(취소선), `target=_blank`·`loading=lazy`·`rel` 속성 허용
+  - 관련 글 섹션 추가 - 같은 카테고리 글 `limit: 7` 페치 후 현재 글 제외 최대 5개 표시 (limit 7로 필터 후에도 최대 5개 보장)
+  - `fetchPosts` + `fetchComments` 를 `Promise.all`로 병렬화
+- `src/features/post-detail/ui/code-block-enhancer.tsx` (신규)
+  - `useEffect`에서 `.markdown-content pre` 요소를 순회, 언어 레이블과 복사 버튼을 포함한 헤더를 생성
+  - `pre`를 `[data-code-wrapper]` div로 감싸 헤더가 가로 스크롤 밖에 고정
+  - 복사 성공 시 "복사됨" 텍스트 2초간 표시 후 복원; `resetTimer` splice 시 `-1` 가드 추가
+  - `if (!pre.parentNode) return` 얼리 리턴으로 고아 wrapper 생성 방지
+- `src/app-layer/style/typography.css`
+  - `.markdown-content pre` - SSR 시각 폴백으로 `background-color`, `border`, `border-radius` 추가 (JS 하이드레이션 전 코드 블록이 unstyled 영역으로 표시되던 문제 수정)
+  - `.markdown-content [data-code-wrapper]` - 래퍼 활성화 시 동일 시각 스타일로 덮어쓰기; `[data-code-wrapper] > pre` 배경/보더/반경 초기화
+
+**핵심 결정:**
+
+- rehype 파이프라인 순서: `rehypeShiki` → `rehypeExternalLinks` → `rehypeLazyImages` → `rehypeSanitize` - sanitize가 마지막에 실행되어 커스텀 플러그인이 주입한 속성도 화이트리스트 적용 가능
+- SSR/hydration 동일성 보장: `pre` 기본 스타일에 시각 폴백을 두고, 래퍼 활성화 시 `[data-code-wrapper] > pre`로 초기화 - SSR과 post-hydration 렌더가 시각적으로 동일
+
+**리뷰 라운드:** 3회
+- Round 1 (1 WARNING, 1 SUGGESTION): SSR 코드 블록 unstyled - `.markdown-content pre`에 배경/보더/반경 추가; `pre.parentNode?.insertBefore` 불완전 가드 - `if (!pre.parentNode) return`으로 교체
+- Round 2 (2 SUGGESTION): `fetchPosts limit: 6` 필터 후 4개 반환 가능 - `limit: 7`로 수정; `timers.splice(indexOf(-1))` 엣지 케이스 - `if (idx !== -1)` 가드 추가 (skipReview)
