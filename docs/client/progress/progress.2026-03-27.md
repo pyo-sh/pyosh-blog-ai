@@ -79,6 +79,19 @@ GuestbookPage (Server Component, SSR)
 
 **리뷰 라운드:** 1회 (Suggestion 2건 수정 - 클락 스큐 가드, 중복 의존성 제거)
 
+### #177 [F-17] 다크 모드 (PR #218 머지)
+
+CSS 변수 기반 다크/라이트 테마 시스템을 완성했다. 핵심 인프라(theme.css, ThemeProvider, layout.tsx)는 이미 존재했으며, 미완성 항목 3가지를 완료했다.
+
+**주요 변경 사항:**
+
+- `app-layer/style/transition.css` - `.transition-theme`에 `border-color`·`box-shadow` 추가 (스펙 명시 변경사항)
+- `widgets/header/theme-button.tsx` - 토글 버튼에 `aria-label` 추가 (`다크 모드로 전환` / `라이트 모드로 전환`)
+- `shared/lib/cookie.ts` - `setCookie` 재작성: 이전 구현이 `document.cookie` setter 시맨틱을 오해하여 쿠키 전체 문자열을 덮어쓰려 했으나 브라우저는 단일 쿠키만 파싱함. 새 구현은 올바른 단일 할당으로 수정하고 `path=/; SameSite=Lax; Secure; Max-Age` 속성 추가
+- `app-layer/theme/theme-provider.tsx` - 테마 쿠키에 `Max-Age=1년` 적용 (재방문 시 유지)
+
+**리뷰 라운드:** 1회 (Suggestion 1건 - cookie.ts에 Secure 플래그 추가)
+
 ### #172 [F-15] 맨 위로 버튼 (PR #214 머지)
 
 맨 위로 버튼(F-15)을 구현했다. 긴 콘텐츠 페이지에서 1 viewport 이상 스크롤 시 우하단에 페이드인되고, 클릭 시 smooth scroll로 상단으로 이동한다.
