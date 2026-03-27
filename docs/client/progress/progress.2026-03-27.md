@@ -78,3 +78,15 @@ GuestbookPage (Server Component, SSR)
 - A-01 모달 포커스 트랩 (별도 이슈)
 
 **리뷰 라운드:** 1회 (Suggestion 2건 수정 - 클락 스큐 가드, 중복 의존성 제거)
+
+### #172 [F-15] 맨 위로 버튼 (PR #214 머지)
+
+맨 위로 버튼(F-15)을 구현했다. 긴 콘텐츠 페이지에서 1 viewport 이상 스크롤 시 우하단에 페이드인되고, 클릭 시 smooth scroll로 상단으로 이동한다.
+
+**주요 변경 사항:**
+
+- `shared/ui/icons/arrow-up-icon.tsx` - 업 화살표 SVG 아이콘 컴포넌트
+- `shared/ui/libs/scroll-to-top.tsx` - ScrollToTop 컴포넌트: `fixed bottom-6 right-6 z-40`, `hidden md:flex`(데스크톱 전용), throttle 100ms scroll handler, `handleScroll()` 마운트 즉시 호출로 초기 상태 동기화, `aria-label="맨 위로"`, opacity 페이드인/아웃
+- 5개 페이지에 배치: `posts/[slug]`, `tags`, `tags/[slug]`, `search`, `guestbook`
+
+**리뷰 라운드:** 2회 (Warning 1건 - 하드 리로드 시 초기 상태 미동기화 수정, Suggestion 1건 - PR description breakpoint 오기재 수정)
