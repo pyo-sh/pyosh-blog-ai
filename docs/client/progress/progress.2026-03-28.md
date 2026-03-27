@@ -2,6 +2,45 @@
 
 ## 완료된 작업
 
+### #200 글 메타데이터 편집 (PR #245 머지)
+
+관리자 글 작성/수정 화면의 메타데이터 입력을 확장하고, 공개 글 카드/상세 페이지가 새 필드를 실제로 소비하도록 연결한 뒤 자동 리뷰 여러 라운드와 `origin/main` 머지 충돌까지 정리해 병합했다.
+
+**주요 변경 사항:**
+
+- `src/features/post-editor/ui/post-form.tsx`
+  - category tree select, tag chip input, thumbnail uploader, summary/description/comment status 입력, 발행 확인 모달, post card preview를 포함하는 메타데이터 편집 흐름으로 확장
+  - 자동 summary 생성, 저장/발행 intent 처리, 새 태그 invalidate를 포함한 저장 후속 처리 보강
+- `src/features/post-editor/ui/*`
+  - `category-tree-select.tsx`, `tag-chip-input.tsx`, `thumbnail-uploader.tsx`, `post-card-preview.tsx`, `publish-confirm-modal.tsx` 추가
+  - `markdown-editor.tsx` blur/onChange ref 동기화와 현재 문서 기준 summary 생성 흐름 보완
+- `src/entities/post/model.ts`, `src/entities/tag/api.ts`, `src/app/manage/posts/[id]/edit/page.tsx`
+  - post create/update payload에 `summary`, `description`, `commentStatus`를 반영하고, 수정 페이지 초기값과 tag query 계약을 맞춤
+- `src/features/post-list/ui/post-card.tsx`
+  - 공개 post card가 저장된 `post.summary`를 우선 사용하도록 수정
+- `src/app/(public)/posts/[slug]/page.tsx`, `src/shared/lib/markdown.ts`, `src/shared/lib/structured-data.ts`, `src/shared/ui/json-ld.tsx`
+  - 공개 글 상세에서 `description`을 노출하고 `BlogPosting`/`BreadcrumbList` JSON-LD와 TOC payload를 유지
+  - 마지막 `origin/main` 머지에서 들어온 TOC/slug/structured-data 변경과 충돌한 구간을 직접 정리
+
+**리뷰 수정 사항:**
+
+- 실패한 publish/archive intent가 로컬 상태를 잘못 덮어쓰지 않도록 수정
+- markdown blur handler가 stale callback/내용을 읽지 않도록 ref 기반으로 정리
+- 자동 summary 길이 초과, 이후 content 수정 시 stale 되는 문제, tag 입력 blur 손실, thumbnail URL 적용 시점 문제 수정
+- public post card가 summary를 무시하던 회귀와 description 미사용 문제 수정
+- public post detail의 `cache()` stale 문제 제거 후, JSON-LD/TOC 복원과 no-store 중복 fetch 회귀를 다시 정리
+- 마지막 merge 단계에서 `main`과 충돌한 `posts/[slug]/page.tsx`, `shared/lib/markdown.ts`, `shared/lib/structured-data.ts`를 수동 병합해 PR을 `CLEAN` 상태로 복구
+
+**검증:**
+
+- `pnpm lint`
+- `pnpm build`
+- `pnpm compile:types`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 유지됐다.
+
 ### #199 구조화 데이터 (JSON-LD) (PR #246 머지)
 
 홈, 글 상세, 카테고리, 태그 공개 페이지에 JSON-LD 구조화 데이터를 추가하고, 자동 리뷰에서 지적된 성능·FSD 계층·환경 변수 안전성 이슈를 반영한 뒤 병합했다.
