@@ -2,6 +2,51 @@
 
 ## 완료된 작업
 
+### #208 댓글 삭제 + 벌크 선택/삭제 (PR #250 머지)
+
+관리자 댓글 관리 화면에 단일 삭제 방식 선택, 페이지 간 선택 유지, 벌크 삭제/복원 흐름을 마무리하고 PR을 병합했다. 자동 리뷰에서 반복 제기된 `hidden` 댓글 복원 요구는 현행 서버 계약 밖으로 확인되어 이번 PR 범위에서 제외했고, server/client 후속 이슈로 분리한 뒤 현재 범위만 머지했다.
+
+**주요 변경 사항:**
+
+- `src/widgets/admin-comments/ui/admin-comments-page.tsx`
+  - 페이지 간 선택 유지가 가능한 선택 상태를 추가하고, 단건/벌크 액션을 하나의 action context로 통합
+  - 소프트 삭제, 영구 삭제, 복원 흐름을 모달 기반으로 연결
+  - 리뷰 수정으로 bulk action 교집합 계산, stale cascade count 방지, 불필요한 페이지 뒤로가기 제거를 반영
+- `src/widgets/admin-comments/ui/comment-delete-modal.tsx`
+  - 삭제/복원 액션 선택 모달 추가
+  - 선택된 액션에 따라 CTA 문구가 일치하도록 수정
+- `src/widgets/admin-comments/ui/comment-detail-modal.tsx`, `src/widgets/admin-comments/ui/comment-table.tsx`
+  - 상세 모달/테이블에서 직접 삭제하던 흐름을 관리 액션 기반으로 전환
+  - thread 내 탐색 후에도 현재 댓글 기준으로 pending/cleanup 이 맞도록 보완
+- `src/entities/comment/api.ts`, `src/entities/comment/index.ts`
+  - 단건 삭제 action 파라미터, 단건 restore, 벌크 operate helper 추가
+- `src/widgets/dashboard/ui/recent-comments-section.tsx`
+  - 변경된 admin delete helper 시그니처에 맞춰 mutation 호출 갱신
+
+**리뷰 수정 사항:**
+
+- stacked modal 상태에서 Escape 입력 시 상세 모달까지 같이 닫히던 회귀 수정
+- thread view에서 다른 댓글로 이동한 뒤 액션 수행 시 pending/cleanup 타겟이 어긋나던 문제 수정
+- bulk action이 선택한 댓글 상태와 무관하게 항상 restore/soft_delete/hard_delete를 노출하던 문제 수정
+- cascade count fetch에 request sequencing을 추가해 이전 요청 응답이 현재 모달 내용을 덮어쓰지 않도록 수정
+- 버튼 문구를 실제 동작과 맞추고, 페이지당 1개만 보이는 상황에서도 액션 성공 후 무조건 이전 페이지로 이동하지 않도록 수정
+
+**후속 이슈 분리:**
+
+- server: `pyo-sh/pyosh-blog-be#69` - `hidden -> active` 댓글 복원 API 지원
+- client: `#254` - `hidden` 복원 UI 연동 + `Modal` 접근성 라벨 보완
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- PR `#250`은 후속 이슈 분리를 PR 코멘트에 남긴 뒤 병합했다.
+
 ### #207 에셋 갤러리/관리 (PR #252 머지)
 
 관리자 에셋 라이브러리를 스펙 기준으로 마무리했다. 그리드 선택, 상세 모달, 삭제 확인, URL/마크다운 복사, 포스트 에디터 썸네일/이미지 선택 플로우를 하나의 자산 선택 경험으로 정리했고, 자동 리뷰 마지막 경고였던 상세 모달 미리보기 에러 상태 고착 문제까지 수정한 뒤 PR을 병합했다.
