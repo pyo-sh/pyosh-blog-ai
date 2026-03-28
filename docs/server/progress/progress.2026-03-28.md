@@ -2,6 +2,12 @@
 
 ## Completed
 
+- [x] Issue #67: Admin 글 목록 조회수/댓글수 정렬 지원 + PR #68 merge 완료
+  - `AdminPostListQuerySchema`에 `totalPageviews`, `commentCount` 정렬 키 추가
+  - `PostService.getPostList()`에서 stats/comment 집계 서브쿼리 기반 정렬을 추가해 `asc|desc`와 기존 필터/페이지네이션을 유지
+  - `test/routes/posts.test.ts`에 조회수/댓글수 정렬 asc/desc 및 filter/pagination 호환 통합 테스트 추가
+  - Codex review clean 후 PR #68 merge
+
 - [x] Issue #191: PR #66 에셋 업로드 검증 강화 리뷰 반영 + merge 완료
   - `image/webp` 검증을 `RIFF....WEBP` 시그니처까지 확인하도록 보강
   - `image/svg+xml`은 지원을 유지하되, active content를 차단하는 좁은 safe subset 검증 추가
@@ -11,6 +17,11 @@
 
 ## Notes
 
+- 관련 PR: [PR #68](https://github.com/pyo-sh/pyosh-blog-be/pull/68)
+- 관련 이슈: #67
+- 검증 메모:
+  - `test/routes/posts.test.ts` 67개 통과 확인
+  - 전체 `pnpm test`는 이 작업과 무관하게 기존 guestbook 테스트가 `site_settings_tb` 누락으로 실패함
 - 관련 PR: [PR #66](https://github.com/pyo-sh/pyosh-blog-be/pull/66)
 - 관련 이슈: #191
 - 검증 메모:

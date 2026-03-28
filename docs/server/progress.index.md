@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-28 | Issue #67 Admin 글 목록 조회수/댓글수 정렬 지원: aggregate sort(`totalPageviews`, `commentCount`) 추가, posts 통합 테스트 보강, PR #68 머지 | ✅   |
 | 2026-03-28 | Issue #191 PR #66 리뷰 반영: WebP/SVG 업로드 검증 강화 + assets 테스트 보강 + PR #66 머지 | ✅   |
 | 2026-03-27 | Issue #46 Swagger documentation: Zod `.describe()` 전체 적용, security/CSRF/rate-limit 문서, swagger spec 항상 등록(UI는 non-prod 전용), tags 12개, 공유 ErrorResponseSchema 통일 + PR #65 머지 | ✅   |
 | 2026-03-27 | Issue #44 Posts admin lifecycle: PATCH /bulk 신규, hardDeletePost cascade 수정 (댓글/통계/고아태그), cleanOrphanTags 헬퍼 추출, 통합 테스트 16건 추가 + PR #63 머지 | ✅   |
@@ -53,6 +54,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - Issue #67 Admin 글 목록 조회수/댓글수 정렬 지원 + PR #68 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - Issue #191 PR #66 리뷰 반영: WebP/SVG 업로드 검증 강화 + PR #66 머지
 - [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - Issue #46 Swagger documentation: Zod describe 전체 적용, security/CSRF/rate-limit 문서, swagger 분리 등록 + PR #65 머지
 - [progress.2026-03-27.md](./progress/progress.2026-03-27.md) - Issue #41 Posts admin CRUD: 통합 테스트 16건 + buildPaginatedResponse 버그 수정 + PR #62 머지
