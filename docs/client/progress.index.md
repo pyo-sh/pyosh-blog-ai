@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) - 수정일 컬럼/미리보기 Storybook 정리, server pinned-count endpoint 연동, 자동 리뷰 4라운드 반영 후 PR #259 머지 | ✅   |
 | 2026-03-28 | #209 댓글 작성/삭제 액션 + secret reveal token 복원 흐름 - 게스트 이메일 제거 유지, reveal token 기반 secret 복원, legacy recovery/접근성 리뷰 반영, PR #255 머지 | ✅   |
 | 2026-03-28 | #254 Admin 댓글 hidden 복원 UI 연동 + Modal 접근성 보완 - `hidden -> active` restore UI 연결, shared `Modal` accessible name 전달, PR #258 머지 | ✅   |
 | 2026-03-28 | #210 Sitemap + RSS + robots.txt (F-30b) - Next.js `sitemap.xml`/`rss.xml`/`robots.txt`, `/api/posts/slugs` fetch 추가, PR #256 머지 | ✅   |
@@ -78,6 +79,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) PR #259 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #209 댓글 작성/삭제 액션 + secret reveal token 복원 흐름 PR #255 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #254 Admin 댓글 hidden 복원 UI 연동 + Modal 접근성 보완 PR #258 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #210 Sitemap + RSS + robots.txt PR #256 머지

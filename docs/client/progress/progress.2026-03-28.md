@@ -2,6 +2,47 @@
 
 ## 완료된 작업
 
+### #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) (PR #259 머지)
+
+관리자 글 관리 화면의 남은 조작 UX를 마무리했다. 목록에서 공개/고정 토글과 휴지통/영구 삭제 흐름을 유지하면서 `updatedAt` 기반 수정일 컬럼을 추가했고, 관리자 글 목록 Storybook을 실제 UI 조합으로 정리했다. 자동 리뷰 과정에서 `고정 글 최대 5개 제한`은 client 추정 로직으로는 안전하게 끝낼 수 없다는 점이 드러나 server 후속 이슈를 분리했고, 이후 server `pinned-count` endpoint와 `409` 제한 검증 계약이 들어온 뒤 이를 소비하도록 client를 마무리해 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/app/manage/posts/page.tsx`
+  - 공개/고정 인라인 토글 optimistic update를 유지하면서 pin 제한 판단을 cache 추정이 아닌 `/api/admin/posts/pinned-count` query 기반으로 전환
+  - pin 토글 성공/실패 시 `admin-posts`와 `pinned-count` query를 함께 invalidate 하도록 정리
+  - 서버 `409` 응답을 pin limit 토스트로 매핑
+- `src/widgets/admin-post-list/ui/post-table.tsx`
+  - 관리자 글 목록에 수정일 컬럼을 추가하고 trash/active 탭 모두에서 일관되게 노출
+- `src/widgets/admin-post-preview/ui/post-preview.tsx`
+  - 미리보기 화면에서도 동일한 `pinned-count` query와 `409` 처리 흐름을 사용하도록 정리
+  - 삭제 후 목록/카운트 query invalidation을 함께 수행
+- `src/entities/post/api.ts`, `src/entities/post/model.ts`, `src/entities/post/lib.ts`, `src/entities/post/index.ts`
+  - `GET /api/admin/posts/pinned-count` API helper와 응답 타입 추가
+  - cache 기반 pinned count 계산 helper를 제거하고 pin limit error 판별 helper로 교체
+- `stories/widgets/admin/post-list.stories.tsx`
+  - 실제 관리자 글 목록 조합을 반영하도록 스토리 갱신
+- `src/features/comment-section/ui/comment-list.tsx`
+  - 검증 중 발견된 duplicate `aria-label` 정리
+
+**리뷰 수정 사항:**
+
+- 초기 구현의 전체 목록 스캔 기반 pinned count 계산을 제거
+- cache 기반 pinned count 추정도 권위 있는 소스가 아니라는 리뷰를 반영해 server endpoint 연동으로 전환
+- server 이슈 `pyo-sh/pyosh-blog-be#73`를 분리해 pinned count endpoint / pin limit 검증 계약을 선행 반영
+- 새 server 계약 반영 후 자동 리뷰 clean 상태까지 재검증
+
+**검증:**
+
+- `pnpm build`
+- `pnpm compile:types`
+- `pnpm lint`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- PR `#259`는 자동 리뷰 4라운드 후 clean 판정으로 병합됐다.
+
 ### #209 댓글 작성/삭제 액션 + secret reveal token 복원 흐름 (PR #255 머지)
 
 공개 댓글 폼에서 게스트 이메일 필드를 제거한 상태를 유지하면서, 비밀 댓글 복원 권한을 서버 `revealToken` 계약으로 전환했다. 기존 PR에서 반복되던 secret comment 복원/legacy 호환/접근성 리뷰를 정리해 자동 리뷰 clean 상태까지 만든 뒤 PR을 병합했다.
