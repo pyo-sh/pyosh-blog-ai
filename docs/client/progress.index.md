@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #204 카테고리 배치 편집 + 일괄 선택 (F-24b) - dnd-kit 배치 편집, moved/new-parent 변경 추적, 배치 저장/취소, 일괄 숨김/표시, 리뷰 3라운드 및 `main` 병합 충돌 정리, PR #253 머지 | ✅   |
 | 2026-03-28 | #206 카테고리 CRUD 모달 (F-25) - 전용 삭제 모달, move/trash 액션 payload, 빈 이름 비활성화, Storybook story, PR #251 머지 | ✅   |
 | 2026-03-28 | #202 이미지 삽입 + 프리뷰 모드 (F-22b) - pending image placeholder/upload-on-save, split/editor/modal preview, scroll sync, 자동 리뷰 6라운드 반영, PR #249 머지 | ✅   |
 | 2026-03-28 | #201 SEO 동적 메타데이터 + canonical (F-30a) - shared SEO util, public route metadata, admin noindex, review 3라운드 반영, PR #248 머지 | ✅   |
@@ -72,6 +73,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #204 카테고리 배치 편집 + 일괄 선택 PR #253 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #206 카테고리 CRUD 모달 PR #251 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #202 이미지 삽입 + 프리뷰 모드 PR #249 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #201 SEO 동적 메타데이터 + canonical PR #248 머지

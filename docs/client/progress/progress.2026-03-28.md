@@ -2,6 +2,45 @@
 
 ## 완료된 작업
 
+### #204 카테고리 배치 편집 + 일괄 선택 (PR #253 머지)
+
+관리자 카테고리 트리에 배치 편집 모드와 일괄 선택 모드를 추가했다. `dnd-kit` 기반 드래그 앤 드롭, `moved`/`new-parent` 변경 마커, 배치 저장/취소, 선택한 카테고리 숨김/보이기 토글을 연결했고, 자동 리뷰 3라운드에서 나온 트리 이동/숨김 카테고리 처리 문제와 마지막 `main` 병합 충돌까지 정리한 뒤 PR을 머지했다.
+
+**주요 변경 사항:**
+
+- `src/features/category-manager/ui/category-tree.tsx`
+  - `view`/`select`/`edit` 모드 상태, 드래그 컨텍스트, 변경 추적, 배치 저장/취소 흐름 추가
+  - 선택 모드와 편집 모드 진입 시 숨김 카테고리를 함께 노출하고, 종료 시 이전 필터 상태로 복원
+- `src/features/category-manager/ui/category-tree-row.tsx`, `src/features/category-manager/ui/category-tree-toolbar.tsx`
+  - 체크박스, 드래그 핸들, 드롭 라인/하이라이트, `moved`/`new-parent` 마커, 모드별 액션 바 추가
+- `src/features/category-manager/lib/tree-utils.ts`
+  - 트리 복제, visible row 계산, 순환참조 차단, 이동 적용, 원본 대비 diff 계산 유틸 추가
+  - 리뷰 경고를 반영해 nested 카테고리의 cross-branch 이동과 숨김 형제 reorder 회귀를 수정
+- `src/entities/category/api.ts`, `src/entities/category/model.ts`, `src/entities/category/index.ts`
+  - `PATCH /api/categories/tree`용 배치 변경 타입과 클라이언트 API 추가
+  - `origin/main`의 삭제 계약 변경과 충돌한 `DeleteCategoryOptions` 타입/삭제 API를 함께 병합
+- `src/features/category-manager/ui/category-manager.tsx`, `src/features/category-manager/ui/category-delete-modal.tsx`
+  - 배치 저장 mutation, 일괄 visibility mutation을 추가하고, 마지막 merge 단계에서 충돌한 삭제 모달 최신 흐름을 통합
+- `package.json`, `pnpm-lock.yaml`
+  - `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` 의존성 추가
+
+**리뷰 수정 사항:**
+
+- `moveCategory()`가 제거된 형제 배열만 기준으로 목적지를 찾아 nested 카테고리의 교차 브랜치 이동이 실패하던 문제 수정
+- 선택 모드에서 숨김 카테고리를 다시 표시할 수 없던 문제를 수정하기 위해 모드 진입 시 숨김 필터를 강제 노출
+- 편집 모드에서 숨김 형제 카테고리가 보이지 않는 상태로 함께 재정렬되던 회귀를 수정하기 위해 배치 편집 시 전체 형제를 노출
+- 머지 직전 `origin/main`의 카테고리 삭제 플로우 변경과 충돌한 `api.ts`, `model.ts`, `category-manager.tsx`를 수동 병합
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+
 ### #206 카테고리 CRUD 모달 (PR #251 머지)
 
 관리자 카테고리 관리 화면의 생성/수정/삭제 모달을 스펙 기준으로 정리하고, 리뷰에서 잡힌 삭제 API 계약까지 반영한 뒤 PR을 병합했다. 기존 인라인 삭제 확인을 전용 모달로 분리해 하위 카테고리 차단, 글 이동/휴지통 선택, 대상 미선택 시 삭제 비활성화를 모두 한 흐름으로 묶었다.
