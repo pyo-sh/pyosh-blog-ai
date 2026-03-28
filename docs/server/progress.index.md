@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-03-29 | Issue #73 Admin pinned 글 상한(5개) 강제: pinned count 엔드포인트 추가, create/update/restore/delete 전이 동시성 잠금 정리, posts 테스트 보강, PR #74 머지 | ✅   |
 | 2026-03-28 | Issue #69 Admin 댓글 hidden 상태 복원 API 지원: 단일/벌크 restore를 `deleted | hidden -> active`로 확장, comments 테스트 보강, 리뷰 제안으로 restore `400` 응답 스키마 보완, PR #72 머지 | ✅   |
 | 2026-03-28 | Issue #67 Admin 글 목록 조회수/댓글수 정렬 지원: aggregate sort(`totalPageviews`, `commentCount`) 추가, posts 통합 테스트 보강, PR #68 머지 | ✅   |
 | 2026-03-28 | Issue #191 PR #66 리뷰 반영: WebP/SVG 업로드 검증 강화 + assets 테스트 보강 + PR #66 머지 | ✅   |
@@ -55,6 +56,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-29.md](./progress/progress.2026-03-29.md) - Issue #73 Admin pinned 글 상한 5개 강제 + pinned count 엔드포인트 + PR #74 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - Issue #69 Admin 댓글 hidden 상태 복원 API 지원 + PR #72 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - Issue #67 Admin 글 목록 조회수/댓글수 정렬 지원 + PR #68 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - Issue #191 PR #66 리뷰 반영: WebP/SVG 업로드 검증 강화 + PR #66 머지
