@@ -2,6 +2,39 @@
 
 ## 완료된 작업
 
+### #207 에셋 갤러리/관리 (PR #252 머지)
+
+관리자 에셋 라이브러리를 스펙 기준으로 마무리했다. 그리드 선택, 상세 모달, 삭제 확인, URL/마크다운 복사, 포스트 에디터 썸네일/이미지 선택 플로우를 하나의 자산 선택 경험으로 정리했고, 자동 리뷰 마지막 경고였던 상세 모달 미리보기 에러 상태 고착 문제까지 수정한 뒤 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/features/asset-uploader/ui/asset-uploader.tsx`, `src/features/asset-uploader/ui/asset-grid.tsx`, `src/features/asset-uploader/ui/asset-detail-modal.tsx`
+  - 관리자 에셋 그리드, 다중 선택, 상세 보기, 삭제 확인, URL/마크다운 복사 액션을 연결
+  - 좌우 이동이 가능한 상세 모달과 미리보기/메타데이터 패널을 추가하고, 자산 전환 시 preview error state가 초기화되도록 수정
+- `src/entities/asset/api.ts`, `src/entities/asset/lib.ts`, `src/entities/asset/ui/asset-picker-modal.tsx`
+  - 에셋 조회/선택 공용 로직과 picker modal을 entity 계층으로 정리해 업로더와 포스트 에디터가 재사용하도록 구성
+- `src/features/post-editor/ui/thumbnail-uploader.tsx`
+  - 썸네일 선택 플로우를 새 asset picker와 연결하고, 임의 호스트 preview URL도 그대로 표시할 수 있게 보완
+- `stories/widgets/admin/asset-gallery.stories.tsx`
+  - 관리자 에셋 갤러리 상호작용을 Storybook에서 확인할 수 있도록 스토리 추가
+
+**리뷰 수정 사항:**
+
+- asset picker를 feature 계층에서 entity 계층으로 이동해 FSD 경계를 정리
+- 고정된 asset host 가정으로 preview가 깨지던 문제를 수정해 임의 asset URL도 표시 가능하게 조정
+- 썸네일 picker 선택 후 stale state가 남던 흐름을 정리
+- 상세 모달에서 한 자산 로드 실패 후 다음 자산으로 이동해도 에러 fallback이 유지되던 회귀를 `asset.url` 변경 시 에러 상태 초기화로 수정
+
+**검증:**
+
+- `pnpm build`
+- `pnpm compile:types`
+- `pnpm lint`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+
 ### #204 카테고리 배치 편집 + 일괄 선택 (PR #253 머지)
 
 관리자 카테고리 트리에 배치 편집 모드와 일괄 선택 모드를 추가했다. `dnd-kit` 기반 드래그 앤 드롭, `moved`/`new-parent` 변경 마커, 배치 저장/취소, 선택한 카테고리 숨김/보이기 토글을 연결했고, 자동 리뷰 3라운드에서 나온 트리 이동/숨김 카테고리 처리 문제와 마지막 `main` 병합 충돌까지 정리한 뒤 PR을 머지했다.
