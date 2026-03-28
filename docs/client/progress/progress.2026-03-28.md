@@ -2,6 +2,36 @@
 
 ## 완료된 작업
 
+### #254 Admin 댓글 hidden 복원 UI 연동 + Modal 접근성 보완 (PR #258 머지)
+
+관리자 댓글 관리 화면에서 `hidden` 상태 댓글을 `active`로 복원하는 클라이언트 흐름을 서버 계약에 맞춰 연결하고, 공용 `Modal` 컴포넌트에 explicit accessible name 전달 경로를 추가한 뒤 PR을 병합했다. 자동 리뷰는 clean으로 통과했고 후속 수정 없이 바로 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/widgets/admin-comments/ui/admin-comments-page.tsx`
+  - `hidden` 상태를 `restore` 가능 상태에 포함해 단건/벌크 action 교집합 계산이 `hidden | deleted -> active` 계약과 일치하도록 수정
+  - action modal 제목/설명을 삭제 전용 문구에서 일반 작업 흐름으로 조정
+- `src/widgets/admin-comments/ui/comment-detail-modal.tsx`, `src/widgets/admin-comments/ui/comment-table.tsx`
+  - `hidden` 댓글 상세에서 복원 버튼을 노출하고, 테이블에서도 `hidden` 행을 삭제 버튼이 아닌 관리 액션으로 전환
+- `src/widgets/admin-comments/ui/comment-delete-modal.tsx`
+  - 복원 설명을 `숨김 또는 삭제된 댓글` 기준으로 정리하고 모달 accessible name을 전달
+- `src/shared/ui/libs/modal.tsx`
+  - `aria-label` / `aria-labelledby` 전달을 지원하고 `role="dialog"` 및 `aria-modal`을 실제 dialog element로 이동
+- `src/features/**`, `src/entities/asset/ui/asset-picker-modal.tsx`, `src/shared/ui/confirm-dialog.tsx`
+  - 모든 `Modal` 사용처에 explicit accessible name을 추가해 shared modal 접근성 회귀를 정리
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 동기 `codex` 리뷰는 PR `#258`에서 clean review로 종료되어 추가 resolve 라운드 없이 바로 머지했다.
+
 ### #210 Sitemap + RSS + robots.txt (PR #256 머지)
 
 서버 기반 SEO 보조 라우트 중 sitemap, RSS, robots 범위를 Next.js App Router로 옮겼다. 공개 글 slug 전용 fetch를 추가하고, `sitemap.xml`/`rss.xml`/`robots.txt`를 메타데이터 라우트와 Route Handler로 구성한 뒤 PR을 병합했다.

@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #254 Admin 댓글 hidden 복원 UI 연동 + Modal 접근성 보완 - `hidden -> active` restore UI 연결, shared `Modal` accessible name 전달, PR #258 머지 | ✅   |
 | 2026-03-28 | #210 Sitemap + RSS + robots.txt (F-30b) - Next.js `sitemap.xml`/`rss.xml`/`robots.txt`, `/api/posts/slugs` fetch 추가, PR #256 머지 | ✅   |
 | 2026-03-28 | #208 댓글 삭제 + 벌크 선택/삭제 (F-28b) - 단일/벌크 삭제/복원 모달, 페이지 간 선택 유지, 리뷰 5라운드 반영, 후속 server/client 이슈 분리 후 PR #250 머지 | ✅   |
 | 2026-03-28 | #207 에셋 갤러리/관리 (F-27) - 관리자 에셋 그리드/선택/상세 모달/삭제/URL 복사, 포스트 에디터 picker 통합, preview error state reset, PR #252 머지 | ✅   |
@@ -76,6 +77,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #254 Admin 댓글 hidden 복원 UI 연동 + Modal 접근성 보완 PR #258 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #210 Sitemap + RSS + robots.txt PR #256 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #208 댓글 삭제 + 벌크 선택/삭제 PR #250 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #207 에셋 갤러리/관리 PR #252 머지
