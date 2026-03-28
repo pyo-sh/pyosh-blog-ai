@@ -2,6 +2,52 @@
 
 ## 완료된 작업
 
+### #209 댓글 작성/삭제 액션 + secret reveal token 복원 흐름 (PR #255 머지)
+
+공개 댓글 폼에서 게스트 이메일 필드를 제거한 상태를 유지하면서, 비밀 댓글 복원 권한을 서버 `revealToken` 계약으로 전환했다. 기존 PR에서 반복되던 secret comment 복원/legacy 호환/접근성 리뷰를 정리해 자동 리뷰 clean 상태까지 만든 뒤 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/entities/comment/api.ts`, `src/entities/comment/model.ts`, `src/entities/comment/index.ts`
+  - 댓글 생성 응답에서 `revealToken`을 받을 수 있도록 타입과 API helper를 확장
+  - `POST /api/comments/:id/reveal` 기반 비밀 댓글 복원 helper 추가
+- `src/features/comment-section/lib/guest-secret-store.ts`
+  - 비밀 댓글 본문 평문 저장 대신 `revealToken` 저장 구조로 전환
+  - `MAX_ENTRIES = 20` FIFO 제한 추가
+  - legacy secret comment cache를 author-bound로 보강하고, stale identity/다중 작성자 케이스까지 복구 가능하도록 보완
+- `src/features/comment-section/ui/comment-list.tsx`
+  - 비밀 댓글 자동 복원 effect를 token reveal / legacy recovery로 분리
+  - 이미 복원된 댓글을 목록 갱신 시 다시 마스킹하지 않도록 상태 병합 유지
+  - 동일 댓글에 대한 중복 `/reveal` 호출과 in-flight 결과 유실 경로를 제거
+  - 삭제 모달에 explicit accessible name을 다시 추가
+- `src/features/comment-section/ui/comment-form.tsx`
+  - 일반 댓글 작성에서는 이메일 제거 상태를 유지
+  - legacy secret recovery가 필요한 경우에만 이메일 입력 필드를 조건부로 다시 노출
+
+**리뷰 수정 사항:**
+
+- transient reveal 실패 시 `revealToken`을 즉시 삭제하지 않도록 수정
+- token 저장소에 FIFO eviction(20개)을 추가
+- legacy cache를 author-bound로 묶어 다른 작성자에게 재노출되지 않도록 수정
+- stale legacy active identity보다 사용자가 입력한 identity를 우선하도록 조정
+- 프로필 입력 중 token reveal 요청 결과가 버려지지 않도록 effect를 분리
+
+**후속 연계:**
+
+- server: `pyo-sh/pyosh-blog-be#70` - 비밀 댓글 reveal token 발급 및 검증 API
+- client: `#257` - reveal token 기반 클라이언트 복원 흐름
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 자동 리뷰는 여러 라운드에 걸쳐 secret reveal/legacy 호환 경고를 순차 해소했고, 마지막에는 clean review로 종료됐다.
+
 ### #254 Admin 댓글 hidden 복원 UI 연동 + Modal 접근성 보완 (PR #258 머지)
 
 관리자 댓글 관리 화면에서 `hidden` 상태 댓글을 `active`로 복원하는 클라이언트 흐름을 서버 계약에 맞춰 연결하고, 공용 `Modal` 컴포넌트에 explicit accessible name 전달 경로를 추가한 뒤 PR을 병합했다. 자동 리뷰는 clean으로 통과했고 후속 수정 없이 바로 머지됐다.
