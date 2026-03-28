@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #210 Sitemap + RSS + robots.txt (F-30b) - Next.js `sitemap.xml`/`rss.xml`/`robots.txt`, `/api/posts/slugs` fetch 추가, PR #256 머지 | ✅   |
 | 2026-03-28 | #208 댓글 삭제 + 벌크 선택/삭제 (F-28b) - 단일/벌크 삭제/복원 모달, 페이지 간 선택 유지, 리뷰 5라운드 반영, 후속 server/client 이슈 분리 후 PR #250 머지 | ✅   |
 | 2026-03-28 | #207 에셋 갤러리/관리 (F-27) - 관리자 에셋 그리드/선택/상세 모달/삭제/URL 복사, 포스트 에디터 picker 통합, preview error state reset, PR #252 머지 | ✅   |
 | 2026-03-28 | #204 카테고리 배치 편집 + 일괄 선택 (F-24b) - dnd-kit 배치 편집, moved/new-parent 변경 추적, 배치 저장/취소, 일괄 숨김/표시, 리뷰 3라운드 및 `main` 병합 충돌 정리, PR #253 머지 | ✅   |
@@ -75,6 +76,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #210 Sitemap + RSS + robots.txt PR #256 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #208 댓글 삭제 + 벌크 선택/삭제 PR #250 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #207 에셋 갤러리/관리 PR #252 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #204 카테고리 배치 편집 + 일괄 선택 PR #253 머지
