@@ -2,6 +2,36 @@
 
 ## 완료된 작업
 
+### #206 카테고리 CRUD 모달 (PR #251 머지)
+
+관리자 카테고리 관리 화면의 생성/수정/삭제 모달을 스펙 기준으로 정리하고, 리뷰에서 잡힌 삭제 API 계약까지 반영한 뒤 PR을 병합했다. 기존 인라인 삭제 확인을 전용 모달로 분리해 하위 카테고리 차단, 글 이동/휴지통 선택, 대상 미선택 시 삭제 비활성화를 모두 한 흐름으로 묶었다.
+
+**주요 변경 사항:**
+
+- `src/features/category-manager/ui/category-delete-modal.tsx`
+  - 삭제 불가(하위 카테고리 존재), 단순 삭제, 글 이동/휴지통 선택 상태를 분리한 전용 모달 추가
+  - 글이 있는 카테고리 삭제 시 이동 대상 카테고리 선택과 라디오 액션을 제공하고, 대상 미선택 시 삭제 버튼 비활성화
+- `src/features/category-manager/ui/category-manager.tsx`
+  - 기존 인라인 삭제 모달 제거
+  - 삭제 mutation이 `action`/`moveTo`를 포함한 payload를 사용하도록 리팩터링
+- `src/entities/category/api.ts`, `src/entities/category/model.ts`, `src/entities/category/index.ts`
+  - 카테고리 삭제 API를 `DELETE /api/categories/:id?action=...` 계약에 맞게 확장
+  - 자동 리뷰 경고를 반영해 빈 카테고리 삭제도 명시적 `action`을 보내도록 강제
+- `src/features/category-manager/ui/category-form-modal.tsx`
+  - 이름 입력 trim 기준 비활성화, 50자 제한, 필드 `aria-label` 추가
+- `stories/features/category-delete-modal.stories.tsx`
+  - 단순 삭제, 글 포함 삭제, 하위 카테고리 차단 상태 Storybook 스토리 추가
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+
 ### #202 이미지 삽입 + 프리뷰 모드 (PR #249 머지)
 
 관리자 마크다운 에디터에 남아 있던 이미지 삽입 플로우와 프리뷰 제어를 마무리했다. 드래그 앤 드롭, 클립보드 붙여넣기, 이미지 버튼 기반 삽입을 pending placeholder 방식으로 통합했고, split/editor/modal 프리뷰 모드와 에디터-프리뷰 스크롤 동기화까지 연결한 뒤 자동 리뷰 6라운드에서 나온 pending-image edge case들을 정리해 병합했다.
