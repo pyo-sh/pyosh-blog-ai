@@ -2,6 +2,12 @@
 
 ## Completed
 
+- [x] Issue #69: Admin 댓글 hidden 상태 복원 API 지원 + PR #72 merge 완료
+  - `CommentService.restoreComment()`가 `deleted | hidden -> active`를 허용하고, bulk restore도 두 상태를 함께 복원하도록 확장
+  - `comment.route.ts` / `comment.schema.ts` / `api-spec.md`에 restore 계약과 `400` 응답 문서를 반영해 Swagger/OpenAPI와 실제 동작을 일치시킴
+  - `test/routes/comments.test.ts`에 hidden 단일 복원 및 hidden/deleted 혼합 벌크 복원 통합 테스트 추가
+  - Codex review suggestion 1건(restore route `400` 응답 스키마 누락) 반영 후 PR #72 merge
+
 - [x] Issue #67: Admin 글 목록 조회수/댓글수 정렬 지원 + PR #68 merge 완료
   - `AdminPostListQuerySchema`에 `totalPageviews`, `commentCount` 정렬 키 추가
   - `PostService.getPostList()`에서 stats/comment 집계 서브쿼리 기반 정렬을 추가해 `asc|desc`와 기존 필터/페이지네이션을 유지
@@ -17,6 +23,11 @@
 
 ## Notes
 
+- 관련 PR: [PR #72](https://github.com/pyo-sh/pyosh-blog-be/pull/72)
+- 관련 이슈: #69
+- 검증 메모:
+  - `comments.test.ts`에서 hidden 단일 복원과 hidden/deleted 혼합 벌크 복원 케이스 통과 확인
+  - 전체 `pnpm test`는 repo 기존 guestbook/stats/health 실패로 green은 아니었음
 - 관련 PR: [PR #68](https://github.com/pyo-sh/pyosh-blog-be/pull/68)
 - 관련 이슈: #67
 - 검증 메모:
