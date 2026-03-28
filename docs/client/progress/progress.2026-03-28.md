@@ -2,6 +2,31 @@
 
 ## 완료된 작업
 
+### #203 글 관리 벌크 작업 + 미리보기 (PR #247 머지)
+
+글 관리 화면의 남은 클라이언트 제어를 마무리했다. 벌크 액션 바에 공개 여부 변경을 추가해 카테고리/댓글 상태/공개 여부를 한 번에 묶어 전송할 수 있게 했고, 글 미리보기 페이지에서는 `contentModifiedAt`을 직접 설정하거나 제거할 수 있는 컨트롤을 추가한 뒤 자동 리뷰까지 통과시켜 병합했다.
+
+**주요 변경 사항:**
+
+- `src/widgets/admin-post-list/ui/bulk-actions.tsx`
+  - 활성 글 벌크 액션 바에 공개 여부 드롭다운을 추가하고, 초기화/적용/확인 모달이 visibility 변경까지 함께 다루도록 확장
+- `src/app/manage/posts/page.tsx`, `src/entities/post/model.ts`
+  - 벌크 update payload에 `visibility`를 포함하도록 연결해 category/comment status/visibility를 단일 요청 본문으로 보낼 수 있게 정리
+- `src/widgets/admin-post-preview/ui/post-preview.tsx`
+  - 미리보기 컨트롤 바에 `datetime-local` 기반 수정일 입력, 적용 버튼, 수정일 제거 버튼 추가
+  - 현재 글의 `contentModifiedAt`이 있으면 미리보기 메타 영역에도 함께 노출
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 클라이언트는 계속 `PATCH /api/admin/posts/bulk` 계약을 사용한다. 현재 로컬 server 트리에는 해당 라우트가 없어 bulk 동작은 server 측 선행 작업에 계속 의존한다.
+
 ### #196 댓글 표시 개선 (PR #242 머지)
 
 공개 글 상세의 댓글 섹션을 paginated comment API/meta 기준으로 재정비하고, 자동 리뷰 다라운드에서 나온 edge case를 끝까지 정리한 뒤 PR을 병합했다.

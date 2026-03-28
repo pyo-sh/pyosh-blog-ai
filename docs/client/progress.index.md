@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-03-28 | #203 글 관리 벌크 작업 + 미리보기 (F-21b) - bulk visibility payload 연결, preview `contentModifiedAt` 설정/제거 컨트롤, PR #247 머지 | ✅   |
 | 2026-03-28 | #196 댓글 표시 개선 (F-27/F-28b) - paginated comment fetch/meta, locked/disabled 상태, guest secret 복원, delete fallback/hydration fix, PR #242 머지 | ✅   |
 | 2026-03-28 | #200 글 메타데이터 편집 (F-20) - PostForm 메타 필드 확장(summary/description/comment status/thumbnail/tag/category), 공개 post card/detail 반영, JSON-LD/TOC 충돌 정리, PR #245 머지 | ✅   |
 | 2026-03-28 | #199 구조화 데이터 (JSON-LD) - `WebSite`/`SearchAction`/`BlogPosting`/`BreadcrumbList` 삽입, 리뷰 수정 2라운드, PR #246 머지 | ✅   |
@@ -68,6 +69,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #203 글 관리 벌크 작업 + 미리보기 PR #247 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #196 댓글 표시 개선 PR #242 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #200 글 메타데이터 편집 PR #245 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #199 구조화 데이터 (JSON-LD) PR #246 머지
