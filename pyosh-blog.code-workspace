@@ -11,5 +11,6 @@
       { "directory": "./server", "changeProcessCWD": true },
     ],
     "eslint.useFlatConfig": true,
+    "liveServer.settings.multiRootWorkspaceName": "whole",
   },
 }
