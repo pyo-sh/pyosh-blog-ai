@@ -2,6 +2,39 @@
 
 ## 완료된 작업
 
+### #202 이미지 삽입 + 프리뷰 모드 (PR #249 머지)
+
+관리자 마크다운 에디터에 남아 있던 이미지 삽입 플로우와 프리뷰 제어를 마무리했다. 드래그 앤 드롭, 클립보드 붙여넣기, 이미지 버튼 기반 삽입을 pending placeholder 방식으로 통합했고, split/editor/modal 프리뷰 모드와 에디터-프리뷰 스크롤 동기화까지 연결한 뒤 자동 리뷰 6라운드에서 나온 pending-image edge case들을 정리해 병합했다.
+
+**주요 변경 사항:**
+
+- `src/features/post-editor/ui/post-form.tsx`
+  - pending image 상태, 업로드-온-세이브 흐름, 프리뷰 모드 토글, 프리뷰 모달, 스크롤 동기화 연결
+  - 삭제된 pending image를 짧은 복구 캐시에 보관해 undo 복원은 가능하게 유지하면서 blob URL은 즉시 해제하도록 조정
+- `src/features/post-editor/ui/markdown-editor.tsx`, `src/features/post-editor/ui/markdown-toolbar.tsx`
+  - 드래그 앤 드롭/클립보드 이미지 입력 처리 추가
+  - 이미지 버튼을 갤러리 모달과 연결하고 대기 이미지 수를 툴바에 노출
+- `src/features/post-editor/lib/image-handler.ts`, `src/features/post-editor/lib/markdown-commands.ts`, `src/features/post-editor/lib/scroll-sync.ts`
+  - `pending-upload:` placeholder 관리, 프리뷰 치환, 일괄 업로드, batch image insertion, proportional scroll sync 추가
+  - duplicate placeholder 치환, escaped alt text, 삭제 후 undo 복원, 삭제 이미지 cleanup 메모리 회수까지 자동 리뷰 피드백을 반영
+- `src/features/post-editor/ui/image-gallery-modal.tsx`, `src/features/post-editor/ui/preview-modal.tsx`
+  - 로컬 파일 선택 + 기존 asset 선택이 가능한 이미지 삽입 모달 추가
+  - 전체 화면 프리뷰 모달 추가
+- `src/shared/lib/markdown.ts`
+  - pending local image preview가 sanitize 단계에서 제거되지 않도록 `blob:` image source 허용
+- `stories/features/markdown-preview.stories.tsx`
+  - split editor/preview 스토리 추가
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건과 신규 `image-gallery-modal.tsx`의 `<img>` warning 1건만 남았다.
+
 ### #201 SEO 동적 메타데이터 + canonical (PR #248 머지)
 
 공개 페이지 전반에 Next.js metadata 기반 SEO 메타데이터를 다시 연결하고, 자동 리뷰 3라운드에서 나온 production-safe URL/metadata inheritance 이슈까지 정리한 뒤 PR을 병합했다.
