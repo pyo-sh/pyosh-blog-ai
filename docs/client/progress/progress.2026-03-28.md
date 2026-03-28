@@ -2,6 +2,43 @@
 
 ## 완료된 작업
 
+### #201 SEO 동적 메타데이터 + canonical (PR #248 머지)
+
+공개 페이지 전반에 Next.js metadata 기반 SEO 메타데이터를 다시 연결하고, 자동 리뷰 3라운드에서 나온 production-safe URL/metadata inheritance 이슈까지 정리한 뒤 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/shared/lib/seo.ts`
+  - 사이트 URL, `metadataBase`, canonical path, 마크다운 plain text 추출, post description 계산을 담당하는 공용 SEO 유틸 추가
+  - 프로덕션에서 `NEXT_PUBLIC_SITE_URL`이 없을 때는 fail-closed로 동작하도록 유지하고, 개발 환경에서만 `http://localhost:3000` fallback을 허용
+- `src/app/layout.tsx`, `src/app/manage/layout.tsx`
+  - 루트 metadata 기본값(title template, description, Open Graph, Twitter card, RSS alternate) 추가
+  - `/manage` 이하 라우트에 `robots: { index: false, follow: false }` 적용
+- `src/app/(public)/*`
+  - 홈, 글 상세, 카테고리, 태그 상세, 태그 목록, 방명록, 검색 페이지에 canonical/description/title metadata 연결
+  - 글 상세는 `generateMetadata()` + `cache()`를 통해 article OG, Twitter card 분기, canonical을 연결하고 page render와 metadata fetch를 재사용
+  - 카테고리/태그 상세는 paginated canonical과 out-of-range 404 정합성을 metadata 단계까지 맞춤
+- `src/features/post-editor/lib/extract-plain-text.ts`, `src/shared/lib/structured-data.ts`
+  - post editor preview와 JSON-LD가 shared SEO helper를 재사용하도록 정리
+- `.env.local.example`
+  - `NEXT_PUBLIC_SITE_URL` 예시 값을 추가해 배포/로컬 설정에 필요한 env를 문서화
+
+**리뷰 수정 사항:**
+
+- 초기 구현에서 프로덕션 fallback이 `localhost` absolute URL을 내보내던 회귀를 수정
+- canonical helper가 페이지별 `openGraph`를 덮어써 루트 OG 필드를 잃던 문제를 수정하고, article 페이지만 필요한 OG 필드를 명시적으로 설정
+- `NEXT_PUBLIC_SITE_URL`이 새 메타데이터 흐름의 필수 환경 변수라는 점을 example env에 반영
+
+**검증:**
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 저장소 기존 warning인 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+
 ### #203 글 관리 벌크 작업 + 미리보기 (PR #247 머지)
 
 글 관리 화면의 남은 클라이언트 제어를 마무리했다. 벌크 액션 바에 공개 여부 변경을 추가해 카테고리/댓글 상태/공개 여부를 한 번에 묶어 전송할 수 있게 했고, 글 미리보기 페이지에서는 `contentModifiedAt`을 직접 설정하거나 제거할 수 있는 컨트롤을 추가한 뒤 자동 리뷰까지 통과시켜 병합했다.
