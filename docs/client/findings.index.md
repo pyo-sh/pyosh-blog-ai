@@ -15,6 +15,9 @@
 | 007 | Next.js 최신 버전 분석 (14→15→16)                  | 2026-02-08 | #next15 #next16 #breaking-changes  |
 | 008 | FSD 마이그레이션 완료 및 TailwindCSS v4 완성       | 2026-02-09 | #fsd #tailwind-v4 #emotion-removal |
 | 009 | Figma plugin API pitfalls for wireframe automation | 2026-03-20 | #figma #wireframe #plugin-api      |
+| 010 | 로딩/빈 상태 컴포넌트 설계 패턴 (Skeleton/Spinner/EmptyState) | 2026-03-27 | #skeleton #spinner #empty-state #accessibility #aria |
+| 011 | Storybook v10 설정 시 발생하는 비직관적 이슈 | 2026-03-27 | #storybook #msw #tanstack-query #typescript |
+| 012 | 패널/모달 닫힐 때 포커스 반환 - 트리거 요소 ref 패턴 | 2026-03-27 | #accessibility #focus-trap #wcag #react #useRef |
 
 ## 🔗 상세 문서
 
@@ -27,9 +30,12 @@
 - [findings.007-nextjs-versions.md](./findings/findings.007-nextjs-versions.md) - Next.js 버전 분석
 - [findings.008-fsd-migration.md](./findings/findings.008-fsd-migration.md) - FSD 구조 완성
 - [findings.009-figma-plugin-api-pitfalls.md](./findings/findings.009-figma-plugin-api-pitfalls.md) - Figma plugin API 주의사항
+- [findings.010-loading-empty-state-patterns.md](./findings/findings.010-loading-empty-state-patterns.md) - 로딩/빈 상태 컴포넌트 설계 패턴
+- [findings.011-storybook-v10-setup.md](./findings/findings.011-storybook-v10-setup.md) - Storybook v10 설정 시 발생하는 비직관적 이슈
+- [findings.012-focus-return-on-modal-close.md](./findings/findings.012-focus-return-on-modal-close.md) - 패널/모달 닫힐 때 포커스 반환 - 트리거 요소 ref 패턴
 
 ## 📊 요약
 
-- **총 문서**: 9개
+- **총 문서**: 12개
 - **주요 성과**: Emotion 제거, TailwindCSS v4 도입, FSD 구조 전환, Next.js 14 업그레이드
 - **주요 이슈**: Emotion App Router 비공식 지원, TailwindCSS v4 + Next.js 16 Turbopack 호환 문제
