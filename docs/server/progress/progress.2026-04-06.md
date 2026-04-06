@@ -2,6 +2,11 @@
 
 ## Completed
 
+- [x] Issue #80: Admin auth route username contract 전환 + PR #83 merge 완료
+  - `src/routes/auth/auth.route.ts`에서 `POST /api/auth/admin/login` request body를 `{ username, password }`로 고정하고 legacy `email` alias 필드를 제거
+  - login response와 `GET /api/auth/me`의 admin 응답에서 legacy `email` 필드를 제거해 외부 계약을 `username` 중심으로 정리
+  - `username` 필드는 현재 username 형식과 `0008_admin_username.sql`로 마이그레이션된 email-shaped username을 모두 허용하도록 검증을 조정해 기존 관리자 계정 로그인 회귀를 방지
+  - `test/routes/auth.test.ts`에 legacy `email` 필드 거부, response shape, migrated email-shaped username 로그인 호환 시나리오를 추가하고 review 2건을 반영한 뒤 PR #83 merge
 - [x] Issue #79: Category/Asset mutation route CSRF 누락 수정 + PR #82 merge 완료
   - `src/routes/categories/category.route.ts`의 `POST /api/categories`, `PATCH /api/categories/tree`, `PATCH /api/categories/:id`, `DELETE /api/categories/:id`에 `fastify.csrfProtection`을 명시적으로 연결해 `/api/admin/*` 바깥의 관리자 mutation route도 문서와 동일한 CSRF 보호를 받도록 정리
   - `src/routes/assets/asset.route.ts`의 `DELETE /api/assets/:id`, `DELETE /api/assets/bulk`에 동일한 CSRF hook을 추가해 upload route와 보호 수준을 맞춤
@@ -10,6 +15,12 @@
 
 ## Notes
 
+- 관련 PR: [PR #83](https://github.com/pyo-sh/pyosh-blog-be/pull/83)
+- 관련 이슈: #80
+- 검증 메모:
+  - `pnpm exec tsc --noEmit` 통과
+  - `NODE_ENV=test pnpm exec vitest run test/routes/auth.test.ts` 실행 후 `11`개 테스트 통과 확인
+  - `pnpm test` 전체 스위트는 변경 범위 밖의 기존 baseline 실패(`test/routes/posts.test.ts`, `test/routes/comments.test.ts`)를 동일하게 재현
 - 관련 PR: [PR #82](https://github.com/pyo-sh/pyosh-blog-be/pull/82)
 - 관련 이슈: #79
 - 검증 메모:
