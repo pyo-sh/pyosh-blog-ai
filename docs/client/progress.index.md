@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-06 | #286 Admin 로그아웃 CSRF 계약 불일치 수정 - `logout()`을 CSRF-aware mutation helper로 전환해 PR #290 머지 | ✅   |
 | 2026-04-04 | #281 Admin 댓글 상태 전환 UI를 실제 API와 연결 - 상세 모달 상태 칩을 hide/restore/delete API와 연결, 관리자 댓글 목록/dashboard 최근 댓글 동기화, 자동 리뷰 4라운드 반영 후 PR #285 머지 | ✅   |
 | 2026-03-29 | #260 PostListItem 디자인 리뉴얼 - 와이어프레임 `post-item` 구조, 모바일 썸네일, category shimmer, pin float, Solar 메타 아이콘 적용 후 PR #261 머지 | ✅   |
 | 2026-03-28 | #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) - 수정일 컬럼/미리보기 Storybook 정리, server pinned-count endpoint 연동, 자동 리뷰 4라운드 반영 후 PR #259 머지 | ✅   |
@@ -81,6 +82,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - #286 Admin 로그아웃 CSRF 계약 불일치 수정 PR #290 머지
 - [progress.2026-04-04.md](./progress/progress.2026-04-04.md) - #281 Admin 댓글 상태 전환 UI를 실제 API와 연결 PR #285 머지
 - [progress.2026-03-29.md](./progress/progress.2026-03-29.md) - #260 PostListItem 디자인 리뉴얼 PR #261 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) PR #259 머지
