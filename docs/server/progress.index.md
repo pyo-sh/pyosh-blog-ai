@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-07 | Issue #84 발행 시 summary 자동 생성: published 저장 시 `contentMd` plain text 200자 summary 보장, draft→published `publishedAt` 보강, posts 테스트 추가, PR #85 머지 | ✅   |
 | 2026-04-06 | Issue #80 Admin auth route username contract 전환: login/me 응답에서 legacy `email` 필드 제거, request body를 `username` 단일 필드로 정리, migrated email-shaped username 호환 로그인 유지, PR #83 머지 | ✅   |
 | 2026-04-06 | Issue #79 Category/Asset mutation route CSRF 누락 수정: categories/assets 관리자 mutation route에 명시적 CSRF hook 추가, route introspection 테스트 보강, PR #82 머지 | ✅   |
 | 2026-04-02 | Issue #75 Admin 댓글 hidden 상태 전환 API 추가: 단건/벌크 hide, public/post commentCount 가시성 정렬, hide 경로 CSRF 적용, PR #76 머지 | ✅   |
@@ -59,6 +60,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - Issue #84 발행 시 summary 자동 생성 + PR #85 머지
 - [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - Issue #80 Admin auth route username contract 전환 + PR #83 머지
 - [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - Issue #79 Category/Asset mutation route CSRF 누락 수정 + PR #82 머지
 - [progress.2026-04-02.md](./progress/progress.2026-04-02.md) - Issue #75 Admin 댓글 hidden 상태 전환 API 추가 + PR #76 머지
