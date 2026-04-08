@@ -12,12 +12,36 @@
 - **Summary**: All dev-log commits target long-lived `docs` branch; squash-merge to `main` via `/dev-archive`
 - **Keywords**: dev-log, docs, git strategy, branching
 
-## 002 - Public shell height and admin login simplification
+## 002 - Public shell height and spacing
 
-- **File**: `decisions/decision-002-layout-shell-and-admin-login-simplification.md`
+- **File**: `decisions/decision-002-public-shell-height-and-spacing.md`
 - **Date**: 2026-04-10
 - **Status**: accepted
-- **Summary**: Rebuild the public shell as a vertical flex layout to keep the footer at the viewport bottom, and simplify `/manage/login` to a centered form on `bg-background-1`
-- **Keywords**: client, layout, footer, header, admin-login, background, css
+- **Summary**: Rebuild the public shell as a vertical flex layout so the footer stays at the viewport bottom and the empty-looking header gap is removed
+- **Keywords**: client, public-layout, footer, header, spacing, css
+
+## 003 - Admin login screen simplification
+
+- **File**: `decisions/decision-003-admin-login-screen-simplification.md`
+- **Date**: 2026-04-10
+- **Status**: accepted
+- **Summary**: Simplify `/manage/login` to a centered login form on `bg-background-1` with decorative gradients removed
+- **Keywords**: client, admin-login, layout, background, form, ux
+
+## 004 - Admin routes must not render public header
+
+- **File**: `decisions/decision-004-admin-routes-must-not-render-public-header.md`
+- **Date**: 2026-04-10
+- **Status**: accepted
+- **Summary**: Exclude the public header from `/manage` routes so admin pages render only the admin chrome
+- **Keywords**: client, admin, header, provider, routing, layout
+
+## 005 - Category empty state must keep management controls
+
+- **File**: `decisions/decision-005-category-empty-state-must-keep-controls.md`
+- **Date**: 2026-04-10
+- **Status**: accepted
+- **Summary**: Keep the category page control box visible even when there are no categories so users can still create and manage categories
+- **Keywords**: client, category, empty-state, control-box, management, ux
 
 <!-- 새 항목은 아래에 추가 -->
