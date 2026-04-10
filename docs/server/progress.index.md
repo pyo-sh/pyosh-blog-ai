@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-10 | Issue #87 API spec/test alignment baseline: auth/guestbook/settings 계약 기준 테스트 정렬, 실제 앱 CSRF e2e 검증 추가, health/stats/settings-service 불안정성 수정, 전체 스위트 `17` files / `258` tests green 복구, PR #90 머지 | ✅   |
 | 2026-04-10 | Issue #88 Dev uploads 상대 경로 계약 유지 및 정적 서빙 검증: upload dir/url prefix 공통화, static 플러그인에서 업로드 디렉토리 선생성, assets 통합 테스트에 `/uploads/...` 정적 접근 검증 추가, PR #89 머지 | ✅   |
 | 2026-04-07 | Issue #84 발행 시 summary 자동 생성: published 저장 시 `contentMd` plain text 200자 summary 보장, draft→published `publishedAt` 보강, posts 테스트 추가, PR #85 머지 | ✅   |
 | 2026-04-06 | Issue #80 Admin auth route username contract 전환: login/me 응답에서 legacy `email` 필드 제거, request body를 `username` 단일 필드로 정리, migrated email-shaped username 호환 로그인 유지, PR #83 머지 | ✅   |
@@ -61,6 +62,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #87 API spec/test alignment baseline + PR #90 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #88 uploads 상대 경로 계약/정적 서빙 검증 + PR #89 머지
 - [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - Issue #84 발행 시 summary 자동 생성 + PR #85 머지
 - [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - Issue #80 Admin auth route username contract 전환 + PR #83 머지
