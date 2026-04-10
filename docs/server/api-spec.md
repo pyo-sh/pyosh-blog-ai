@@ -96,6 +96,24 @@
 
 ### GET `/api/health/ready`
 
+```json
+{
+  "status": "ok | degraded | error",
+  "timestamp": "ISO-8601",
+  "uptime": 12345.67,
+  "version": "string",
+  "memory": {
+    "rss": 0,
+    "heapUsed": 0,
+    "heapTotal": 0
+  },
+  "database": {
+    "status": "ok | error",
+    "latencyMs": 5
+  }
+}
+```
+
 ### GET `/api/health`
 
 ```json
@@ -143,14 +161,15 @@ Request:
 
 ```json
 {
-  "email": "admin@example.com",
+  "username": "admin-user",
   "password": "password123"
 }
 ```
 
 제약:
 
-- `email`: 유효한 이메일 형식
+- `username`: 4..100, 문자/숫자/`_`/`.`/`-` 허용
+- 기존 legacy 계정 호환을 위해 이메일 형식도 허용
 - `password`: 최소 8자
 
 Response `200`:
@@ -159,7 +178,7 @@ Response `200`:
 {
   "admin": {
     "id": 1,
-    "email": "admin@example.com",
+    "username": "admin-user",
     "createdAt": "ISO-8601",
     "updatedAt": "ISO-8601",
     "lastLoginAt": "ISO-8601 | null"
@@ -184,7 +203,7 @@ Admin 로그인 상태:
 {
   "type": "admin",
   "id": 1,
-  "email": "admin@example.com",
+  "username": "admin-user",
   "createdAt": "ISO-8601",
   "updatedAt": "ISO-8601",
   "lastLoginAt": "ISO-8601 | null"
@@ -1454,13 +1473,3 @@ Response: `204 No Content`
 
 - `Content-Type: application/rss+xml; charset=utf-8`
 - `Cache-Control: public, max-age=3600`
-
-## 현재 문서에서 바로잡은 점
-
-- 관리자 로그인 필드는 `username`이 아니라 `email`
-- Admin 보호 라우트의 실패 코드는 구현상 대부분 `401`이 아니라 `403`
-- `/api/admin/posts/pinned-count`가 실제로 존재
-- 댓글/방명록의 관리자 상태값에는 `hidden`이 포함
-- User API는 OAuth 전용이며 `/api/user/me` 입출력을 별도로 정리
-- SEO 엔드포인트는 `/api/*`가 아니라 루트 `/sitemap.xml`, `/rss.xml`
-- Swagger/OpenAPI 생성 시 깨지던 `204` 응답 스키마를 코드에서 정정해 현재 스펙 추출이 가능하다
