@@ -44,4 +44,12 @@
 - **Summary**: Keep the category page control box visible even when there are no categories so users can still create and manage categories
 - **Keywords**: client, category, empty-state, control-box, management, ux
 
+## 006 - Dev asset URL normalization and CSP split
+
+- **File**: `decisions/decision-006-dev-asset-url-normalization-and-csp-split.md`
+- **Date**: 2026-04-10
+- **Status**: accepted
+- **Summary**: Normalize relative asset URLs against the API origin in development and separate dev-only CSP allowances from the production policy
+- **Keywords**: client, assets, uploads, csp, development, nextjs, middleware, fonts
+
 <!-- 새 항목은 아래에 추가 -->
