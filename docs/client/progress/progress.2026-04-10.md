@@ -2,6 +2,37 @@
 
 ## 완료된 작업
 
+### #299 Dev asset URL normalization and CSP split (PR #304 머지)
+
+개발 환경에서 업로드 자산이 `/uploads/...` 상대 경로로 내려올 때 Next.js origin 기준으로 해석되어 이미지가 깨지고, CSP report-only 위반이 Google Fonts/개발 런타임 경고로 과하게 오염되던 문제를 정리했다. `NEXT_PUBLIC_API_URL`이 설정된 경우에만 `/uploads/...`를 표시용 절대 URL로 정규화하는 shared helper를 추가하고, post thumbnail/markdown/admin asset 미리보기는 이 helper를 렌더링 경계에서만 사용하도록 조정했다. 반대로 업로드 응답, editor 저장 payload, asset copy/markdown copy처럼 persisted data로 흘러가는 경로는 canonical `/uploads/...`를 유지하도록 여러 차례 리뷰 코멘트를 반영했다. `src/middleware.ts`는 dev/prod CSP를 분기해 development에서 필요한 `fonts.googleapis.com`, `unsafe-eval`, websocket connect 예외만 제한적으로 허용하도록 수정한 뒤 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/shared/lib/asset-url.ts`
+  - `/uploads/...` 경로를 표시용으로만 정규화하는 helper와 절대 URL을 canonical 경로로 되돌리는 helper를 추가
+  - `NEXT_PUBLIC_API_URL`이 없으면 localhost fallback을 만들지 않고 상대 경로를 그대로 유지하도록 보완
+- `src/entities/post/api.ts`, `src/shared/lib/markdown.ts`
+  - post thumbnail read 경로와 markdown 렌더링에서만 asset URL을 정규화해 기존 relative asset도 public/admin 화면에서 정상 렌더링되도록 조정
+- `src/features/post-editor/ui/*`
+  - thumbnail picker/upload, post preview, submit payload에서 display URL과 persisted URL을 분리
+  - 저장 시 `thumbnailUrl`은 다시 canonical `/uploads/...`로 변환해 no-op edit에도 절대 URL이 저장되지 않도록 수정
+- `src/entities/asset/lib.ts`, `src/features/asset-uploader/ui/asset-uploader.tsx`
+  - asset manager의 URL/markdown copy 흐름에서 environment-specific absolute URL이 클립보드로 유출되지 않도록 canonicalization 추가
+- `src/middleware.ts`
+  - dev/prod CSP를 분리하고 development에 필요한 font/style/script/connect 예외만 허용
+
+**검증:**
+
+- `pnpm build`
+- `pnpm compile:types` *(build 후 `.next/types` 생성 상태에서 재실행)*
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+
+**메모:**
+
+- 검증을 위해 issue worktree에서 `pnpm install --frozen-lockfile`로 로컬 `node_modules`를 구성했다.
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- PR `#304`는 동기 `codex` 리뷰 5라운드 동안 canonical/presentation 경계를 순차 보정한 뒤 clean 판정으로 병합됐다.
+
 ### #298 Category empty state must keep management controls (PR #303 머지)
 
 카테고리 관리 페이지에서 카테고리가 0개일 때도 control box 역할의 toolbar가 계속 노출되도록 empty state 렌더링 경로를 조정했다. `src/features/category-manager/ui/category-tree.tsx`의 조기 반환을 제거하고 toolbar를 상단에 유지한 뒤, empty state는 본문 카드 안에서만 렌더링되도록 분리했다. 1차 동기 `codex` 리뷰 suggestion에서 빈 상태에 일괄 선택/배치 편집 액션이 노출되는 UX 회귀가 지적돼, `src/features/category-manager/ui/category-tree-toolbar.tsx`에서 카테고리 수가 0개일 때 해당 액션을 숨기고 생성 버튼과 표시 토글만 남기도록 보완한 후 재리뷰 clean 상태로 PR을 병합했다.

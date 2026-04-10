@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-10 | #299 Dev asset URL normalization and CSP split - `/uploads/...` 표시용 정규화, post/editor/asset copy canonical 경로 유지, dev CSP 허용 분리, 자동 리뷰 5라운드 반영 후 PR #304 머지 | ✅   |
 | 2026-04-10 | #298 Category empty state must keep management controls - 카테고리 empty state에서도 관리 toolbar를 유지하고, 자동 리뷰 suggestion을 반영해 빈 상태에서는 일괄 선택/배치 편집 액션을 숨긴 뒤 PR #303 머지 | ✅   |
 | 2026-04-10 | #297 Admin routes must not render public header - 전역 provider에서 public `Header`를 제거해 `/manage`에서는 admin shell만 렌더링되도록 정리하고 PR #302 머지 | ✅   |
 | 2026-04-10 | #295 Public shell height and spacing - public 레이아웃을 `min-h-screen` flex column으로 재구성해 짧은 페이지에서도 footer가 viewport 하단에 고정되도록 하고 자동 리뷰 2라운드 반영 후 PR #300 머지 | ✅   |
@@ -88,6 +89,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #299 Dev asset URL normalization and CSP split PR #304 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #298 Category empty state must keep management controls PR #303 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #297 Admin routes must not render public header PR #302 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #296 Admin login screen simplification PR #301 머지
