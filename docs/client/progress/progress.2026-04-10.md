@@ -2,6 +2,30 @@
 
 ## 완료된 작업
 
+### #298 Category empty state must keep management controls (PR #303 머지)
+
+카테고리 관리 페이지에서 카테고리가 0개일 때도 control box 역할의 toolbar가 계속 노출되도록 empty state 렌더링 경로를 조정했다. `src/features/category-manager/ui/category-tree.tsx`의 조기 반환을 제거하고 toolbar를 상단에 유지한 뒤, empty state는 본문 카드 안에서만 렌더링되도록 분리했다. 1차 동기 `codex` 리뷰 suggestion에서 빈 상태에 일괄 선택/배치 편집 액션이 노출되는 UX 회귀가 지적돼, `src/features/category-manager/ui/category-tree-toolbar.tsx`에서 카테고리 수가 0개일 때 해당 액션을 숨기고 생성 버튼과 표시 토글만 남기도록 보완한 후 재리뷰 clean 상태로 PR을 병합했다.
+
+**주요 변경 사항:**
+
+- `src/features/category-manager/ui/category-tree.tsx`
+  - 카테고리 0개 상태에서도 toolbar를 항상 렌더링하도록 early return 제거
+  - empty state를 tree content 영역 내부 카드로 옮기고, 빈 트리에서는 drag-and-drop 컨텍스트를 마운트하지 않도록 분기
+- `src/features/category-manager/ui/category-tree-toolbar.tsx`
+  - `totalCount === 0`일 때 `일괄 선택`과 `배치 편집` 버튼을 숨기고 `카테고리 추가` 버튼은 유지
+
+**검증:**
+
+- `pnpm build`
+- `pnpm compile:types` *(build 후 `.next/types` 생성 상태에서 재실행)*
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+
+**메모:**
+
+- 워크트리에는 의존성이 없어 검증 전에 `pnpm install --frozen-lockfile`로 로컬 `node_modules`를 구성했다.
+- `pnpm lint`는 저장소 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- PR `#303`은 동기 `codex` 리뷰 2라운드 후 clean 판정으로 병합됐다.
+
 ### #297 Admin routes must not render public header (PR #302 머지)
 
 관리자 라우트가 전역 provider에서 주입되는 public `Header`와 admin shell header를 동시에 렌더링하던 문제를 수정했다. public header는 이미 `src/app/(public)/layout-shell.tsx`가 소유하고 있으므로, `src/app-layer/provider/index.tsx`에서 전역 `Header` 렌더링을 제거해 `/manage` 이하에서는 admin chrome만 남도록 정리했다. 동기 `codex` 리뷰 clean 상태를 확인한 뒤 PR을 병합했다.
