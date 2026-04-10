@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-10 | #296 Admin login screen simplification - `/manage/login`을 단색 배경의 중앙 정렬 로그인 폼으로 단순화하고 PR #301 머지 | ✅   |
 | 2026-04-07 | #289 Admin auth client username 계약 전환 - admin login 응답 unwrap과 admin current-user 타입을 서버 shape에 맞추고, 사용자명 입력 UX를 정리한 뒤 자동 리뷰 2라운드 반영 후 PR #294 머지 | ✅   |
 | 2026-04-07 | #287 Admin 방명록 hide/restore HTTP method 불일치 수정 - guestbook patch helper를 분리해 hide/restore 단건/벌크 요청을 `PATCH`로 정리하고 PR #291 머지 | ✅   |
 | 2026-04-06 | #286 Admin 로그아웃 CSRF 계약 불일치 수정 - `logout()`을 CSRF-aware mutation helper로 전환해 PR #290 머지 | ✅   |
@@ -84,6 +85,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #296 Admin login screen simplification PR #301 머지
 - [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - #289 Admin auth client username 계약 전환 PR #294 머지
 - [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - #287 Admin 방명록 hide/restore HTTP method 불일치 수정 PR #291 머지
 - [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - #286 Admin 로그아웃 CSRF 계약 불일치 수정 PR #290 머지
