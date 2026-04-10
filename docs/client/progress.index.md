@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-10 | #297 Admin routes must not render public header - 전역 provider에서 public `Header`를 제거해 `/manage`에서는 admin shell만 렌더링되도록 정리하고 PR #302 머지 | ✅   |
 | 2026-04-10 | #295 Public shell height and spacing - public 레이아웃을 `min-h-screen` flex column으로 재구성해 짧은 페이지에서도 footer가 viewport 하단에 고정되도록 하고 자동 리뷰 2라운드 반영 후 PR #300 머지 | ✅   |
 | 2026-04-10 | #296 Admin login screen simplification - `/manage/login`을 단색 배경의 중앙 정렬 로그인 폼으로 단순화하고 PR #301 머지 | ✅   |
 | 2026-04-07 | #289 Admin auth client username 계약 전환 - admin login 응답 unwrap과 admin current-user 타입을 서버 shape에 맞추고, 사용자명 입력 UX를 정리한 뒤 자동 리뷰 2라운드 반영 후 PR #294 머지 | ✅   |
@@ -86,6 +87,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #297 Admin routes must not render public header PR #302 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #296 Admin login screen simplification PR #301 머지
 - [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - #289 Admin auth client username 계약 전환 PR #294 머지
 - [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - #287 Admin 방명록 hide/restore HTTP method 불일치 수정 PR #291 머지
