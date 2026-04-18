@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-18 | Issue #98 Server PR/push CI 추가: `ci.yml` 신규 구성, Node 20 + pnpm 고정, MySQL service + `.env.test` 생성, PR 중복 실행 방지를 위해 `push`를 `main`으로 제한, PR #99 머지 | ✅   |
 | 2026-04-18 | Issue #96 Server API `/api` prefix 제거: route prefix/OAuth callback/Swagger 설명/통합 테스트를 루트 경로로 전환, `/health` lightweight probe 유지 + 상세 상태는 `/health/status`로 분리, `api-spec.md` 갱신, PR #97 머지 | ✅   |
 | 2026-04-10 | Issue #87 API spec/test alignment baseline: auth/guestbook/settings 계약 기준 테스트 정렬, 실제 앱 CSRF e2e 검증 추가, health/stats/settings-service 불안정성 수정, 전체 스위트 `17` files / `258` tests green 복구, PR #90 머지 | ✅   |
 | 2026-04-10 | Issue #88 Dev uploads 상대 경로 계약 유지 및 정적 서빙 검증: upload dir/url prefix 공통화, static 플러그인에서 업로드 디렉토리 선생성, assets 통합 테스트에 `/uploads/...` 정적 접근 검증 추가, PR #89 머지 | ✅   |
@@ -63,6 +64,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #98 Server PR/push CI 추가 + PR #99 머지
 - [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #96 server API `/api` prefix 제거 + health probe 계약 유지 + PR #97 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #87 API spec/test alignment baseline + PR #90 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #88 uploads 상대 경로 계약/정적 서빙 검증 + PR #89 머지
