@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-18 | #310 Client API 경로에서 `/api` prefix 제거 - client API helper, middleware auth 체크, Storybook/MSW 경로를 루트 기준으로 정렬하고 PR #311 머지 | ✅   |
 | 2026-04-10 | #299 Dev asset URL normalization and CSP split - `/uploads/...` 표시용 정규화, post/editor/asset copy canonical 경로 유지, dev CSP 허용 분리, 자동 리뷰 5라운드 반영 후 PR #304 머지 | ✅   |
 | 2026-04-10 | #298 Category empty state must keep management controls - 카테고리 empty state에서도 관리 toolbar를 유지하고, 자동 리뷰 suggestion을 반영해 빈 상태에서는 일괄 선택/배치 편집 액션을 숨긴 뒤 PR #303 머지 | ✅   |
 | 2026-04-10 | #297 Admin routes must not render public header - 전역 provider에서 public `Header`를 제거해 `/manage`에서는 admin shell만 렌더링되도록 정리하고 PR #302 머지 | ✅   |
