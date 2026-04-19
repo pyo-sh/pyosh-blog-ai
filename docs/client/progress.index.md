@@ -6,6 +6,15 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-18 | #310 Client API 경로에서 `/api` prefix 제거 - client API helper, middleware auth 체크, Storybook/MSW 경로를 루트 기준으로 정렬하고 PR #311 머지 | ✅   |
+| 2026-04-10 | #299 Dev asset URL normalization and CSP split - `/uploads/...` 표시용 정규화, post/editor/asset copy canonical 경로 유지, dev CSP 허용 분리, 자동 리뷰 5라운드 반영 후 PR #304 머지 | ✅   |
+| 2026-04-10 | #298 Category empty state must keep management controls - 카테고리 empty state에서도 관리 toolbar를 유지하고, 자동 리뷰 suggestion을 반영해 빈 상태에서는 일괄 선택/배치 편집 액션을 숨긴 뒤 PR #303 머지 | ✅   |
+| 2026-04-10 | #297 Admin routes must not render public header - 전역 provider에서 public `Header`를 제거해 `/manage`에서는 admin shell만 렌더링되도록 정리하고 PR #302 머지 | ✅   |
+| 2026-04-10 | #295 Public shell height and spacing - public 레이아웃을 `min-h-screen` flex column으로 재구성해 짧은 페이지에서도 footer가 viewport 하단에 고정되도록 하고 자동 리뷰 2라운드 반영 후 PR #300 머지 | ✅   |
+| 2026-04-10 | #296 Admin login screen simplification - `/manage/login`을 단색 배경의 중앙 정렬 로그인 폼으로 단순화하고 PR #301 머지 | ✅   |
+| 2026-04-07 | #289 Admin auth client username 계약 전환 - admin login 응답 unwrap과 admin current-user 타입을 서버 shape에 맞추고, 사용자명 입력 UX를 정리한 뒤 자동 리뷰 2라운드 반영 후 PR #294 머지 | ✅   |
+| 2026-04-07 | #287 Admin 방명록 hide/restore HTTP method 불일치 수정 - guestbook patch helper를 분리해 hide/restore 단건/벌크 요청을 `PATCH`로 정리하고 PR #291 머지 | ✅   |
+| 2026-04-06 | #286 Admin 로그아웃 CSRF 계약 불일치 수정 - `logout()`을 CSRF-aware mutation helper로 전환해 PR #290 머지 | ✅   |
 | 2026-04-04 | #281 Admin 댓글 상태 전환 UI를 실제 API와 연결 - 상세 모달 상태 칩을 hide/restore/delete API와 연결, 관리자 댓글 목록/dashboard 최근 댓글 동기화, 자동 리뷰 4라운드 반영 후 PR #285 머지 | ✅   |
 | 2026-03-29 | #260 PostListItem 디자인 리뉴얼 - 와이어프레임 `post-item` 구조, 모바일 썸네일, category shimmer, pin float, Solar 메타 아이콘 적용 후 PR #261 머지 | ✅   |
 | 2026-03-28 | #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) - 수정일 컬럼/미리보기 Storybook 정리, server pinned-count endpoint 연동, 자동 리뷰 4라운드 반영 후 PR #259 머지 | ✅   |
@@ -81,6 +90,13 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #299 Dev asset URL normalization and CSP split PR #304 머지
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #298 Category empty state must keep management controls PR #303 머지
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #297 Admin routes must not render public header PR #302 머지
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #296 Admin login screen simplification PR #301 머지
+- [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - #289 Admin auth client username 계약 전환 PR #294 머지
+- [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - #287 Admin 방명록 hide/restore HTTP method 불일치 수정 PR #291 머지
+- [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - #286 Admin 로그아웃 CSRF 계약 불일치 수정 PR #290 머지
 - [progress.2026-04-04.md](./progress/progress.2026-04-04.md) - #281 Admin 댓글 상태 전환 UI를 실제 API와 연결 PR #285 머지
 - [progress.2026-03-29.md](./progress/progress.2026-03-29.md) - #260 PostListItem 디자인 리뉴얼 PR #261 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - #205 글 관리 인라인 토글 + 영구 삭제 (F-21c) PR #259 머지

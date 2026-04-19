@@ -6,6 +6,13 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-18 | Issue #98 Server PR/push CI 추가: `ci.yml` 신규 구성, Node 20 + pnpm 고정, MySQL service + `.env.test` 생성, PR 중복 실행 방지를 위해 `push`를 `main`으로 제한, PR #99 머지 | ✅   |
+| 2026-04-18 | Issue #96 Server API `/api` prefix 제거: route prefix/OAuth callback/Swagger 설명/통합 테스트를 루트 경로로 전환, `/health` lightweight probe 유지 + 상세 상태는 `/health/status`로 분리, `api-spec.md` 갱신, PR #97 머지 | ✅   |
+| 2026-04-10 | Issue #87 API spec/test alignment baseline: auth/guestbook/settings 계약 기준 테스트 정렬, 실제 앱 CSRF e2e 검증 추가, health/stats/settings-service 불안정성 수정, 전체 스위트 `17` files / `258` tests green 복구, PR #90 머지 | ✅   |
+| 2026-04-10 | Issue #88 Dev uploads 상대 경로 계약 유지 및 정적 서빙 검증: upload dir/url prefix 공통화, static 플러그인에서 업로드 디렉토리 선생성, assets 통합 테스트에 `/uploads/...` 정적 접근 검증 추가, PR #89 머지 | ✅   |
+| 2026-04-07 | Issue #84 발행 시 summary 자동 생성: published 저장 시 `contentMd` plain text 200자 summary 보장, draft→published `publishedAt` 보강, posts 테스트 추가, PR #85 머지 | ✅   |
+| 2026-04-06 | Issue #80 Admin auth route username contract 전환: login/me 응답에서 legacy `email` 필드 제거, request body를 `username` 단일 필드로 정리, migrated email-shaped username 호환 로그인 유지, PR #83 머지 | ✅   |
+| 2026-04-06 | Issue #79 Category/Asset mutation route CSRF 누락 수정: categories/assets 관리자 mutation route에 명시적 CSRF hook 추가, route introspection 테스트 보강, PR #82 머지 | ✅   |
 | 2026-04-02 | Issue #75 Admin 댓글 hidden 상태 전환 API 추가: 단건/벌크 hide, public/post commentCount 가시성 정렬, hide 경로 CSRF 적용, PR #76 머지 | ✅   |
 | 2026-03-29 | Issue #73 Admin pinned 글 상한(5개) 강제: pinned count 엔드포인트 추가, create/update/restore/delete 전이 동시성 잠금 정리, posts 테스트 보강, PR #74 머지 | ✅   |
 | 2026-03-28 | Issue #69 Admin 댓글 hidden 상태 복원 API 지원: 단일/벌크 restore를 `deleted | hidden -> active`로 확장, comments 테스트 보강, 리뷰 제안으로 restore `400` 응답 스키마 보완, PR #72 머지 | ✅   |
@@ -57,6 +64,13 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #98 Server PR/push CI 추가 + PR #99 머지
+- [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #96 server API `/api` prefix 제거 + health probe 계약 유지 + PR #97 머지
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #87 API spec/test alignment baseline + PR #90 머지
+- [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #88 uploads 상대 경로 계약/정적 서빙 검증 + PR #89 머지
+- [progress.2026-04-07.md](./progress/progress.2026-04-07.md) - Issue #84 발행 시 summary 자동 생성 + PR #85 머지
+- [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - Issue #80 Admin auth route username contract 전환 + PR #83 머지
+- [progress.2026-04-06.md](./progress/progress.2026-04-06.md) - Issue #79 Category/Asset mutation route CSRF 누락 수정 + PR #82 머지
 - [progress.2026-04-02.md](./progress/progress.2026-04-02.md) - Issue #75 Admin 댓글 hidden 상태 전환 API 추가 + PR #76 머지
 - [progress.2026-03-29.md](./progress/progress.2026-03-29.md) - Issue #73 Admin pinned 글 상한 5개 강제 + pinned count 엔드포인트 + PR #74 머지
 - [progress.2026-03-28.md](./progress/progress.2026-03-28.md) - Issue #69 Admin 댓글 hidden 상태 복원 API 지원 + PR #72 머지
