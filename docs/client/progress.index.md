@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-22 | #316 게시글 상세 SSR slug double encoding으로 인한 404 수정 - 원래 slug 우선 조회 + 404 시 decode fallback으로 PR #317 머지 | ✅   |
 | 2026-04-20 | #314 발행된 게시글 상세 페이지 404 및 slug 무결성 문제 - 댓글 preload 실패가 전체 `notFound()`로 전파되지 않도록 완화하고 PR #315 머지 | ✅   |
 | 2026-04-18 | #310 Client API 경로에서 `/api` prefix 제거 - client API helper, middleware auth 체크, Storybook/MSW 경로를 루트 기준으로 정렬하고 PR #311 머지 | ✅   |
 | 2026-04-10 | #299 Dev asset URL normalization and CSP split - `/uploads/...` 표시용 정규화, post/editor/asset copy canonical 경로 유지, dev CSP 허용 분리, 자동 리뷰 5라운드 반영 후 PR #304 머지 | ✅   |
@@ -91,6 +92,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-22.md](./progress/progress.2026-04-22.md) - #316 게시글 상세 SSR slug double encoding 404 수정, PR #317 머지
 - [progress.2026-04-20.md](./progress/progress.2026-04-20.md) - #314 발행된 게시글 상세 페이지 404 및 slug 무결성 문제 1차 완화, PR #315 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #299 Dev asset URL normalization and CSP split PR #304 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #298 Category empty state must keep management controls PR #303 머지
