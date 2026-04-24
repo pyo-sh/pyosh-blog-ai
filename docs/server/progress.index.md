@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-24 | Issue #108 cloudflared trusted proxy 서브넷 고정: `TRUSTED_PROXY_RANGES`를 단일 IP 대신 blog_network 서브넷 CIDR로 지정하도록 `.env.example` 및 compose 주석 가이드 추가, `package.json` 1.1.2 bump, v1.1.2 태그, PR #109 머지 | ✅   |
 | 2026-04-18 | Issue #98 Server PR/push CI 추가: `ci.yml` 신규 구성, Node 20 + pnpm 고정, MySQL service + `.env.test` 생성, PR 중복 실행 방지를 위해 `push`를 `main`으로 제한, PR #99 머지 | ✅   |
 | 2026-04-18 | Issue #96 Server API `/api` prefix 제거: route prefix/OAuth callback/Swagger 설명/통합 테스트를 루트 경로로 전환, `/health` lightweight probe 유지 + 상세 상태는 `/health/status`로 분리, `api-spec.md` 갱신, PR #97 머지 | ✅   |
 | 2026-04-10 | Issue #87 API spec/test alignment baseline: auth/guestbook/settings 계약 기준 테스트 정렬, 실제 앱 CSRF e2e 검증 추가, health/stats/settings-service 불안정성 수정, 전체 스위트 `17` files / `258` tests green 복구, PR #90 머지 | ✅   |

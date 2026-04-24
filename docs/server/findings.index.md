@@ -22,6 +22,7 @@
 | 014 | 게시글 검색 전략 (MySQL LIKE)                         | 2026-02-22 | #search #mysql #like #drizzle |
 | 015 | Guestbook + settings API (Issue #35)                  | 2026-03-26 | #guestbook #settings #drizzle #http-semantics #soft-delete |
 | 016 | Categories API (Issue #34)                            | 2026-03-26 | #categories #drizzle #toctou #tree #migration |
+| 017 | Trusted Proxy — Docker 네트워크 서브넷 고정           | 2026-04-24 | #trusted-proxy #docker #cloudflared #session-cookie #deployment |
 
 ## 🔗 상세 문서
 
@@ -41,6 +42,7 @@
 - [findings.014-post-search-strategy.md](./findings/findings.014-post-search-strategy.md) - 게시글 검색 전략 (MySQL LIKE)
 - [findings.015-guestbook-settings-api.md](./findings/findings.015-guestbook-settings-api.md) - Guestbook + settings API 설계 (Issue #35)
 - [findings.016-categories-api.md](./findings/findings.016-categories-api.md) - Categories API 설계 (Issue #34)
+- [findings.017-trusted-proxy-docker-subnet.md](./findings/findings.017-trusted-proxy-docker-subnet.md) - Trusted Proxy Docker 네트워크 서브넷 고정 (Issue #108)
 
 ## 📊 요약
 
