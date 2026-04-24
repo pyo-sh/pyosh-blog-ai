@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-24 | #312 원격 게시글 이미지 호스트 확장 - `api.pyosh.com`과 GitHub/Notion/Naver 계열 호스트를 `next/image` 허용 목록에 추가하고 wildcard 매칭을 Next semantics에 맞춘 뒤 PR #322 머지 | ✅   |
 | 2026-04-24 | #319 헤더에 방명록 네비게이션 링크 추가 - 공개 헤더 액션 영역에 `/guestbook` 링크를 추가하고 PR #321 머지 | ✅   |
 | 2026-04-24 | #318 `/categories` 아카이브 페이지 추가 및 사이드바 전체보기 링크 404 prefetch 해소 - PR #320 머지 | ✅   |
 | 2026-04-22 | #316 게시글 상세 SSR slug double encoding으로 인한 404 수정 - 원래 slug 우선 조회 + 404 시 decode fallback으로 PR #317 머지 | ✅   |
@@ -94,6 +95,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #312 원격 게시글 이미지 호스트 확장 PR #322 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #319 헤더에 방명록 네비게이션 링크 추가 PR #321 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #318 `/categories` 아카이브 페이지 추가 및 사이드바 전체보기 링크 404 prefetch 해소 PR #320 머지
 - [progress.2026-04-22.md](./progress/progress.2026-04-22.md) - #316 게시글 상세 SSR slug double encoding 404 수정, PR #317 머지
