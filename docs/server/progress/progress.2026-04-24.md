@@ -1,5 +1,33 @@
 # Server Progress - 2026-04-24
 
+## Issue #111 — 카테고리/태그 유니코드 slug 복구 및 관리자 category slug override (PR #112 머지)
+
+**Status**: Merged
+
+### What was done
+
+한글·이모지 등 비-ASCII 이름으로 category/tag를 만들 때 빈 slug 또는 `-2` 형태 legacy slug가 생성되던 서버 버그를 복구했다. category 생성/수정은 유니코드 slug를 기본으로 사용하고, 빈 결과만 `id` fallback으로 처리하도록 정리했다. 또한 관리자 category API에 수동 slug override를 추가했다.
+
+**파일 변경:**
+- `src/shared/slug.ts`: `needsLegacySlugRepair()` 추가로 post/category/tag가 동일한 legacy slug 판정 규칙을 공유.
+- `src/routes/categories/category.*`: create/update를 Unicode slug + retryable finalization 흐름으로 전환, 자동 충돌은 readable suffix(`slug-2`) 유지, manual override 충돌은 `400`으로 제어.
+- `src/routes/tags/tag.service.ts`: tag 생성/legacy repair를 Unicode slug 기반으로 전환하고, 같은 요청 내 slug 충돌을 순차 생성으로 직렬화.
+- `scripts/repair-taxonomy-slugs.ts`: dry-run 기본, `--apply`, `--target=categories|tags|all` 지원하는 one-off 복구 스크립트 추가.
+- `test/routes/categories.test.ts`, `test/routes/tags.test.ts`, `test/shared/slug.test.ts`: 한글 slug, 빈 결과 `id` fallback, readable suffix 유지, legacy repair, colliding tag 생성 회귀 테스트 추가.
+
+### Review
+
+- 리뷰 1차: category 자동 충돌이 숫자 slug로 퇴행하고 repair 스크립트가 부분 적용될 수 있다는 warning → readable suffix 복원, in-memory reservation + single transaction apply로 수정.
+- 리뷰 2차: category/tag 최종 slug update가 concurrent duplicate에서 raw DB error로 실패할 수 있다는 warning → duplicate-entry retry finalize 로직 추가.
+- 리뷰 3차: 같은 요청 내 신규 tag 생성이 병렬 실행되어 colliding normalized slug에서 stale snapshot 문제를 일으킬 수 있다는 warning → `newNames` 생성 경로를 순차화하고 회귀 테스트 추가.
+- 리뷰 4차: `0 critical / 0 warning / 0 suggestion` clean.
+
+### Verification
+
+- `pnpm compile:types`
+- `pnpm test` → `19` files, `282` tests passed
+- PR #112 squash merge → `main`
+
 ## Issue #108 — cloudflared trusted proxy 서브넷 고정 (PR #109 머지, v1.1.2)
 
 **Status**: Merged
