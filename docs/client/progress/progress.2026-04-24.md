@@ -2,6 +2,29 @@
 
 ## 완료된 작업
 
+### #313 Preview 배포 인덱싱 차단 및 sitemap/robots SEO 점검 (PR #323 머지)
+
+Preview·staging 배포에서는 `X-Robots-Tag: noindex, nofollow` 헤더를 내려 검색엔진 색인을 막고, 운영 도메인(`pyosh.com`, `www.pyosh.com`)과 일반적인 비-Vercel production 배포는 계속 index 가능하도록 middleware 판별 조건을 정리했다. 함께 `sitemap.xml`과 `robots.txt` 생성 경로를 점검해 `/api` prefix 제거 이후에도 현재 운영 경로 기준으로 이미 올바르게 동작하고 있음을 확인했다. 1차 자동 리뷰에서 non-Vercel production 환경까지 de-index할 수 있다는 warning이 제기돼 hostname + env 기반 조건으로 보정한 뒤 재리뷰 clean 판정 후 PR `#323`이 병합됐다.
+
+**주요 변경 사항:**
+
+- `src/middleware.ts`
+  - non-production 요청에 `X-Robots-Tag: noindex, nofollow` 헤더 추가
+  - 운영 도메인과 비-Vercel production 배포는 de-index 되지 않도록 hostname + env 기반 판별로 보정
+- `src/app/sitemap.ts`, `src/app/robots.ts`
+  - 현재 sitemap/robots 출력이 live 경로를 사용하고 구 `/api` 경로를 참조하지 않음을 검증
+  - 추가 수정은 필요하지 않아 무변경으로 종료
+
+**검증:**
+
+- `pnpm build`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+
+**메모:**
+
+- `pnpm lint` warning 2건은 기존 저장소 상태로, `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용과 `src/shared/ui/error-boundary.tsx`의 미사용 인자다.
+
 ### #312 원격 게시글 이미지 호스트 확장 및 `next/image` 허용 분기 정합화 (PR #322 머지)
 
 Production에서 `api.pyosh.com`에 저장된 게시글 이미지가 `next/image`의 remote host 검증에 막혀 썸네일과 상세 대표 이미지가 깨지던 문제를 수정했다. 이번 작업에서는 `next.config.js`의 `images.remotePatterns`를 `api.pyosh.com`뿐 아니라 GitHub, Notion, Naver 계열 이미지 호스트까지 확장했고, 같은 허용 목록을 `src/shared/config/remote-image-hosts.json`으로 분리해 `PostCard`의 `supportsNextImage()`도 동일한 규칙을 따르도록 맞췄다. 1차 자동 리뷰에서 wildcard host 매처가 Next.js semantics보다 넓다는 warning이 나와 `**.domain`은 서브도메인만 매치하도록 수정하고, apex가 필요한 Notion 호스트(`www.notion.so`, `www.notion.site`)는 명시적으로 추가한 뒤 재리뷰 clean 판정 후 PR `#322`가 병합됐다.
