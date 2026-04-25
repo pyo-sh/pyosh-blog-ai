@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-25 | Issue #117 guestbook guest email optional 계약 반영: guest create schema/route test 반영 후 Codex review suggestion으로 OpenAPI 설명 문구 정렬, PR #118 머지 | ✅   |
 | 2026-04-25 | Issue #113 휴지통 `categoryId=NULL` 게시글 enrichment 500 복구: 관리자 목록/상세 null-tolerant enrichment, restore 400 guard, posts 회귀 테스트 추가, PR #114 머지 | ✅   |
 | 2026-04-24 | Issue #111 카테고리/태그 slug 생성 복구: Unicode slug 생성, category manual override, legacy repair script, review warning 3회 반영 후 PR #112 머지 | ✅   |
 | 2026-04-24 | Issue #108 cloudflared trusted proxy 서브넷 고정: `TRUSTED_PROXY_RANGES`를 단일 IP 대신 blog_network 서브넷 CIDR로 지정하도록 `.env.example` 및 compose 주석 가이드 추가, `package.json` 1.1.2 bump, v1.1.2 태그, PR #109 머지 | ✅   |
@@ -67,6 +68,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - Issue #117 guestbook guest email optional 계약 반영 + PR #118 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - Issue #113 휴지통 `categoryId=NULL` 게시글 enrichment 500 복구 + PR #114 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - Issue #111 taxonomy Unicode slug 복구 + category manual override + repair script + PR #112 머지
 - [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #98 Server PR/push CI 추가 + PR #99 머지

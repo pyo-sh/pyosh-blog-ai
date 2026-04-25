@@ -1,5 +1,29 @@
 # Server Progress - 2026-04-25
 
+## Issue #117 — Guestbook guest email optional 계약 반영 (PR #118 머지)
+
+**Status**: Merged
+
+### What was done
+
+게스트 방명록 생성 요청에서 `guestEmail`을 선택값으로 허용하는 변경이 PR #118로 올라간 상태에서 review 단계부터 파이프라인을 재개했다. Codex review는 동작/테스트 측면에서는 clean이었고, OpenAPI route description이 여전히 게스트가 이름, 이메일, 비밀번호를 모두 보내야 한다고 설명하는 문서 불일치 1건만 제안했다.
+
+제안은 유효하다고 판단해 `src/routes/guestbook/guestbook.route.ts`의 `POST /guestbook` 설명 문자열을 스키마와 일치하도록 수정했다. 이제 게스트는 이름과 비밀번호를 전달해야 하고, 이메일은 선택이라고 명시된다. suggestion-only 리뷰였기 때문에 재리뷰 없이 바로 finalize/merge 경로로 진행했다.
+
+**파일 변경:**
+- `src/routes/guestbook/guestbook.route.ts`: guestbook POST OpenAPI 설명을 `guestEmail` 선택 계약에 맞게 수정.
+
+### Review
+
+- codex review 결과 `0 critical / 0 warning / 1 suggestion`.
+- 반영 내용: OpenAPI 설명 문구가 optional email 계약과 어긋나던 부분 수정.
+
+### Verification
+
+- `pnpm test` 시도
+- 결과: worktree에 `node_modules`가 없어 `vitest: not found`로 실행 불가
+- PR #118 squash merge → `main`
+
 ## Issue #113 — 휴지통 categoryId NULL 게시글 enrichment 500 복구 (PR #114 머지)
 
 **Status**: Merged
