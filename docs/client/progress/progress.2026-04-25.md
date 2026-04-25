@@ -2,6 +2,37 @@
 
 ## 완료된 작업
 
+### #328 Category 이름 한글 IME 입력 시 manage error boundary 트립 회귀 수정 (PR #331 머지)
+
+관리자 카테고리 모달에서 한글 IME 입력 중 화면이 `/manage/error.tsx` fallback으로 전환되던 회귀를 수정했다. 원인은 PR #327에서 추가한 composition 처리 패턴에 있었다. 카테고리 이름 입력이 `useState` 기반 composing 플래그에 의존하면서 `onChange` 클로저가 직전 렌더 상태를 참조했고, 동시에 composition 중 controlled input 값을 재기입하는 흐름이 섞여 있었다. 이번 수정에서는 ref 기반으로 composition 상태를 추적하는 `useImeSafeText()` 훅을 추가하고, composing 중에는 raw value를 그대로 state에 반영해 입력 표시를 유지하면서 transform은 일반 입력과 composition 종료 시점에만 적용하도록 정리했다. 같은 stale pattern이 있던 태그 입력도 함께 같은 훅으로 전환했다. PR `#331`은 동기 `codex` 리뷰 2라운드 후 clean 판정으로 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/shared/hooks/use-ime-safe-text.ts`
+  - ref 기반 IME-safe text hook 추가
+  - composition 중에는 raw value를 유지하고, 일반 입력/`compositionend`에서는 caller transform을 적용
+  - 모달 reopen 등 중간 종료 상황을 위한 composition reset 제공
+- `src/features/category-manager/ui/category-form-modal.tsx`
+  - 카테고리 이름 입력을 shared hook으로 전환
+  - stale composing state 제거
+  - NFC normalize를 commit 시점에만 적용
+- `src/features/post-editor/ui/tag-chip-input.tsx`
+  - 태그 입력의 composition 추적도 shared hook으로 통일
+  - Enter/blur guard는 ref 기반 composing 상태를 직접 참조하도록 변경
+
+**검증:**
+
+- `pnpm install --offline --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint` warning 2건은 기존 이슈로 유지됐다.
+- `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 warning 1건
+- `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 warning 1건
+
 ### #329 Public post list item 링크 구조 정리 (PR #330 머지)
 
 public post list item이 `article` 내부에서 절대 위치 `Link` overlay와 실제 view 컨테이너가 형제 관계로 배치돼 있던 구조를 정리했다. 이번 수정에서는 overlay anchor를 제거하고, `Link`가 썸네일/메타/제목/요약을 포함한 실제 item view를 직접 감싸도록 마크업을 바꿨다. 바깥 `article`은 기존처럼 hover shift와 배경 hover shell로 유지하고, 기존 패딩과 클릭 영역은 `Link`로 옮겨 시각 구조와 DOM 의미론을 일치시켰다. PR `#330`은 동기 `codex` 리뷰 후 clean 판정으로 병합됐다.
