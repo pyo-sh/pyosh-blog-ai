@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-25 | #329 Public post list item 링크 구조 정리 - overlay anchor를 제거하고 `Link`가 실제 item view를 감싸도록 바꾼 뒤 PR #330 머지 | ✅   |
 | 2026-04-25 | #326 Category/Tag 한글 slug 라우트 404 + Category 입력 한글 IME 분해 버그 수정 - shared slug 정규화 유틸 도입, category/tag route param 정규화, category name NFC 입력 보정 후 PR #327 머지 | ✅   |
 | 2026-04-25 | #324 휴지통/관리자 화면에서 카테고리 NULL 글 표시 및 복원 UX 정리 - 관리자 post 타입 nullable 전환, orphan 글 `(카테고리 없음)` 표시, 복원 전 카테고리 재지정 모달 추가, public 상세 nullable guard 정리 후 PR #325 머지 | ✅   |
 | 2026-04-24 | #313 Preview 배포 인덱싱 차단 및 sitemap/robots SEO 점검 - non-production `X-Robots-Tag` 헤더를 middleware에 추가하고, 운영 도메인/비-Vercel production 예외를 보정한 뒤 PR #323 머지 | ✅   |
@@ -98,6 +99,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #329 Public post list item 링크 구조 정리 PR #330 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #324 휴지통/관리자 화면에서 카테고리 NULL 글 표시 및 복원 UX 정리 PR #325 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #313 Preview 배포 인덱싱 차단 및 sitemap/robots SEO 점검 PR #323 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #312 원격 게시글 이미지 호스트 확장 PR #322 머지

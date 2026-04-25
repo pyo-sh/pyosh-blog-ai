@@ -2,6 +2,30 @@
 
 ## 완료된 작업
 
+### #329 Public post list item 링크 구조 정리 (PR #330 머지)
+
+public post list item이 `article` 내부에서 절대 위치 `Link` overlay와 실제 view 컨테이너가 형제 관계로 배치돼 있던 구조를 정리했다. 이번 수정에서는 overlay anchor를 제거하고, `Link`가 썸네일/메타/제목/요약을 포함한 실제 item view를 직접 감싸도록 마크업을 바꿨다. 바깥 `article`은 기존처럼 hover shift와 배경 hover shell로 유지하고, 기존 패딩과 클릭 영역은 `Link`로 옮겨 시각 구조와 DOM 의미론을 일치시켰다. PR `#330`은 동기 `codex` 리뷰 후 clean 판정으로 병합됐다.
+
+**주요 변경 사항:**
+
+- `src/features/post-list/ui/post-list-item.tsx`
+  - 절대 위치 overlay `Link` 제거
+  - `Link`가 실제 item view wrapper가 되도록 구조 변경
+  - 기존 `px-4 py-5 sm:px-5` 클릭 영역을 `Link`로 이동
+  - `article`의 hover animation/background 동작은 유지
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint` warning은 기존 항목인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 2건만 남았다.
+- issue worktree에는 의존성이 없어서 verify 전에 `pnpm install --frozen-lockfile`로 worktree 전용 `node_modules`를 구성했다.
+
 ### #326 Category/Tag 한글 slug 라우트 404 + Category 입력 한글 IME 분해 버그 수정 (PR #327 머지)
 
 카테고리/태그 공개 페이지가 한글 slug 직링크에서 404를 내고, 관리자 카테고리 모달의 이름 입력이 한글 IME 사용 시 자모 분해 형태로 남던 문제를 한 번에 정리했다. 이번 수정에서는 게시글 상세 slug 조회에서 이미 검증된 decode fallback + Unicode 정규화 패턴을 category/tag 경로에도 공통으로 적용하도록 `shared` slug 유틸을 추가했다. category slug lookup은 저장된 slug와 route param을 같은 기준으로 비교하도록 바꿨고, tag 페이지는 active tag 판별뿐 아니라 posts fetch에 넘기는 `tagSlug`도 정규화된 값으로 통일했다. 또한 카테고리 이름 입력은 composition 중간값을 그대로 두되, 합성이 끝나는 시점과 submit 직전에 NFC로 다시 정규화해 저장 시 `에이아이` 같은 합성형 문자열이 유지되도록 했다. PR `#327`은 동기 `codex` 리뷰 후 clean 판정으로 병합됐다.
