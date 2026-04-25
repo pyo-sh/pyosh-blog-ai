@@ -2,6 +2,32 @@
 
 ## 완료된 작업
 
+### #332 카테고리 관리 모달 한글 IME 조합 끊김 수정 (PR #333 머지)
+
+카테고리 관리 모달의 이름 input에서 한글 IME 조합 중 자모 분리나 첫 글자 유실이 발생하던 문제를 수정했다. 직접 원인은 category input 자체보다 공용 `Modal`의 포커스 관리였다. `CategoryFormModal`이 매 렌더마다 새 `onClose` 함수를 `Modal`에 전달했고, `Modal`의 포커스 트랩 effect가 `[isOpen, onClose]`에 의존하면서 입력 중에도 cleanup과 재실행이 반복됐다. 그 cleanup에서 이전 활성 요소로 포커스를 돌리는 로직이 한글 조합 중간에 개입해 IME가 끊기고 있었다. 이번 수정에서는 `Modal`이 최신 `onClose`를 ref로 읽도록 바꾸고, 초기 포커스와 keydown 핸들러는 `isOpen` 기준으로만 설치되게 정리했다. 포커스 복원은 실제 모달 닫힘 전환에서만 실행되도록 분리했고, 카테고리 폼의 modal close handler도 `useCallback`으로 안정화했다. PR `#333`은 동기 `codex` 리뷰 1라운드 후 clean 판정으로 병합됐다.
+
+**주요 변경 사항:**
+
+- `src/shared/ui/libs/modal.tsx`
+  - 최신 `onClose`를 ref로 유지해 포커스 트랩 effect dependency에서 제거
+  - 모달 open 시에만 초기 포커스와 ESC/Tab keydown 핸들러를 설치
+  - 포커스 복원은 effect cleanup이 아니라 실제 close transition에서만 실행되도록 분리
+- `src/features/category-manager/ui/category-form-modal.tsx`
+  - modal에 전달하는 `onClose`를 `useCallback`으로 안정화
+  - submit 중 close 차단 동작은 유지
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint` warning은 기존 항목인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 2건만 남았다.
+- issue worktree에는 의존성이 없어 verify 전에 `pnpm install --frozen-lockfile`로 worktree 전용 `node_modules`를 구성했다.
+
 ### #328 Category 이름 한글 IME 입력 시 manage error boundary 트립 회귀 수정 (PR #331 머지)
 
 관리자 카테고리 모달에서 한글 IME 입력 중 화면이 `/manage/error.tsx` fallback으로 전환되던 회귀를 수정했다. 원인은 PR #327에서 추가한 composition 처리 패턴에 있었다. 카테고리 이름 입력이 `useState` 기반 composing 플래그에 의존하면서 `onChange` 클로저가 직전 렌더 상태를 참조했고, 동시에 composition 중 controlled input 값을 재기입하는 흐름이 섞여 있었다. 이번 수정에서는 ref 기반으로 composition 상태를 추적하는 `useImeSafeText()` 훅을 추가하고, composing 중에는 raw value를 그대로 state에 반영해 입력 표시를 유지하면서 transform은 일반 입력과 composition 종료 시점에만 적용하도록 정리했다. 같은 stale pattern이 있던 태그 입력도 함께 같은 훅으로 전환했다. PR `#331`은 동기 `codex` 리뷰 2라운드 후 clean 판정으로 머지됐다.

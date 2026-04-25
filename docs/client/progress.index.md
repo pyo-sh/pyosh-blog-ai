@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-25 | #332 카테고리 관리 모달 한글 IME 조합 끊김 수정 - shared modal 포커스 복원을 실제 close 전환으로 제한하고 PR #333 머지 | ✅   |
 | 2026-04-25 | #328 Category 이름 한글 IME 입력 회귀 수정 - ref 기반 IME-safe hook으로 카테고리/태그 입력을 정리하고 PR #331 머지 | ✅   |
 | 2026-04-25 | #329 Public post list item 링크 구조 정리 - overlay anchor를 제거하고 `Link`가 실제 item view를 감싸도록 바꾼 뒤 PR #330 머지 | ✅   |
 | 2026-04-25 | #326 Category/Tag 한글 slug 라우트 404 + Category 입력 한글 IME 분해 버그 수정 - shared slug 정규화 유틸 도입, category/tag route param 정규화, category name NFC 입력 보정 후 PR #327 머지 | ✅   |
