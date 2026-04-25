@@ -2,6 +2,21 @@
 
 ## 완료된 작업
 
+### #334 Guestbook create type should allow missing guest email (PR #335 머지)
+
+게스트북 생성 타입이 `guestEmail`을 필수로 강제하던 클라이언트 계약을 서버/API 동작과 맞췄다. 이번 변경에서는 `CreateGuestbookGuestBody`의 `guestEmail`을 optional로 전환해, 이메일 없이 작성 가능한 guestbook 입력 흐름과 타입 정의가 동일한 계약을 갖도록 정리했다. PR `#335`는 동기 `codex` 리뷰 1라운드 후 clean 판정으로 병합됐다.
+
+**주요 변경 사항:**
+
+- `src/entities/guestbook/model.ts`
+  - `CreateGuestbookGuestBody.guestEmail`을 `string`에서 `string | undefined` 성격의 optional 필드로 변경
+  - guestbook 작성 폼과 API payload가 이메일 없는 guest 작성도 타입 수준에서 허용하도록 정렬
+
+**검증:**
+
+- 동기 `codex` PR 리뷰 1라운드
+- 리뷰 결과: `0 critical / 0 warning / 0 suggestion`
+
 ### #332 카테고리 관리 모달 한글 IME 조합 끊김 수정 (PR #333 머지)
 
 카테고리 관리 모달의 이름 input에서 한글 IME 조합 중 자모 분리나 첫 글자 유실이 발생하던 문제를 수정했다. 직접 원인은 category input 자체보다 공용 `Modal`의 포커스 관리였다. `CategoryFormModal`이 매 렌더마다 새 `onClose` 함수를 `Modal`에 전달했고, `Modal`의 포커스 트랩 effect가 `[isOpen, onClose]`에 의존하면서 입력 중에도 cleanup과 재실행이 반복됐다. 그 cleanup에서 이전 활성 요소로 포커스를 돌리는 로직이 한글 조합 중간에 개입해 IME가 끊기고 있었다. 이번 수정에서는 `Modal`이 최신 `onClose`를 ref로 읽도록 바꾸고, 초기 포커스와 keydown 핸들러는 `isOpen` 기준으로만 설치되게 정리했다. 포커스 복원은 실제 모달 닫힘 전환에서만 실행되도록 분리했고, 카테고리 폼의 modal close handler도 `useCallback`으로 안정화했다. PR `#333`은 동기 `codex` 리뷰 1라운드 후 clean 판정으로 병합됐다.

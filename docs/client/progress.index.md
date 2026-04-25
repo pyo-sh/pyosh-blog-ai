@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-25 | #334 Guestbook create type should allow missing guest email - `CreateGuestbookGuestBody.guestEmail`을 optional로 전환하고 PR #335 머지 | ✅   |
 | 2026-04-25 | #332 카테고리 관리 모달 한글 IME 조합 끊김 수정 - shared modal 포커스 복원을 실제 close 전환으로 제한하고 PR #333 머지 | ✅   |
 | 2026-04-25 | #328 Category 이름 한글 IME 입력 회귀 수정 - ref 기반 IME-safe hook으로 카테고리/태그 입력을 정리하고 PR #331 머지 | ✅   |
 | 2026-04-25 | #329 Public post list item 링크 구조 정리 - overlay anchor를 제거하고 `Link`가 실제 item view를 감싸도록 바꾼 뒤 PR #330 머지 | ✅   |
@@ -101,6 +102,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #334 Guestbook create type should allow missing guest email PR #335 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #328 Category 이름 한글 IME 입력 회귀 수정 PR #331 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #329 Public post list item 링크 구조 정리 PR #330 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #324 휴지통/관리자 화면에서 카테고리 NULL 글 표시 및 복원 UX 정리 PR #325 머지
