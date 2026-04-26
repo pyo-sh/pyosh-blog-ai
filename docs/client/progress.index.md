@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-26 | #352 public category tree spacing/icon 후속 보정 - sidebar와 `/categories` toggle slot을 다시 키우고 row spacing과 overview child indent를 wireframe 기준으로 복구한 뒤 PR #355 머지 | ✅   |
 | 2026-04-26 | #352 public category tree 정렬/고정 count column 후속 보정 - sidebar와 `/categories` row를 중앙 정렬 기준으로 다시 맞추고 overview count를 고정 right column으로 정렬한 뒤 자동 리뷰 suggestion 1건(hover color inheritance)을 반영해 PR #354 머지 | ✅   |
 | 2026-04-26 | #352 Sidebar 카테고리 UI 재디자인 보정 - sidebar leaf indicator slot/spacing과 overview typography를 wireframe 기준으로 다시 맞추고 nested overview toggle 회귀를 자동 리뷰 warning 1건 반영 후 PR #353 머지 | ✅   |
 | 2026-04-26 | #348 `/categories` 페이지 재디자인 - wireframe 기준 compact tree archive, stat strip, overview 전용 group/leaf 구조를 구현하고 자동 리뷰 warning 1건(숨겨진 link tab order)을 보정한 뒤 PR #351 머지 | ✅   |
@@ -112,6 +113,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 public category tree spacing/icon 후속 보정, PR #355 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 public category tree 정렬/고정 count column 후속 보정, PR #354 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 Sidebar 카테고리 UI 재디자인 보정, PR #353 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #348 `/categories` 페이지 재디자인, PR #351 머지

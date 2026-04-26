@@ -2,6 +2,34 @@
 
 ## 완료된 작업
 
+### #352 public category tree spacing/icon 후속 보정 (PR #355 머지)
+
+같은 이슈 `#352`에서 sidebar와 `/categories` category tree에 남아 있던 spacing 회귀를 한 번 더 정리했다. 직전 보정 이후 toggle slot이 `20px` 기준으로 다시 조여지면서 chevron이 작아 보이고, sidebar row도 wireframe보다 낮아져 title/icon이 다소 빽빽하게 붙어 있었다. 이번 라운드에서는 `CategoryTree` 구조는 그대로 유지한 채 control slot, row padding, depth indent만 다시 보정해 시각 밀도를 wireframe 쪽으로 되돌리는 데 집중했다.
+
+sidebar 쪽은 toggle/icon slot을 `24px`로 키우고 link row를 `py-2` 기준으로 넉넉하게 다시 잡아, 사용자가 기준으로 준 `padding-top: 8px` 수준의 vertical rhythm과 비슷한 정렬감을 맞췄다. `/categories` overview도 같은 `24px` control slot을 쓰도록 맞춰 toggle icon 축소 회귀를 제거했고, child category indent step을 더 크게 잡아 top-level parent 바로 아래 자식이 한 칸 tab된 것처럼 읽히도록 조정했다. count는 이전 라운드에서 만든 fixed right column 구조를 유지해 모든 item이 같은 x-position에 남도록 했다.
+
+이번 PR은 동기 `codex` 리뷰 1라운드 clean 판정으로 추가 resolve 없이 바로 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/features/category-tree/ui/category-tree.tsx`
+  - sidebar/overview 공통 control slot을 `24px`로 키워 toggle icon 축소 회귀 보정
+  - sidebar와 overview child row의 vertical padding을 다시 늘려 wireframe에 가까운 item height 복구
+  - overview child indentation step을 확대해 immediate child가 한 칸 tab된 계층감으로 보이도록 조정
+  - 기존 fixed right count column 정렬은 유지
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 자동 리뷰는 `0 critical / 0 warning / 0 suggestion` clean 판정이었다.
+
 ### #352 public category tree 정렬/고정 count column 후속 보정 (PR #354 머지)
 
 PR `#353` 머지 후 남아 있던 시각 정렬 문제를 같은 이슈 `#352`에서 한 번 더 보정했다. 이번 변경은 구조를 다시 크게 뒤엎지 않고 `CategoryTree` row contract만 정리하는 쪽으로 좁혔다. sidebar 쪽은 icon slot과 title/count row를 `items-center` 기준으로 다시 맞추고 title line-height를 `1.2`로 낮춰, 8px dot indicator와 텍스트가 실제 시각상 중앙에 맞도록 보정했다. `/categories` overview 쪽은 top-level category title만 요청값대로 `1.0625rem` / `700`으로 올리고, depth indentation이 오른쪽 count 위치를 흔들지 않도록 indent를 icon/content 측에만 남기고 count는 고정 right column으로 분리했다.
