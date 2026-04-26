@@ -2,6 +2,32 @@
 
 ## 완료된 작업
 
+### #349 사이드바 카테고리 트리 leaf 아이템 circle indicator 추가 (PR #350 머지)
+
+public sidebar category tree에서 부모 category와 leaf category가 같은 row 구조를 써서 계층 정보가 흐려지던 문제를 정리했다. 구현 기준은 root repo wireframe `docs/client/designs/public/home-page-sidebar.html`의 category section이었고, 요구사항대로 부모 category는 기존 chevron toggle과 expand/collapse 동작을 그대로 유지하면서 leaf category만 direct link row로 분기했다. leaf row는 별도 chevron spacer를 두지 않고 `solar:record-linear` 아이콘을 label 앞에 배치해, 자식이 없는 항목이라는 신호를 더 직접적으로 주도록 맞췄다.
+
+이번 수정은 sidebar variant에만 한정했고 `/categories` overview variant의 compact card/list 표현은 그대로 유지했다. 따라서 홈, 태그 목록, category detail, post detail 등 public sidebar를 공유하는 화면들은 같은 개선을 받되 categories index 자체의 정보 구조는 건드리지 않았다. 동기 `codex` 리뷰는 1라운드 clean 판정이었고 PR `#350`으로 바로 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/features/category-tree/ui/category-tree.tsx`
+  - sidebar leaf category를 전용 direct link row로 분기
+  - leaf marker로 `solar:record-linear` 아이콘을 추가
+  - 부모 category의 chevron toggle/expand state 로직은 유지
+  - overview variant는 기존 compact list/card 표현을 그대로 유지
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 자동 리뷰는 suggestion 없이 clean이어서 resolve 라운드 없이 바로 머지됐다.
+
 ### #346 Public 카테고리 내비게이션 UI 정리 (PR #347 머지)
 
 최근 category overview와 public sidebar 개선 이후 커진 category row 표현을 다시 compact한 public navigation 톤으로 조정했다. `CategoryTree`의 sidebar variant에서는 label weight와 vertical padding을 낮추고, 자식이 없는 category도 기존 blank spacer 대신 `aria-hidden` leaf marker를 같은 width slot 안에 렌더링해 chevron이 있는 항목과 정렬을 유지했다. Chevron toggle의 hit area와 expand/collapse 동작은 그대로 유지했다.
