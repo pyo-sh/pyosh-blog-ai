@@ -2,6 +2,37 @@
 
 ## 완료된 작업
 
+### #352 Sidebar 카테고리 UI 재디자인 보정 (PR #353 머지)
+
+최근 public category tree redesign 이후 wireframe과 어긋난 sidebar/categories UI를 보정했다. sidebar leaf category는 부모 toggle과 같은 left slot 안에 8px dot indicator를 두도록 row 구조를 다시 맞춰, 아이콘 위치와 텍스트 간격이 일관되게 정렬되도록 수정했다. `/categories` overview는 top-level count badge의 배경/rounding을 제거하고 title/count typography를 wireframe 밀도에 맞게 낮췄으며, overview 전용 렌더링을 root group + leaf 분기 대신 재귀 `CategoryItem` 기반으로 다시 정리해 중첩 child category도 toggle 가능한 구조로 통합했다.
+
+동시에 Storybook mock category tree에 손자 depth를 추가하고 public `CategoryTree` 전용 story를 만들어 sidebar/overview 둘 다 회귀를 바로 확인할 수 있게 했다. 동기 `codex` 리뷰 1차에서는 recursive overview 도입 후 `getDefaultExpandedSlugs()`와 `모두 펼치기`가 root slug만 수집해 nested expandable group이 기본 확장/expand-all 대상에서 빠지는 warning 1건이 나왔고, visible descendant 전체를 재귀 수집하도록 보정한 뒤 2차 clean 판정으로 PR `#353`이 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/features/category-tree/ui/category-tree.tsx`
+  - sidebar leaf row를 toggle slot 기준으로 재정렬하고 8px dot indicator 적용
+  - category title/count typography를 wireframe 밀도로 조정
+  - overview count badge의 background/radius 제거
+  - overview tree를 재귀 `CategoryItem` 구조로 통합해 nested child group toggle 지원
+  - overview 기본 확장 slug와 `모두 펼치기` 대상을 visible descendant 전체로 재귀 수집
+- `stories/mocks/data/categories.ts`
+  - count 값과 손자 depth mock category를 추가해 overview nested toggle 회귀를 재현 가능하게 정리
+- `stories/features/category-tree.stories.tsx`
+  - public category tree의 sidebar/overview variant를 직접 확인하는 Storybook story 추가
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- issue worktree에는 verify용 의존성이 없어 `pnpm install --frozen-lockfile`로 worktree-local `node_modules`를 먼저 구성했다.
+
 ### #348 `/categories` 페이지 재디자인 - 컴팩트 트리 레이아웃 (PR #351 머지)
 
 `/categories` 페이지를 root repo wireframe `docs/client/designs/public/categories.html` 기준의 compact tree archive로 다시 구현했다. 기존 gradient/card 중심 overview를 걷어내고, `ArchiveHeader`는 그대로 유지하면서 제목을 `카테고리`로 맞추고 우측 summary를 `총 N개 분류`로 단순화했다. 본문에는 2칸 stat strip을 추가해 분류 수와 공개 글 수만 남기고, category overview는 top-level group + leaf 구조의 전용 compact tree로 분리했다.
