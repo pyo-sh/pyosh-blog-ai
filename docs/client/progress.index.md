@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-26 | #342 카테고리 전체보기 500 오류 수정 - server route가 client export를 호출하지 않도록 category count helper를 분리하고 public sidebar divider 위치를 보정한 뒤 PR #343 머지 | ✅   |
 | 2026-04-26 | #340 Public sidebar 카테고리 섹션 정리 및 active path auto-expand - 카테고리 섹션 제목/전체보기 액션을 정리하고 category/post 현재 경로만 자동 expand되도록 tree seed를 분리한 뒤 자동 리뷰 warning 1건 보정 후 PR #341 머지 | ✅   |
 | 2026-04-26 | #337 public 비밀글 안내 문구 한글화 - legacy 영어/한국어 secret mask를 모두 인식하고 public 표시 문구를 `비공개입니다.` 로 통일한 뒤 PR #339 머지 | ✅   |
 | 2026-04-26 | #336 public 사이드바 모바일 헤더 겹침 및 데스크톱 border-right 정렬 수정 - 모바일 패널을 헤더 높이 아래로 오프셋하고 데스크톱 sidebar spacing을 `border-right + padding` 구조로 재정렬한 뒤 PR #338 머지 | ✅   |
@@ -105,6 +106,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #342 카테고리 전체보기 500 오류 수정 및 sidebar divider 위치 조정, PR #343 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #340 Public sidebar 카테고리 섹션 정리 및 active path auto-expand, PR #341 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #336 public 사이드바 모바일 헤더 겹침 및 데스크톱 border-right 정렬 수정 PR #338 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #334 Guestbook create type should allow missing guest email PR #335 머지
