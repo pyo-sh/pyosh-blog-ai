@@ -2,6 +2,33 @@
 
 ## 완료된 작업
 
+### #352 public category tree 정렬/고정 count column 후속 보정 (PR #354 머지)
+
+PR `#353` 머지 후 남아 있던 시각 정렬 문제를 같은 이슈 `#352`에서 한 번 더 보정했다. 이번 변경은 구조를 다시 크게 뒤엎지 않고 `CategoryTree` row contract만 정리하는 쪽으로 좁혔다. sidebar 쪽은 icon slot과 title/count row를 `items-center` 기준으로 다시 맞추고 title line-height를 `1.2`로 낮춰, 8px dot indicator와 텍스트가 실제 시각상 중앙에 맞도록 보정했다. `/categories` overview 쪽은 top-level category title만 요청값대로 `1.0625rem` / `700`으로 올리고, depth indentation이 오른쪽 count 위치를 흔들지 않도록 indent를 icon/content 측에만 남기고 count는 고정 right column으로 분리했다.
+
+동기 `codex` 리뷰 1차 결과는 suggestion 1건뿐이었고, 내용은 hover color inheritance 회귀였다. `titleClassName`이 자식 span에 직접 text color를 주면서 link의 `hover:text-primary-1` 피드백이 title에 전파되지 않던 문제라, span의 base color를 제거해 hover 상속을 복구했다. suggestion-only라 `resolve-skip` 경로로 보정 후 PR `#354`를 머지했다.
+
+**주요 변경 사항:**
+
+- `src/features/category-tree/ui/category-tree.tsx`
+  - sidebar/overview row를 고정 `count` column이 있는 grid 구조로 재정렬
+  - icon slot과 title/count row를 `items-center` 기준으로 맞추고 title line-height를 `1.2`로 조정
+  - `/categories` top-level title만 `1.0625rem` / `700` 적용
+  - overview nested wrapper의 폭 감소(`ml/pl`)를 제거해 모든 item의 count x-position을 동일하게 고정
+  - review suggestion 반영: title span의 직접 text color를 제거해 link hover color 상속 복구
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 자동 리뷰는 `0 critical / 0 warning / 1 suggestion`이었고, hover color inheritance만 보정한 뒤 `skipReview=true`로 머지됐다.
+
 ### #352 Sidebar 카테고리 UI 재디자인 보정 (PR #353 머지)
 
 최근 public category tree redesign 이후 wireframe과 어긋난 sidebar/categories UI를 보정했다. sidebar leaf category는 부모 toggle과 같은 left slot 안에 8px dot indicator를 두도록 row 구조를 다시 맞춰, 아이콘 위치와 텍스트 간격이 일관되게 정렬되도록 수정했다. `/categories` overview는 top-level count badge의 배경/rounding을 제거하고 title/count typography를 wireframe 밀도에 맞게 낮췄으며, overview 전용 렌더링을 root group + leaf 분기 대신 재귀 `CategoryItem` 기반으로 다시 정리해 중첩 child category도 toggle 가능한 구조로 통합했다.
