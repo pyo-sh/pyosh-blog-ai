@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-26 | #337 public 비밀글 안내 문구 한글화 - legacy 영어/한국어 secret mask를 모두 인식하고 public 표시 문구를 `비공개입니다.` 로 통일한 뒤 PR #339 머지 | ✅   |
 | 2026-04-26 | #336 public 사이드바 모바일 헤더 겹침 및 데스크톱 border-right 정렬 수정 - 모바일 패널을 헤더 높이 아래로 오프셋하고 데스크톱 sidebar spacing을 `border-right + padding` 구조로 재정렬한 뒤 PR #338 머지 | ✅   |
 | 2026-04-25 | #334 Guestbook create type should allow missing guest email - `CreateGuestbookGuestBody.guestEmail`을 optional로 전환하고 PR #335 머지 | ✅   |
 | 2026-04-25 | #332 카테고리 관리 모달 한글 IME 조합 끊김 수정 - shared modal 포커스 복원을 실제 close 전환으로 제한하고 PR #333 머지 | ✅   |
@@ -112,6 +113,7 @@
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #312 원격 게시글 이미지 호스트 확장 PR #322 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #319 헤더에 방명록 네비게이션 링크 추가 PR #321 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #318 `/categories` 아카이브 페이지 추가 및 사이드바 전체보기 링크 404 prefetch 해소 PR #320 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #337 public 비밀글 안내 문구 한글화, PR #339 머지
 - [progress.2026-04-22.md](./progress/progress.2026-04-22.md) - #316 게시글 상세 SSR slug double encoding 404 수정, PR #317 머지
 - [progress.2026-04-20.md](./progress/progress.2026-04-20.md) - #314 발행된 게시글 상세 페이지 404 및 slug 무결성 문제 1차 완화, PR #315 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #299 Dev asset URL normalization and CSP split PR #304 머지
