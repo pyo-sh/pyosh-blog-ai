@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-26 | #346 Public 카테고리 내비게이션 UI 정리 - sidebar category label 밀도를 낮추고 leaf marker를 추가했으며 `/categories` overview를 compact list 스타일로 정리하고 category empty state shadow를 제거한 뒤 PR #347 머지 | ✅   |
 | 2026-04-26 | #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선 - `/categories`·`/categories/[slug]`·`/tags` 헤더를 shared archive title system으로 통일하고 categories overview item을 card형으로 재구성하며 desktop public sidebar 폭을 `240px`로 보정한 뒤 PR #345 머지 | ✅   |
 | 2026-04-26 | #342 카테고리 전체보기 500 오류 수정 - server route가 client export를 호출하지 않도록 category count helper를 분리하고 public sidebar divider 위치를 보정한 뒤 PR #343 머지 | ✅   |
 | 2026-04-26 | #340 Public sidebar 카테고리 섹션 정리 및 active path auto-expand - 카테고리 섹션 제목/전체보기 액션을 정리하고 category/post 현재 경로만 자동 expand되도록 tree seed를 분리한 뒤 자동 리뷰 warning 1건 보정 후 PR #341 머지 | ✅   |
@@ -107,6 +108,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #346 Public 카테고리 내비게이션 UI 정리, PR #347 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선, PR #345 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #342 카테고리 전체보기 500 오류 수정 및 sidebar divider 위치 조정, PR #343 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #340 Public sidebar 카테고리 섹션 정리 및 active path auto-expand, PR #341 머지

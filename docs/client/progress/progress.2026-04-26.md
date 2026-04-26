@@ -2,6 +2,35 @@
 
 ## 완료된 작업
 
+### #346 Public 카테고리 내비게이션 UI 정리 (PR #347 머지)
+
+최근 category overview와 public sidebar 개선 이후 커진 category row 표현을 다시 compact한 public navigation 톤으로 조정했다. `CategoryTree`의 sidebar variant에서는 label weight와 vertical padding을 낮추고, 자식이 없는 category도 기존 blank spacer 대신 `aria-hidden` leaf marker를 같은 width slot 안에 렌더링해 chevron이 있는 항목과 정렬을 유지했다. Chevron toggle의 hit area와 expand/collapse 동작은 그대로 유지했다.
+
+`/categories` overview variant는 큰 rounded card와 row shadow를 제거하고 얇은 border, left rail, muted surface, count pill 중심의 compact list item으로 재정리했다. `/categories/[slug]`에서 글이 없는 category empty state는 shared `EmptyState` variant를 바꾸지 않고 해당 route와 Storybook preview에서만 `shadow-none`을 넘겨 public layout과 맞췄다. 동기 `codex` 리뷰는 1라운드 clean 판정이었고 PR `#347`로 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/features/category-tree/ui/category-tree.tsx`
+  - sidebar label weight/padding을 줄여 category tree 밀도를 보정
+  - leaf category에 non-interactive `aria-hidden` marker 추가
+  - overview variant를 shadow 없는 compact bordered list item으로 재정리
+- `src/app/(public)/categories/[slug]/page.tsx`
+  - category page empty state에 한정해 box shadow 제거
+- `stories/app/category-posts.stories.tsx`
+  - category posts empty Storybook preview에 동일한 no-shadow 표현 반영
+
+**검증:**
+
+- `pnpm install --frozen-lockfile`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+- `pnpm build`
+
+**메모:**
+
+- `pnpm lint`는 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- 자동 리뷰는 suggestion 없이 clean이어서 resolve 라운드 없이 바로 머지됐다.
+
 ### #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선 (PR #345 머지)
 
 `/categories`, `/categories/[slug]`, `/tags`의 공개 아카이브 헤더 시각 언어를 하나의 shared component 체계로 정리했다. 기존에는 `/categories/[slug]`만 `ArchiveHeader`를 사용하고 `/categories`, `/tags`는 별도 header markup을 유지하고 있어 title scale, eyebrow, 메타 카운트 배치가 서로 달랐다. 이번 작업에서는 `ArchiveHeader`가 페이지별로 다른 summary와 eyebrow를 받을 수 있도록 일반화하고, `/categories`의 제목을 요구사항대로 `Categories`로 변경해 세 라우트가 같은 구조의 타이틀 시스템을 공유하도록 맞췄다.
