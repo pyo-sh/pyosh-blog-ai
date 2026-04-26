@@ -2,6 +2,36 @@
 
 ## 완료된 작업
 
+### #348 `/categories` 페이지 재디자인 - 컴팩트 트리 레이아웃 (PR #351 머지)
+
+`/categories` 페이지를 root repo wireframe `docs/client/designs/public/categories.html` 기준의 compact tree archive로 다시 구현했다. 기존 gradient/card 중심 overview를 걷어내고, `ArchiveHeader`는 그대로 유지하면서 제목을 `카테고리`로 맞추고 우측 summary를 `총 N개 분류`로 단순화했다. 본문에는 2칸 stat strip을 추가해 분류 수와 공개 글 수만 남기고, category overview는 top-level group + leaf 구조의 전용 compact tree로 분리했다.
+
+구현은 `CategoryTree`의 sidebar variant와 overview variant를 명확히 분리하는 방향으로 정리했다. sidebar 쪽은 직전 PR #350에서 들어간 leaf row 개선을 유지했고, overview 쪽에만 전체 펼치기/접기, 상위 3개 그룹 기본 확장, muted count pill, compact leaf indentation을 넣었다. 동기 `codex` 리뷰 1차에서는 collapsed group의 hidden link가 tab order에 남는 접근성 warning 1건이 나왔고, child panel을 closed state에서 비노출/비상호작용 상태로 바꿔 재리뷰 clean 판정 후 PR `#351`이 머지됐다.
+
+**주요 변경 사항:**
+
+- `src/app/(public)/categories/page.tsx`
+  - header title을 `카테고리`로 조정하고 summary를 `총 N개 분류`로 단순화
+  - 2칸 stat strip으로 `분류` / `공개 글` 핵심 수치만 노출
+- `src/features/category-tree/ui/category-tree.tsx`
+  - overview variant 전용 compact tree UI 추가
+  - top-level group toggle, `모두 펼치기` / `모두 접기`, 상위 3개 기본 확장 구현
+  - public sidebar leaf row 개선(`solar:record-linear`)과 overview redesign을 같은 파일에서 병합
+  - collapsed overview panel의 descendant link를 tab order에서 제거
+
+**검증:**
+
+- `pnpm install --offline --frozen-lockfile`
+- `pnpm build`
+- `pnpm compile:types`
+- `pnpm lint` *(저장소 기존 warning 2건 유지)*
+
+**메모:**
+
+- `pnpm compile:types`는 이 저장소의 `.next/types` 포함 규칙 때문에 `pnpm build` 완료 후 순차 실행했다.
+- `pnpm lint`는 기존 warning인 `src/features/post-editor/ui/image-gallery-modal.tsx`의 `<img>` 사용 1건과 `src/shared/ui/error-boundary.tsx`의 `_error` 미사용 1건만 남았다.
+- merge 단계에서 `origin/main`의 PR #350 leaf row 변경과 충돌이 발생해, compact overview 변경과 leaf marker 변경을 한 파일에서 재통합한 뒤 정상 머지했다.
+
 ### #349 사이드바 카테고리 트리 leaf 아이템 circle indicator 추가 (PR #350 머지)
 
 public sidebar category tree에서 부모 category와 leaf category가 같은 row 구조를 써서 계층 정보가 흐려지던 문제를 정리했다. 구현 기준은 root repo wireframe `docs/client/designs/public/home-page-sidebar.html`의 category section이었고, 요구사항대로 부모 category는 기존 chevron toggle과 expand/collapse 동작을 그대로 유지하면서 leaf category만 direct link row로 분기했다. leaf row는 별도 chevron spacer를 두지 않고 `solar:record-linear` 아이콘을 label 앞에 배치해, 자식이 없는 항목이라는 신호를 더 직접적으로 주도록 맞췄다.

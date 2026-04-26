@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-26 | #348 `/categories` 페이지 재디자인 - wireframe 기준 compact tree archive, stat strip, overview 전용 group/leaf 구조를 구현하고 자동 리뷰 warning 1건(숨겨진 link tab order)을 보정한 뒤 PR #351 머지 | ✅   |
 | 2026-04-26 | #349 사이드바 카테고리 트리 leaf 아이템 circle indicator 추가 - public sidebar에서 부모 카테고리는 chevron toggle을 유지하고 leaf 카테고리는 `solar:record-linear` circle marker + direct link row로 구분한 뒤 PR #350 머지 | ✅   |
 | 2026-04-26 | #346 Public 카테고리 내비게이션 UI 정리 - sidebar category label 밀도를 낮추고 leaf marker를 추가했으며 `/categories` overview를 compact list 스타일로 정리하고 category empty state shadow를 제거한 뒤 PR #347 머지 | ✅   |
 | 2026-04-26 | #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선 - `/categories`·`/categories/[slug]`·`/tags` 헤더를 shared archive title system으로 통일하고 categories overview item을 card형으로 재구성하며 desktop public sidebar 폭을 `240px`로 보정한 뒤 PR #345 머지 | ✅   |
@@ -109,6 +110,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #348 `/categories` 페이지 재디자인, PR #351 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #349 사이드바 카테고리 트리 leaf 아이템 circle indicator 추가, PR #350 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #346 Public 카테고리 내비게이션 UI 정리, PR #347 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선, PR #345 머지
