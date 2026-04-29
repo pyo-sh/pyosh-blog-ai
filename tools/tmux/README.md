@@ -85,8 +85,6 @@ tmuxinator start -p tools/tmux/session.docker.yml
 
 | Window | 이름 | Layout | Panes | 용도 |
 |--------|------|--------|-------|------|
-| 0 | lab | tiled (2x2) | 4 | 메인 작업 |
-| 1 | server1 | even-vertical | 4 | 서버 에이전트 |
-| 2 | server2 | even-vertical | 4 | 서버 에이전트 |
-| 3 | client1 | even-vertical | 4 | 클라이언트 에이전트 |
-| 4 | client2 | even-vertical | 4 | 클라이언트 에이전트 |
+| 0 | lab | even-horizontal | 2 | 메인 작업 |
+| 1 | server1 | even-horizontal | 2 | 서버 작업 |
+| 2 | client1 | even-horizontal | 2 | 클라이언트 작업 |
