@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-29 | 루트 워크스페이스 정리 - tracker/orchestrator 계열 도구 삭제, docs 기록은 `/dev-log` + git 히스토리로 유지 | done |
 | 2026-03-23 | 와이어프레임 color-mix()→rgba() 전면교체(99곳), inline-block 수정, Figma 직접 패치(Navigation×19, Highlighted Text×11, Code×26) | done |
 | 2026-03-23 | 와이어프레임 HTML 컬러 토큰/타이포그래피 컴플라이언스 수정 + Figma 캡처 (19개 프레임, node-id 70:2-88:2) | done |
 | 2026-03-14 | Codex schema contract fix + dev-codex-pipeline --tool override (PR #203) - review_schema.json required array, nullable path/line, review_publish.py null guard, SKILL.md parse-first TOOL pattern, 54 tests passing | done |
