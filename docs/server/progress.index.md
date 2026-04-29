@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-29 | Issue #119 카테고리 일괄 삭제 API: `DELETE /categories/bulk` 추가, 단일 트랜잭션 기반 move/trash 처리와 검증/회귀 테스트 보강, PR #120 머지 | ✅   |
 | 2026-04-25 | Issue #117 guestbook guest email optional 계약 반영: guest create schema/route test 반영 후 Codex review suggestion으로 OpenAPI 설명 문구 정렬, PR #118 머지 | ✅   |
 | 2026-04-25 | Issue #113 휴지통 `categoryId=NULL` 게시글 enrichment 500 복구: 관리자 목록/상세 null-tolerant enrichment, restore 400 guard, posts 회귀 테스트 추가, PR #114 머지 | ✅   |
 | 2026-04-24 | Issue #111 카테고리/태그 slug 생성 복구: Unicode slug 생성, category manual override, legacy repair script, review warning 3회 반영 후 PR #112 머지 | ✅   |
@@ -68,6 +69,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - Issue #119 카테고리 일괄 삭제 API + PR #120 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - Issue #117 guestbook guest email optional 계약 반영 + PR #118 머지
 - [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - Issue #113 휴지통 `categoryId=NULL` 게시글 enrichment 500 복구 + PR #114 머지
 - [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - Issue #111 taxonomy Unicode slug 복구 + category manual override + repair script + PR #112 머지
