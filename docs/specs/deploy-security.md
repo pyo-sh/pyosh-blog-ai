@@ -115,12 +115,12 @@ await fastify.register(cors, {
 
 | 라우트 그룹 | 적용 방식 | 비고 |
 |---|---|---|
-| `/api/admin/*` (GET 제외) | 프리픽스 레벨 hook 일괄 적용 | 모든 Admin 상태 변경 |
-| `POST /api/posts/:postId/comments` | 개별 route hook | 댓글 작성 |
-| `DELETE /api/comments/:id` | 개별 route hook | 댓글 삭제 |
-| `POST /api/guestbook` | 개별 route hook | 방명록 작성 |
-| `DELETE /api/guestbook/:id` | 개별 route hook | 방명록 삭제 |
-| `POST /api/assets/upload` | 이미 적용됨 | 유지 |
+| `/admin/*` (GET 제외) | 프리픽스 레벨 hook 일괄 적용 | 모든 Admin 상태 변경 |
+| `POST /posts/:postId/comments` | 개별 route hook | 댓글 작성 |
+| `DELETE /comments/:id` | 개별 route hook | 댓글 삭제 |
+| `POST /guestbook` | 개별 route hook | 방명록 작성 |
+| `DELETE /guestbook/:id` | 개별 route hook | 방명록 삭제 |
+| `POST /assets/upload` | 이미 적용됨 | 유지 |
 | GET 요청 전체 | 미적용 | 읽기 전용 |
 
 #### Admin 일괄 적용
@@ -139,12 +139,12 @@ fastify.register(async (adminRoutes) => {
   adminRoutes.register(guestbookAdminRoutes);
   adminRoutes.register(assetAdminRoutes);
   adminRoutes.register(settingsAdminRoutes);
-}, { prefix: '/api/admin' });
+}, { prefix: '/admin' });
 ```
 
 #### CSRF 토큰 발급
 
-기존 `GET /api/auth/csrf-token` 엔드포인트 유지. 클라이언트가 페이지 로드 시 토큰을 받아 이후 요청에 `X-CSRF-Token` 헤더로 포함.
+기존 `GET /auth/csrf-token` 엔드포인트 유지. 클라이언트가 페이지 로드 시 토큰을 받아 이후 요청에 `X-CSRF-Token` 헤더로 포함.
 
 ### 5.4 CSP (Content Security Policy)
 
@@ -314,7 +314,7 @@ if (env.GITHUB_CLIENT_ID) {
 
 | 메서드 | 경로 | 용도 | 변경 사항 |
 |---|---|---|---|
-| GET | `/api/auth/csrf-token` | CSRF 토큰 발급 | 기존 유지 |
+| GET | `/auth/csrf-token` | CSRF 토큰 발급 | 기존 유지 |
 
 ### 서버 변경 필요사항
 

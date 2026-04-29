@@ -10,28 +10,28 @@
 
 | 경로 | 페이지 | 데이터 소스 |
 |---|---|---|
-| `/` | 홈 — 최신 글 목록 (페이지네이션) | `GET /api/posts` |
-| `/posts/[slug]` | 글 상세 (MD 렌더링 + 댓글) | `GET /api/posts/:slug` |
-| `/categories/[slug]` | 카테고리별 글 목록 | `GET /api/posts?categoryId=N` |
-| `/tags` | 태그 목록 | `GET /api/tags` |
-| `/tags/[slug]` | 태그별 글 목록 | `GET /api/posts?tagSlug=xxx` |
-| `/popular` | 인기 글 | `GET /api/stats/popular` |
-| `/guestbook` | 방명록 | `GET /api/guestbook` |
-| `/search?q=keyword` | 검색 결과 | `GET /api/posts?q=keyword` |
+| `/` | 홈 — 최신 글 목록 (페이지네이션) | `GET /posts` |
+| `/posts/[slug]` | 글 상세 (MD 렌더링 + 댓글) | `GET /posts/:slug` |
+| `/categories/[slug]` | 카테고리별 글 목록 | `GET /posts?categoryId=N` |
+| `/tags` | 태그 목록 | `GET /tags` |
+| `/tags/[slug]` | 태그별 글 목록 | `GET /posts?tagSlug=xxx` |
+| `/popular` | 인기 글 | `GET /stats/popular` |
+| `/guestbook` | 방명록 | `GET /guestbook` |
+| `/search?q=keyword` | 검색 결과 | `GET /posts?q=keyword` |
 
 ### Admin (관리자) — prefix: `/manage`
 
 | 경로 | 페이지 | 데이터 소스 |
 |---|---|---|
-| `/manage/login` | 관리자 로그인 | `POST /api/auth/admin/login` |
-| `/manage` | 대시보드 (통계 요약) | `GET /api/admin/stats/manage` |
-| `/manage/posts` | 글 목록 (전체 상태) | `GET /api/admin/posts` |
-| `/manage/posts/new` | 글 작성 | `POST /api/admin/posts` |
-| `/manage/posts/[id]/edit` | 글 수정 | `PATCH /api/admin/posts/:id` |
-| `/manage/categories` | 카테고리 관리 | `GET /api/categories` |
-| `/manage/assets` | 에셋 라이브러리 | `GET /api/assets`, `POST /api/assets/upload` |
-| `/manage/comments` | 댓글 관리 | `GET /api/admin/comments` |
-| `/manage/guestbook` | 방명록 관리 | `GET /api/admin/guestbook` |
+| `/manage/login` | 관리자 로그인 | `POST /auth/admin/login` |
+| `/manage` | 대시보드 (통계 요약) | `GET /admin/stats/manage` |
+| `/manage/posts` | 글 목록 (전체 상태) | `GET /admin/posts` |
+| `/manage/posts/new` | 글 작성 | `POST /admin/posts` |
+| `/manage/posts/[id]/edit` | 글 수정 | `PATCH /admin/posts/:id` |
+| `/manage/categories` | 카테고리 관리 | `GET /categories` |
+| `/manage/assets` | 에셋 라이브러리 | `GET /assets`, `POST /assets/upload` |
+| `/manage/comments` | 댓글 관리 | `GET /admin/comments` |
+| `/manage/guestbook` | 방명록 관리 | `GET /admin/guestbook` |
 
 ---
 
@@ -100,12 +100,12 @@
 
 ### 3.4 태그 (`/tags`, `/tags/[slug]`)
 
-- `/tags`: 전체 태그 클라우드/목록 (`GET /api/tags` — post count 포함)
+- `/tags`: 전체 태그 클라우드/목록 (`GET /tags` — post count 포함)
 - `/tags/[slug]`: 해당 태그의 글 목록 (홈과 동일 레이아웃)
 
 ### 3.5 인기 글 (`/popular`)
 
-- `GET /api/stats/popular` 기반
+- `GET /stats/popular` 기반
 - 기간 선택 가능 (7일/30일)
 - 조회수/방문자수 표시
 
@@ -125,7 +125,7 @@
 
 ### 3.8 조회수 기록
 
-- 글 상세 페이지 마운트 시 클라이언트 `useEffect`에서 `POST /api/stats/view` 호출
+- 글 상세 페이지 마운트 시 클라이언트 `useEffect`에서 `POST /stats/view` 호출
 - `sessionStorage`로 이미 조회한 글 추적 → 같은 세션 내 재방문 시 API 호출 생략
 - 추가 중복 제거는 서버 담당
 
@@ -133,7 +133,7 @@
 
 - 헤더 네비게이션에 검색 아이콘/바 추가
 - `/search?q=keyword` 페이지에서 결과 표시
-- `GET /api/posts?q=keyword` 활용 (서버 사이드 검색)
+- `GET /posts?q=keyword` 활용 (서버 사이드 검색)
 - 결과 레이아웃은 홈 글 목록과 동일
 - 페이지네이션 지원
 
@@ -171,7 +171,7 @@
   - 상태 (draft / published / archived)
   - 가시성 (public / private)
   - 발행일 (선택)
-- **이미지 업로드**: 에디터 인라인 (드래그&드롭 또는 버튼) → `POST /api/assets/upload` → 마크다운에 `![](url)` 자동 삽입
+- **이미지 업로드**: 에디터 인라인 (드래그&드롭 또는 버튼) → `POST /assets/upload` → 마크다운에 `![](url)` 자동 삽입
 
 ### 4.5 카테고리 관리 (`/manage/categories`)
 
@@ -228,9 +228,9 @@
 
 ### 5.4 인증 (Admin)
 
-- 세션 쿠키 기반 (`POST /api/auth/admin/login`)
+- 세션 쿠키 기반 (`POST /auth/admin/login`)
 - Next.js middleware로 `/manage/*` 보호
-- `GET /api/auth/me`로 세션 유효성 확인
+- `GET /auth/me`로 세션 유효성 확인
 
 ### 5.5 이미지 처리
 
@@ -342,7 +342,7 @@ client/src/
 ### Phase 3: 공개 부가 기능
 9. 댓글 시스템 (게스트, 비밀댓글 마스킹)
 10. 방명록
-11. 태그 목록/필터 (`GET /api/tags`)
+11. 태그 목록/필터 (`GET /tags`)
 12. 인기 글
 13. 조회수 기록 (useEffect + sessionStorage 중복 방지)
 
