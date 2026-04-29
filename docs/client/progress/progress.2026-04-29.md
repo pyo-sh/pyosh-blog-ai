@@ -2,6 +2,7 @@
 
 ## Completed
 
+- [x] #368 강력 새로고침/cold cache에서 sidebar Iconify SVG가 초기 0x0으로 잡히는 문제를 줄이고 핵심 UI 폰트 preload를 추가한 뒤 PR #369 머지
 - [x] #365 Windows에서 `NanumSquareNeo` UI 폰트 렌더링이 더 예측 가능하도록 variable WOFF2를 static weight WOFF2 구성으로 교체하고 PR #366 머지
 - [x] #363 블로그 전역/UI 폰트를 자체 호스팅 `NanumSquareNeo`로 전환하고 게시글 제목/본문 및 관리자 미리보기에 `MaruBuri`를 적용한 뒤 PR #364 머지
 - [x] #360 관리자 카테고리 일괄 선택 모드에 삭제 액션을 추가하고 PR #362 머지
@@ -9,6 +10,8 @@
 
 ## Discoveries
 
+- `@iconify/react` 기본 엔트리는 정적 icon object를 넘겨도 mount 전 빈 fallback span을 만들 수 있으므로, 서버 초기 HTML부터 SVG 박스를 안정적으로 보존하려면 정적 아이콘 사용처는 `@iconify/react/offline`가 더 적합하다.
+- 자체 호스팅 static font를 전역 preload할 때는 전체 weight를 선점하면 초기 네트워크 비용이 커지므로, UI 첫 화면에서 가장 많이 쓰는 regular/bold 파일만 선점하고 나머지 weight는 기존 `@font-face` 로딩에 맡기는 편이 균형적이다.
 - `NanumSquareNeo` static 배포본은 300/400/700/800/900 weight만 제공하므로 앱에서 널리 쓰는 Tailwind `font-medium`(500), `font-semibold`(600)을 별도 `@font-face` alias로 명시해야 브라우저별 synthetic matching 차이를 줄일 수 있다.
 - Google Fonts import 제거 후에는 CSP report-only 정책의 `fonts.googleapis.com`/`fonts.gstatic.com` allowlist도 함께 제거해야 자체 호스팅 폰트 모델과 정책이 일치한다.
 - 게시글 본문 클래스인 `.post-markdown`을 에디터 preview와 관리자 post preview에도 붙여야 실제 공개 상세와 미리보기 사이의 마크다운 렌더링 차이가 줄어든다.
@@ -17,6 +20,10 @@
 
 ## Issues & Resolutions
 
+- **Issue**: public/admin sidebar와 header 주변 정적 Iconify 아이콘이 강력 새로고침 시 초기 HTML에서 0x0 fallback으로 관찰될 수 있음
+- **Resolution**: `src`의 정적 Solar 아이콘 사용처를 `@iconify/react/offline`로 전환하고 public/admin sidebar 핵심 아이콘에는 명시적인 `width`/`height`와 `shrink-0`을 추가
+- **Issue**: NanumSquareNeo가 CSS에서 선언되어 있지만 preload가 없어 cold cache에서 fallback font가 먼저 보인 뒤 UI 폰트로 교체됨
+- **Resolution**: root layout에 `NanumSquareNeoTTF-bRg.woff2`와 `NanumSquareNeoTTF-cBd.woff2` preload link를 추가해 regular/bold UI 텍스트의 초기 요청 우선순위를 올림
 - **Issue**: `NanumSquareNeo-Variable.woff2` 단일 파일은 Windows에서 UI 텍스트가 macOS보다 딱딱하게 보이고 렌더링 차이가 크게 체감됨
 - **Resolution**: `NanumSquareNeoTTF-aLt/bRg/cBd/dEb/eHv.woff2` static 파일로 교체하고 300/400/700/800/900을 weight별 `@font-face`로 등록
 - **Issue**: 자동 리뷰에서 static 전환 후 앱의 500/600 weight 요청이 등록되지 않아 브라우저별 synthetic matching으로 흐를 수 있다고 지적
@@ -32,6 +39,7 @@
 
 ## Verification
 
+- #368: `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 clean, PR #369 머지
 - #365: `fc-scan`으로 NanumSquareNeo static WOFF2가 non-variable TrueType 기반임을 확인, `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 warning 1건 반영 후 재리뷰 clean, PR #366 머지
 - #363: `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 suggestion 1건 반영 후 재검증, PR #364 머지
 - #360: `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 clean

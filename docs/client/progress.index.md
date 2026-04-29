@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-29 | #368 강력 새로고침 시 sidebar 아이콘 0x0 및 폰트 지연 적용 개선 - 정적 Iconify 사용처를 offline 렌더링으로 전환하고 sidebar 아이콘 크기와 NanumSquareNeo 핵심 weight preload를 보정한 뒤 자동 리뷰 clean 후 PR #369 머지 | ✅   |
 | 2026-04-29 | #365 NanumSquareNeo Windows 렌더링 개선 - variable WOFF2 단일 파일을 static weight WOFF2 파일로 교체하고 500/600 weight alias까지 등록한 뒤 자동 리뷰 clean 후 PR #366 머지 | ✅   |
 | 2026-04-29 | #363 블로그 타이포그래피 폰트 마이그레이션 - `Gothic A1` Google Fonts import를 제거하고 자체 호스팅 `NanumSquareNeo`/`MaruBuri` 토큰을 적용했으며 리뷰 suggestion으로 CSP Google font allowlist까지 정리한 뒤 PR #364 머지 | ✅   |
 | 2026-04-29 | #360 관리자 카테고리 일괄 삭제 액션 - `DELETE /categories/bulk` 클라이언트 API와 선택 모드 삭제 버튼/확인 모달을 추가하고 자동 리뷰 clean 후 PR #362 머지 | ✅   |
@@ -118,6 +119,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #368 sidebar icon SSR/offline 렌더링 및 UI font preload 보정, PR #369 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #365 NanumSquareNeo Windows 렌더링 개선, PR #366 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #363 블로그 타이포그래피 폰트 마이그레이션, PR #364 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #360 관리자 카테고리 일괄 삭제 액션, PR #362 머지
