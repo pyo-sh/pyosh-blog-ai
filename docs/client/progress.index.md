@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-29 | #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드가 사라지는 문제 - `removeCategory()` 재귀 복귀 대입을 제거하고 자동 리뷰 clean 후 PR #361 머지 | ✅   |
 | 2026-04-27 | #352 public category tree view 분리 - sidebar와 `/categories` renderer를 분리하고 공유 로직만 lib로 추출했으며 `/categories` Storybook을 추가한 뒤 PR #356 생성 | ✅   |
 | 2026-04-26 | #352 public category tree spacing/icon 후속 보정 - sidebar와 `/categories` toggle slot을 다시 키우고 row spacing과 overview child indent를 wireframe 기준으로 복구한 뒤 PR #355 머지 | ✅   |
 | 2026-04-26 | #352 public category tree 정렬/고정 count column 후속 보정 - sidebar와 `/categories` row를 중앙 정렬 기준으로 다시 맞추고 overview count를 고정 right column으로 정렬한 뒤 자동 리뷰 suggestion 1건(hover color inheritance)을 반영해 PR #354 머지 | ✅   |
@@ -114,6 +115,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드 누락 수정, PR #361 머지
 - [progress.2026-04-27.md](./progress/progress.2026-04-27.md) - #352 public category tree view 분리 및 `/categories` Storybook 추가, PR #356 생성
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 public category tree spacing/icon 후속 보정, PR #355 머지
 - [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 public category tree 정렬/고정 count column 후속 보정, PR #354 머지
