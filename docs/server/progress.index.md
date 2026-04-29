@@ -6,6 +6,11 @@
 
 | 날짜       | 주요 작업                              | 상태 |
 | ---------- | -------------------------------------- | ---- |
+| 2026-04-29 | Issue #119 카테고리 일괄 삭제 API: `DELETE /categories/bulk` 추가, 단일 트랜잭션 기반 move/trash 처리와 검증/회귀 테스트 보강, PR #120 머지 | ✅   |
+| 2026-04-25 | Issue #117 guestbook guest email optional 계약 반영: guest create schema/route test 반영 후 Codex review suggestion으로 OpenAPI 설명 문구 정렬, PR #118 머지 | ✅   |
+| 2026-04-25 | Issue #113 휴지통 `categoryId=NULL` 게시글 enrichment 500 복구: 관리자 목록/상세 null-tolerant enrichment, restore 400 guard, posts 회귀 테스트 추가, PR #114 머지 | ✅   |
+| 2026-04-24 | Issue #111 카테고리/태그 slug 생성 복구: Unicode slug 생성, category manual override, legacy repair script, review warning 3회 반영 후 PR #112 머지 | ✅   |
+| 2026-04-24 | Issue #108 cloudflared trusted proxy 서브넷 고정: `TRUSTED_PROXY_RANGES`를 단일 IP 대신 blog_network 서브넷 CIDR로 지정하도록 `.env.example` 및 compose 주석 가이드 추가, `package.json` 1.1.2 bump, v1.1.2 태그, PR #109 머지 | ✅   |
 | 2026-04-18 | Issue #98 Server PR/push CI 추가: `ci.yml` 신규 구성, Node 20 + pnpm 고정, MySQL service + `.env.test` 생성, PR 중복 실행 방지를 위해 `push`를 `main`으로 제한, PR #99 머지 | ✅   |
 | 2026-04-18 | Issue #96 Server API `/api` prefix 제거: route prefix/OAuth callback/Swagger 설명/통합 테스트를 루트 경로로 전환, `/health` lightweight probe 유지 + 상세 상태는 `/health/status`로 분리, `api-spec.md` 갱신, PR #97 머지 | ✅   |
 | 2026-04-10 | Issue #87 API spec/test alignment baseline: auth/guestbook/settings 계약 기준 테스트 정렬, 실제 앱 CSRF e2e 검증 추가, health/stats/settings-service 불안정성 수정, 전체 스위트 `17` files / `258` tests green 복구, PR #90 머지 | ✅   |
@@ -64,6 +69,10 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - Issue #119 카테고리 일괄 삭제 API + PR #120 머지
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - Issue #117 guestbook guest email optional 계약 반영 + PR #118 머지
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - Issue #113 휴지통 `categoryId=NULL` 게시글 enrichment 500 복구 + PR #114 머지
+- [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - Issue #111 taxonomy Unicode slug 복구 + category manual override + repair script + PR #112 머지
 - [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #98 Server PR/push CI 추가 + PR #99 머지
 - [progress.2026-04-18.md](./progress/progress.2026-04-18.md) - Issue #96 server API `/api` prefix 제거 + health probe 계약 유지 + PR #97 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - Issue #87 API spec/test alignment baseline + PR #90 머지

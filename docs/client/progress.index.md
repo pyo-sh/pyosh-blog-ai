@@ -6,6 +6,30 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-29 | #360 관리자 카테고리 일괄 삭제 액션 - `DELETE /categories/bulk` 클라이언트 API와 선택 모드 삭제 버튼/확인 모달을 추가하고 자동 리뷰 clean 후 PR #362 머지 | ✅   |
+| 2026-04-29 | #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드가 사라지는 문제 - `removeCategory()` 재귀 복귀 대입을 제거하고 자동 리뷰 clean 후 PR #361 머지 | ✅   |
+| 2026-04-27 | #352 public category tree view 분리 - sidebar와 `/categories` renderer를 분리하고 공유 로직만 lib로 추출했으며 `/categories` Storybook을 추가한 뒤 PR #356 생성 | ✅   |
+| 2026-04-26 | #352 public category tree spacing/icon 후속 보정 - sidebar와 `/categories` toggle slot을 다시 키우고 row spacing과 overview child indent를 wireframe 기준으로 복구한 뒤 PR #355 머지 | ✅   |
+| 2026-04-26 | #352 public category tree 정렬/고정 count column 후속 보정 - sidebar와 `/categories` row를 중앙 정렬 기준으로 다시 맞추고 overview count를 고정 right column으로 정렬한 뒤 자동 리뷰 suggestion 1건(hover color inheritance)을 반영해 PR #354 머지 | ✅   |
+| 2026-04-26 | #352 Sidebar 카테고리 UI 재디자인 보정 - sidebar leaf indicator slot/spacing과 overview typography를 wireframe 기준으로 다시 맞추고 nested overview toggle 회귀를 자동 리뷰 warning 1건 반영 후 PR #353 머지 | ✅   |
+| 2026-04-26 | #348 `/categories` 페이지 재디자인 - wireframe 기준 compact tree archive, stat strip, overview 전용 group/leaf 구조를 구현하고 자동 리뷰 warning 1건(숨겨진 link tab order)을 보정한 뒤 PR #351 머지 | ✅   |
+| 2026-04-26 | #349 사이드바 카테고리 트리 leaf 아이템 circle indicator 추가 - public sidebar에서 부모 카테고리는 chevron toggle을 유지하고 leaf 카테고리는 `solar:record-linear` circle marker + direct link row로 구분한 뒤 PR #350 머지 | ✅   |
+| 2026-04-26 | #346 Public 카테고리 내비게이션 UI 정리 - sidebar category label 밀도를 낮추고 leaf marker를 추가했으며 `/categories` overview를 compact list 스타일로 정리하고 category empty state shadow를 제거한 뒤 PR #347 머지 | ✅   |
+| 2026-04-26 | #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선 - `/categories`·`/categories/[slug]`·`/tags` 헤더를 shared archive title system으로 통일하고 categories overview item을 card형으로 재구성하며 desktop public sidebar 폭을 `240px`로 보정한 뒤 PR #345 머지 | ✅   |
+| 2026-04-26 | #342 카테고리 전체보기 500 오류 수정 - server route가 client export를 호출하지 않도록 category count helper를 분리하고 public sidebar divider 위치를 보정한 뒤 PR #343 머지 | ✅   |
+| 2026-04-26 | #340 Public sidebar 카테고리 섹션 정리 및 active path auto-expand - 카테고리 섹션 제목/전체보기 액션을 정리하고 category/post 현재 경로만 자동 expand되도록 tree seed를 분리한 뒤 자동 리뷰 warning 1건 보정 후 PR #341 머지 | ✅   |
+| 2026-04-26 | #337 public 비밀글 안내 문구 한글화 - legacy 영어/한국어 secret mask를 모두 인식하고 public 표시 문구를 `비공개입니다.` 로 통일한 뒤 PR #339 머지 | ✅   |
+| 2026-04-26 | #336 public 사이드바 모바일 헤더 겹침 및 데스크톱 border-right 정렬 수정 - 모바일 패널을 헤더 높이 아래로 오프셋하고 데스크톱 sidebar spacing을 `border-right + padding` 구조로 재정렬한 뒤 PR #338 머지 | ✅   |
+| 2026-04-25 | #334 Guestbook create type should allow missing guest email - `CreateGuestbookGuestBody.guestEmail`을 optional로 전환하고 PR #335 머지 | ✅   |
+| 2026-04-25 | #332 카테고리 관리 모달 한글 IME 조합 끊김 수정 - shared modal 포커스 복원을 실제 close 전환으로 제한하고 PR #333 머지 | ✅   |
+| 2026-04-25 | #328 Category 이름 한글 IME 입력 회귀 수정 - ref 기반 IME-safe hook으로 카테고리/태그 입력을 정리하고 PR #331 머지 | ✅   |
+| 2026-04-25 | #329 Public post list item 링크 구조 정리 - overlay anchor를 제거하고 `Link`가 실제 item view를 감싸도록 바꾼 뒤 PR #330 머지 | ✅   |
+| 2026-04-25 | #326 Category/Tag 한글 slug 라우트 404 + Category 입력 한글 IME 분해 버그 수정 - shared slug 정규화 유틸 도입, category/tag route param 정규화, category name NFC 입력 보정 후 PR #327 머지 | ✅   |
+| 2026-04-25 | #324 휴지통/관리자 화면에서 카테고리 NULL 글 표시 및 복원 UX 정리 - 관리자 post 타입 nullable 전환, orphan 글 `(카테고리 없음)` 표시, 복원 전 카테고리 재지정 모달 추가, public 상세 nullable guard 정리 후 PR #325 머지 | ✅   |
+| 2026-04-24 | #313 Preview 배포 인덱싱 차단 및 sitemap/robots SEO 점검 - non-production `X-Robots-Tag` 헤더를 middleware에 추가하고, 운영 도메인/비-Vercel production 예외를 보정한 뒤 PR #323 머지 | ✅   |
+| 2026-04-24 | #312 원격 게시글 이미지 호스트 확장 - `api.pyosh.com`과 GitHub/Notion/Naver 계열 호스트를 `next/image` 허용 목록에 추가하고 wildcard 매칭을 Next semantics에 맞춘 뒤 PR #322 머지 | ✅   |
+| 2026-04-24 | #319 헤더에 방명록 네비게이션 링크 추가 - 공개 헤더 액션 영역에 `/guestbook` 링크를 추가하고 PR #321 머지 | ✅   |
+| 2026-04-24 | #318 `/categories` 아카이브 페이지 추가 및 사이드바 전체보기 링크 404 prefetch 해소 - PR #320 머지 | ✅   |
 | 2026-04-22 | #316 게시글 상세 SSR slug double encoding으로 인한 404 수정 - 원래 slug 우선 조회 + 404 시 decode fallback으로 PR #317 머지 | ✅   |
 | 2026-04-20 | #314 발행된 게시글 상세 페이지 404 및 slug 무결성 문제 - 댓글 preload 실패가 전체 `notFound()`로 전파되지 않도록 완화하고 PR #315 머지 | ✅   |
 | 2026-04-18 | #310 Client API 경로에서 `/api` prefix 제거 - client API helper, middleware auth 체크, Storybook/MSW 경로를 루트 기준으로 정렬하고 PR #311 머지 | ✅   |
@@ -92,6 +116,28 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #360 관리자 카테고리 일괄 삭제 액션, PR #362 머지
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드 누락 수정, PR #361 머지
+- [progress.2026-04-27.md](./progress/progress.2026-04-27.md) - #352 public category tree view 분리 및 `/categories` Storybook 추가, PR #356 생성
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 public category tree spacing/icon 후속 보정, PR #355 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 public category tree 정렬/고정 count column 후속 보정, PR #354 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #352 Sidebar 카테고리 UI 재디자인 보정, PR #353 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #348 `/categories` 페이지 재디자인, PR #351 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #349 사이드바 카테고리 트리 leaf 아이템 circle indicator 추가, PR #350 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #346 Public 카테고리 내비게이션 UI 정리, PR #347 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #344 Categories/Tags 헤더 디자인 통일 및 categories 목록/퍼블릭 사이드바 UI 개선, PR #345 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #342 카테고리 전체보기 500 오류 수정 및 sidebar divider 위치 조정, PR #343 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #340 Public sidebar 카테고리 섹션 정리 및 active path auto-expand, PR #341 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #336 public 사이드바 모바일 헤더 겹침 및 데스크톱 border-right 정렬 수정 PR #338 머지
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #334 Guestbook create type should allow missing guest email PR #335 머지
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #328 Category 이름 한글 IME 입력 회귀 수정 PR #331 머지
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #329 Public post list item 링크 구조 정리 PR #330 머지
+- [progress.2026-04-25.md](./progress/progress.2026-04-25.md) - #324 휴지통/관리자 화면에서 카테고리 NULL 글 표시 및 복원 UX 정리 PR #325 머지
+- [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #313 Preview 배포 인덱싱 차단 및 sitemap/robots SEO 점검 PR #323 머지
+- [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #312 원격 게시글 이미지 호스트 확장 PR #322 머지
+- [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #319 헤더에 방명록 네비게이션 링크 추가 PR #321 머지
+- [progress.2026-04-24.md](./progress/progress.2026-04-24.md) - #318 `/categories` 아카이브 페이지 추가 및 사이드바 전체보기 링크 404 prefetch 해소 PR #320 머지
+- [progress.2026-04-26.md](./progress/progress.2026-04-26.md) - #337 public 비밀글 안내 문구 한글화, PR #339 머지
 - [progress.2026-04-22.md](./progress/progress.2026-04-22.md) - #316 게시글 상세 SSR slug double encoding 404 수정, PR #317 머지
 - [progress.2026-04-20.md](./progress/progress.2026-04-20.md) - #314 발행된 게시글 상세 페이지 404 및 slug 무결성 문제 1차 완화, PR #315 머지
 - [progress.2026-04-10.md](./progress/progress.2026-04-10.md) - #299 Dev asset URL normalization and CSP split PR #304 머지
