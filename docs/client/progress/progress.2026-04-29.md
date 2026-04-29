@@ -2,6 +2,7 @@
 
 ## Completed
 
+- [x] #370 홈에서 글 상세 이동 시 Markdown/Shiki cold-start로 RSC 응답이 지연되는 문제를 완화하고 PR #371 머지
 - [x] #368 강력 새로고침/cold cache에서 sidebar Iconify SVG가 초기 0x0으로 잡히는 문제를 줄이고 핵심 UI 폰트 preload를 추가한 뒤 PR #369 머지
 - [x] #365 Windows에서 `NanumSquareNeo` UI 폰트 렌더링이 더 예측 가능하도록 variable WOFF2를 static weight WOFF2 구성으로 교체하고 PR #366 머지
 - [x] #363 블로그 전역/UI 폰트를 자체 호스팅 `NanumSquareNeo`로 전환하고 게시글 제목/본문 및 관리자 미리보기에 `MaruBuri`를 적용한 뒤 PR #364 머지
@@ -10,6 +11,8 @@
 
 ## Discoveries
 
+- 코드블록이 없는 게시글도 `@shikijs/rehype`를 정적 import하면 RSC 렌더 경로에서 Shiki highlighter 초기화 비용을 낼 수 있다. Markdown AST로 code node를 먼저 감지하고 코드블록이 있을 때만 동적 import하면 일반 글의 렌더 경로를 크게 줄일 수 있다.
+- Shiki 언어 lazy loading을 켤 때는 알 수 없는 fence language가 렌더 실패로 전파되지 않도록 `fallbackLanguage` 같은 안전 경로가 필요하다.
 - `@iconify/react` 기본 엔트리는 정적 icon object를 넘겨도 mount 전 빈 fallback span을 만들 수 있으므로, 서버 초기 HTML부터 SVG 박스를 안정적으로 보존하려면 정적 아이콘 사용처는 `@iconify/react/offline`가 더 적합하다.
 - 자체 호스팅 static font를 전역 preload할 때는 전체 weight를 선점하면 초기 네트워크 비용이 커지므로, UI 첫 화면에서 가장 많이 쓰는 regular/bold 파일만 선점하고 나머지 weight는 기존 `@font-face` 로딩에 맡기는 편이 균형적이다.
 - `NanumSquareNeo` static 배포본은 300/400/700/800/900 weight만 제공하므로 앱에서 널리 쓰는 Tailwind `font-medium`(500), `font-semibold`(600)을 별도 `@font-face` alias로 명시해야 브라우저별 synthetic matching 차이를 줄일 수 있다.
@@ -20,6 +23,8 @@
 
 ## Issues & Resolutions
 
+- **Issue**: HAR에서 홈에서 `테스트글` 상세로 이동할 때 `/posts/테스트글?_rsc=...` RSC 응답이 8.24초 걸리고, 응답 크기는 작지만 stream receive가 7.89초 지속됨
+- **Resolution**: `renderMarkdown()`를 plain processor와 lazy Shiki processor로 분리하고, Markdown AST의 code node 감지 결과에 따라 코드블록이 있는 글에서만 `@shikijs/rehype`를 동적 import하도록 변경. Shiki 초기 언어 세트는 bash/css/html/js/json/jsx/markdown/shell/tsx/ts로 제한하고 `lazy` + `fallbackLanguage: "text"`로 unsupported language 안전성을 유지
 - **Issue**: public/admin sidebar와 header 주변 정적 Iconify 아이콘이 강력 새로고침 시 초기 HTML에서 0x0 fallback으로 관찰될 수 있음
 - **Resolution**: `src`의 정적 Solar 아이콘 사용처를 `@iconify/react/offline`로 전환하고 public/admin sidebar 핵심 아이콘에는 명시적인 `width`/`height`와 `shrink-0`을 추가
 - **Issue**: NanumSquareNeo가 CSS에서 선언되어 있지만 preload가 없어 cold cache에서 fallback font가 먼저 보인 뒤 UI 폰트로 교체됨
@@ -39,6 +44,7 @@
 
 ## Verification
 
+- #370: `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, Markdown detector one-off 확인(plain=false, blockquote/list fence=true), 자동 리뷰 warning 2건 반영 후 재리뷰 clean, PR #371 머지
 - #368: `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 clean, PR #369 머지
 - #365: `fc-scan`으로 NanumSquareNeo static WOFF2가 non-variable TrueType 기반임을 확인, `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 warning 1건 반영 후 재리뷰 clean, PR #366 머지
 - #363: `pnpm compile:types`, `pnpm lint` (기존 warning 2건 유지), `pnpm build`, 자동 리뷰 suggestion 1건 반영 후 재검증, PR #364 머지
