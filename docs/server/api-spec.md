@@ -18,32 +18,32 @@
 
 - 개발 환경에서는 Swagger UI가 `/docs`에 노출된다.
 - OpenAPI 스펙은 서버가 등록한 Zod route schema에서 자동 생성된다.
-- 루트 컬렉션 경로는 OpenAPI 상 `/api/posts/`, `/api/categories/`, `/api/assets/`처럼 trailing slash로 보일 수 있다. 이 문서에서는 읽기 편하게 slash 없는 형태로 표기했다.
+- 루트 컬렉션 경로는 OpenAPI 상 `/posts/`, `/categories/`, `/assets/`처럼 trailing slash로 보일 수 있다. 이 문서에서는 읽기 편하게 slash 없는 형태로 표기했다.
 - 카테고리 트리, 댓글 replies, 방명록 replies 같은 재귀 응답은 현재 OpenAPI 변환기 한계로 nested `items`가 느슨하게 표현될 수 있다. 그 구조 설명은 이 문서가 더 정확하다.
 
 ### 인증
 
 | 방식 | 설명 |
 |---|---|
-| Admin session | `POST /api/auth/admin/login` 성공 시 세션 쿠키 발급. 관리자 전용 라우트는 `requireAdmin`으로 보호되며, 미인증 시 `403` |
-| OAuth session | Google/GitHub Passport 로그인 후 `request.user` 사용. `/api/user/*`는 `requireAuth`로 보호되며, 미인증 시 `401` |
+| Admin session | `POST /auth/admin/login` 성공 시 세션 쿠키 발급. 관리자 전용 라우트는 `requireAdmin`으로 보호되며, 미인증 시 `403` |
+| OAuth session | Google/GitHub Passport 로그인 후 `request.user` 사용. `/user/*`는 `requireAuth`로 보호되며, 미인증 시 `401` |
 | Optional auth | 댓글/방명록 조회·작성·삭제 일부는 로그인 없이도 호출 가능 |
 
 ### CSRF
 
-- `GET`, `HEAD`, `OPTIONS`, `TRACE` 외 메서드에 대해 `/api/admin/*` 전체에 CSRF 보호가 적용된다.
+- `GET`, `HEAD`, `OPTIONS`, `TRACE` 외 메서드에 대해 `/admin/*` 전체에 CSRF 보호가 적용된다.
 - Public 라우트 중 일부도 개별적으로 CSRF 보호를 적용한다.
-- 토큰 발급: `GET /api/auth/csrf-token`
+- 토큰 발급: `GET /auth/csrf-token`
 - 전송 헤더: `x-csrf-token`
 
 ### Rate limit
 
 | Endpoint | Limit |
 |---|---|
-| `POST /api/auth/admin/login` | 5 req/min |
-| `POST /api/posts/:postId/comments` | 10 req/min |
-| `POST /api/guestbook` | 10 req/min |
-| `POST /api/stats/view` | 30 req/min |
+| `POST /auth/admin/login` | 5 req/min |
+| `POST /posts/:postId/comments` | 10 req/min |
+| `POST /guestbook` | 10 req/min |
+| `POST /stats/view` | 30 req/min |
 
 ### 에러 응답
 
@@ -73,9 +73,9 @@
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/health` | 단순 헬스 체크 |
-| GET | `/api/health/live` | liveness |
-| GET | `/api/health/ready` | readiness + DB 상태 |
-| GET | `/api/health` | 종합 상태 + DB 상태 |
+| GET | `/health/live` | liveness |
+| GET | `/health/ready` | readiness + DB 상태 |
+| GET | `/health/status` | 종합 상태 + DB 상태 |
 
 ### GET `/health`
 
@@ -83,7 +83,7 @@
 { "status": "ok", "timestamp": "ISO-8601" }
 ```
 
-### GET `/api/health/live`
+### GET `/health/live`
 
 ```json
 {
@@ -94,7 +94,7 @@
 }
 ```
 
-### GET `/api/health/ready`
+### GET `/health/ready`
 
 ```json
 {
@@ -114,7 +114,7 @@
 }
 ```
 
-### GET `/api/health`
+### GET `/health/status`
 
 ```json
 {
@@ -136,7 +136,7 @@
 
 ## Auth
 
-Prefix: `/api/auth`
+Prefix: `/auth`
 
 | Method | Path | Auth | CSRF | 설명 |
 |---|---|---|---|---|
@@ -149,13 +149,13 @@ Prefix: `/api/auth`
 | POST | `/admin/logout` | Admin session | Required | 관리자 로그아웃 |
 | GET | `/me` | Optional | - | 현재 로그인 주체 조회 |
 
-### GET `/api/auth/csrf-token`
+### GET `/auth/csrf-token`
 
 ```json
 { "token": "string" }
 ```
 
-### POST `/api/auth/admin/login`
+### POST `/auth/admin/login`
 
 Request:
 
@@ -191,11 +191,11 @@ Response `200`:
 - `401`: 자격 증명 오류
 - `429`: rate limit
 
-### POST `/api/auth/admin/logout`
+### POST `/auth/admin/logout`
 
 Response: `204 No Content`
 
-### GET `/api/auth/me`
+### GET `/auth/me`
 
 Admin 로그인 상태:
 
@@ -229,7 +229,7 @@ OAuth 로그인 상태:
 
 ## Categories
 
-Prefix: `/api/categories`
+Prefix: `/categories`
 
 | Method | Path | Auth | CSRF | 설명 |
 |---|---|---|---|---|
@@ -239,7 +239,7 @@ Prefix: `/api/categories`
 | PATCH | `/:id` | Admin | Required | 카테고리 수정 |
 | DELETE | `/:id` | Admin | Required | 카테고리 삭제 |
 
-### GET `/api/categories`
+### GET `/categories`
 
 Query:
 
@@ -269,7 +269,7 @@ Query:
 }
 ```
 
-### POST `/api/categories`
+### POST `/categories`
 
 Request:
 
@@ -281,7 +281,7 @@ Request:
 }
 ```
 
-### PATCH `/api/categories/tree`
+### PATCH `/categories/tree`
 
 Request:
 
@@ -300,7 +300,7 @@ Response:
 { "success": true }
 ```
 
-### PATCH `/api/categories/:id`
+### PATCH `/categories/:id`
 
 Request:
 
@@ -332,7 +332,7 @@ Response `200`:
 }
 ```
 
-### DELETE `/api/categories/:id`
+### DELETE `/categories/:id`
 
 Query:
 
@@ -345,7 +345,7 @@ Response: `204 No Content`
 
 ## Assets
 
-Prefix: `/api/assets`
+Prefix: `/assets`
 
 | Method | Path | Auth | CSRF | 설명 |
 |---|---|---|---|---|
@@ -355,7 +355,7 @@ Prefix: `/api/assets`
 | DELETE | `/bulk` | Admin | Required | 에셋 일괄 삭제 |
 | DELETE | `/:id` | Admin | Required | 에셋 단건 삭제 |
 
-### POST `/api/assets/upload`
+### POST `/assets/upload`
 
 Content-Type: `multipart/form-data`
 
@@ -386,7 +386,7 @@ Response `201`:
 }
 ```
 
-### GET `/api/assets`
+### GET `/assets`
 
 Query:
 
@@ -419,7 +419,7 @@ Response:
 }
 ```
 
-### GET `/api/assets/:id`
+### GET `/assets/:id`
 
 ```json
 {
@@ -432,7 +432,7 @@ Response:
 }
 ```
 
-### DELETE `/api/assets/bulk`
+### DELETE `/assets/bulk`
 
 Request:
 
@@ -444,19 +444,19 @@ Response: `204 No Content`
 
 ## Posts
 
-Public prefix: `/api/posts`
+Public prefix: `/posts`
 
-Admin prefix: `/api/admin/posts`
+Admin prefix: `/admin/posts`
 
 ### Public endpoints
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/posts` | 공개 발행 게시글 목록 |
-| GET | `/api/posts/slugs` | sitemap용 slug 목록 |
-| GET | `/api/posts/:slug` | slug 기반 게시글 상세 |
+| GET | `/posts` | 공개 발행 게시글 목록 |
+| GET | `/posts/slugs` | sitemap용 slug 목록 |
+| GET | `/posts/:slug` | slug 기반 게시글 상세 |
 
-### GET `/api/posts`
+### GET `/posts`
 
 Query:
 
@@ -520,7 +520,7 @@ Response:
 }
 ```
 
-### GET `/api/posts/slugs`
+### GET `/posts/slugs`
 
 ```json
 {
@@ -533,7 +533,7 @@ Response:
 }
 ```
 
-### GET `/api/posts/:slug`
+### GET `/posts/:slug`
 
 ```json
 {
@@ -576,17 +576,17 @@ Response:
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/admin/posts` | 전체 게시글 목록 |
-| GET | `/api/admin/posts/pinned-count` | pinned 게시글 수 |
-| GET | `/api/admin/posts/:id` | ID 기반 상세 |
-| POST | `/api/admin/posts` | 게시글 생성 |
-| PATCH | `/api/admin/posts/bulk` | 벌크 작업 |
-| PATCH | `/api/admin/posts/:id` | 게시글 수정 |
-| DELETE | `/api/admin/posts/:id` | soft delete |
-| PUT | `/api/admin/posts/:id/restore` | 복원 |
-| DELETE | `/api/admin/posts/:id/hard` | hard delete |
+| GET | `/admin/posts` | 전체 게시글 목록 |
+| GET | `/admin/posts/pinned-count` | pinned 게시글 수 |
+| GET | `/admin/posts/:id` | ID 기반 상세 |
+| POST | `/admin/posts` | 게시글 생성 |
+| PATCH | `/admin/posts/bulk` | 벌크 작업 |
+| PATCH | `/admin/posts/:id` | 게시글 수정 |
+| DELETE | `/admin/posts/:id` | soft delete |
+| PUT | `/admin/posts/:id/restore` | 복원 |
+| DELETE | `/admin/posts/:id/hard` | hard delete |
 
-### GET `/api/admin/posts`
+### GET `/admin/posts`
 
 Query:
 
@@ -605,13 +605,13 @@ Query:
 
 응답 구조는 public 목록과 동일하다.
 
-### GET `/api/admin/posts/pinned-count`
+### GET `/admin/posts/pinned-count`
 
 ```json
 { "pinnedCount": 3 }
 ```
 
-### POST `/api/admin/posts`
+### POST `/admin/posts`
 
 Request:
 
@@ -656,10 +656,10 @@ Request:
 Response `201`:
 
 ```json
-{ "post": { "...PostDetail" : "GET /api/posts/:slug 의 post와 동일 구조" } }
+{ "post": { "...PostDetail" : "GET /posts/:slug 의 post와 동일 구조" } }
 ```
 
-### PATCH `/api/admin/posts/bulk`
+### PATCH `/admin/posts/bulk`
 
 Request:
 
@@ -686,7 +686,7 @@ Request:
 
 Response: `204 No Content`
 
-### PATCH `/api/admin/posts/:id`
+### PATCH `/admin/posts/:id`
 
 수정 가능한 필드:
 
@@ -709,11 +709,11 @@ Response: `204 No Content`
 { "post": { "...PostDetail": "..." } }
 ```
 
-### DELETE `/api/admin/posts/:id`
+### DELETE `/admin/posts/:id`
 
 Response: `204 No Content`
 
-### PUT `/api/admin/posts/:id/restore`
+### PUT `/admin/posts/:id/restore`
 
 Response:
 
@@ -721,19 +721,19 @@ Response:
 { "post": { "...PostDetail": "..." } }
 ```
 
-### DELETE `/api/admin/posts/:id/hard`
+### DELETE `/admin/posts/:id/hard`
 
 Response: `204 No Content`
 
 ## Tags
 
-Prefix: `/api/tags`
+Prefix: `/tags`
 
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/` | 공개 발행 게시글 기준 태그 목록 |
 
-### GET `/api/tags`
+### GET `/tags`
 
 ```json
 {
@@ -750,9 +750,9 @@ Prefix: `/api/tags`
 
 ## Comments
 
-Public prefix: `/api`
+Public prefixes: `/posts`, `/comments`
 
-Admin prefix: `/api/admin`
+Admin prefix: `/admin`
 
 ### Public endpoints
 
@@ -763,7 +763,7 @@ Admin prefix: `/api/admin`
 | POST | `/comments/:id/reveal` | - | - | 비밀 댓글 복원 토큰 조회 |
 | DELETE | `/comments/:id` | Optional | Required | 댓글 삭제 |
 
-### GET `/api/posts/:postId/comments`
+### GET `/posts/:postId/comments`
 
 Query:
 
@@ -813,7 +813,7 @@ Response:
 - 공개 응답의 `status`는 `active | deleted`.
 - 비밀 댓글은 작성자와 관리자만 원문을 볼 수 있다.
 
-### POST `/api/posts/:postId/comments`
+### POST `/posts/:postId/comments`
 
 OAuth 작성:
 
@@ -878,7 +878,7 @@ Response `201`:
 }
 ```
 
-### POST `/api/comments/:id/reveal`
+### POST `/comments/:id/reveal`
 
 Request:
 
@@ -910,7 +910,7 @@ Response:
 }
 ```
 
-### DELETE `/api/comments/:id`
+### DELETE `/comments/:id`
 
 OAuth 사용자는 세션으로 삭제 가능.
 
@@ -926,13 +926,13 @@ Response: `204 No Content`
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/admin/comments` | 전체 댓글 목록 |
-| GET | `/api/admin/comments/:id/thread` | 부모 + 답글 전체 |
-| PUT | `/api/admin/comments/:id/restore` | `deleted` 또는 `hidden` 복원 |
-| DELETE | `/api/admin/comments/bulk` | 벌크 복원/삭제 |
-| DELETE | `/api/admin/comments/:id` | 단건 soft/hard delete |
+| GET | `/admin/comments` | 전체 댓글 목록 |
+| GET | `/admin/comments/:id/thread` | 부모 + 답글 전체 |
+| PUT | `/admin/comments/:id/restore` | `deleted` 또는 `hidden` 복원 |
+| DELETE | `/admin/comments/bulk` | 벌크 복원/삭제 |
+| DELETE | `/admin/comments/:id` | 단건 soft/hard delete |
 
-### GET `/api/admin/comments`
+### GET `/admin/comments`
 
 Query:
 
@@ -985,7 +985,7 @@ Response:
 }
 ```
 
-### GET `/api/admin/comments/:id/thread`
+### GET `/admin/comments/:id/thread`
 
 ```json
 {
@@ -994,13 +994,13 @@ Response:
 }
 ```
 
-### PUT `/api/admin/comments/:id/restore`
+### PUT `/admin/comments/:id/restore`
 
 ```json
 { "success": true }
 ```
 
-### DELETE `/api/admin/comments/bulk`
+### DELETE `/admin/comments/bulk`
 
 Request:
 
@@ -1019,7 +1019,7 @@ Request:
 
 Response: `204 No Content`
 
-### DELETE `/api/admin/comments/:id`
+### DELETE `/admin/comments/:id`
 
 Query:
 
@@ -1031,9 +1031,9 @@ Response: `204 No Content`
 
 ## Guestbook
 
-Public prefix: `/api`
+Public prefix: `/guestbook`
 
-Admin prefix: `/api/admin`
+Admin prefix: `/admin`
 
 ### Public endpoints
 
@@ -1043,7 +1043,7 @@ Admin prefix: `/api/admin`
 | POST | `/guestbook` | Optional | Required | 방명록 작성 |
 | DELETE | `/guestbook/:id` | Optional | Required | 방명록 삭제 |
 
-### GET `/api/guestbook`
+### GET `/guestbook`
 
 Query:
 
@@ -1088,7 +1088,7 @@ Response:
 - 공개 응답의 `status`는 `active | deleted`.
 - 비밀글은 작성자와 관리자만 원문을 볼 수 있다.
 
-### POST `/api/guestbook`
+### POST `/guestbook`
 
 OAuth 작성:
 
@@ -1146,7 +1146,7 @@ Response `201`:
 }
 ```
 
-### DELETE `/api/guestbook/:id`
+### DELETE `/guestbook/:id`
 
 게스트 삭제 요청:
 
@@ -1160,13 +1160,13 @@ Response: `204 No Content`
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/admin/guestbook` | 전체 방명록 목록 |
-| DELETE | `/api/admin/guestbook/bulk` | 벌크 비가역 삭제 |
-| PATCH | `/api/admin/guestbook/bulk` | 벌크 hide/restore |
-| PATCH | `/api/admin/guestbook/:id` | 단건 hide/restore |
-| DELETE | `/api/admin/guestbook/:id` | 단건 soft/hard delete |
+| GET | `/admin/guestbook` | 전체 방명록 목록 |
+| DELETE | `/admin/guestbook/bulk` | 벌크 비가역 삭제 |
+| PATCH | `/admin/guestbook/bulk` | 벌크 hide/restore |
+| PATCH | `/admin/guestbook/:id` | 단건 hide/restore |
+| DELETE | `/admin/guestbook/:id` | 단건 soft/hard delete |
 
-### GET `/api/admin/guestbook`
+### GET `/admin/guestbook`
 
 Query:
 
@@ -1209,7 +1209,7 @@ Response:
 }
 ```
 
-### DELETE `/api/admin/guestbook/bulk`
+### DELETE `/admin/guestbook/bulk`
 
 Request:
 
@@ -1227,7 +1227,7 @@ Request:
 
 Response: `204 No Content`
 
-### PATCH `/api/admin/guestbook/bulk`
+### PATCH `/admin/guestbook/bulk`
 
 Request:
 
@@ -1245,7 +1245,7 @@ Request:
 
 Response: `204 No Content`
 
-### PATCH `/api/admin/guestbook/:id`
+### PATCH `/admin/guestbook/:id`
 
 Query:
 
@@ -1255,7 +1255,7 @@ Query:
 
 Response: `204 No Content`
 
-### DELETE `/api/admin/guestbook/:id`
+### DELETE `/admin/guestbook/:id`
 
 Query:
 
@@ -1267,22 +1267,22 @@ Response: `204 No Content`
 
 ## Settings
 
-Public prefix: `/api/settings`
+Public prefix: `/settings`
 
-Admin prefix: `/api/admin`
+Admin prefix: `/admin`
 
 | Method | Path | Auth | CSRF | 설명 |
 |---|---|---|---|---|
-| GET | `/api/settings/guestbook` | Public | - | 방명록 활성 상태 조회 |
-| PATCH | `/api/admin/settings/guestbook` | Admin | Required | 방명록 활성 상태 변경 |
+| GET | `/settings/guestbook` | Public | - | 방명록 활성 상태 조회 |
+| PATCH | `/admin/settings/guestbook` | Admin | Required | 방명록 활성 상태 변경 |
 
-### GET `/api/settings/guestbook`
+### GET `/settings/guestbook`
 
 ```json
 { "enabled": true }
 ```
 
-### PATCH `/api/admin/settings/guestbook`
+### PATCH `/admin/settings/guestbook`
 
 Request:
 
@@ -1298,18 +1298,18 @@ Response:
 
 ## Stats
 
-Public prefix: `/api/stats`
+Public prefix: `/stats`
 
-Admin prefix: `/api/admin/stats`
+Admin prefix: `/admin/stats`
 
 | Method | Path | Auth | CSRF | 설명 |
 |---|---|---|---|---|
-| POST | `/api/stats/view` | Public | Required | 조회수 기록 |
-| GET | `/api/stats/popular` | Public | - | 인기 게시글 |
-| GET | `/api/stats/total-views` | Public | - | 사이트 전체 조회수 |
-| GET | `/api/admin/stats/dashboard` | Admin | - | 대시보드 통계 |
+| POST | `/stats/view` | Public | Required | 조회수 기록 |
+| GET | `/stats/popular` | Public | - | 인기 게시글 |
+| GET | `/stats/total-views` | Public | - | 사이트 전체 조회수 |
+| GET | `/admin/stats/dashboard` | Admin | - | 대시보드 통계 |
 
-### POST `/api/stats/view`
+### POST `/stats/view`
 
 Request:
 
@@ -1337,7 +1337,7 @@ Response:
 - 동일 IP가 같은 대상에 5분 내 재요청하면 `deduplicated: true`
 - `postId`가 존재하면 공개 발행 게시글에 대해서만 집계되며, 그 외는 `404`
 
-### GET `/api/stats/popular`
+### GET `/stats/popular`
 
 Query:
 
@@ -1362,13 +1362,13 @@ Response:
 }
 ```
 
-### GET `/api/stats/total-views`
+### GET `/stats/total-views`
 
 ```json
 { "totalPageviews": 1234 }
 ```
 
-### GET `/api/admin/stats/dashboard`
+### GET `/admin/stats/dashboard`
 
 ```json
 {
@@ -1387,7 +1387,7 @@ Response:
 
 ## User
 
-Prefix: `/api/user`
+Prefix: `/user`
 
 모든 엔드포인트는 OAuth 로그인 필요.
 
@@ -1397,7 +1397,7 @@ Prefix: `/api/user`
 | PUT | `/me` | 내 프로필 수정 |
 | DELETE | `/me` | 회원 탈퇴 |
 
-### GET `/api/user/me`
+### GET `/user/me`
 
 ```json
 {
@@ -1415,7 +1415,7 @@ Prefix: `/api/user`
 
 - `providerUserId`, `deletedAt` 등 민감 필드는 노출하지 않는다.
 
-### PUT `/api/user/me`
+### PUT `/user/me`
 
 Request:
 
@@ -1432,9 +1432,9 @@ Request:
 - `avatarUrl`: 유효한 URL 또는 `null`
 - 빈 body도 허용되며 no-op으로 처리된다
 
-Response는 `GET /api/user/me`와 동일 구조다.
+Response는 `GET /user/me`와 동일 구조다.
 
-### DELETE `/api/user/me`
+### DELETE `/user/me`
 
 Response: `204 No Content`
 

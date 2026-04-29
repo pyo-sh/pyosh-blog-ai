@@ -16,7 +16,7 @@
 - Pino 로깅: dev(pretty), prod(JSON), test(warn)
 - 민감 데이터 마스킹: authorization, cookie, set-cookie 헤더
 - 전역 에러 핸들러: HttpError 분류, 미처리 에러 로깅
-- 헬스 체크: `/health`, `/api/health/live`, `/api/health/ready`
+- 헬스 체크: `/health`, `/health/live`, `/health/ready`
 - 클라이언트: 별도 에러 수집 없음
 
 개선이 필요한 부분:
@@ -101,7 +101,7 @@ const logger = pino(
   "reqId": "req-1",
   "req": {
     "method": "POST",
-    "url": "/api/admin/posts",
+    "url": "/admin/posts",
     "ip": "192.168.1.1"
   },
   "res": {
@@ -126,7 +126,7 @@ const logger = pino(
   },
   "req": {
     "method": "POST",
-    "url": "/api/admin/posts",
+    "url": "/admin/posts",
     "ip": "192.168.1.1"
   },
   "userId": 1,
@@ -284,12 +284,12 @@ if (typeof window !== 'undefined') {
 | 경로 | 용도 | 응답 |
 |---|---|---|
 | `GET /health` | 기본 생존 확인 | `{ status: "ok" }` |
-| `GET /api/health/live` | 버전 + 업타임 + 메모리 | `{ version, uptime, memory }` |
-| `GET /api/health/ready` | DB 연결 확인 | 200 또는 503 |
+| `GET /health/live` | 버전 + 업타임 + 메모리 | `{ version, uptime, memory }` |
+| `GET /health/ready` | DB 연결 확인 | 200 또는 503 |
 
 - `/health`: 로드밸런서 기본 헬스 체크용
-- `/api/health/live`: 서버 상태 상세 확인
-- `/api/health/ready`: 서비스 준비 상태 (DB 포함)
+- `/health/live`: 서버 상태 상세 확인
+- `/health/ready`: 서비스 준비 상태 (DB 포함)
 
 ### 5.6 컴포넌트 구조
 
@@ -333,8 +333,8 @@ if (typeof window !== 'undefined') {
 - [ ] API 에러가 구조화된 형태로 콘솔에 로깅된다
 - [ ] 미처리 Promise rejection이 콘솔에 로깅된다
 - [ ] 헬스 체크 엔드포인트가 정상 응답한다
-- [ ] `/api/health/live`가 `{ version, uptime, memory }` 형태로 응답한다
-- [ ] `/api/health/ready`가 DB 연결 실패 시 503을 반환한다
+- [ ] `/health/live`가 `{ version, uptime, memory }` 형태로 응답한다
+- [ ] `/health/ready`가 DB 연결 실패 시 503을 반환한다
 
 ## 8. 에지 케이스
 
