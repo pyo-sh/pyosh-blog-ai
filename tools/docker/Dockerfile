@@ -29,11 +29,11 @@ RUN apt-get update && apt-get install -y ruby && gem install tmuxinator \
 # Codex CLI
 RUN npm install -g @openai/codex
 
-# Chromium for Playwright MCP (ARM64 네이티브 — 자율 Figma 캡처용)
+# Chromium for Playwright-based browser automation (ARM64 native)
 # Ubuntu 24.04에서 chromium-browser는 snap wrapper이므로 Playwright 전용 Chromium 사용.
 # PLAYWRIGHT_BROWSERS_PATH를 /opt/ms-playwright로 고정하여 빌드·런타임 모두 동일 경로 참조.
-# chrome 채널 shim(/opt/google/chrome/chrome): Playwright MCP 기본 설정(chrome channel)이
-# 해당 경로를 탐색하므로 settings.json 변경 없이 연결.
+# chrome 채널 shim(/opt/google/chrome/chrome): Playwright 기본 설정(chrome channel)이
+# 해당 경로를 탐색하므로 추가 설정 없이 연결.
 # --no-sandbox: Docker 컨테이너는 user namespace가 없어 sandbox 없이 실행 필요.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN npm install -g playwright \
@@ -69,9 +69,5 @@ RUN curl -fsSL https://claude.ai/install.sh | bash \
 ENV PATH="/home/dev/.local/bin:$PATH"
 
 WORKDIR /workspace
-
-# agent-tracker hooks 사전 설정 (빌드 시 1회 실행)
-COPY --chown=dev:dev tools/agent-tracker /workspace/tools/agent-tracker
-RUN bash tools/agent-tracker/setup.sh --yes
 
 ENTRYPOINT ["entrypoint.sh"]

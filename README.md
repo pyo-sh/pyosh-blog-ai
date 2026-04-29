@@ -1,194 +1,146 @@
 # pyosh-blog-ai
 
-AI 컨텍스트 및 개발 워크플로를 관리하는 부모 레포지토리입니다.
+`pyosh-blog-ai`는 pyosh-blog 개발을 위한 AI 컨텍스트, 작업 기록, 자동화 스킬, Docker/tmux 개발 환경을 관리하는 루트 레포지토리입니다.
 
-실제 애플리케이션 코드는 별도 레포지토리(`pyosh-blog-fe`, `pyosh-blog-be`)에서 관리되며, 이 레포지토리는 AI 도구(Claude Code 등)가 모노레포처럼 작업할 수 있도록 컨텍스트를 통합합니다.
+애플리케이션 코드는 이 레포지토리에 포함되지 않습니다. `client/`와 `server/`는 같은 워크스페이스 아래에 별도로 클론되는 독립 Git 레포지토리입니다.
 
-## 초기 세팅
+## Repositories
 
-이 레포지토리를 클론한 뒤, `client/`와 `server/` 폴더에 각각의 애플리케이션 레포지토리를 클론해야 합니다.
+| Area | GitHub repo | Local path | 역할 |
+|------|-------------|------------|------|
+| `workspace` | `pyo-sh/pyosh-blog-ai` | `/workspace` | AI 컨텍스트, docs, skills, 개발 환경 |
+| `client` | `pyo-sh/pyosh-blog-fe` | `/workspace/client` | Next.js 프론트엔드 |
+| `server` | `pyo-sh/pyosh-blog-be` | `/workspace/server` | Fastify API 서버 |
+
+각 area는 독립 Git repo입니다. `client`나 `server` 작업에서 `git`, `gh`, `pnpm`을 실행할 때는 해당 디렉터리로 이동해서 실행합니다.
+
+## Setup
 
 ```bash
-# 1. 부모 레포지토리 클론
 git clone https://github.com/pyo-sh/pyosh-blog-ai.git pyosh-blog
 cd pyosh-blog
 
-# 2. client (프론트엔드) 레포지토리 클론
 git clone https://github.com/pyo-sh/pyosh-blog-fe.git client
-
-# 3. server (백엔드) 레포지토리 클론
 git clone https://github.com/pyo-sh/pyosh-blog-be.git server
-```
 
-> `client/`와 `server/`는 `.gitignore`에 포함되어 있어 부모 레포지토리에서 추적하지 않습니다.
-
-## 프로젝트 구조
-
-```
-pyosh-blog/
-├── CLAUDE.md                    # AI 에이전트 전역 규칙
-├── client/                      # pyosh-blog-fe (Next.js)
-├── server/                      # pyosh-blog-be (Fastify + Drizzle ORM + MySQL)
-├── docs/
-│   ├── client/                  # client 작업 기록 (progress / findings / decisions)
-│   └── server/                  # server 작업 기록
-├── tools/                       # 개발자 편의 도구 (tmux 등)
-├── skills/                      # Claude Code 스킬
-├── scripts/                     # 유틸리티 스크립트
-├── .env.example                 # 환경 변수 템플릿
-└── pyosh-blog.code-workspace    # VS Code 워크스페이스
-```
-
-## 레포지토리 관계
-
-| 역할                  | 레포지토리                                               | 로컬 경로  |
-| --------------------- | -------------------------------------------------------- | ---------- |
-| AI 컨텍스트 (이 레포) | [pyosh-blog-ai](https://github.com/pyo-sh/pyosh-blog-ai) | `/` (루트) |
-| 프론트엔드            | [pyosh-blog-fe](https://github.com/pyo-sh/pyosh-blog-fe) | `/client`  |
-| 백엔드                | [pyosh-blog-be](https://github.com/pyo-sh/pyosh-blog-be) | `/server`  |
-
-각 레포지토리는 독립적인 Git 히스토리를 가지며, 부모 레포지토리에서 서브모듈이 아닌 별도 클론으로 관리됩니다.
-
-## 이 레포지토리가 관리하는 것
-
-- **`CLAUDE.md`** — AI 에이전트의 작업 규칙 (Issue 기반 워크플로, Git 컨벤션 등)
-- **`docs/`** — 개발 진행 기록, 기술 조사, 아키텍처 결정 문서
-- **`.agents/skills/`** — Claude Code 커스텀 스킬
-- **GitHub Issues** — 모든 작업의 Single Source of Truth
-
-## 환경 변수 설정
-
-`tools/` 폴더의 개발자 편의 도구(tmux 세션 등)는 환경 변수를 통해 로컬 경로를 설정합니다. 처음 세팅할 때 `.env.example`을 복사하여 본인의 환경에 맞게 수정하세요.
-
-```bash
 cp .env.example .env
-# .env 파일을 열어 경로를 수정
 ```
 
-> `.env`는 `.gitignore`에 포함되어 있어 git에 추적되지 않습니다.
+`client/`와 `server/`는 루트 repo의 `.gitignore`에 포함되어 있습니다. 루트 repo는 서브모듈을 사용하지 않습니다.
 
-## AI 개발 워크플로
+## Directory Map
 
-모든 코딩 작업은 GitHub Issue에서 시작하여 PR Merge로 종료됩니다. 코드 작성과 리뷰는 **별도 AI 세션**에서 실행하여 컨텍스트 오염을 방지합니다.
-
-> **주의**: `/dev-pipeline`과 `/dev-orchestrator`는 `claude -p --dangerously-skip-permissions` 옵션으로 헤드리스 서브프로세스를 실행합니다. 모든 도구 호출이 자동 승인되므로 **Docker 컨테이너 안에서 실행하는 것을 권장**합니다. 설정 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
-
-### 자동 파이프라인 (`/dev-pipeline`)
-
-`/dev-pipeline`은 코딩부터 Merge까지 전체 사이클을 오케스트레이션합니다. 리뷰/수정은 `claude -p` 헤드리스 서브프로세스로 실행되며, 사용자는 각 단계에서 의사결정만 합니다.
-
-```
-┌─ 메인 세션 (파이프라인) ─────────────────────────────────────┐
-│                                                               │
-│  /dev-build (코딩 + PR 생성)                                  │
-│       │                                                       │
-│       ▼                                                       │
-│  ┌─ claude -p 서브프로세스 ──┐                                │
-│  │  /dev-review (코드 리뷰)   │                                │
-│  └──────────┬────────────────┘                                │
-│             │                                                 │
-│             ▼                                                 │
-│  ┌─ Critical 있음 ─────────────────────────────────────────┐  │
-│  │  ┌─ claude -p 서브프로세스 ──┐                          │  │
-│  │  │  /dev-resolve (코드 수정)  │ ──→ 재리뷰 (자동 반복)   │  │
-│  │  └───────────────────────────┘                          │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│             │                                                 │
-│             ▼                                                 │
-│  ┌─ Critical 없음 ─── 사용자 결정 ─────┐                     │
-│  │                                      │                     │
-│  │  "Merge"          → 바로 Merge       │                     │
-│  │  "Fix & Re-review" → 수정 후 재리뷰  │                     │
-│  │  "Fix & Merge"    → 수정 후 바로 Merge │                    │
-│  └──────────────────────────────────────┘                     │
-│             │                                                 │
-│             ▼                                                 │
-│  Merge (lock 기반 직렬화) → Worktree 정리 → /dev-log          │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
+```text
+pyosh-blog/
+├── AGENTS.md                    # Codex/agent 공통 작업 규칙
+├── CLAUDE.md                    # Claude Code 루트 컨텍스트
+├── client/                      # pyosh-blog-fe, 별도 Git repo
+├── server/                      # pyosh-blog-be, 별도 Git repo
+├── docs/
+│   ├── client/                  # client progress / findings / decisions
+│   ├── server/                  # server progress / findings / decisions
+│   └── workspace/               # root repo, tools, workflow 기록
+├── .agents/
+│   ├── references/              # area/repo/worktree 공통 정의
+│   ├── scripts/                 # monorepo shell helpers
+│   └── skills/                  # Codex/Claude workflow skills
+├── .claude/                     # 루트 repo Claude Code 설정과 shared rules
+├── tools/
+│   ├── claude/                  # Claude 설정 템플릿과 bootstrap
+│   ├── docker/                  # dev-lab Docker 환경
+│   └── tmux/                    # host/container tmux 설정
+├── scripts/
+│   └── context-bar.sh           # Claude Code statusLine
+└── .workspace/                  # worktrees, pipeline state, 임시 산출물 (ignored)
 ```
 
-### 배치 오케스트레이터 (`/dev-orchestrator`)
+## Managed Content
 
-`/dev-orchestrator`는 여러 Issue를 의존성 DAG 기반으로 병렬 처리합니다. 각 Issue마다 `claude -p` 백그라운드 프로세스로 `/dev-pipeline`을 실행하고, PID 기반으로 완료/실패/정체를 감지합니다.
+- `docs/`: 진행 기록, 기술 조사, 의사결정 문서. `/dev-log`는 long-lived `docs` 브랜치에 기록하고, `/dev-archive`로 main에 반영합니다.
+- `.agents/skills/`: issue 기반 개발, 리뷰, 기록, GitHub CLI, handoff, design-system 관련 스킬.
+- `.agents/references/monorepo-layout.md`: area, repo, worktree path의 단일 기준.
+- `tools/`: Docker, tmux, Claude 설정 동기화 도구.
+- `scripts/context-bar.sh`: Claude Code status line. 현재 Claude hook 기반 tracker는 사용하지 않습니다.
 
-```
-┌─ 오케스트레이터 세션 ────────────────────────────────────────┐
-│                                                               │
-│  Issue 목록 → 의존성 DAG 구성 → 사이클 검증                   │
-│       │                                                       │
-│       ▼                                                       │
-│  ┌─ 백그라운드 프로세스 (최대 maxConcurrent개) ────────────┐  │
-│  │  claude -p /dev-pipeline #1  (PID 12345)                │  │
-│  │  claude -p /dev-pipeline #2  (PID 12346)                │  │
-│  │  claude -p /dev-pipeline #5  (PID 12347)                │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│       │                                                       │
-│       ▼  (30초 폴링)                                          │
-│  완료 감지 → 의존 Issue unblock → 새 Issue dispatch            │
-│  정체 감지 → 프로세스 사망 시 자동 재시도 (최대 1회)           │
-│       │                                                       │
-│       ▼                                                       │
-│  전체 완료 → 결과 요약 → /dev-log                              │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
-```
+`.workspace/`는 런타임 상태와 임시 파일을 담는 ignored 디렉터리입니다. 과거 도구의 산출물이 남아 있을 수 있지만, 소스 오브 트루스로 취급하지 않습니다.
 
-> **토큰 효율성**: 오케스트레이터는 PID 감시와 `gh api` 폴링만 수행하고, 코드 분석은 하지 않습니다. 각 파이프라인은 독립 프로세스에서 실행되어 토큰이 분리됩니다.
+## Environment
 
-### 수동 실행
+`.env`는 로컬 전용입니다.
 
-각 스킬을 별도 세션에서 개별 실행할 수도 있습니다:
+| 변수 | 용도 |
+|------|------|
+| `TMUX_ROOT` | tmuxinator 세션 root 경로 |
+| `TZ` | Docker 컨테이너 timezone. 기본값은 `Asia/Seoul` |
+
+## Docker And Tmux
+
+Docker 개발 환경은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
 
 ```bash
-# 세션 A: 코딩
-/dev-build
-
-# 세션 B: 리뷰 (코드 작성과 다른 세션에서 실행)
-/dev-review
-
-# 세션 C: 리뷰 대응 (필요시)
-/dev-resolve
+cd tools/docker
+docker compose up -d
+docker exec -it dev-lab tmux attach -t lab
 ```
 
-### 스킬 목록
+tmux 설정과 세션 시작 방법은 [tools/tmux/README.md](tools/tmux/README.md)를 참조하세요. 현재 컨테이너 세션은 `lab`, `server1`, `client1` 세 window로 구성됩니다. 파이프라인 실행에 tmux는 필수가 아니며, 병렬 작업을 위한 편의 환경입니다.
 
-| 스킬 | 용도 |
-|------|------|
-| **dev-orchestrator** | 여러 Issue 병렬 처리 (의존성 DAG + 헤드리스 백그라운드 프로세스) |
-| **dev-pipeline** | 단일 Issue 자동화 (build → review → resolve → merge) |
-| **dev-build** | Issue → Worktree → 코딩 → Push → PR 생성 |
-| **dev-review** | PR 코드 리뷰 (심각도: Critical / Warning / Suggestion) |
-| **dev-resolve** | 리뷰 코멘트 대응 및 코드 수정 |
-| **dev-log** | progress / findings / decisions 기록 관리 |
-| **dev-issue** | decisions 파일을 GitHub Issue로 변환 |
+## Claude Code Config
 
-### 리뷰 심각도와 Merge 흐름
+공유 Claude 설정의 원본은 `tools/claude/templates/`입니다. 배포된 `.claude/` 파일을 직접 수정하기보다 템플릿을 수정하고 bootstrap을 실행합니다.
 
-| 심각도 | 의미 | 파이프라인 동작 |
-|--------|------|----------------|
-| **Critical** | 버그, 보안 취약점, 데이터 손실 위험 | 자동으로 `/dev-resolve` 트리거, 수정 후 재리뷰 |
-| **Warning** | 잠재적 문제, 성능 저하 | 사용자가 수정 여부 결정 |
-| **Suggestion** | 가독성, 컨벤션 개선 | 사용자가 수정 여부 결정 |
+```bash
+bash tools/claude/bootstrap.sh --dry-run
+bash tools/claude/bootstrap.sh --apply
+```
 
-Critical이 모두 해결되면 사용자에게 Warning/Suggestion 처리 방법을 묻습니다. 사용자가 수용 가능하다고 판단하면 즉시 Merge할 수 있습니다.
+컨테이너에서는 `entrypoint.sh`가 `/home/dev/.auth` volume을 `~/.claude`, `~/.codex`, `~/.config/gh`, `~/.gitconfig`, `~/.ssh`로 연결합니다. Claude Code의 `statusLine`은 `/workspace/scripts/context-bar.sh`를 직접 참조합니다.
 
-### Merge queue
+## Workflow
 
-여러 파이프라인이 동시에 실행될 때 (오케스트레이터를 통해), 같은 area에서 동시 merge로 인한 rebase 충돌을 방지하기 위해 lock 기반 직렬화를 사용합니다. `pipeline_acquire_merge_lock` / `pipeline_release_merge_lock`으로 area당 하나의 파이프라인만 merge할 수 있습니다. Stale lock은 PID 검사로 자동 회수됩니다.
+애플리케이션 작업은 GitHub Issue에서 시작해 PR merge로 끝납니다. 루트 repo 작업은 사용자 지시를 우선하며, 완료 후 `docs/workspace/`에 기록합니다.
 
-### Docker 환경 설정
+### Core Skills
 
-Docker 컨테이너 안에서 AI 에이전트를 실행하는 방법은 [tools/docker/README.md](tools/docker/README.md)를 참조하세요.
+| Skill | 용도 |
+|-------|------|
+| `dev-build` | Issue → worktree → 코드 변경 → push → PR 생성 |
+| `dev-review` | PR 코드 리뷰. 작성 세션과 분리해서 실행 |
+| `dev-resolve` | 리뷰 코멘트 대응, 수정, re-review 요청 |
+| `dev-pipeline` | build → review → resolve → merge → log 자동화 |
+| `dev-codex-pipeline` | Codex 중심 synchronous pipeline |
+| `dev-log` | progress / findings / decisions 기록을 `docs` 브랜치에 저장 |
+| `dev-archive` | 누적된 `docs` 브랜치를 PR로 main에 squash merge |
+| `dev-issue` | docs나 사용자 요청을 GitHub Issue로 변환 |
 
-### tmux 환경 설정
+추가 스킬은 `.agents/skills/` 아래에 있습니다. 특정 스킬의 세부 절차는 각 `SKILL.md`를 기준으로 합니다.
 
-agent-tracker 대시보드 등 tmux 기반 도구를 사용하려면 [tools/tmux/README.md](tools/tmux/README.md)를 참조하세요. 파이프라인/오케스트레이터 실행에는 tmux가 필수가 아닙니다.
+### Worktrees
 
-### 왜 세션을 분리하는가?
+작업 worktree는 루트 repo 아래에 area별로 생성됩니다.
 
-같은 AI 세션이 코드 작성과 리뷰를 모두 수행하면, 작성 시의 컨텍스트가 리뷰를 편향시킵니다. 세션을 분리하면:
+```text
+.workspace/worktrees/{area}/issue-{N}
+```
 
-- **리뷰어는 코드만 봅니다** — "왜 이렇게 했는지"를 모르기 때문에 코드 자체의 품질을 평가
-- **엣지케이스 발견률 향상** — 작성자의 blind spot을 다른 시각에서 포착
-- **리뷰 기준의 일관성** — 체크리스트 기반으로 매번 동일한 기준 적용
+이 경로는 area별 issue 번호 충돌을 피하고, `client`/`server` Git repo 내부에 pipeline 상태를 섞지 않기 위한 규칙입니다.
+
+### Verification
+
+| Area | 확인 명령 |
+|------|-----------|
+| `client` | `(cd client && pnpm compile:types && pnpm lint && pnpm build)` |
+| `server` | `(cd server && pnpm test)` |
+| `workspace` | 변경 내용에 맞는 문서/스크립트 검증. 고정 verify 명령 없음 |
+
+## Retired Runtime Tooling
+
+다음 구성은 런타임 도구에서 제거되었습니다. 관련 과거 기록은 `docs/`와 Git history에 남깁니다.
+
+- `dev-orchestrator`
+- `tools/orchctl`
+- `tools/agent-tracker`
+- Figma MCP 설정 (`.mcp.json`, `mcp/figma-*`)
+- Claude hook 기반 agent tracker
+
+새 자동화는 현재 남아 있는 `.agents/skills/`, `tools/`, `scripts/`를 기준으로 추가합니다.

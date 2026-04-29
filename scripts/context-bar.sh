@@ -103,8 +103,8 @@ transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
 max_context=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
 max_k=$((max_context / 1000))
 
-# Calculate context bar — use pre-computed value from statusline-wrapper.sh if available,
-# otherwise fall back to reading transcript directly.
+# Calculate context bar from transcript usage. TRANSCRIPT_TOKENS is kept as an
+# optional override for manually wrapped status-line execution.
 # NOTE: Fallback logic must stay in sync — search SYNC:token-calc-fallback
 context_length=0
 if [[ -n "${TRANSCRIPT_TOKENS:-}" && "${TRANSCRIPT_TOKENS:-0}" -gt 0 ]] 2>/dev/null; then

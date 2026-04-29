@@ -140,7 +140,7 @@ if [[ "$MODE" == "apply" ]]; then
   echo "Backups saved to: ${BACKUP_DIR#$ROOT_DIR/}"
   echo "Next steps:"
   echo "  1. Review diffs in root/client/server"
-  echo "  2. Open Claude in each repo once and verify /memory, /permissions, and /hooks"
+  echo "  2. Open Claude in each repo once and verify /memory and /permissions"
   echo "  3. Put personal preferences in CLAUDE.local.md or .claude/settings.local.json only"
 else
   echo

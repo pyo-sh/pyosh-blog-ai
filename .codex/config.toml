@@ -9,12 +9,6 @@ sandbox_mode = "workspace-write"
 # Pause before running commands that modify git state or run external processes
 approval_policy = "on-request"
 
-[mcp_servers.figma-remote-mcp]
-url = "https://mcp.figma.com/mcp"
-
-[mcp_servers.figma-desktop]
-url = "http://127.0.0.1:3845/mcp"
-
 [profiles.review]
 # Use for code review tasks that need deep reasoning
 model_reasoning_effort = "high"
