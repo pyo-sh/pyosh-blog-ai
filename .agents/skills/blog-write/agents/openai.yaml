@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blog Write"
+  short_description: "Organize thoughts into personal essay drafts"
+  default_prompt: "Use $blog-write to organize my rough thoughts, ask clarifying questions, and draft a personal essay after my answers."

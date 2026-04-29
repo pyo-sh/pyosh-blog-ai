@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blog Polish"
+  short_description: "Polish personal essays without changing meaning"
+  default_prompt: "Use $blog-polish to lightly polish my personal essay without changing its meaning, claims, or emotional tone."
