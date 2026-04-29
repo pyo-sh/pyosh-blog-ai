@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-29 | #363 블로그 타이포그래피 폰트 마이그레이션 - `Gothic A1` Google Fonts import를 제거하고 자체 호스팅 `NanumSquareNeo`/`MaruBuri` 토큰을 적용했으며 리뷰 suggestion으로 CSP Google font allowlist까지 정리한 뒤 PR #364 머지 | ✅   |
 | 2026-04-29 | #360 관리자 카테고리 일괄 삭제 액션 - `DELETE /categories/bulk` 클라이언트 API와 선택 모드 삭제 버튼/확인 모달을 추가하고 자동 리뷰 clean 후 PR #362 머지 | ✅   |
 | 2026-04-29 | #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드가 사라지는 문제 - `removeCategory()` 재귀 복귀 대입을 제거하고 자동 리뷰 clean 후 PR #361 머지 | ✅   |
 | 2026-04-27 | #352 public category tree view 분리 - sidebar와 `/categories` renderer를 분리하고 공유 로직만 lib로 추출했으며 `/categories` Storybook을 추가한 뒤 PR #356 생성 | ✅   |
@@ -116,6 +117,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #363 블로그 타이포그래피 폰트 마이그레이션, PR #364 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #360 관리자 카테고리 일괄 삭제 액션, PR #362 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드 누락 수정, PR #361 머지
 - [progress.2026-04-27.md](./progress/progress.2026-04-27.md) - #352 public category tree view 분리 및 `/categories` Storybook 추가, PR #356 생성
