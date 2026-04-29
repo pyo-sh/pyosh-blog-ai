@@ -1,6 +1,9 @@
 ---
 name: supanova-design-skill
-description: Supanova Design Skill 추천 조합 로더. 상황에 맞는 서브스킬 조합을 자동으로 선택해 규칙을 적용한다. 새 랜딩페이지: taste + output. 최고 품질: taste + soft + output. 기존 페이지 업그레이드: redesign.
+description: >
+  Supanova Design Skill 추천 조합 로더. 상황에 맞는 서브스킬 조합을 자동으로
+  선택해 규칙을 적용한다. 새 랜딩페이지: taste + output. 최고 품질:
+  taste + soft + output. 기존 페이지 업그레이드: redesign.
 ---
 
 # Supanova Design Skill - 조합 로더
