@@ -6,6 +6,10 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-04-29 | #370 홈에서 글 상세 이동 성능 개선 - 코드블록 없는 글은 Shiki를 로드하지 않는 plain Markdown processor를 사용하고 code node가 있을 때만 제한된 언어 세트의 lazy Shiki processor를 초기화하도록 바꾼 뒤 자동 리뷰 warning 2건을 반영해 PR #371 머지 | ✅   |
+| 2026-04-29 | #368 강력 새로고침 시 sidebar 아이콘 0x0 및 폰트 지연 적용 개선 - 정적 Iconify 사용처를 offline 렌더링으로 전환하고 sidebar 아이콘 크기와 NanumSquareNeo 핵심 weight preload를 보정한 뒤 자동 리뷰 clean 후 PR #369 머지 | ✅   |
+| 2026-04-29 | #365 NanumSquareNeo Windows 렌더링 개선 - variable WOFF2 단일 파일을 static weight WOFF2 파일로 교체하고 500/600 weight alias까지 등록한 뒤 자동 리뷰 clean 후 PR #366 머지 | ✅   |
+| 2026-04-29 | #363 블로그 타이포그래피 폰트 마이그레이션 - `Gothic A1` Google Fonts import를 제거하고 자체 호스팅 `NanumSquareNeo`/`MaruBuri` 토큰을 적용했으며 리뷰 suggestion으로 CSP Google font allowlist까지 정리한 뒤 PR #364 머지 | ✅   |
 | 2026-04-29 | #360 관리자 카테고리 일괄 삭제 액션 - `DELETE /categories/bulk` 클라이언트 API와 선택 모드 삭제 버튼/확인 모달을 추가하고 자동 리뷰 clean 후 PR #362 머지 | ✅   |
 | 2026-04-29 | #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드가 사라지는 문제 - `removeCategory()` 재귀 복귀 대입을 제거하고 자동 리뷰 clean 후 PR #361 머지 | ✅   |
 | 2026-04-27 | #352 public category tree view 분리 - sidebar와 `/categories` renderer를 분리하고 공유 로직만 lib로 추출했으며 `/categories` Storybook을 추가한 뒤 PR #356 생성 | ✅   |
@@ -116,6 +120,10 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #370 홈에서 글 상세 이동 성능 개선, PR #371 머지
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #368 sidebar icon SSR/offline 렌더링 및 UI font preload 보정, PR #369 머지
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #365 NanumSquareNeo Windows 렌더링 개선, PR #366 머지
+- [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #363 블로그 타이포그래피 폰트 마이그레이션, PR #364 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #360 관리자 카테고리 일괄 삭제 액션, PR #362 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #359 관리자 카테고리 배치 편집 3-depth 하위 노드 이동 시 중간 노드 누락 수정, PR #361 머지
 - [progress.2026-04-27.md](./progress/progress.2026-04-27.md) - #352 public category tree view 분리 및 `/categories` Storybook 추가, PR #356 생성
