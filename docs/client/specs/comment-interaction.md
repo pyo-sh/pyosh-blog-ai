@@ -1,7 +1,7 @@
 # F-08: 댓글 작성/삭제 (게스트 폼, 대댓글, 비밀번호 삭제)
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-20
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -336,7 +336,7 @@ function get(commentId: number): string | null {
 | DELETE | `/api/comments/:id` | 댓글 삭제 (일반) | 없음 |
 | DELETE | `/api/admin/comments/:id?action=hard_delete` | 댓글 삭제 (관리자) | hard delete 파라미터 추가 |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|

@@ -1,7 +1,7 @@
 # F-37: Swagger 세부화
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-20
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -307,4 +307,4 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
 
 ## 10. 미해결 사항
 
-- `zod-openapi` 패키지 추가 필요 여부 확인: `.openapi({ example })` 사용 시 별도 패키지가 필요할 수 있음. `.describe()`만으로 충분한지, 스키마 전체 example이 필요한지 구현 단계에서 결정
+없음. `.describe()` 중심으로 상세 설명을 제공하고, 필요한 예시는 현재 OpenAPI 변환 범위에서 관리한다.

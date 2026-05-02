@@ -1,7 +1,7 @@
 # F-09: 방명록
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-20
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -182,7 +182,7 @@ CommentForm 컴포넌트를 `variant="guestbook"`으로 재사용한다. 단, �
 | GET /api/admin/guestbook | 관리자 목록 (필터: authorType, startDate, endDate) |
 | DELETE /api/admin/guestbook/:id | 관리자 강제 삭제 (비밀번호 불필요) |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|

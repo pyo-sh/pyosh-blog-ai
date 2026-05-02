@@ -1,7 +1,7 @@
 # F-28: 댓글 관리 (목록, 비밀글 확인, 강제 삭제)
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-24
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -11,23 +11,23 @@
 
 ## 2. 배경 및 동기
 
-현재 구현 상태:
+초기 구현 상태:
 
 - 페이지네이션 테이블 (10개/페이지)
 - 작성자 (이름 + 타입 뱃지 + 답글 뱃지), 댓글 내용 (펼치기/접기), 비밀 상태, 댓글 상태, 날짜
 - 삭제 버튼 (soft delete만)
-- 서버 필터 지원: postId, authorType, startDate, endDate (UI 미구현)
+- 서버 필터 지원: postId, authorType, startDate, endDate
 - Admin은 비밀 댓글 마스킹 없이 조회 가능
 
-개선이 필요한 부분:
+완료된 개선 사항:
 
-- 필터 UI 없음
-- Hard delete + cascade 미구현
-- 소프트/영구 삭제 선택 불가
-- 댓글 상세 보기 없음 (긴 댓글 확인 불편)
-- 해당 글로의 링크 없음 (postId만 표시)
-- 벌크 작업 없음
-- 글 제목이 아닌 postId로만 식별
+- 필터 UI
+- Hard delete + cascade
+- 소프트/영구 삭제 선택
+- 댓글 상세 보기
+- 해당 글로의 링크
+- 벌크 작업
+- 글 제목 표시
 
 ## 3. 목표
 
@@ -346,7 +346,7 @@ AdminCommentsPage
 | DELETE | `/api/admin/comments/:id` | 단일 삭제 | `?action=soft_delete` 또는 `?action=hard_delete` |
 | DELETE | `/api/admin/comments/bulk` | 벌크 삭제/복원 | **신규** |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|

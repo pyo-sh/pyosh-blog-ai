@@ -1,7 +1,7 @@
 # F-34: 프로덕션 쿠키/CORS 설정
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-24
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -11,7 +11,7 @@
 
 ## 2. 배경 및 동기
 
-현재 구현 상태:
+초기 구현 상태:
 
 - 쿠키: `secure`만 조건부 설정. `httpOnly`, `sameSite` 미설정
 - CORS: 단일 origin (`CLIENT_URL`), credentials 허용. methods/headers/max-age 미명시
@@ -21,7 +21,7 @@
 - Helmet: HSTS가 `CLIENT_PROTOCOL === 'https'`로 조건부 적용
 - OAuth: Google/GitHub 구현되어 있으나 v1에서 미사용
 
-보안 위험:
+초기 보안 위험:
 
 - `httpOnly` 미설정 → XSS로 세션 쿠키 탈취 가능
 - `sameSite` 미설정 → CSRF 공격에 취약
@@ -316,7 +316,7 @@ if (env.GITHUB_CLIENT_ID) {
 |---|---|---|---|
 | GET | `/auth/csrf-token` | CSRF 토큰 발급 | 기존 유지 |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|
@@ -328,7 +328,7 @@ if (env.GITHUB_CLIENT_ID) {
 | `app.ts` | Swagger 프로덕션 조건부 등록 |
 | `passport.ts` | OAuth 전략 조건부 등록 |
 
-### 클라이언트 변경 필요사항
+### 클라이언트 변경 사항
 
 | 항목 | 설명 |
 |---|---|
@@ -362,7 +362,7 @@ if (env.GITHUB_CLIENT_ID) {
 | 외부 HTTP 이미지 (prod) | CSP에 의해 차단 → Admin에게 HTTPS URL 사용 안내 |
 | OAuth 환경변수 부분 설정 (ID만, Secret 없음) | 서버 startup 시 Zod 검증 실패 → exit(1) |
 | dev에서 CSRF 토큰 없이 테스트 | CSRF는 test 환경에서 비활성 (기존 동작 유지) |
-| OAuth 활성화 시 `sameSite: strict` 충돌 | OAuth 콜백은 외부 리다이렉트이므로 `strict`에서 쿠키 누락. OAuth 활성화 시 `sameSite`를 `lax`로 변경 필요 |
+| OAuth 활성화 시 `sameSite: strict` 충돌 | OAuth 콜백은 외부 리다이렉트이므로 `strict`에서 쿠키 누락. OAuth 활성화 시 `sameSite`를 `lax`로 재검토 |
 
 ## 9. 의존성
 
