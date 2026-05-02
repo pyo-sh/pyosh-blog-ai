@@ -2,8 +2,8 @@
 
 > pyosh-blog v1
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-18
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -63,7 +63,7 @@
 | 세션 | @fastify/session + cookie | |
 | 보안 | helmet, CSRF, rate-limit, CORS | |
 | 파일 업로드 | @fastify/multipart | 로컬 파일시스템 저장 |
-| API 문서 | Swagger + Swagger UI | v1에서 세부화 예정 |
+| API 문서 | Swagger + Swagger UI | Zod 기반 상세 설명/예시 포함 |
 | 테스트 | Vitest | |
 
 ---

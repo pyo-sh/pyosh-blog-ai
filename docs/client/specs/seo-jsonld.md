@@ -1,7 +1,7 @@
 # F-31: 구조화 데이터 (JSON-LD)
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-21
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -232,7 +232,7 @@ export function buildWebSiteJsonLd(siteUrl: string): WebSiteJsonLd;
 | GET | `/api/posts/:slug` | 글 상세 | `category.ancestors` 필드 추가 |
 | GET | `/api/categories` | 카테고리 트리 | 기존 (클라이언트에서 경로 추출) |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|

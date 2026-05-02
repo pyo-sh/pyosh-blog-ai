@@ -1,7 +1,7 @@
 # F-30: SEO 메타 (메타태그, OG, sitemap, RSS, robots.txt, canonical URL)
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-21
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -329,7 +329,7 @@ export function getPostDescription(post: Post): string;
 | GET | `/api/posts` | 최근 글 목록 | 기존 (RSS용) |
 | GET | `/api/categories` | 카테고리 목록 | 기존 (sitemap용) |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|

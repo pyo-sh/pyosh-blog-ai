@@ -1,7 +1,7 @@
 # F-29: 방명록 관리 (목록, 강제 삭제)
 
-**상태:** DRAFT
-**최종 수정:** 2026-03-24
+**상태:** DONE
+**최종 수정:** 2026-05-02
 
 ---
 
@@ -11,21 +11,21 @@
 
 ## 2. 배경 및 동기
 
-현재 구현 상태:
+초기 구현 상태:
 
 - 페이지네이션 테이블 (10개/페이지)
 - 작성자, 내용, 비밀 여부, 날짜, 삭제 버튼
 - 삭제 (soft delete만)
-- 서버 필터 지원: authorType, startDate, endDate (UI 미구현)
+- 서버 필터 지원: authorType, startDate, endDate
 
-개선이 필요한 부분:
+완료된 개선 사항:
 
-- 필터/검색 UI 없음
-- Hard delete 미구현
-- 소프트/영구/숨김 선택 불가
-- 상세 보기 없음
-- 벌크 작업 없음
-- 방명록 기능 on/off 없음
+- 필터/검색 UI
+- Hard delete
+- 소프트/영구/숨김 선택
+- 상세 보기
+- 벌크 작업
+- 방명록 기능 on/off
 
 ## 3. 목표
 
@@ -275,7 +275,7 @@ GuestbookManager
 | GET | `/api/settings/guestbook` | 방명록 활성 상태 조회 | **신규** (Public) |
 | PATCH | `/api/admin/settings/guestbook` | 방명록 활성 상태 변경 | **신규** (Admin) |
 
-### 서버 변경 필요사항
+### 서버 변경 사항
 
 | 항목 | 설명 |
 |---|---|
