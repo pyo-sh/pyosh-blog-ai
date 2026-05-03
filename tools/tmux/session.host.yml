@@ -14,13 +14,22 @@
 name: blog
 root: <%= ENV.fetch('TMUX_ROOT', '.') %>
 
+# Keep window names and pane counts mirrored with session.docker.yml.
 windows:
-  - work:
+  - lab:
       layout: even-horizontal
       panes:
         - # left
         - # right
 
-  - project:
+  - server1:
+      layout: even-horizontal
       panes:
-        - # auto-attached by session.host.wait-and-attach.sh
+        - # left
+        - # right
+
+  - client1:
+      layout: even-horizontal
+      panes:
+        - # left
+        - # right
