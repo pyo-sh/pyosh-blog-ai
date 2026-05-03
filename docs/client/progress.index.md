@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-05-03 | #372 Admin 휴지통 탭 삭제 글 전용 조회 - 클라이언트가 `deletedState=deleted`를 사용하도록 전환하고 Storybook/MSW의 `includeDeleted=true` 의미를 실제 API와 맞춘 뒤 자동 리뷰 clean 후 PR #382 머지 | ✅   |
 | 2026-04-29 | #370 홈에서 글 상세 이동 성능 개선 - 코드블록 없는 글은 Shiki를 로드하지 않는 plain Markdown processor를 사용하고 code node가 있을 때만 제한된 언어 세트의 lazy Shiki processor를 초기화하도록 바꾼 뒤 자동 리뷰 warning 2건을 반영해 PR #371 머지 | ✅   |
 | 2026-04-29 | #368 강력 새로고침 시 sidebar 아이콘 0x0 및 폰트 지연 적용 개선 - 정적 Iconify 사용처를 offline 렌더링으로 전환하고 sidebar 아이콘 크기와 NanumSquareNeo 핵심 weight preload를 보정한 뒤 자동 리뷰 clean 후 PR #369 머지 | ✅   |
 | 2026-04-29 | #365 NanumSquareNeo Windows 렌더링 개선 - variable WOFF2 단일 파일을 static weight WOFF2 파일로 교체하고 500/600 weight alias까지 등록한 뒤 자동 리뷰 clean 후 PR #366 머지 | ✅   |
@@ -120,6 +121,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-05-03.md](./progress/progress.2026-05-03.md) - #372 Admin 휴지통 탭 삭제 글 전용 조회 적용, PR #382 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #370 홈에서 글 상세 이동 성능 개선, PR #371 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #368 sidebar icon SSR/offline 렌더링 및 UI font preload 보정, PR #369 머지
 - [progress.2026-04-29.md](./progress/progress.2026-04-29.md) - #365 NanumSquareNeo Windows 렌더링 개선, PR #366 머지
