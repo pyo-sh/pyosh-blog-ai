@@ -14,7 +14,7 @@
 name: blog
 root: <%= ENV.fetch('TMUX_ROOT', '.') %>
 
-# Keep window names and pane counts mirrored with session.docker.yml.
+# Keep the host and docker session window names aligned.
 windows:
   - lab:
       layout: even-horizontal
@@ -22,14 +22,9 @@ windows:
         - # left
         - # right
 
-  - server1:
-      layout: even-horizontal
+  - project:
+      layout: main-horizontal
       panes:
-        - # left
-        - # right
-
-  - client1:
-      layout: even-horizontal
-      panes:
-        - # left
-        - # right
+        - ./tools/tmux/session.host.wait-and-attach.sh
+        - # bottom left
+        - # bottom right
