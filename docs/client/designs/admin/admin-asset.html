@@ -358,6 +358,41 @@
     .admin-tab:hover{color:var(--text2);}
     .admin-tab.active{background:rgba(138,111,224,0.10);color:var(--primary1);}
 
+    /* Category */
+    .category-chip{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:7px 12px;border-radius:999px;font-size:13px;font-weight:500;
+      color:var(--text2);background:var(--background1);border:1px solid var(--border4);
+      cursor:pointer;transition:background .15s,border-color .15s,color .15s;
+    }
+    .category-chip:hover{background:var(--background3);border-color:var(--border3);}
+    .category-chip.active{background:rgba(138,111,224,0.12);border-color:rgba(138,111,224,0.35);color:var(--primary1);}
+    .category-count{font-family:'Outfit','Gothic A1',sans-serif;font-size:12px;color:var(--text4);}
+    .category-chip.active .category-count{color:var(--primary1);}
+    .category-dot{width:8px;height:8px;border-radius:50%;background:var(--grey3);flex-shrink:0;}
+    .category-dot.thumbnail{background:var(--primary1);}
+    .category-dot.default{background:var(--positive1);}
+    .category-dot.uncategorized{background:var(--grey3);}
+    .category-dot.custom{background:var(--yellow1);}
+    .asset-name{display:flex;flex-direction:column;gap:2px;min-width:0;}
+    .asset-display-name{font-size:14px;line-height:1.25rem;font-weight:600;color:var(--text1);}
+    .asset-file-name{font-size:12px;line-height:1rem;color:var(--text4);}
+    .asset-card-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:8px;}
+    .asset-card-footer p{min-width:0;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+    .category-mini{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 7px;border-radius:999px;font-size:11px;font-weight:600;
+      background:var(--background3);color:var(--text3);white-space:nowrap;
+    }
+    .category-mini.thumbnail{background:rgba(138,111,224,0.12);color:var(--primary1);}
+    .category-mini.default{background:rgba(7,133,86,0.10);color:var(--positive1);}
+    .category-mini.uncategorized{background:rgba(144,153,161,0.12);color:var(--grey4);}
+    .category-table-row{
+      display:grid;grid-template-columns:minmax(0,1fr) 72px 150px;gap:12px;align-items:center;
+      padding:10px 0;border-bottom:1px solid var(--border4);
+    }
+    .category-table-row:last-child{border-bottom:none;}
+
     /* ═══ Page-Specific Styles ═══ */
 
     /* Hover overlay: URL copy button only (top-right) */
@@ -379,12 +414,12 @@
       accent-color:var(--primary1);display:none;
     }
     .selection-mode .asset-card .select-checkbox{display:block;}
-    .asset-card.selected{outline:2px solid var(--primary1);outline-offset:-2px;border-radius:12px;}
+    .selection-mode .asset-card.selected{outline:2px solid var(--primary1);outline-offset:-2px;border-radius:12px;}
 
     /* Selection action bar */
     .selection-bar{
       position:sticky;top:56px;z-index:8;
-      display:none;align-items:center;gap:12px;
+      display:none;align-items:center;gap:12px;flex-wrap:wrap;
       padding:10px 16px;border-radius:10px;margin-bottom:16px;
       background:var(--background2);border:1px solid var(--border3);
       box-shadow:0 2px 8px rgba(0,0,0,.08);
@@ -406,6 +441,7 @@
 
     @media(max-width:639px){
       .dropzone{padding:24px 16px;}
+      .category-table-row{grid-template-columns:minmax(0,1fr);gap:8px;}
     }
     @media(max-width:767px){
       .modal-content.modal-asset-detail{
@@ -504,6 +540,20 @@
           <p class="text-body-sm font-medium" style="color:var(--text2);">이미지를 드래그하거나 클릭하여 업로드</p>
           <p class="text-ui-xs" style="color:var(--text4);">JPEG, PNG, GIF, WebP, SVG / 최대 10MB / 5개까지 동시 업로드</p>
         </div>
+        <div class="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-3 w-full max-w-2xl mx-auto mt-5 text-left" onclick="event.stopPropagation()">
+          <label class="flex flex-col gap-1">
+            <span class="text-ui-xs font-medium" style="color:var(--text3);">업로드 카테고리</span>
+            <select class="admin-select w-full">
+              <option>기본</option>
+              <option>썸네일</option>
+              <option>미분류</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-ui-xs font-medium" style="color:var(--text3);">별명</span>
+            <input class="admin-input" placeholder="비워두면 파일명을 사용" value="">
+          </label>
+        </div>
         <input type="file" id="fileInput" class="hidden" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml">
       </div>
 
@@ -524,22 +574,41 @@
           </div>
         </div>
         <!-- Queue items -->
-        <div class="flex flex-row gap-3 flex-wrap">
-          <!-- Completed item -->
-          <div class="flex items-center gap-3 px-3 py-2 rounded-lg" style="background:var(--background1);border:1px solid var(--border4);">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <!-- Pending item with editable metadata -->
+          <div class="grid grid-cols-[64px_minmax(0,1fr)] gap-3 px-3 py-3 rounded-lg" style="background:var(--background1);border:1px solid var(--border4);">
             <img src="https://picsum.photos/seed/upload-done/64/48" alt="미리보기" class="w-16 h-12 rounded object-cover" style="min-width:64px;">
-            <div class="flex flex-col gap-0.5 min-w-0">
-              <span class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">screenshot-01.png</span>
-              <span class="text-ui-xs" style="color:var(--text4);">2.4 MB</span>
+            <div class="flex flex-col gap-2 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">screenshot-01.png</span>
+                <span class="text-ui-xs shrink-0" style="color:var(--text4);">2.4 MB</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_128px] gap-2">
+                <input class="admin-input" style="padding-top:6px;padding-bottom:6px;font-size:13px;" value="설정 화면 캡처" aria-label="에셋 별명">
+                <select class="admin-select w-full" style="padding-top:6px;padding-bottom:6px;font-size:13px;" aria-label="에셋 카테고리">
+                  <option selected>기본</option>
+                  <option>썸네일</option>
+                  <option>미분류</option>
+                </select>
+              </div>
             </div>
-            <iconify-icon icon="solar:check-circle-bold" width="20" style="color:var(--positive1);flex-shrink:0;"></iconify-icon>
           </div>
-          <!-- In-progress item -->
-          <div class="flex items-center gap-3 px-3 py-2 rounded-lg" style="background:var(--background1);border:1px solid var(--border4);">
+          <!-- In-progress item with locked metadata -->
+          <div class="grid grid-cols-[64px_minmax(0,1fr)] gap-3 px-3 py-3 rounded-lg" style="background:var(--background1);border:1px solid var(--border4);">
             <div class="w-16 h-12 rounded flex-shrink-0" style="background:var(--background3);min-width:64px;"></div>
-            <div class="flex flex-col gap-1 min-w-0" style="min-width:120px;">
-              <span class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">architecture-diagram.png</span>
-              <span class="text-ui-xs" style="color:var(--text4);">5.1 MB</span>
+            <div class="flex flex-col gap-2 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">architecture-diagram.png</span>
+                <span class="text-ui-xs shrink-0" style="color:var(--text4);">5.1 MB</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_128px] gap-2 opacity-70">
+                <input class="admin-input" style="padding-top:6px;padding-bottom:6px;font-size:13px;" value="아키텍처 다이어그램" disabled aria-label="에셋 별명">
+                <select class="admin-select w-full" style="padding-top:6px;padding-bottom:6px;font-size:13px;" disabled aria-label="에셋 카테고리">
+                  <option selected>기본</option>
+                  <option>썸네일</option>
+                  <option>미분류</option>
+                </select>
+              </div>
               <div class="w-full rounded-full" style="background:var(--background3);height:6px;">
                 <div class="rounded-full" style="width:60%;background:var(--primary1);height:6px;"></div>
               </div>
@@ -548,19 +617,65 @@
         </div>
       </div>
 
+      <!-- ═══ Category Filters ═══ -->
+      <div class="admin-card mb-4 reveal-stagger" style="padding:16px;">
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <button class="category-chip active" type="button" onclick="setCategoryFilter(this)">
+                전체 <span class="category-count">42</span>
+              </button>
+              <button class="category-chip" type="button" onclick="setCategoryFilter(this)">
+                <span class="category-dot thumbnail"></span>썸네일 <span class="category-count">6</span>
+              </button>
+              <button class="category-chip" type="button" onclick="setCategoryFilter(this)">
+                <span class="category-dot default"></span>기본 <span class="category-count">28</span>
+              </button>
+              <button class="category-chip" type="button" onclick="setCategoryFilter(this)">
+                <span class="category-dot uncategorized"></span>미분류 <span class="category-count">8</span>
+              </button>
+            </div>
+            <button class="btn-secondary lg:ml-auto" style="padding:7px 12px;font-size:13px;" onclick="openModal('categoryModal')">
+              <iconify-icon icon="solar:folder-with-files-linear" width="16"></iconify-icon>
+              카테고리 관리
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_180px_120px] gap-2">
+            <label class="relative">
+              <iconify-icon icon="solar:magnifer-linear" width="16" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text4);"></iconify-icon>
+              <input class="admin-input" style="padding-left:36px;" placeholder="별명 또는 파일명 검색" value="">
+            </label>
+            <select class="admin-select w-full">
+              <option>최근 업로드순</option>
+              <option>파일명순</option>
+              <option>용량순</option>
+            </select>
+            <button class="btn-secondary" style="padding:8px 12px;font-size:13px;" onclick="toggleSelectionMode()">
+              <iconify-icon icon="solar:check-square-linear" width="16"></iconify-icon>
+              선택
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ Gallery Toolbar ═══ -->
       <div class="flex items-center justify-between mb-4 reveal-stagger">
         <p class="text-ui-sm" style="color:var(--text3);">총 42개</p>
-        <button class="btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="toggleSelectionMode()">
-          <iconify-icon icon="solar:check-square-linear" width="16"></iconify-icon>
-          선택
-        </button>
+        <div class="flex items-center gap-2">
+          <span class="text-ui-xs hidden sm:inline" style="color:var(--text4);">카테고리는 정렬과 경로에 영향을 주지 않음</span>
+        </div>
       </div>
 
       <!-- ═══ Selection Mode Action Bar (sticky, shown only in selection mode) ═══ -->
       <div class="selection-bar" id="selectionBar">
         <span class="text-ui-sm font-medium" style="color:var(--primary1);">3개 선택됨</span>
-        <div class="flex items-center gap-2 ml-auto">
+        <div class="flex flex-wrap items-center gap-2 ml-auto">
+          <select class="admin-select" style="padding-top:6px;padding-bottom:6px;font-size:13px;">
+            <option>카테고리 변경</option>
+            <option>썸네일</option>
+            <option>기본</option>
+            <option>미분류</option>
+          </select>
           <button class="btn-secondary" style="padding:6px 12px;font-size:13px;" onclick="selectAll()">
             <iconify-icon icon="solar:checklist-linear" width="16"></iconify-icon>
             전체 선택
@@ -590,8 +705,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">react-lifecycle-diagram.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">3.2 MB / 1920x1080 / 2026.03.15</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">React 생명주기 대표 이미지</p>
+              <p class="asset-file-name line-clamp-1">react-lifecycle-diagram.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">3.2 MB / 1920x1080 / 2026.03.15</p>
+              <span class="category-mini thumbnail">썸네일</span>
+            </div>
           </div>
         </div>
 
@@ -607,8 +728,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">nextjs-routing-flow.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">2.1 MB / 1600x900 / 2026.03.12</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">Next.js 라우팅 플로우</p>
+              <p class="asset-file-name line-clamp-1">nextjs-routing-flow.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">2.1 MB / 1600x900 / 2026.03.12</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -624,8 +751,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">css-grid-cheatsheet.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">4.5 MB / 2400x1350 / 2026.03.10</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">CSS Grid 요약표</p>
+              <p class="asset-file-name line-clamp-1">css-grid-cheatsheet.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">4.5 MB / 2400x1350 / 2026.03.10</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -641,8 +774,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">docker-architecture.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">1.8 MB / 1280x720 / 2026.03.08</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">도커 아키텍처 다이어그램</p>
+              <p class="asset-file-name line-clamp-1">docker-architecture.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">1.8 MB / 1280x720 / 2026.03.08</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -658,8 +797,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">api-response-example.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">0.9 MB / 800x600 / 2026.03.06</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">API 응답 예시</p>
+              <p class="asset-file-name line-clamp-1">api-response-example.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">0.9 MB / 800x600 / 2026.03.06</p>
+              <span class="category-mini uncategorized">미분류</span>
+            </div>
           </div>
         </div>
 
@@ -675,8 +820,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">typescript-type-hierarchy.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">2.7 MB / 1920x1080 / 2026.03.04</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">타입스크립트 타입 계층</p>
+              <p class="asset-file-name line-clamp-1">typescript-type-hierarchy.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">2.7 MB / 1920x1080 / 2026.03.04</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -692,8 +843,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">vitest-coverage-report.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">1.4 MB / 1440x900 / 2026.03.02</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">Vitest 커버리지 리포트</p>
+              <p class="asset-file-name line-clamp-1">vitest-coverage-report.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">1.4 MB / 1440x900 / 2026.03.02</p>
+              <span class="category-mini uncategorized">미분류</span>
+            </div>
           </div>
         </div>
 
@@ -709,8 +866,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">github-actions-workflow.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">3.1 MB / 2000x1200 / 2026.02.28</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">GitHub Actions 워크플로</p>
+              <p class="asset-file-name line-clamp-1">github-actions-workflow.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">3.1 MB / 2000x1200 / 2026.02.28</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -726,8 +889,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">database-schema-v2.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">2.3 MB / 1600x1000 / 2026.02.25</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">데이터베이스 스키마 v2</p>
+              <p class="asset-file-name line-clamp-1">database-schema-v2.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">2.3 MB / 1600x1000 / 2026.02.25</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -743,8 +912,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">performance-metrics.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">1.6 MB / 1280x800 / 2026.02.22</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">성능 지표 캡처</p>
+              <p class="asset-file-name line-clamp-1">performance-metrics.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">1.6 MB / 1280x800 / 2026.02.22</p>
+              <span class="category-mini uncategorized">미분류</span>
+            </div>
           </div>
         </div>
 
@@ -760,8 +935,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">blog-thumbnail-rsc.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">0.7 MB / 800x450 / 2026.02.20</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">RSC 글 대표 썸네일</p>
+              <p class="asset-file-name line-clamp-1">blog-thumbnail-rsc.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">0.7 MB / 800x450 / 2026.02.20</p>
+              <span class="category-mini thumbnail">썸네일</span>
+            </div>
           </div>
         </div>
 
@@ -777,8 +958,14 @@
             </div>
           </div>
           <div class="p-3">
-            <p class="text-ui-sm font-medium line-clamp-1" style="color:var(--text1);">zustand-store-pattern.png</p>
-            <p class="text-ui-xs" style="color:var(--text4);">1.9 MB / 1440x810 / 2026.02.18</p>
+            <div class="asset-name">
+              <p class="asset-display-name line-clamp-1">Zustand 스토어 패턴</p>
+              <p class="asset-file-name line-clamp-1">zustand-store-pattern.png</p>
+            </div>
+            <div class="asset-card-footer">
+              <p class="text-ui-xs" style="color:var(--text4);">1.9 MB / 1440x810 / 2026.02.18</p>
+              <span class="category-mini default">기본</span>
+            </div>
           </div>
         </div>
 
@@ -801,11 +988,14 @@
       </div>
 
       <!-- ═══ Asset Detail Modal ═══ -->
-      <div class="modal-overlay open" id="assetModal" onclick="if(event.target===this)closeModal('assetModal')">
-        <div class="modal-content modal-asset-detail max-w-2xl">
+      <div class="modal-overlay" id="assetModal" onclick="if(event.target===this)closeModal('assetModal')">
+        <div class="modal-content modal-asset-detail max-w-3xl">
           <!-- Header -->
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-bold" style="color:var(--text1);">react-lifecycle-diagram.png</h3>
+            <div class="min-w-0">
+              <h3 class="text-lg font-bold line-clamp-1" style="color:var(--text1);">React 생명주기 대표 이미지</h3>
+              <p class="text-ui-xs line-clamp-1" style="color:var(--text4);">react-lifecycle-diagram.png</p>
+            </div>
             <button class="btn-ghost" onclick="closeModal('assetModal')" aria-label="닫기">
               <iconify-icon icon="solar:close-circle-linear" width="22"></iconify-icon>
             </button>
@@ -819,6 +1009,21 @@
             <button class="modal-nav-btn next" onclick="navigateAsset(1)" aria-label="다음 에셋">
               <iconify-icon icon="solar:alt-arrow-right-linear" width="20"></iconify-icon>
             </button>
+          </div>
+          <!-- Editable Info -->
+          <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_180px] gap-3 mb-4">
+            <label class="flex flex-col gap-1">
+              <span class="text-ui-xs font-medium" style="color:var(--text3);">별명</span>
+              <input class="admin-input" value="React 생명주기 대표 이미지">
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-ui-xs font-medium" style="color:var(--text3);">카테고리</span>
+              <select class="admin-select w-full">
+                <option selected>썸네일</option>
+                <option>기본</option>
+                <option>미분류</option>
+              </select>
+            </label>
           </div>
           <!-- Metadata -->
           <div class="grid grid-cols-2 gap-x-6 gap-y-3 mb-6">
@@ -843,12 +1048,24 @@
               <p class="text-ui-sm" style="color:var(--text1);">2026.03.15 14:32</p>
             </div>
             <div>
+              <p class="text-ui-xs" style="color:var(--text3);">카테고리</p>
+              <p class="text-ui-sm" style="color:var(--text1);">썸네일</p>
+            </div>
+            <div>
+              <p class="text-ui-xs" style="color:var(--text3);">업로드 위치</p>
+              <p class="text-ui-sm" style="color:var(--text1);">썸네일 선택</p>
+            </div>
+            <div>
               <p class="text-ui-xs" style="color:var(--text3);">URL</p>
               <p class="text-ui-sm line-clamp-1" style="color:var(--text1);">/uploads/2026/03/f7a3b2c1-xxxx.png</p>
             </div>
           </div>
           <!-- Action Buttons: URL copy, markdown copy, delete -->
           <div class="flex flex-wrap gap-2">
+            <button class="btn-primary">
+              <iconify-icon icon="solar:diskette-linear" width="16"></iconify-icon>
+              저장
+            </button>
             <button class="btn-secondary">
               <iconify-icon icon="solar:link-minimalistic-2-linear" width="16"></iconify-icon>
               URL 복사
@@ -863,6 +1080,86 @@
                 삭제
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Asset Category Modal ═══ -->
+      <div class="modal-overlay" id="categoryModal" onclick="if(event.target===this)closeModal('categoryModal')">
+        <div class="modal-content max-w-xl">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold" style="color:var(--text1);">에셋 카테고리</h3>
+            <button class="btn-ghost" onclick="closeModal('categoryModal')" aria-label="닫기">
+              <iconify-icon icon="solar:close-circle-linear" width="22"></iconify-icon>
+            </button>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2 mb-5">
+            <input class="admin-input" placeholder="새 카테고리 이름" value="">
+            <button class="btn-primary shrink-0">
+              <iconify-icon icon="solar:add-circle-linear" width="16"></iconify-icon>
+              생성
+            </button>
+          </div>
+          <div class="rounded-xl px-4" style="background:var(--background2);border:1px solid var(--border4);">
+            <div class="category-table-row">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="category-dot thumbnail"></span>
+                <div class="min-w-0">
+                  <p class="text-ui-sm font-semibold line-clamp-1" style="color:var(--text1);">썸네일</p>
+                  <p class="text-ui-xs" style="color:var(--text4);">기본 제공</p>
+                </div>
+              </div>
+              <p class="text-ui-sm" style="color:var(--text3);">6개</p>
+              <div class="flex items-center gap-1 justify-start sm:justify-end">
+                <button class="btn-ghost">수정</button>
+                <button class="btn-ghost" style="color:var(--text4);cursor:not-allowed;" disabled>고정</button>
+              </div>
+            </div>
+            <div class="category-table-row">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="category-dot default"></span>
+                <div class="min-w-0">
+                  <p class="text-ui-sm font-semibold line-clamp-1" style="color:var(--text1);">기본</p>
+                  <p class="text-ui-xs" style="color:var(--text4);">기본 제공</p>
+                </div>
+              </div>
+              <p class="text-ui-sm" style="color:var(--text3);">28개</p>
+              <div class="flex items-center gap-1 justify-start sm:justify-end">
+                <button class="btn-ghost">수정</button>
+                <button class="btn-ghost" style="color:var(--text4);cursor:not-allowed;" disabled>고정</button>
+              </div>
+            </div>
+            <div class="category-table-row">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="category-dot uncategorized"></span>
+                <div class="min-w-0">
+                  <p class="text-ui-sm font-semibold line-clamp-1" style="color:var(--text1);">미분류</p>
+                  <p class="text-ui-xs" style="color:var(--text4);">기본 제공</p>
+                </div>
+              </div>
+              <p class="text-ui-sm" style="color:var(--text3);">8개</p>
+              <div class="flex items-center gap-1 justify-start sm:justify-end">
+                <button class="btn-ghost">수정</button>
+                <button class="btn-ghost" style="color:var(--text4);cursor:not-allowed;" disabled>고정</button>
+              </div>
+            </div>
+            <div class="category-table-row">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="category-dot custom"></span>
+                <div class="min-w-0">
+                  <p class="text-ui-sm font-semibold line-clamp-1" style="color:var(--text1);">다이어그램</p>
+                  <p class="text-ui-xs" style="color:var(--text4);">사용자 추가</p>
+                </div>
+              </div>
+              <p class="text-ui-sm" style="color:var(--text3);">0개</p>
+              <div class="flex items-center gap-1 justify-start sm:justify-end">
+                <button class="btn-ghost">수정</button>
+                <button class="btn-ghost" style="color:var(--negative1);">삭제</button>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end mt-5">
+            <button class="btn-secondary" onclick="closeModal('categoryModal')">닫기</button>
           </div>
         </div>
       </div>
@@ -942,11 +1239,16 @@
         openModal('assetModal');
       }
     }
+    function setCategoryFilter(button){
+      document.querySelectorAll('.category-chip.active').forEach(chip=>chip.classList.remove('active'));
+      button.classList.add('active');
+    }
 
     document.addEventListener('keydown',e=>{
       if(e.key==='Escape'&&document.getElementById('sidebar').classList.contains('mobile-open'))closeMobileSidebar();
       if(e.key==='Escape'&&selectionMode){toggleSelectionMode();return;}
       if(e.key==='Escape'&&document.getElementById('assetModal').classList.contains('open'))closeModal('assetModal');
+      if(e.key==='Escape'&&document.getElementById('categoryModal').classList.contains('open'))closeModal('categoryModal');
       // Arrow key navigation in detail modal
       if(document.getElementById('assetModal').classList.contains('open')){
         if(e.key==='ArrowLeft')navigateAsset(-1);
