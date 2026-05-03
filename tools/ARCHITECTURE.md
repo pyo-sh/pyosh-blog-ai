@@ -151,9 +151,8 @@ The host can run an outer `blog` session, then attach to the inner Docker `lab` 
 
 ```text
 blog
-├─ lab        2 panes (first pane attaches to dev-lab:lab)
-├─ server1    2 panes
-└─ client1    2 panes
+├─ work       2 panes
+└─ project    3 panes (top attaches to dev-lab:lab)
 
 lab
 ├─ lab        2 panes
