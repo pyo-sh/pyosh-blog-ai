@@ -14,6 +14,7 @@
 name: lab
 root: <%= ENV.fetch('TMUX_ROOT', '.') %>
 
+# Keep window names and pane counts mirrored with session.host.yml.
 windows:
   - lab:
       layout: even-horizontal
