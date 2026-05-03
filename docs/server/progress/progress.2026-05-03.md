@@ -1,5 +1,35 @@
 # Server Progress — 2026-05-03
 
+## Issue #124 — 에셋 카테고리와 별명 메타데이터 API
+
+- PR: pyo-sh/pyosh-blog-be#127
+- 상태: 머지 완료
+
+### 작업 내용
+
+- `asset_category_tb`와 `asset_tb.display_name`, `asset_tb.category_id`를 추가하고, 기본 보호 카테고리 `thumbnail`, `default`, `uncategorized` seed/backfill migration 및 Drizzle snapshot을 반영했다.
+- `GET/POST/PATCH/DELETE /assets/categories`로 flat 에셋 카테고리 CRUD를 추가하고, 보호 카테고리 삭제를 차단했다.
+- 사용자 카테고리 삭제 시 연결된 에셋을 `uncategorized`로 이동하도록 처리했다.
+- 업로드 multipart metadata(`metadata` JSON, `displayName`, `categoryId`)를 지원하고 업로드 응답/목록/상세 응답에 `displayName`, `category`를 포함했다.
+- `GET /assets`에 `categoryId`, `q` 검색 필터와 기존 페이지네이션 조합을 추가했다.
+- `PATCH /assets/:id`, `PATCH /assets/bulk/category`로 단일/벌크 에셋 메타데이터 수정을 추가했다.
+- 관리용 메타데이터 노출을 막기 위해 `GET /assets/:id`도 Admin 인증 필요 경로로 정리했다.
+- multi-file upload는 metadata/category 사전 검증과 실패 시 생성 에셋/파일 cleanup을 적용해 실패 요청의 부분 생성 위험을 줄였다.
+
+### 리뷰 반영
+
+- Codex review 1차: Drizzle `0012_snapshot.json` 누락 경고 반영.
+- Codex review 2차: upload `displayName` 200자 제한 사전 검증 경고 반영.
+- Codex review 3차: 공개 상세 조회의 관리 메타데이터 노출, multi-upload metadata 실패 partial write 경고 반영.
+- Codex review 4차: multi-upload 뒤 파일 실패 시 partial asset cleanup 경고 반영.
+- Codex review 5차: `0 critical / 0 warning / 0 suggestion` clean.
+
+### 검증
+
+- `pnpm compile:types`
+- `pnpm lint`
+- `pnpm test` — 19 files / 327 tests 통과
+
 ## Issue #123 — Post 공개 접근과 검색엔진 색인 정책 분리
 
 - PR: pyo-sh/pyosh-blog-be#125
