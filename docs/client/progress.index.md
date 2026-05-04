@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-05-04 | #375 Admin 인증 경계에서 클라이언트 민감 상태 정리 - shared cleanup registry를 추가해 React Query cache와 CSRF token promise 정리를 공통화하고 login render, admin 401/403 redirect, XHR upload auth failure, logout 성공 흐름에 연결한 뒤 자동 리뷰 warning 2건을 반영해 PR #385 머지 | ✅   |
 | 2026-05-04 | #374 Admin 로그아웃 시 클라이언트 민감 캐시 정리 - 로그아웃 성공 후 React Query cache와 CSRF token promise를 명시적으로 정리하고 자동 리뷰 clean 후 PR #384 머지 | ✅   |
 | 2026-05-03 | #373 Admin 영역 Link 자동 프리패치 정책 정리 - admin shell/navigation, dashboard, 글/댓글 목록, preview, admin error action Link에 `prefetch={false}`를 적용하고 자동 리뷰 suggestion 1건을 반영한 뒤 PR #383 머지 | ✅   |
 | 2026-05-03 | #372 Admin 휴지통 탭 삭제 글 전용 조회 - 클라이언트가 `deletedState=deleted`를 사용하도록 전환하고 Storybook/MSW의 `includeDeleted=true` 의미를 실제 API와 맞춘 뒤 자동 리뷰 clean 후 PR #382 머지 | ✅   |
@@ -123,6 +124,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-05-04.md](./progress/progress.2026-05-04.md) - #375 Admin 인증 경계에서 클라이언트 민감 상태 정리, PR #385 머지
 - [progress.2026-05-04.md](./progress/progress.2026-05-04.md) - #374 Admin 로그아웃 시 클라이언트 민감 캐시 정리, PR #384 머지
 - [progress.2026-05-03.md](./progress/progress.2026-05-03.md) - #373 Admin 영역 Link 자동 프리패치 정책 정리, PR #383 머지
 - [progress.2026-05-03.md](./progress/progress.2026-05-03.md) - #372 Admin 휴지통 탭 삭제 글 전용 조회 적용, PR #382 머지
