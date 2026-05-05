@@ -1,5 +1,27 @@
 # Client Progress — 2026-05-05
 
+## #378 Admin 글 수정 페이지 초기 데이터 서버 주입
+
+- Issue: pyo-sh/pyosh-blog-fe#378
+- PR: pyo-sh/pyosh-blog-fe#388
+- 상태: 머지 완료
+
+### 작업 내용
+
+- `/manage/posts/[id]/edit` route를 Client Component에서 `force-dynamic` Server Component로 전환해 글 상세 초기 데이터를 서버 렌더 단계에서 준비하도록 했다.
+- `cookies()`에서 `sessionId`만 읽어 내부 Admin API 호출용 cookie header를 만들고, 클라이언트 prop으로 인증 정보를 전달하지 않도록 했다.
+- Admin 상세 fetch는 기존 `serverFetch` 기본 `cache: "no-store"` 경로를 사용해 public cache helper나 revalidate 옵션을 타지 않게 유지했다.
+- 잘못된 ID와 404는 `notFound()`로 처리하고, 401/403은 `/manage/login` 또는 `/manage/login?reason=forbidden`으로 redirect하도록 정리했다.
+- `PostDetail -> PostFormValues` 변환 로직을 post-editor의 순수 helper로 분리하고 edit page와 저장 성공 후 form hydration에서 재사용했다.
+- preview page도 동일한 Admin post cookie header helper를 사용하도록 중복을 줄였다.
+
+### 검증
+
+- `pnpm compile:types`
+- `pnpm lint` (기존 unrelated warning 2건 유지)
+- `pnpm build`
+- 자동 리뷰: Critical 0, Warning 0, Suggestion 1(public API import 반영 후 skip-review merge)
+
 ## #377 Public 서버 fetch 및 cache 정책 최적화
 
 - Issue: pyo-sh/pyosh-blog-fe#377
