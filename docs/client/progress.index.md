@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-05-05 | #377 Public 서버 fetch 및 cache 정책 최적화 - `serverFetch` 기본 `no-store`를 유지하면서 `publicServerFetch`와 공개 revalidate 정책 상수를 추가하고 공개 글/카테고리/태그/통계/RSS/sitemap fetch에 시간 기반 revalidate를 적용했으며 자동 리뷰 clean 후 PR #387 머지 | ✅   |
 | 2026-05-05 | #376 Client 데이터 로딩 및 query key 정책 표준화 - public/admin namespace가 분리된 entity query key factory를 추가하고 관리자 글/카테고리/에셋/댓글/방명록/dashboard 및 public 글/태그 key를 공유 factory로 교체했으며 태그 제안 `/tags` 조회를 입력 상호작용 이후로 지연한 뒤 자동 리뷰 clean 후 PR #386 머지 | ✅   |
 | 2026-05-04 | #375 Admin 인증 경계에서 클라이언트 민감 상태 정리 - shared cleanup registry를 추가해 React Query cache와 CSRF token promise 정리를 공통화하고 login render, admin 401/403 redirect, XHR upload auth failure, logout 성공 흐름에 연결한 뒤 자동 리뷰 warning 2건을 반영해 PR #385 머지 | ✅   |
 | 2026-05-04 | #374 Admin 로그아웃 시 클라이언트 민감 캐시 정리 - 로그아웃 성공 후 React Query cache와 CSRF token promise를 명시적으로 정리하고 자동 리뷰 clean 후 PR #384 머지 | ✅   |
