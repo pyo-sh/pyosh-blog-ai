@@ -1,5 +1,31 @@
 # Client Progress — 2026-05-05
 
+## #379 검색엔진 노출 토글 및 noindex 메타 처리
+
+- Issue: pyo-sh/pyosh-blog-fe#379
+- PR: pyo-sh/pyosh-blog-fe#389
+- 상태: 머지 완료
+
+### 작업 내용
+
+- Post 모델과 create/update payload에 `searchIndexable`을 추가하고, API normalize 단계에서 기존 응답 누락 시 기본값을 `true`로 보정했다.
+- Post editor 기본값을 `searchIndexable=true`로 두고, 서버 초기값 hydration과 저장 payload에 검색엔진 노출 값을 포함했다.
+- 작성/수정 form, 글 목록 card preview, Admin preview control bar에 검색엔진 노출 상태를 표시하고 토글을 추가했다.
+- Admin 글 목록에 검색엔진 노출 상태 column과 optimistic quick toggle을 추가했다.
+- `visibility=private` 글에서는 검색엔진 토글을 비활성화하고 “검색 제외” 상태로 표시하되, 저장된 `searchIndexable` 값은 유지해 public 전환 시 이전 의도가 보존되도록 했다.
+- 공개 글 상세 metadata에서 `searchIndexable=false`이면 `robots: { index: false, follow: true }`를 추가하고, canonical/Open Graph/Twitter metadata는 유지했다.
+- `searchIndexable=false` 글 상세에서는 `BlogPosting` JSON-LD를 렌더링하지 않도록 했다.
+- `PublishedPostSlug.searchIndexable`을 sitemap slug contract에 포함하고, sitemap은 `searchIndexable=true` slug만 emit하도록 보정했다.
+- 관련 Storybook mock과 story initial data에 `searchIndexable`을 추가했다.
+
+### 검증
+
+- `pnpm compile:types`
+- `pnpm lint` (기존 unrelated warning 2건 유지)
+- `pnpm build`
+- 자동 리뷰: 3라운드 후 Critical 0, Warning 0, Suggestion 0
+- 참고: `pnpm exec tsc -p tsconfig.storybook.json --noEmit`은 기존 Storybook `Post` mock과 `PublishedPostListItem` 타입 불일치가 남아 실패했다.
+
 ## #378 Admin 글 수정 페이지 초기 데이터 서버 주입
 
 - Issue: pyo-sh/pyosh-blog-fe#378

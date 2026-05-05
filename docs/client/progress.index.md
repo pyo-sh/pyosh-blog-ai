@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-05-05 | #379 검색엔진 노출 토글 및 noindex 메타 처리 - Post `searchIndexable` 필드를 form/list/preview/public metadata/sitemap 계약에 연결하고 private 글에서는 토글을 비활성화하되 저장 의도를 보존했으며 자동 리뷰 warning 2라운드(sitemap contract)를 반영해 PR #389 머지 | ✅   |
 | 2026-05-05 | #378 Admin 글 수정 페이지 초기 데이터 서버 주입 - edit route를 동적 Server Component로 전환해 `sessionId` cookie로 Admin 상세를 서버에서 no-store fetch하고 `PostFormValues` 초기값을 바로 전달했으며 리뷰 suggestion 1건(public API import)을 반영한 뒤 PR #388 머지 | ✅   |
 | 2026-05-05 | #377 Public 서버 fetch 및 cache 정책 최적화 - `serverFetch` 기본 `no-store`를 유지하면서 `publicServerFetch`와 공개 revalidate 정책 상수를 추가하고 공개 글/카테고리/태그/통계/RSS/sitemap fetch에 시간 기반 revalidate를 적용했으며 자동 리뷰 clean 후 PR #387 머지 | ✅   |
 | 2026-05-05 | #376 Client 데이터 로딩 및 query key 정책 표준화 - public/admin namespace가 분리된 entity query key factory를 추가하고 관리자 글/카테고리/에셋/댓글/방명록/dashboard 및 public 글/태그 key를 공유 factory로 교체했으며 태그 제안 `/tags` 조회를 입력 상호작용 이후로 지연한 뒤 자동 리뷰 clean 후 PR #386 머지 | ✅   |
