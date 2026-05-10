@@ -6,6 +6,7 @@
 
 | 날짜       | 주요 작업                            | 상태 |
 | ---------- | ------------------------------------ | ---- |
+| 2026-05-10 | #381 Admin 에셋 카테고리와 썸네일 선택 UX - 에셋 카테고리/별명 API 계약을 클라이언트에 연결하고 업로드 큐 메타데이터, 에셋 목록 필터/검색/배지, 상세 편집, 카테고리 관리, 일괄 카테고리 변경, 썸네일 picker 현재 글 우선 탐색을 추가했으며 자동 리뷰 clean 후 PR #391 머지 | ✅   |
 | 2026-05-10 | #380 Admin middleware 관리자 세션 검증 강화 - `/manage` middleware가 `/auth/me`의 200 status만 보지 않고 `type: "admin"` 응답만 허용하도록 바꾸고 non-admin/unavailable 상태를 reason query로 login에 fail closed 처리했으며 자동 리뷰 clean 후 PR #390 머지 | ✅   |
 | 2026-05-05 | #379 검색엔진 노출 토글 및 noindex 메타 처리 - Post `searchIndexable` 필드를 form/list/preview/public metadata/sitemap 계약에 연결하고 private 글에서는 토글을 비활성화하되 저장 의도를 보존했으며 자동 리뷰 warning 2라운드(sitemap contract)를 반영해 PR #389 머지 | ✅   |
 | 2026-05-05 | #378 Admin 글 수정 페이지 초기 데이터 서버 주입 - edit route를 동적 Server Component로 전환해 `sessionId` cookie로 Admin 상세를 서버에서 no-store fetch하고 `PostFormValues` 초기값을 바로 전달했으며 리뷰 suggestion 1건(public API import)을 반영한 뒤 PR #388 머지 | ✅   |
@@ -129,6 +130,7 @@
 
 ## 🔗 상세 문서
 
+- [progress.2026-05-10.md](./progress/progress.2026-05-10.md) - #381 Admin 에셋 카테고리와 썸네일 선택 UX, PR #391 머지
 - [progress.2026-05-10.md](./progress/progress.2026-05-10.md) - #380 Admin middleware 관리자 세션 검증 강화, PR #390 머지
 - [progress.2026-05-05.md](./progress/progress.2026-05-05.md) - #376 Client 데이터 로딩 및 query key 정책 표준화, PR #386 머지
 - [progress.2026-05-04.md](./progress/progress.2026-05-04.md) - #375 Admin 인증 경계에서 클라이언트 민감 상태 정리, PR #385 머지
